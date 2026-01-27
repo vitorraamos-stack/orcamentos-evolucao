@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useLocation, Link } from 'wouter';
+import { useLocation } from 'wouter';
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -33,42 +33,39 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   if (!user) return null;
 
-  const NavItems = () => (
+  // Função auxiliar para renderizar os itens de menu
+  // Isso garante que a lógica seja executada a cada renderização do componente pai
+  const renderNavItems = () => (
     <div className="space-y-1">
       <Button 
-        asChild
         variant={location === '/' ? 'secondary' : 'ghost'} 
         className={cn("w-full justify-start", location === '/' && "bg-sidebar-accent text-sidebar-accent-foreground")}
+        onClick={() => setLocation('/')}
       >
-        <Link href="/">
-          <Calculator className="mr-2 h-4 w-4" />
-          Calculadora
-        </Link>
+        <Calculator className="mr-2 h-4 w-4" />
+        Calculadora
       </Button>
       
       <Button 
-        asChild
         variant={location === '/materiais' ? 'secondary' : 'ghost'} 
         className={cn("w-full justify-start", location === '/materiais' && "bg-sidebar-accent text-sidebar-accent-foreground")}
+        onClick={() => setLocation('/materiais')}
       >
-        <Link href="/materiais">
-          <Package className="mr-2 h-4 w-4" />
-          Materiais
-        </Link>
+        <Package className="mr-2 h-4 w-4" />
+        Materiais
       </Button>
       
-      {isAdmin && (
+      {/* Renderização condicional explícita */}
+      {isAdmin ? (
         <Button 
-          asChild
           variant={location === '/settings' ? 'secondary' : 'ghost'} 
           className={cn("w-full justify-start", location === '/settings' && "bg-sidebar-accent text-sidebar-accent-foreground")}
+          onClick={() => setLocation('/settings')}
         >
-          <Link href="/settings">
-            <Settings className="mr-2 h-4 w-4" />
-            Configurações
-          </Link>
+          <Settings className="mr-2 h-4 w-4" />
+          Configurações
         </Button>
-      )}
+      ) : null}
     </div>
   );
 
@@ -82,7 +79,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
         
         <div className="flex-1 p-4">
-          <NavItems />
+          {renderNavItems()}
         </div>
 
         <div className="p-4 border-t border-sidebar-border/50">
@@ -121,7 +118,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <span className="font-bold text-lg">Evolução</span>
               </div>
               <div className="p-4">
-                <NavItems />
+                {renderNavItems()}
               </div>
               <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-sidebar-border/50">
                 <Button variant="outline" className="w-full justify-start" onClick={signOut}>
