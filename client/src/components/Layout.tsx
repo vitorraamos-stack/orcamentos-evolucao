@@ -9,10 +9,15 @@ import {
   Printer,
   Menu,
   Settings,
-  Bug
+  Bug,
+  ShieldCheck,
+  ShieldAlert
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
+
+// Versão para controle de cache
+const APP_VERSION = "v1.2 (Fix Admin)";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, loading, signOut, isAdmin } = useAuth();
@@ -35,7 +40,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   // Função auxiliar para renderizar os itens de menu
-  // Isso garante que a lógica seja executada a cada renderização do componente pai
   const renderNavItems = () => (
     <div className="space-y-1">
       <Button 
@@ -56,25 +60,48 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         Materiais
       </Button>
       
-      {/* Renderização condicional explícita */}
-      {isAdmin ? (
+      {/* 
+        MODIFICAÇÃO DE DEBUG:
+        Removemos a condicional {isAdmin && ...} para forçar o botão a aparecer.
+        Agora ele mostra visualmente se está habilitado ou não.
+        Isso confirma se o problema é lógica ou cache.
+      */}
+      <div className="pt-2 pb-1">
+        <p className="px-2 text-xs font-semibold text-muted-foreground mb-1">
+          Administração
+        </p>
         <Button 
           variant={location === '/settings' ? 'secondary' : 'ghost'} 
-          className={cn("w-full justify-start", location === '/settings' && "bg-sidebar-accent text-sidebar-accent-foreground")}
-          onClick={() => setLocation('/settings')}
+          className={cn(
+            "w-full justify-start", 
+            location === '/settings' && "bg-sidebar-accent text-sidebar-accent-foreground",
+            !isAdmin && "opacity-75"
+          )}
+          onClick={() => {
+            if (isAdmin) {
+              setLocation('/settings');
+            } else {
+              alert('O sistema ainda não reconheceu seu acesso Admin. Tente recarregar a página.');
+            }
+          }}
         >
           <Settings className="mr-2 h-4 w-4" />
           Configurações
+          {isAdmin ? (
+            <ShieldCheck className="ml-auto h-3 w-3 text-green-500" />
+          ) : (
+            <ShieldAlert className="ml-auto h-3 w-3 text-orange-500" />
+          )}
         </Button>
-      ) : null}
+      </div>
 
       <Button 
         variant={location === '/debug' ? 'secondary' : 'ghost'} 
-        className={cn("w-full justify-start text-orange-500", location === '/debug' && "bg-sidebar-accent text-sidebar-accent-foreground")}
+        className={cn("w-full justify-start text-orange-500 mt-4", location === '/debug' && "bg-sidebar-accent text-sidebar-accent-foreground")}
         onClick={() => setLocation('/debug')}
       >
         <Bug className="mr-2 h-4 w-4" />
-        Debug
+        Debug Info
       </Button>
     </div>
   );
@@ -99,7 +126,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
             <div className="overflow-hidden">
               <p className="text-sm font-medium truncate">{user.email}</p>
-              <p className="text-xs text-muted-foreground truncate">{isAdmin ? 'Administrador' : 'Consultor'}</p>
+              <div className="flex items-center gap-1">
+                <p className="text-xs text-muted-foreground truncate">
+                  {isAdmin ? 'Administrador' : 'Consultor'}
+                </p>
+                <span className="text-[10px] text-muted-foreground/50 ml-auto">
+                  {APP_VERSION}
+                </span>
+              </div>
             </div>
           </div>
           <Button variant="outline" className="w-full justify-start border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" onClick={signOut}>
@@ -131,6 +165,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {renderNavItems()}
               </div>
               <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-sidebar-border/50">
+                <div className="px-2 mb-2 text-[10px] text-center text-muted-foreground">
+                  {APP_VERSION}
+                </div>
                 <Button variant="outline" className="w-full justify-start" onClick={signOut}>
                   <LogOut className="mr-2 h-4 w-4" />
                   Sair
