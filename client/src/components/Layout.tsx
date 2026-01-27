@@ -35,37 +35,39 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const NavItems = () => (
     <div className="space-y-1">
-      <Link href="/">
-        <Button 
-          variant={location === '/' ? 'secondary' : 'ghost'} 
-          className={cn("w-full justify-start", location === '/' && "bg-sidebar-accent text-sidebar-accent-foreground")}
-        >
+      <Button 
+        asChild
+        variant={location === '/' ? 'secondary' : 'ghost'} 
+        className={cn("w-full justify-start", location === '/' && "bg-sidebar-accent text-sidebar-accent-foreground")}
+      >
+        <Link href="/">
           <Calculator className="mr-2 h-4 w-4" />
           Calculadora
-        </Button>
-      </Link>
+        </Link>
+      </Button>
       
-      {/* Admin check removed for MVP or simplified */}
-      <Link href="/materiais">
-        <Button 
-          variant={location === '/materiais' ? 'secondary' : 'ghost'} 
-          className={cn("w-full justify-start", location === '/materiais' && "bg-sidebar-accent text-sidebar-accent-foreground")}
-        >
+      <Button 
+        asChild
+        variant={location === '/materiais' ? 'secondary' : 'ghost'} 
+        className={cn("w-full justify-start", location === '/materiais' && "bg-sidebar-accent text-sidebar-accent-foreground")}
+      >
+        <Link href="/materiais">
           <Package className="mr-2 h-4 w-4" />
           Materiais
-        </Button>
-      </Link>
+        </Link>
+      </Button>
       
       {isAdmin && (
-        <Link href="/settings">
-          <Button 
-            variant={location === '/settings' ? 'secondary' : 'ghost'} 
-            className={cn("w-full justify-start", location === '/settings' && "bg-sidebar-accent text-sidebar-accent-foreground")}
-          >
+        <Button 
+          asChild
+          variant={location === '/settings' ? 'secondary' : 'ghost'} 
+          className={cn("w-full justify-start", location === '/settings' && "bg-sidebar-accent text-sidebar-accent-foreground")}
+        >
+          <Link href="/settings">
             <Settings className="mr-2 h-4 w-4" />
             Configurações
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       )}
     </div>
   );

@@ -16,13 +16,7 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       
-      {/* Protected Routes */}
-      <Route path="/">
-        <Layout>
-          <Home />
-        </Layout>
-      </Route>
-      
+      {/* Protected Routes - Specific routes first */}
       <Route path="/materiais">
         <Layout>
           <Materiais />
@@ -32,6 +26,12 @@ function Router() {
       <Route path="/settings">
         <Layout>
           <Settings />
+        </Layout>
+      </Route>
+
+      <Route path="/">
+        <Layout>
+          <Home />
         </Layout>
       </Route>
 
