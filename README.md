@@ -6,7 +6,7 @@ Sistema web para cálculo de orçamentos de comunicação visual, desenvolvido c
 
 *   **Calculadora Inteligente**: Cálculo de área (cm -> m²) com aplicação automática de faixas de preço.
 *   **Gestão de Materiais**: Cadastro de materiais com valor mínimo e múltiplas faixas de preço (Tiered Pricing).
-*   **Autenticação**: Login seguro via Supabase Auth.
+*   **Autenticação**: Login seguro via, Supabase Auth.
 *   **Exportação**: Botão para copiar resumo formatado para WhatsApp.
 
 ## Configuração Inicial
