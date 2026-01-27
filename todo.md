@@ -1,4 +1,1 @@
-- [ ] Criar SQL para tabela profiles e triggers de sync com auth.users
-- [ ] Criar SQL Functions (RPC) para create_user e delete_user
-- [ ] Implementar página Settings.tsx com lista de usuários
-- [ ] Adicionar rota /settings no App.tsx e link no Layout.tsx
+- [ ] Sincronizar módulo de gestão de usuários com GitHub
