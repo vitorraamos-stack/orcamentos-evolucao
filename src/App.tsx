@@ -3,30 +3,33 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import Login from "@/pages/Login";
 import Home from "@/pages/Home";
-import { Route, Switch } from "wouter";
+// IMPORTANTE: Agora estamos importando o componente real!
+import Materiais from "@/pages/Materiais"; 
+import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Layout from "./components/Layout";
 
-// Placeholder for Materiais page (will be implemented in next phase)
-const Materiais = () => <div className="p-4">Módulo de Materiais (Em construção)</div>;
-
 function Router() {
+  const { user, isAdmin } = useAuth();
+
   return (
     <Switch>
       <Route path="/login" component={Login} />
       
-      {/* Protected Routes */}
+      {/* Rota Principal */}
       <Route path="/">
         <Layout>
           <Home />
         </Layout>
       </Route>
       
+      {/* Rota de Materiais Corrigida */}
       <Route path="/materiais">
         <Layout>
-          <Materiais />
+          {/* Só permite acesso se for Admin, senão volta para a Home */}
+          {isAdmin ? <Materiais /> : <Redirect to="/" />}
         </Layout>
       </Route>
 
