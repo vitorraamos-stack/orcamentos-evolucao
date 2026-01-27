@@ -17,7 +17,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 
 // Versão para controle de cache
-const APP_VERSION = "v1.3 (EMERGENCY)";
+const APP_VERSION = "v1.4 (Stable)";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, loading, signOut, isAdmin } = useAuth();
@@ -145,10 +145,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Header */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* EMERGENCY BANNER - REMOVER APÓS DEBUG */}
-        <div className="bg-red-600 text-white text-center text-xs font-bold py-1 px-4">
-          MODO DE DEBUG ATIVO - VERSÃO {APP_VERSION}
-        </div>
+
 
         <header className="md:hidden flex items-center justify-between p-4 border-b bg-card">
           <div className="flex items-center space-x-2">
