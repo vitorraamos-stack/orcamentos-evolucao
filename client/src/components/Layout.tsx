@@ -7,7 +7,8 @@ import {
   Calculator, 
   LogOut, 
   Printer,
-  Menu
+  Menu,
+  Settings
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
@@ -54,6 +55,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           Materiais
         </Button>
       </Link>
+      
+      {isAdmin && (
+        <Link href="/settings">
+          <Button 
+            variant={location === '/settings' ? 'secondary' : 'ghost'} 
+            className={cn("w-full justify-start", location === '/settings' && "bg-sidebar-accent text-sidebar-accent-foreground")}
+          >
+            <Settings className="mr-2 h-4 w-4" />
+            Configurações
+          </Button>
+        </Link>
+      )}
     </div>
   );
 
