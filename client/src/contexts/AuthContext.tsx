@@ -66,12 +66,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
         
       if (data && data.role === 'admin') {
+        console.log('User is admin (confirmed by DB)');
         setIsAdmin(true);
       } else {
-        // Fallback for demo: check email domain or specific email
-        setIsAdmin(user.email?.includes('admin') || false);
+        console.log('User is NOT admin. DB Role:', data?.role);
+        setIsAdmin(false);
       }
     } catch (e) {
+      console.error('Error checking user role:', e);
       // If table doesn't exist or error, fallback to false
       setIsAdmin(false);
     }
