@@ -46,4 +46,4 @@ Este projeto já está configurado para deploy no Netlify.
 *   `/src/pages`: Telas do sistema (Home, Login, Materiais).
 *   `/src/components`: Componentes reutilizáveis (UI Shadcn).
 *   `/src/lib`: Configuração do Supabase e utilitários.
-*   `/src/contexts`: Contexto de Autenticação.
+*   `/src/contexts`: Contexto de Autenticação.up
