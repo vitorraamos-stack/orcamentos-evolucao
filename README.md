@@ -47,3 +47,4 @@ Este projeto já está configurado para deploy no Netlify.
 *   `/src/components`: Componentes reutilizáveis (UI Shadcn).
 *   `/src/lib`: Configuração do Supabase e utilitários.
 *   `/src/contexts`: Contexto de Autenticação.up
+<!-- Trigger deploy: v1.3 emergency banner check 2026-01-27 -->
