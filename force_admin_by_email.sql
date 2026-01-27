@@ -3,7 +3,7 @@
 
 DO $$
 DECLARE
-  target_email text := 'SEU_EMAIL_AQUI'; -- <--- COLOQUE SEU EMAIL AQUI
+  target_email text := 'vitor@evolucaoimpressos.com.br'; -- <--- COLOQUE SEU EMAIL AQUI
   target_user_id uuid;
 BEGIN
   -- 1. Busca o ID do usuário pelo email
