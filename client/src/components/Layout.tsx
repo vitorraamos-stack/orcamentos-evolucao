@@ -17,7 +17,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 
 // Versão para controle de cache
-const APP_VERSION = "v1.4 (Stable)";
+const APP_VERSION = "v1.5 (Admin Fix)";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, loading, signOut, isAdmin } = useAuth();
