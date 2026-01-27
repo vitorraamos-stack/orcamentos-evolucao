@@ -1,1 +1,2 @@
-- [ ] Publicar código fonte no repositório GitHub remoto
+- [ ] Refatorar página de Materiais para usar Table component em vez de Cards
+- [ ] Melhorar UX do formulário de cadastro de faixas de preço
