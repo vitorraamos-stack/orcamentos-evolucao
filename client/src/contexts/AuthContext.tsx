@@ -62,10 +62,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Isso garante acesso mesmo se o banco falhar
     const ADMIN_EMAILS = ['vitor@evolucaoimpressos.com.br', 'admin@evolucao.com', 'teste@teste.com'];
     
-    if (user.email && ADMIN_EMAILS.includes(user.email)) {
-      console.log('User is admin (confirmed by EMAIL whitelist):', user.email);
-      setIsAdmin(true);
-      return;
+    if (user.email) {
+      const userEmail = user.email.toLowerCase().trim();
+      const adminEmailsLower = ADMIN_EMAILS.map(e => e.toLowerCase().trim());
+      
+      console.log('Checking admin access for:', userEmail);
+      console.log('Allowed admins:', adminEmailsLower);
+
+      if (adminEmailsLower.includes(userEmail)) {
+        console.log('✅ User is admin (confirmed by EMAIL whitelist):', userEmail);
+        setIsAdmin(true);
+        return;
+      }
     }
 
     try {
