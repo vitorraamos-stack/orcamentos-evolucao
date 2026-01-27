@@ -8,7 +8,8 @@ import {
   LogOut, 
   Printer,
   Menu,
-  Settings
+  Settings,
+  Bug
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
@@ -66,6 +67,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           Configurações
         </Button>
       ) : null}
+
+      <Button 
+        variant={location === '/debug' ? 'secondary' : 'ghost'} 
+        className={cn("w-full justify-start text-orange-500", location === '/debug' && "bg-sidebar-accent text-sidebar-accent-foreground")}
+        onClick={() => setLocation('/debug')}
+      >
+        <Bug className="mr-2 h-4 w-4" />
+        Debug
+      </Button>
     </div>
   );
 

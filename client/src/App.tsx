@@ -5,6 +5,7 @@ import Login from "@/pages/Login";
 import Home from "@/pages/Home";
 import Materiais from "@/pages/Materiais";
 import Settings from "@/pages/Settings";
+import Debug from "@/pages/Debug";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -26,6 +27,12 @@ function Router() {
       <Route path="/settings">
         <Layout>
           <Settings />
+        </Layout>
+      </Route>
+
+      <Route path="/debug">
+        <Layout>
+          <Debug />
         </Layout>
       </Route>
 
