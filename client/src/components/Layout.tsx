@@ -39,6 +39,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   if (!user) return null;
 
+  // DEBUG: Mostrar toast se for admin
+  useEffect(() => {
+    if (isAdmin) {
+      console.log('Layout: User is Admin, Settings button should be visible');
+    }
+  }, [isAdmin]);
+
   // Função auxiliar para renderizar os itens de menu
   const renderNavItems = () => (
     <div className="space-y-1">

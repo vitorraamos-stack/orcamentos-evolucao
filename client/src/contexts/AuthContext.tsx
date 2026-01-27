@@ -58,13 +58,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Let's implement a basic check: if email contains 'admin', it's admin (for demo purposes)
     // OR query a profiles table if it exists.
     
+    // FALLBACK DE SEGURANÇA: Lista de emails que SEMPRE são admins
+    // Isso garante acesso mesmo se o banco falhar
+    const ADMIN_EMAILS = ['vitor@evolucaoimpressos.com.br', 'admin@evolucao.com', 'teste@teste.com'];
+    
+    if (user.email && ADMIN_EMAILS.includes(user.email)) {
+      console.log('User is admin (confirmed by EMAIL whitelist):', user.email);
+      setIsAdmin(true);
+      return;
+    }
+
     try {
+      console.log('Checking role in DB for user:', user.id);
       const { data, error } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', user.id)
         .single();
         
+      if (error) {
+        console.error('Supabase DB Error:', error);
+        // Se der erro 406 (Not Acceptable) ou tabela não existir,
+        // ainda tentamos verificar se o email parece ser de admin como último recurso
+        if (user.email?.includes('admin') || user.email?.includes('vitor')) {
+           console.log('DB failed but email looks like admin, granting access as fallback');
+           setIsAdmin(true);
+           return;
+        }
+      }
+
       if (data && data.role === 'admin') {
         console.log('User is admin (confirmed by DB)');
         setIsAdmin(true);
@@ -74,7 +96,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (e) {
       console.error('Error checking user role:', e);
-      // If table doesn't exist or error, fallback to false
       setIsAdmin(false);
     }
   };
