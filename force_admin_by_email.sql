@@ -21,4 +21,3 @@ BEGIN
     RAISE NOTICE 'Usuário % (ID: %) agora é ADMIN.', target_email, target_user_id;
   END IF;
 END $$;
-
