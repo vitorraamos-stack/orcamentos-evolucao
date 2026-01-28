@@ -29,6 +29,16 @@ export default function Home() {
     fetchMaterials();
   }, []);
 
+  const parseValue = (val: string | number | null | undefined) => {
+    if (val === null || val === undefined || val === '') return 0;
+    const clean = val.toString().trim();
+    const normalized = clean.includes(',')
+      ? clean.replace(/\./g, '').replace(',', '.')
+      : clean;
+    const parsed = parseFloat(normalized.replace(/[^0-9.-]/g, ''));
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
   const fetchMaterials = async () => {
     try {
       const { data: materialsData, error: materialsError } = await supabase
@@ -73,8 +83,8 @@ export default function Home() {
     const material = materials.find(m => m.id === selectedMaterialId);
     if (!material) return;
 
-    const w = parseFloat(width);
-    const h = parseFloat(height);
+    const w = parseValue(width);
+    const h = parseValue(height);
     const q = parseInt(quantity);
 
     if (isNaN(w) || isNaN(h) || isNaN(q)) {
@@ -96,17 +106,21 @@ export default function Home() {
     // Actually, usually tiers are like: 0-3, 3-10, 10+
     // So we look for the tier that covers the totalArea.
     
-    const sortedTiers = [...material.tiers].sort((a, b) => a.min_area - b.min_area);
+    const sortedTiers = [...material.tiers].sort(
+      (a, b) => parseValue(a.min_area) - parseValue(b.min_area)
+    );
     
     const matchingTier = sortedTiers.find(tier => {
-      if (tier.max_area === null) {
-        return totalAreaCalc >= tier.min_area;
+      const minArea = parseValue(tier.min_area);
+      const maxArea = tier.max_area === null ? null : parseValue(tier.max_area);
+      if (maxArea === null) {
+        return totalAreaCalc >= minArea;
       }
-      return totalAreaCalc >= tier.min_area && totalAreaCalc < tier.max_area;
+      return totalAreaCalc >= minArea && totalAreaCalc < maxArea;
     });
 
     if (matchingTier) {
-      pricePerM2 = matchingTier.price_per_m2;
+      pricePerM2 = parseValue(matchingTier.price_per_m2);
       setAppliedTierPrice(pricePerM2);
     } else {
       // Fallback if no tier matches (should not happen if 0-null exists)
@@ -116,7 +130,7 @@ export default function Home() {
       if (sortedTiers.length > 0) {
          // If area is smaller than first tier, use first tier price? Or 0?
          // Let's assume first tier.
-         pricePerM2 = sortedTiers[0].price_per_m2;
+         pricePerM2 = parseValue(sortedTiers[0].price_per_m2);
          setAppliedTierPrice(pricePerM2);
       } else {
         pricePerM2 = 0;
@@ -127,8 +141,9 @@ export default function Home() {
     let calculatedPrice = totalAreaCalc * pricePerM2;
 
     // Apply Minimum Price
-    if (calculatedPrice < material.min_price) {
-      calculatedPrice = material.min_price;
+    const minPrice = parseValue(material.min_price);
+    if (calculatedPrice < minPrice) {
+      calculatedPrice = minPrice;
     }
 
     setTotalPrice(calculatedPrice);
@@ -196,7 +211,8 @@ _Gerado em ${new Date().toLocaleDateString()}_`;
               <div className="space-y-2">
                 <Label>Largura (cm)</Label>
                 <Input 
-                  type="number" 
+                  type="text" 
+                  inputMode="decimal"
                   value={width} 
                   onChange={e => setWidth(e.target.value)} 
                   placeholder="0"
@@ -206,7 +222,8 @@ _Gerado em ${new Date().toLocaleDateString()}_`;
               <div className="space-y-2">
                 <Label>Altura (cm)</Label>
                 <Input 
-                  type="number" 
+                  type="text" 
+                  inputMode="decimal"
                   value={height} 
                   onChange={e => setHeight(e.target.value)} 
                   placeholder="0"

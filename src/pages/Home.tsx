@@ -29,10 +29,13 @@ export default function Home() {
   const selectedMaterial = useMemo(() => materials.find(m => m.id === selectedMaterialId), [materials, selectedMaterialId]);
 
   // Função para limpar e converter valores brasileiros (vírgula) para floats de cálculo
-  const parseValue = (val: string) => {
-    if (!val) return 0;
-    const clean = val.toString().replace(',', '.');
-    const parsed = parseFloat(clean);
+  const parseValue = (val: string | number | null | undefined) => {
+    if (val === null || val === undefined || val === '') return 0;
+    const clean = val.toString().trim();
+    const normalized = clean.includes(',')
+      ? clean.replace(/\./g, '').replace(',', '.')
+      : clean;
+    const parsed = parseFloat(normalized.replace(/[^0-9.-]/g, ''));
     return isNaN(parsed) ? 0 : parsed;
   };
 
@@ -57,14 +60,16 @@ export default function Home() {
     }
 
     // Busca o preço na faixa correta baseado na medida calculada
-    let appliedTier = selectedMaterial.tiers?.find((t: any) => 
-      medidaBase >= t.min_area && (t.max_area === null || medidaBase <= t.max_area)
-    );
+    let appliedTier = selectedMaterial.tiers?.find((t: any) => {
+      const minArea = parseValue(t.min_area);
+      const maxArea = t.max_area === null ? null : parseValue(t.max_area);
+      return medidaBase >= minArea && (maxArea === null || medidaBase <= maxArea);
+    });
 
-    const pricePerUnit = appliedTier ? appliedTier.price_per_m2 : 0;
+    const pricePerUnit = appliedTier ? parseValue(appliedTier.price_per_m2) : 0;
     const finalPrice = medidaBase * pricePerUnit;
 
-    const minPrice = Number(selectedMaterial.min_price ?? 0);
+    const minPrice = parseValue(selectedMaterial.min_price);
     const isUnderMinimumThreshold = minPrice > 0 && finalPrice > 0 && finalPrice < minPrice;
 
     return { 
