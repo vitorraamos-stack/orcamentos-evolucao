@@ -31,8 +31,11 @@ export default function Home() {
   // Função para limpar e converter valores brasileiros (vírgula) para floats de cálculo
   const parseValue = (val: string) => {
     if (!val) return 0;
-    const clean = val.toString().replace(',', '.');
-    const parsed = parseFloat(clean);
+    const clean = val.toString().trim();
+    const normalized = clean.includes(',')
+      ? clean.replace(/\./g, '').replace(',', '.')
+      : clean;
+    const parsed = parseFloat(normalized.replace(/[^0-9.-]/g, ''));
     return isNaN(parsed) ? 0 : parsed;
   };
 
