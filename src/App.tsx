@@ -36,7 +36,8 @@ function Router() {
       
       <Route path="/configuracoes">
   <Layout>
-    <Configuracoes />
+    {/* Se for Admin entra, se não for, é chutado para a Home */}
+    {isAdmin ? <Configuracoes /> : <Redirect to="/" />}
   </Layout>
 </Route>
 
