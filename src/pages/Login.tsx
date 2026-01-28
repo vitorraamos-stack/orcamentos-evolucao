@@ -39,7 +39,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-8">
         
-        {/* CABEÇALHO GERAL (Logo e Nome) - Centralizado */}
+        {/* CABEÇALHO (Logo e Nome) */}
         <div className="flex flex-col items-center text-center space-y-2">
           <img 
             src="/logo.png" 
@@ -53,7 +53,6 @@ export default function Login() {
         {/* CARTÃO DE LOGIN */}
         <Card className="border-border/50 shadow-lg">
           
-          {/* MUDANÇA AQUI: Adicionei 'text-center' para alinhar o título com a logo */}
           <CardHeader className="text-center space-y-1">
             <CardTitle className="text-xl">Acessar Sistema</CardTitle>
             <CardDescription>Entre com suas credenciais para continuar</CardDescription>
@@ -87,8 +86,10 @@ export default function Login() {
                 />
               </div>
             </CardContent>
-            <CardFooter>
-              <Button type="submit" className="w-full font-bold" disabled={loading}>
+            
+            {/* AQUI ESTÁ A CORREÇÃO: Adicionei 'pt-6' para dar espaço entre senha e botão */}
+            <CardFooter className="pt-6">
+              <Button type="submit" className="w-full font-bold h-10" disabled={loading}>
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Entrar
               </Button>

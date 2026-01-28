@@ -1,6 +1,6 @@
+import React, { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation, Link } from 'wouter';
-import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { 
   Calculator, 
@@ -12,7 +12,11 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+interface LayoutProps {
+  children: React.ReactNode;
+}
+
+export default function Layout({ children }: LayoutProps) {
   const { user, loading, signOut, isAdmin } = useAuth();
   const [location, setLocation] = useLocation();
 
@@ -32,6 +36,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   if (!user) return null;
 
+  // Componente de navegação interno com tipos corretos
   const NavItems = () => (
     <div className="space-y-1">
       <Link href="/">
@@ -74,16 +79,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex bg-background">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-64 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
-        <div className="p-6 flex items-center space-x-3 border-b border-sidebar-border/50">
-          {/* AQUI ESTÁ A LOGO */}
+        <div className="p-6 flex items-center justify-center border-b border-sidebar-border/50">
           <img 
-            src="/logo.png" 
-            alt="Logo Evolução" 
-            className="h-10 w-auto object-contain" 
+            src="/logo-branca.png" 
+            alt="Evolução Comunicação Visual" 
+            className="h-14 w-auto object-contain" 
           />
-          <span className="font-bold text-sm leading-tight tracking-tight">
-            Evolução <br/> Com. Visual
-          </span>
         </div>
         
         <div className="flex-1 p-4">
@@ -100,7 +101,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <p className="text-xs text-muted-foreground truncate">{isAdmin ? 'Administrador' : 'Consultor'}</p>
             </div>
           </div>
-          <Button variant="outline" className="w-full justify-start border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" onClick={signOut}>
+          <Button variant="outline" className="w-full justify-start border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" onClick={() => signOut()}>
             <LogOut className="mr-2 h-4 w-4" />
             Sair
           </Button>
@@ -110,26 +111,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Mobile Header */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="md:hidden flex items-center justify-between p-4 border-b bg-card">
-          <div className="flex items-center space-x-2">
-            <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
-            <span className="font-bold text-sm">Evolução</span>
+          <div className="flex items-center justify-center flex-1">
+            <img src="/logo-branca.png" alt="Evolução" className="h-10 w-auto object-contain" />
           </div>
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="absolute right-4 text-foreground">
                 <Menu className="h-6 w-6" />
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-64 bg-sidebar text-sidebar-foreground p-0">
-              <div className="p-6 flex items-center space-x-2 border-b border-sidebar-border/50">
-                <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
-                <span className="font-bold text-sm">Evolução</span>
+              <div className="p-6 flex items-center justify-center border-b border-sidebar-border/50">
+                <img src="/logo-branca.png" alt="Evolução" className="h-12 w-auto object-contain" />
               </div>
               <div className="p-4">
                 <NavItems />
               </div>
               <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-sidebar-border/50">
-                <Button variant="outline" className="w-full justify-start" onClick={signOut}>
+                <Button variant="outline" className="w-full justify-start" onClick={() => signOut()}>
                   <LogOut className="mr-2 h-4 w-4" />
                   Sair
                 </Button>
