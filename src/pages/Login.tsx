@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Printer } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Login() {
@@ -39,9 +39,13 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-8">
         <div className="flex flex-col items-center text-center space-y-2">
-          <div className="p-3 bg-primary/10 rounded-full">
-            <Printer className="h-10 w-10 text-primary" />
-          </div>
+          {/* AQUI ESTÁ A MUDANÇA: Logo da empresa em destaque */}
+          <img 
+            src="/logo.png" 
+            alt="Logo Evolução" 
+            className="h-24 w-auto mb-2 object-contain" 
+          />
+          
           <h1 className="text-2xl font-bold tracking-tight">Evolução - Comunicação Visual</h1>
           <p className="text-muted-foreground">Sistema de Orçamentos</p>
         </div>
@@ -71,21 +75,4 @@ export default function Login() {
                   id="password"
                   type="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="bg-secondary/50"
-                />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Entrar
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
-      </div>
-    </div>
-  );
-}
+                  onChange={(e) => set
