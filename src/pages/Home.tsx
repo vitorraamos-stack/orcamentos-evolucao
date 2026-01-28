@@ -55,22 +55,24 @@ export default function Home() {
     materials.find(m => m.id === selectedMaterialId), 
   [materials, selectedMaterialId]);
 
-  // Função para tratar a vírgula brasileira e converter para número
-  const parseBrazilianNumber = (val: string) => {
+  // CORREÇÃO: Função ultra-robusta para converter "10,5" ou "10.5" em número real
+  const parseValue = (val: string) => {
     if (!val) return 0;
-    const cleanVal = val.replace(',', '.');
-    return parseFloat(cleanVal) || 0;
+    // Substitui vírgula por ponto e remove qualquer coisa que não seja número ou ponto
+    const normalized = val.replace(',', '.').replace(/[^0-9.]/g, '');
+    return parseFloat(normalized) || 0;
   };
 
   const calculation = useMemo(() => {
-    if (!selectedMaterial || !width || !height || !quantity) return null;
+    if (!selectedMaterial) return null;
 
-    const w = parseBrazilianNumber(width);
-    const h = parseBrazilianNumber(height);
+    const w = parseValue(width);
+    const h = parseValue(height);
     const qty = parseInt(quantity) || 0;
 
-    if (w === 0 || h === 0 || qty === 0) return null;
+    if (w <= 0 || h <= 0 || qty <= 0) return null;
 
+    // Cálculo da área em m²
     const areaPerItem = (w * h) / 10000;
     const totalArea = areaPerItem * qty;
 
@@ -93,17 +95,17 @@ export default function Home() {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
   };
 
-  const formatNumber = (val: number) => {
+  // Formata o número de volta para o padrão com vírgula para exibição no resumo
+  const formatDisplayNumber = (val: number) => {
     return val.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
   };
 
-  // O TEXTO QUE SERÁ EXIBIDO E COPIADO
   const budgetSummaryText = useMemo(() => {
     if (!calculation || !selectedMaterial) return "";
     
     return `${selectedMaterial.name} - 
 4x0 impressão digital em alta resolução frente color - 
-Tamanho: ${formatNumber(calculation.width)} x ${formatNumber(calculation.height)} cm (larg x alt) - 
+Tamanho: ${formatDisplayNumber(calculation.width)} x ${formatDisplayNumber(calculation.height)} cm (larg x alt) - 
 Acabamentos: corte reto
 ---------------------------
 Quantidade: ${calculation.quantity} un.
@@ -111,20 +113,13 @@ Valor Total: ${formatCurrency(calculation.finalPrice)}${calculation.isMinimumApp
 ${observation ? `Observação: ${observation}` : ''}`;
   }, [calculation, selectedMaterial, observation]);
 
-  const clearForm = () => {
-    setWidth('');
-    setHeight('');
-    setQuantity('1');
-    setObservation('');
-  };
-
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-8rem)]">
       <div className="lg:col-span-6 space-y-6">
         <Card className="h-full border-border/50 shadow-sm flex flex-col">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calculator className="h-5 w-5 text-primary" />
+            <CardTitle className="flex items-center gap-2 text-primary">
+              <Calculator className="h-5 w-5" />
               Calculadora de Orçamento
             </CardTitle>
           </CardHeader>
@@ -154,7 +149,7 @@ ${observation ? `Observação: ${observation}` : ''}`;
                   value={width} 
                   onChange={e => setWidth(e.target.value)} 
                   placeholder="0,00"
-                  className="h-12 text-lg font-mono-nums"
+                  className="h-12 text-lg"
                 />
               </div>
               <div className="space-y-2">
@@ -165,7 +160,7 @@ ${observation ? `Observação: ${observation}` : ''}`;
                   value={height} 
                   onChange={e => setHeight(e.target.value)} 
                   placeholder="0,00"
-                  className="h-12 text-lg font-mono-nums"
+                  className="h-12 text-lg"
                 />
               </div>
             </div>
@@ -176,7 +171,7 @@ ${observation ? `Observação: ${observation}` : ''}`;
                 type="number" 
                 value={quantity} 
                 onChange={e => setQuantity(e.target.value)} 
-                className="h-12 text-lg font-mono-nums"
+                className="h-12 text-lg"
               />
             </div>
 
@@ -190,7 +185,7 @@ ${observation ? `Observação: ${observation}` : ''}`;
             </div>
           </CardContent>
           <CardFooter className="border-t bg-secondary/10 p-4">
-            <Button variant="ghost" onClick={clearForm} className="ml-auto text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" onClick={() => { setWidth(''); setHeight(''); setQuantity('1'); setObservation(''); }} className="ml-auto text-muted-foreground hover:text-foreground">
               <RefreshCw className="mr-2 h-4 w-4" /> Limpar Campos
             </Button>
           </CardFooter>
@@ -205,12 +200,11 @@ ${observation ? `Observação: ${observation}` : ''}`;
           <CardContent className="flex-1 py-6 flex flex-col">
             {!calculation ? (
               <div className="text-center text-sidebar-foreground/50 py-20">
-                <p>Preencha os dados ao lado para gerar o resumo.</p>
+                <p>Aguardando medidas para calcular...</p>
               </div>
             ) : (
               <div className="flex flex-col h-full space-y-6">
-                {/* ÁREA DE TEXTO PRONTA PARA CÓPIA */}
-                <div className="bg-sidebar-accent/20 p-4 rounded-lg border border-sidebar-border/50 whitespace-pre-wrap font-sans text-sm leading-relaxed text-sidebar-foreground/90">
+                <div className="bg-sidebar-accent/30 p-4 rounded-lg border border-sidebar-border/50 whitespace-pre-wrap font-sans text-sm leading-relaxed">
                   {budgetSummaryText}
                 </div>
 
@@ -225,16 +219,14 @@ ${observation ? `Observação: ${observation}` : ''}`;
           </CardContent>
           <CardFooter className="p-4 bg-sidebar-accent/10 border-t border-sidebar-border/50">
             <Button 
-              className="w-full h-14 text-lg bg-sidebar-primary hover:bg-sidebar-primary/90 text-sidebar-primary-foreground font-bold shadow-xl"
+              className="w-full h-14 text-lg bg-sidebar-primary hover:bg-sidebar-primary/90 text-sidebar-primary-foreground font-bold"
               onClick={() => {
-                if (calculation) {
-                  navigator.clipboard.writeText(budgetSummaryText);
-                  toast.success('Resumo completo copiado!');
-                }
+                navigator.clipboard.writeText(budgetSummaryText);
+                toast.success('Copiado com sucesso!');
               }}
               disabled={!calculation}
             >
-              <Copy className="mr-2 h-5 w-5" /> Copiar Resumo Profissional
+              <Copy className="mr-2 h-5 w-5" /> Copiar Resumo
             </Button>
           </CardFooter>
         </Card>
