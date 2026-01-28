@@ -78,7 +78,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="p-6 flex items-center space-x-2 border-b border-sidebar-border/50">
           <Printer className="h-6 w-6 text-sidebar-primary flex-shrink-0" />
           <span className="font-bold text-sm leading-tight tracking-tight">
-            Evolução <br/> Comunicação Visual
+            Evolução - <br/> Comunicação Visual
           </span>
         </div>
         
