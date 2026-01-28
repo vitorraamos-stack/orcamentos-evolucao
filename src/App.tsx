@@ -36,7 +36,7 @@ function Router() {
       
       <Route path="/configuracoes">
   <Layout>
-    {isAdmin ? <Configuracoes /> : <Redirect to="/" />}
+    <Configuracoes />
   </Layout>
 </Route>
 
