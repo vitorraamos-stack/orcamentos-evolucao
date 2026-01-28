@@ -29,8 +29,8 @@ export default function Home() {
   const selectedMaterial = useMemo(() => materials.find(m => m.id === selectedMaterialId), [materials, selectedMaterialId]);
 
   // Função para limpar e converter valores brasileiros (vírgula) para floats de cálculo
-  const parseValue = (val: string) => {
-    if (!val) return 0;
+  const parseValue = (val: string | number | null | undefined) => {
+    if (val === null || val === undefined || val === '') return 0;
     const clean = val.toString().trim();
     const normalized = clean.includes(',')
       ? clean.replace(/\./g, '').replace(',', '.')
@@ -39,11 +39,20 @@ export default function Home() {
     return isNaN(parsed) ? 0 : parsed;
   };
 
+  const parseDimensionToCm = (val: string | number | null | undefined) => {
+    if (val === null || val === undefined || val === '') return 0;
+    const text = val.toString().trim().toLowerCase();
+    const match = text.match(/(-?[\d.,]+)\s*(cm|m)?/);
+    const numeric = parseValue(match?.[1] ?? text);
+    const unit = match?.[2] ?? '';
+    return unit === 'm' ? numeric * 100 : numeric;
+  };
+
   const calculation = useMemo(() => {
     if (!selectedMaterial) return null;
 
-    const w = parseValue(width);
-    const h = parseValue(height);
+    const w = parseDimensionToCm(width);
+    const h = parseDimensionToCm(height);
     const qty = parseInt(quantity) || 0;
 
     if (w <= 0 || h <= 0 || qty <= 0) return null;
@@ -60,14 +69,16 @@ export default function Home() {
     }
 
     // Busca o preço na faixa correta baseado na medida calculada
-    let appliedTier = selectedMaterial.tiers?.find((t: any) => 
-      medidaBase >= t.min_area && (t.max_area === null || medidaBase <= t.max_area)
-    );
+    let appliedTier = selectedMaterial.tiers?.find((t: any) => {
+      const minArea = parseValue(t.min_area);
+      const maxArea = t.max_area === null ? null : parseValue(t.max_area);
+      return medidaBase >= minArea && (maxArea === null || medidaBase <= maxArea);
+    });
 
-    const pricePerUnit = appliedTier ? appliedTier.price_per_m2 : 0;
+    const pricePerUnit = appliedTier ? parseValue(appliedTier.price_per_m2) : 0;
     const finalPrice = medidaBase * pricePerUnit;
 
-    const minPrice = Number(selectedMaterial.min_price ?? 0);
+    const minPrice = parseValue(selectedMaterial.min_price);
     const isUnderMinimumThreshold = minPrice > 0 && finalPrice > 0 && finalPrice < minPrice;
 
     return { 
@@ -122,7 +133,7 @@ Valor Total: ${valorFormatado}`;
                   inputMode="decimal"
                   value={width} 
                   onChange={e => setWidth(e.target.value)} 
-                  placeholder="0,00" 
+                  placeholder="0,00 cm ou 0,00 m" 
                   className="h-12 text-lg" 
                 />
               </div>
@@ -133,7 +144,7 @@ Valor Total: ${valorFormatado}`;
                   inputMode="decimal"
                   value={height} 
                   onChange={e => setHeight(e.target.value)} 
-                  placeholder="0,00" 
+                  placeholder="0,00 cm ou 0,00 m" 
                   className="h-12 text-lg" 
                 />
               </div>
