@@ -85,12 +85,14 @@ export default function Home() {
 
     const minPrice = parseValue(selectedMaterial.min_price);
     const isUnderMinimumThreshold = minPrice > 0 && finalPrice > 0 && finalPrice < minPrice;
+    const isUnderGeneralMinimum = finalPrice > 0 && finalPrice < 100;
 
     return { 
       w, h, qty, 
       finalPrice,
       minPrice,
       isUnderMinimumThreshold,
+      isUnderGeneralMinimum,
       unidade: selectedMaterial.tipo_calculo === 'linear' ? 'ml' : 'm²',
       widthUnit: parsedWidth.unit,
       heightUnit: parsedHeight.unit
@@ -213,6 +215,13 @@ Valor Total: ${valorFormatado}`;
                   <div className="flex gap-2 p-3 rounded-lg bg-red-500/20 border border-red-500/50 text-red-100 text-[11px] leading-tight items-start">
                     <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
                     <p><strong>ATENÇÃO:</strong> Valor abaixo do mínimo do produto ({calculation.minPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}). Se este for o único item da venda, verifique a liberação com a gestão.</p>
+                  </div>
+                )}
+
+                {calculation.isUnderGeneralMinimum && (
+                  <div className="flex gap-2 p-3 rounded-lg bg-red-500/20 border border-red-500/50 text-red-100 text-[11px] leading-tight items-start">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
+                    <p><strong>ATENÇÃO:</strong> Se esse for o único item da venda, verifique a liberação do valor mínimo com a gestão.</p>
                   </div>
                 )}
                 

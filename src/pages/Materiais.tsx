@@ -71,7 +71,7 @@ export default function Materiais() {
 
 
   const handleSave = async () => {
-    if (!name || !minPrice) { toast.error('Preencha os campos obrigatórios'); return; }
+    if (!name) { toast.error('Preencha os campos obrigatórios'); return; }
     try {
       let materialId = editingId;
       const materialData = { 
@@ -79,7 +79,7 @@ export default function Materiais() {
         description, 
         equivalence_message: equivalenceMessage,
         tipo_calculo: tipoCalculo,
-        min_price: parseNum(minPrice),
+        min_price: minPrice ? parseNum(minPrice) : null,
         image_url: imageUrl || null
       };
 
@@ -134,7 +134,7 @@ export default function Materiais() {
     setDescription(material.description || '');
     setEquivalenceMessage(material.equivalence_message || '');
     setTipoCalculo(material.tipo_calculo || 'm2');
-    setMinPrice(material.min_price.toString().replace('.', ','));
+    setMinPrice(material.min_price ? material.min_price.toString().replace('.', ',') : '');
     setImageUrl(material.image_url || '');
     setTiers(material.tiers.length > 0 ? material.tiers.map((t: any) => ({
         ...t,
