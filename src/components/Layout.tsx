@@ -8,7 +8,8 @@ import {
   Calculator, 
   LogOut, 
   Printer,
-  Menu
+  Menu,
+  Settings // <--- 1. Adicionado o ícone de engrenagem
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
@@ -46,15 +47,28 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </Link>
       
       {isAdmin && (
-        <Link href="/materiais">
-          <Button 
-            variant={location === '/materiais' ? 'secondary' : 'ghost'} 
-            className={cn("w-full justify-start", location === '/materiais' && "bg-sidebar-accent text-sidebar-accent-foreground")}
-          >
-            <Package className="mr-2 h-4 w-4" />
-            Materiais
-          </Button>
-        </Link>
+        <>
+          <Link href="/materiais">
+            <Button 
+              variant={location === '/materiais' ? 'secondary' : 'ghost'} 
+              className={cn("w-full justify-start", location === '/materiais' && "bg-sidebar-accent text-sidebar-accent-foreground")}
+            >
+              <Package className="mr-2 h-4 w-4" />
+              Materiais
+            </Button>
+          </Link>
+
+          {/* 2. Novo Botão de Configurações */}
+          <Link href="/configuracoes">
+            <Button 
+              variant={location === '/configuracoes' ? 'secondary' : 'ghost'} 
+              className={cn("w-full justify-start", location === '/configuracoes' && "bg-sidebar-accent text-sidebar-accent-foreground")}
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              Configurações
+            </Button>
+          </Link>
+        </>
       )}
     </div>
   );
@@ -121,12 +135,4 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 p-4 md:p-8 overflow-auto">
-          <div className="max-w-6xl mx-auto">
-            {children}
-          </div>
-        </main>
-      </div>
-    </div>
-  );
-}
+        <main className="flex-1 p-
