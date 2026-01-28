@@ -39,6 +39,15 @@ export default function Home() {
     return isNaN(parsed) ? 0 : parsed;
   };
 
+  const parseDimensionToCm = (val: string | number | null | undefined) => {
+    if (val === null || val === undefined || val === '') return 0;
+    const text = val.toString().trim().toLowerCase();
+    const match = text.match(/(-?[\d.,]+)\s*(cm|m)?/);
+    const numeric = parseValue(match?.[1] ?? text);
+    const unit = match?.[2] ?? '';
+    return unit === 'm' ? numeric * 100 : numeric;
+  };
+
   const fetchMaterials = async () => {
     try {
       const { data: materialsData, error: materialsError } = await supabase
@@ -83,8 +92,8 @@ export default function Home() {
     const material = materials.find(m => m.id === selectedMaterialId);
     if (!material) return;
 
-    const w = parseValue(width);
-    const h = parseValue(height);
+    const w = parseDimensionToCm(width);
+    const h = parseDimensionToCm(height);
     const q = parseInt(quantity);
 
     if (isNaN(w) || isNaN(h) || isNaN(q)) {
@@ -215,7 +224,7 @@ _Gerado em ${new Date().toLocaleDateString()}_`;
                   inputMode="decimal"
                   value={width} 
                   onChange={e => setWidth(e.target.value)} 
-                  placeholder="0"
+                  placeholder="0 cm ou 0 m"
                   className="font-mono-nums text-lg"
                 />
               </div>
@@ -226,7 +235,7 @@ _Gerado em ${new Date().toLocaleDateString()}_`;
                   inputMode="decimal"
                   value={height} 
                   onChange={e => setHeight(e.target.value)} 
-                  placeholder="0"
+                  placeholder="0 cm ou 0 m"
                   className="font-mono-nums text-lg"
                 />
               </div>
