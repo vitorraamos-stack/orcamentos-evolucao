@@ -5,6 +5,7 @@ import Login from "@/pages/Login";
 import Home from "@/pages/Home";
 // IMPORTANTE: Agora estamos importando o componente real!
 import Materiais from "@/pages/Materiais"; 
+import Configuracoes from "@/pages/Configuracoes";
 import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -32,6 +33,12 @@ function Router() {
           {isAdmin ? <Materiais /> : <Redirect to="/" />}
         </Layout>
       </Route>
+      
+      <Route path="/configuracoes">
+  <Layout>
+    {isAdmin ? <Configuracoes /> : <Redirect to="/" />}
+  </Layout>
+</Route>
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
