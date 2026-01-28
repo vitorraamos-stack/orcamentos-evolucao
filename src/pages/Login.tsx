@@ -38,22 +38,27 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-8">
+        
+        {/* CABEÇALHO GERAL (Logo e Nome) - Centralizado */}
         <div className="flex flex-col items-center text-center space-y-2">
-          {/* AQUI ESTÁ A MUDANÇA: Logo da empresa em destaque */}
           <img 
             src="/logo.png" 
             alt="Logo Evolução" 
             className="h-24 w-auto mb-2 object-contain" 
           />
-          
-          <h1 className="text-2xl font-bold tracking-tight">Sistema de Orçamentos</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Evolução - Comunicação Visual</h1>
+          <p className="text-muted-foreground">Sistema de Orçamentos</p>
         </div>
 
+        {/* CARTÃO DE LOGIN */}
         <Card className="border-border/50 shadow-lg">
-          <CardHeader>
-            <CardTitle>Acessar Sistema</CardTitle>
+          
+          {/* MUDANÇA AQUI: Adicionei 'text-center' para alinhar o título com a logo */}
+          <CardHeader className="text-center space-y-1">
+            <CardTitle className="text-xl">Acessar Sistema</CardTitle>
             <CardDescription>Entre com suas credenciais para continuar</CardDescription>
           </CardHeader>
+
           <form onSubmit={handleLogin}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -69,7 +74,9 @@ export default function Login() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Senha</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Senha</Label>
+                </div>
                 <Input
                   id="password"
                   type="password"
@@ -81,7 +88,7 @@ export default function Login() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full font-bold" disabled={loading}>
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Entrar
               </Button>
