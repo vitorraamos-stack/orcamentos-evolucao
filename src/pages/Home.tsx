@@ -39,20 +39,25 @@ export default function Home() {
     return isNaN(parsed) ? 0 : parsed;
   };
 
-  const parseDimensionToCm = (val: string | number | null | undefined) => {
-    if (val === null || val === undefined || val === '') return 0;
+  const parseDimensionWithUnit = (val: string | number | null | undefined) => {
+    if (val === null || val === undefined || val === '') {
+      return { valueCm: 0, unit: 'cm' as 'cm' | 'm' };
+    }
     const text = val.toString().trim().toLowerCase();
     const match = text.match(/(-?[\d.,]+)\s*(cm|m)?/);
     const numeric = parseValue(match?.[1] ?? text);
-    const unit = match?.[2] ?? '';
-    return unit === 'm' ? numeric * 100 : numeric;
+    const unit = (match?.[2] ?? 'cm') as 'cm' | 'm';
+    const valueCm = unit === 'm' ? numeric * 100 : numeric;
+    return { valueCm, unit };
   };
 
   const calculation = useMemo(() => {
     if (!selectedMaterial) return null;
 
-    const w = parseDimensionToCm(width);
-    const h = parseDimensionToCm(height);
+    const parsedWidth = parseDimensionWithUnit(width);
+    const parsedHeight = parseDimensionWithUnit(height);
+    const w = parsedWidth.valueCm;
+    const h = parsedHeight.valueCm;
     const qty = parseInt(quantity) || 0;
 
     if (w <= 0 || h <= 0 || qty <= 0) return null;
@@ -80,13 +85,17 @@ export default function Home() {
 
     const minPrice = parseValue(selectedMaterial.min_price);
     const isUnderMinimumThreshold = minPrice > 0 && finalPrice > 0 && finalPrice < minPrice;
+    const isUnderGeneralMinimum = finalPrice > 0 && finalPrice < 100;
 
     return { 
       w, h, qty, 
       finalPrice,
       minPrice,
       isUnderMinimumThreshold,
-      unidade: selectedMaterial.tipo_calculo === 'linear' ? 'ml' : 'm²'
+      isUnderGeneralMinimum,
+      unidade: selectedMaterial.tipo_calculo === 'linear' ? 'ml' : 'm²',
+      widthUnit: parsedWidth.unit,
+      heightUnit: parsedHeight.unit
     };
   }, [selectedMaterial, width, height, quantity]);
 
@@ -96,9 +105,12 @@ export default function Home() {
     const valorFormatado = calculation.finalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const descMaterial = selectedMaterial.description || "Descrição não cadastrada";
     
+    const widthValue = calculation.widthUnit === 'm' ? calculation.w / 100 : calculation.w;
+    const heightValue = calculation.heightUnit === 'm' ? calculation.h / 100 : calculation.h;
+
     return `${selectedMaterial.name} - 
 ${descMaterial} - 
-Tamanho: ${calculation.w.toLocaleString('pt-BR')} x ${calculation.h.toLocaleString('pt-BR')} cm (larg x alt) - 
+Tamanho: ${widthValue.toLocaleString('pt-BR')} ${calculation.widthUnit} x ${heightValue.toLocaleString('pt-BR')} ${calculation.heightUnit} (larg x alt) - 
 Acabamentos: corte reto
 ---------------------------
 Quantidade: ${calculation.qty} un.
@@ -203,6 +215,13 @@ Valor Total: ${valorFormatado}`;
                   <div className="flex gap-2 p-3 rounded-lg bg-red-500/20 border border-red-500/50 text-red-100 text-[11px] leading-tight items-start">
                     <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
                     <p><strong>ATENÇÃO:</strong> Valor abaixo do mínimo do produto ({calculation.minPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}). Se este for o único item da venda, verifique a liberação com a gestão.</p>
+                  </div>
+                )}
+
+                {calculation.isUnderGeneralMinimum && (
+                  <div className="flex gap-2 p-3 rounded-lg bg-red-500/20 border border-red-500/50 text-red-100 text-[11px] leading-tight items-start">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
+                    <p><strong>ATENÇÃO:</strong> Se esse for o único item da venda, verifique a liberação do valor mínimo com a gestão.</p>
                   </div>
                 )}
                 

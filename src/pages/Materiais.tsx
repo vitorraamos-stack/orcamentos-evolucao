@@ -71,7 +71,7 @@ export default function Materiais() {
 
 
   const handleSave = async () => {
-    if (!name || !minPrice) { toast.error('Preencha os campos obrigatórios'); return; }
+    if (!name) { toast.error('Preencha os campos obrigatórios'); return; }
     try {
       let materialId = editingId;
       const materialData = { 
@@ -79,7 +79,7 @@ export default function Materiais() {
         description, 
         equivalence_message: equivalenceMessage,
         tipo_calculo: tipoCalculo,
-        min_price: parseNum(minPrice),
+        min_price: minPrice ? parseNum(minPrice) : null,
         image_url: imageUrl || null
       };
 
@@ -134,7 +134,7 @@ export default function Materiais() {
     setDescription(material.description || '');
     setEquivalenceMessage(material.equivalence_message || '');
     setTipoCalculo(material.tipo_calculo || 'm2');
-    setMinPrice(material.min_price.toString().replace('.', ','));
+    setMinPrice(material.min_price ? material.min_price.toString().replace('.', ',') : '');
     setImageUrl(material.image_url || '');
     setTiers(material.tiers.length > 0 ? material.tiers.map((t: any) => ({
         ...t,
@@ -194,6 +194,21 @@ export default function Materiais() {
                 />
               </div>
 
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Imagem do Material (URL)</Label>
+                <Input
+                  type="url"
+                  value={imageUrl}
+                  onChange={e => setImageUrl(e.target.value)}
+                  placeholder="https://exemplo.com/imagem.jpg"
+                />
+                {imageUrl && (
+                  <div className="border rounded-md overflow-hidden bg-secondary/20">
+                    <img src={imageUrl} alt={`Imagem do material ${name || 'selecionado'}`} className="w-full h-40 object-cover" />
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-4 border rounded-md p-4 bg-secondary/20">
                 <div className="flex justify-between items-center">
                   <Label className="text-base font-semibold">Tabela de Preços ({tipoCalculo === 'm2' ? 'm²' : 'ml'})</Label>
@@ -220,6 +235,11 @@ export default function Materiais() {
              {m.tipo_calculo === 'linear' && (
               <div className="absolute top-0 right-0 bg-blue-600 text-white text-[10px] px-2 py-1 rounded-bl-lg font-bold flex items-center gap-1">
                 <Ruler className="h-3 w-3" /> LINEAR
+              </div>
+            )}
+            {m.image_url && (
+              <div className="h-40 w-full overflow-hidden border-b">
+                <img src={m.image_url} alt={`Imagem do material ${m.name}`} className="h-full w-full object-cover" />
               </div>
             )}
             <CardHeader>
