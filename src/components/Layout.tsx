@@ -83,7 +83,7 @@ export default function Layout({ children }: LayoutProps) {
           <img 
             src="/logo-branca.png" 
             alt="Evolução Comunicação Visual" 
-            className="h-14 w-auto object-contain" 
+            className="h-16 w-auto object-contain" 
           />
         </div>
         
@@ -112,7 +112,7 @@ export default function Layout({ children }: LayoutProps) {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="md:hidden flex items-center justify-between p-4 border-b bg-card">
           <div className="flex items-center justify-center flex-1">
-            <img src="/logo-branca.png" alt="Evolução" className="h-10 w-auto object-contain" />
+            <img src="/logo-branca.png" alt="Evolução" className="h-12 w-auto object-contain" />
           </div>
           <Sheet>
             <SheetTrigger asChild>
@@ -122,7 +122,7 @@ export default function Layout({ children }: LayoutProps) {
             </SheetTrigger>
             <SheetContent side="left" className="w-64 bg-sidebar text-sidebar-foreground p-0">
               <div className="p-6 flex items-center justify-center border-b border-sidebar-border/50">
-                <img src="/logo-branca.png" alt="Evolução" className="h-12 w-auto object-contain" />
+                <img src="/logo-branca.png" alt="Evolução" className="h-14 w-auto object-contain" />
               </div>
               <div className="p-4">
                 <NavItems />
