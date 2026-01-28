@@ -1,1 +1,0 @@
-- [ ] Sincronizar módulo de gestão de usuários com GitHub
