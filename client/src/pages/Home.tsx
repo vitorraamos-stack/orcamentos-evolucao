@@ -29,6 +29,16 @@ export default function Home() {
     fetchMaterials();
   }, []);
 
+  const parseValue = (val: string) => {
+    if (!val) return 0;
+    const clean = val.toString().trim();
+    const normalized = clean.includes(',')
+      ? clean.replace(/\./g, '').replace(',', '.')
+      : clean;
+    const parsed = parseFloat(normalized.replace(/[^0-9.-]/g, ''));
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
   const fetchMaterials = async () => {
     try {
       const { data: materialsData, error: materialsError } = await supabase
@@ -73,8 +83,8 @@ export default function Home() {
     const material = materials.find(m => m.id === selectedMaterialId);
     if (!material) return;
 
-    const w = parseFloat(width);
-    const h = parseFloat(height);
+    const w = parseValue(width);
+    const h = parseValue(height);
     const q = parseInt(quantity);
 
     if (isNaN(w) || isNaN(h) || isNaN(q)) {
@@ -196,7 +206,8 @@ _Gerado em ${new Date().toLocaleDateString()}_`;
               <div className="space-y-2">
                 <Label>Largura (cm)</Label>
                 <Input 
-                  type="number" 
+                  type="text" 
+                  inputMode="decimal"
                   value={width} 
                   onChange={e => setWidth(e.target.value)} 
                   placeholder="0"
@@ -206,7 +217,8 @@ _Gerado em ${new Date().toLocaleDateString()}_`;
               <div className="space-y-2">
                 <Label>Altura (cm)</Label>
                 <Input 
-                  type="number" 
+                  type="text" 
+                  inputMode="decimal"
                   value={height} 
                   onChange={e => setHeight(e.target.value)} 
                   placeholder="0"
