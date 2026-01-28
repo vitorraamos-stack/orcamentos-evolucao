@@ -39,20 +39,25 @@ export default function Home() {
     return isNaN(parsed) ? 0 : parsed;
   };
 
-  const parseDimensionToCm = (val: string | number | null | undefined) => {
-    if (val === null || val === undefined || val === '') return 0;
+  const parseDimensionWithUnit = (val: string | number | null | undefined) => {
+    if (val === null || val === undefined || val === '') {
+      return { valueCm: 0, unit: 'cm' as 'cm' | 'm' };
+    }
     const text = val.toString().trim().toLowerCase();
     const match = text.match(/(-?[\d.,]+)\s*(cm|m)?/);
     const numeric = parseValue(match?.[1] ?? text);
-    const unit = match?.[2] ?? '';
-    return unit === 'm' ? numeric * 100 : numeric;
+    const unit = (match?.[2] ?? 'cm') as 'cm' | 'm';
+    const valueCm = unit === 'm' ? numeric * 100 : numeric;
+    return { valueCm, unit };
   };
 
   const calculation = useMemo(() => {
     if (!selectedMaterial) return null;
 
-    const w = parseDimensionToCm(width);
-    const h = parseDimensionToCm(height);
+    const parsedWidth = parseDimensionWithUnit(width);
+    const parsedHeight = parseDimensionWithUnit(height);
+    const w = parsedWidth.valueCm;
+    const h = parsedHeight.valueCm;
     const qty = parseInt(quantity) || 0;
 
     if (w <= 0 || h <= 0 || qty <= 0) return null;
@@ -86,7 +91,9 @@ export default function Home() {
       finalPrice,
       minPrice,
       isUnderMinimumThreshold,
-      unidade: selectedMaterial.tipo_calculo === 'linear' ? 'ml' : 'm²'
+      unidade: selectedMaterial.tipo_calculo === 'linear' ? 'ml' : 'm²',
+      widthUnit: parsedWidth.unit,
+      heightUnit: parsedHeight.unit
     };
   }, [selectedMaterial, width, height, quantity]);
 
@@ -96,9 +103,12 @@ export default function Home() {
     const valorFormatado = calculation.finalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const descMaterial = selectedMaterial.description || "Descrição não cadastrada";
     
+    const widthValue = calculation.widthUnit === 'm' ? calculation.w / 100 : calculation.w;
+    const heightValue = calculation.heightUnit === 'm' ? calculation.h / 100 : calculation.h;
+
     return `${selectedMaterial.name} - 
 ${descMaterial} - 
-Tamanho: ${calculation.w.toLocaleString('pt-BR')} x ${calculation.h.toLocaleString('pt-BR')} cm (larg x alt) - 
+Tamanho: ${widthValue.toLocaleString('pt-BR')} ${calculation.widthUnit} x ${heightValue.toLocaleString('pt-BR')} ${calculation.heightUnit} (larg x alt) - 
 Acabamentos: corte reto
 ---------------------------
 Quantidade: ${calculation.qty} un.
