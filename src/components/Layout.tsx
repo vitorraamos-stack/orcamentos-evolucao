@@ -3,9 +3,8 @@ import { useLocation, Link } from 'wouter';
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { 
-  LayoutDashboard, 
-  Package, 
   Calculator, 
+  Package, 
   LogOut, 
   Printer,
   Menu,
@@ -77,8 +76,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-64 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
         <div className="p-6 flex items-center space-x-2 border-b border-sidebar-border/50">
-          <Printer className="h-6 w-6 text-sidebar-primary" />
-          <span className="font-bold text-lg tracking-tight">Evolução</span>
+          <Printer className="h-6 w-6 text-sidebar-primary flex-shrink-0" />
+          <span className="font-bold text-sm leading-tight tracking-tight">
+            Evolução <br/> Comunicação Visual
+          </span>
         </div>
         
         <div className="flex-1 p-4">
@@ -87,7 +88,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         <div className="p-4 border-t border-sidebar-border/50">
           <div className="flex items-center mb-4 px-2">
-            <div className="h-8 w-8 rounded-full bg-sidebar-primary/20 flex items-center justify-center text-sidebar-primary font-bold mr-3">
+            <div className="h-8 w-8 rounded-full bg-sidebar-primary/20 flex items-center justify-center text-sidebar-primary font-bold mr-3 flex-shrink-0">
               {user.email?.charAt(0).toUpperCase()}
             </div>
             <div className="overflow-hidden">
@@ -107,7 +108,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <header className="md:hidden flex items-center justify-between p-4 border-b bg-card">
           <div className="flex items-center space-x-2">
             <Printer className="h-6 w-6 text-primary" />
-            <span className="font-bold">Evolução</span>
+            <span className="font-bold text-sm">Evolução - Com. Visual</span>
           </div>
           <Sheet>
             <SheetTrigger asChild>
@@ -118,7 +119,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <SheetContent side="left" className="w-64 bg-sidebar text-sidebar-foreground p-0">
               <div className="p-6 flex items-center space-x-2 border-b border-sidebar-border/50">
                 <Printer className="h-6 w-6 text-sidebar-primary" />
-                <span className="font-bold text-lg">Evolução</span>
+                <span className="font-bold text-sm">Evolução - Com. Visual</span>
               </div>
               <div className="p-4">
                 <NavItems />
