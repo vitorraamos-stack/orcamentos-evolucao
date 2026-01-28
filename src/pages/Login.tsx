@@ -75,4 +75,21 @@ export default function Login() {
                   id="password"
                   type="password"
                   value={password}
-                  onChange={(e) => set
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="bg-secondary/50"
+                />
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Entrar
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
+      </div>
+    </div>
+  );
+}
