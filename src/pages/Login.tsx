@@ -46,8 +46,7 @@ export default function Login() {
             className="h-24 w-auto mb-2 object-contain" 
           />
           
-          <h1 className="text-2xl font-bold tracking-tight">Evolução - Comunicação Visual</h1>
-          <p className="text-muted-foreground">Sistema de Orçamentos</p>
+          <h1 className="text-2xl font-bold tracking-tight">Sistema de Orçamentos</h1>
         </div>
 
         <Card className="border-border/50 shadow-lg">
