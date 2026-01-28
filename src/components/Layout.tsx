@@ -9,7 +9,7 @@ import {
   LogOut, 
   Printer,
   Menu,
-  Settings // <--- 1. Adicionado o ícone de engrenagem
+  Settings 
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
@@ -58,7 +58,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </Button>
           </Link>
 
-          {/* 2. Novo Botão de Configurações */}
           <Link href="/configuracoes">
             <Button 
               variant={location === '/configuracoes' ? 'secondary' : 'ghost'} 
@@ -135,4 +134,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 p-
+        <main className="flex-1 p-4 md:p-8 overflow-auto">
+          <div className="max-w-6xl mx-auto">
+            {children}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
