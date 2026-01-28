@@ -42,7 +42,7 @@ export default function Login() {
           <div className="p-3 bg-primary/10 rounded-full">
             <Printer className="h-10 w-10 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">Evolução Impressos</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Evolução - Comunicação Visual</h1>
           <p className="text-muted-foreground">Sistema de Orçamentos</p>
         </div>
 
