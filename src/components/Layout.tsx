@@ -6,7 +6,6 @@ import {
   Calculator, 
   Package, 
   LogOut, 
-  Printer,
   Menu,
   Settings 
 } from 'lucide-react';
@@ -75,10 +74,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex bg-background">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-64 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
-        <div className="p-6 flex items-center space-x-2 border-b border-sidebar-border/50">
-          <Printer className="h-6 w-6 text-sidebar-primary flex-shrink-0" />
+        <div className="p-6 flex items-center space-x-3 border-b border-sidebar-border/50">
+          {/* AQUI ESTÁ A LOGO */}
+          <img 
+            src="/logo.png" 
+            alt="Logo Evolução" 
+            className="h-10 w-auto object-contain" 
+          />
           <span className="font-bold text-sm leading-tight tracking-tight">
-            Evolução - <br/> Comunicação Visual
+            Evolução <br/> Com. Visual
           </span>
         </div>
         
@@ -107,8 +111,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="md:hidden flex items-center justify-between p-4 border-b bg-card">
           <div className="flex items-center space-x-2">
-            <Printer className="h-6 w-6 text-primary" />
-            <span className="font-bold text-sm">Evolução - Com. Visual</span>
+            <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
+            <span className="font-bold text-sm">Evolução</span>
           </div>
           <Sheet>
             <SheetTrigger asChild>
@@ -118,8 +122,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </SheetTrigger>
             <SheetContent side="left" className="w-64 bg-sidebar text-sidebar-foreground p-0">
               <div className="p-6 flex items-center space-x-2 border-b border-sidebar-border/50">
-                <Printer className="h-6 w-6 text-sidebar-primary" />
-                <span className="font-bold text-sm">Evolução - Com. Visual</span>
+                <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
+                <span className="font-bold text-sm">Evolução</span>
               </div>
               <div className="p-4">
                 <NavItems />
