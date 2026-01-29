@@ -8,15 +8,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
 import { fetchOsStatuses, createOs, createOsEvent } from '../api';
-import type { OsStatus } from '../types';
+import type { DeliveryType, OsStatus } from '../types';
 import { useAuth } from '@/contexts/AuthContext';
 
 const createSchema = z.object({
-  customer_name: z.string().min(1, 'Informe o cliente.'),
+  sale_number: z.string().min(1, 'Informe o número da venda.'),
+  client_name: z.string().min(1, 'Informe o cliente.'),
   customer_phone: z.string().optional(),
   title: z.string().min(1, 'Informe o título da OS.'),
-  description: z.string().optional(),
+  description: z.string().min(1, 'Informe a descrição técnica.'),
+  delivery_date: z.string().min(1, 'Informe a data de entrega.'),
+  delivery_type: z.enum(['RETIRADA', 'ENTREGA', 'INSTALACAO']),
   status_id: z.string().min(1, 'Selecione o status inicial.'),
   quote_total: z.preprocess((value) => (value === '' ? undefined : Number(value)), z.number().optional()),
 });
@@ -28,12 +33,25 @@ export default function OsCreatePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const [customerName, setCustomerName] = useState('');
+  const [saleNumber, setSaleNumber] = useState('');
+  const [clientName, setClientName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [statusId, setStatusId] = useState('');
   const [quoteTotal, setQuoteTotal] = useState('');
+  const [deliveryDate, setDeliveryDate] = useState('');
+  const [deliveryType, setDeliveryType] = useState<DeliveryType>('RETIRADA');
+  const [shippingCarrier, setShippingCarrier] = useState('');
+  const [trackingCode, setTrackingCode] = useState('');
+  const [address, setAddress] = useState('');
+  const [notes, setNotes] = useState('');
+  const [installationDate, setInstallationDate] = useState('');
+  const [installationTimeWindow, setInstallationTimeWindow] = useState('');
+  const [onSiteContact, setOnSiteContact] = useState('');
+  const [isReproducao, setIsReproducao] = useState(false);
+  const [reproMotivo, setReproMotivo] = useState('');
+  const [hasLetraCaixa, setHasLetraCaixa] = useState(false);
 
   useEffect(() => {
     const loadStatuses = async () => {
@@ -57,20 +75,24 @@ export default function OsCreatePage() {
   }, []);
 
   useEffect(() => {
-    if (!customerName) return;
-    if (!title || title.startsWith('OS -')) {
-      setTitle(`OS - ${customerName}`);
+    if (!saleNumber && !clientName) return;
+    if (!title || title.includes(' - ')) {
+      const nextTitle = [saleNumber, clientName].filter(Boolean).join(' - ');
+      if (nextTitle) setTitle(nextTitle);
     }
-  }, [customerName, title]);
+  }, [saleNumber, clientName, title]);
 
   const statusOptions = useMemo(() => statuses, [statuses]);
 
   const handleSubmit = async () => {
     const parsed = createSchema.safeParse({
-      customer_name: customerName,
+      sale_number: saleNumber,
+      client_name: clientName,
       customer_phone: customerPhone || undefined,
       title,
-      description: description || undefined,
+      description,
+      delivery_date: deliveryDate,
+      delivery_type: deliveryType,
       status_id: statusId,
       quote_total: quoteTotal,
     });
@@ -83,11 +105,27 @@ export default function OsCreatePage() {
     try {
       setSaving(true);
       const os = await createOs({
-        customer_name: parsed.data.customer_name,
+        sale_number: parsed.data.sale_number,
+        client_name: parsed.data.client_name,
+        customer_name: parsed.data.client_name,
         customer_phone: parsed.data.customer_phone ?? null,
         title: parsed.data.title,
-        description: parsed.data.description ?? null,
+        description: parsed.data.description,
+        delivery_date: parsed.data.delivery_date,
+        delivery_type: parsed.data.delivery_type,
+        shipping_carrier: deliveryType === 'ENTREGA' ? shippingCarrier || null : null,
+        tracking_code: deliveryType === 'ENTREGA' ? trackingCode || null : null,
+        address: deliveryType === 'ENTREGA' || deliveryType === 'INSTALACAO' ? address || null : null,
+        notes: deliveryType === 'ENTREGA' ? notes || null : null,
+        installation_date: deliveryType === 'INSTALACAO' ? installationDate || null : null,
+        installation_time_window: deliveryType === 'INSTALACAO' ? installationTimeWindow || null : null,
+        on_site_contact: deliveryType === 'INSTALACAO' ? onSiteContact || null : null,
+        is_reproducao: isReproducao,
+        repro_motivo: isReproducao ? reproMotivo || null : null,
+        has_letra_caixa: hasLetraCaixa,
         status_id: parsed.data.status_id,
+        status_arte: 'Caixa de Entrada',
+        status_producao: null,
         quote_total: parsed.data.quote_total ?? null,
         payment_status: 'PENDING',
         created_by: user?.id ?? null,
@@ -96,7 +134,7 @@ export default function OsCreatePage() {
 
       await createOsEvent({
         os_id: os.id,
-        type: 'CREATED',
+        type: 'created',
         payload: { source: 'manual' },
         created_by: user?.id ?? null,
       });
@@ -129,12 +167,20 @@ export default function OsCreatePage() {
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1">
+              <Label>Nº da venda</Label>
+              <Input value={saleNumber} onChange={(event) => setSaleNumber(event.target.value)} />
+            </div>
+            <div className="space-y-1">
               <Label>Cliente</Label>
-              <Input value={customerName} onChange={(event) => setCustomerName(event.target.value)} />
+              <Input value={clientName} onChange={(event) => setClientName(event.target.value)} />
             </div>
             <div className="space-y-1">
               <Label>Telefone</Label>
               <Input value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Data de entrega</Label>
+              <Input type="date" value={deliveryDate} onChange={(event) => setDeliveryDate(event.target.value)} />
             </div>
           </div>
 
@@ -169,6 +215,87 @@ export default function OsCreatePage() {
               placeholder="Resumo técnico do orçamento (copie da calculadora, se necessário)."
             />
           </div>
+
+          <div className="space-y-2">
+            <Label>Tipo de saída</Label>
+            <RadioGroup value={deliveryType} onValueChange={(value) => setDeliveryType(value as DeliveryType)}>
+              <label className="flex items-center gap-2 text-sm">
+                <RadioGroupItem value="RETIRADA" />
+                Retirada
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <RadioGroupItem value="ENTREGA" />
+                Entrega
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <RadioGroupItem value="INSTALACAO" />
+                Instalação
+              </label>
+            </RadioGroup>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="flex items-center gap-2">
+              <Checkbox checked={isReproducao} onCheckedChange={(checked) => setIsReproducao(Boolean(checked))} />
+              <Label>Reprodução</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox checked={hasLetraCaixa} onCheckedChange={(checked) => setHasLetraCaixa(Boolean(checked))} />
+              <Label>Letra Caixa</Label>
+            </div>
+            {isReproducao && (
+              <div className="space-y-1 md:col-span-2">
+                <Label>Motivo da reprodução</Label>
+                <Input value={reproMotivo} onChange={(event) => setReproMotivo(event.target.value)} />
+              </div>
+            )}
+          </div>
+
+          {deliveryType === 'ENTREGA' && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1">
+                <Label>Transportadora</Label>
+                <Input value={shippingCarrier} onChange={(event) => setShippingCarrier(event.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Código de rastreio</Label>
+                <Input value={trackingCode} onChange={(event) => setTrackingCode(event.target.value)} />
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <Label>Endereço</Label>
+                <Input value={address} onChange={(event) => setAddress(event.target.value)} />
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <Label>Observações</Label>
+                <Input value={notes} onChange={(event) => setNotes(event.target.value)} />
+              </div>
+            </div>
+          )}
+
+          {deliveryType === 'INSTALACAO' && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1">
+                <Label>Data de instalação</Label>
+                <Input type="date" value={installationDate} onChange={(event) => setInstallationDate(event.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Janela de horário</Label>
+                <Input
+                  value={installationTimeWindow}
+                  onChange={(event) => setInstallationTimeWindow(event.target.value)}
+                  placeholder="Ex: 08h-12h"
+                />
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <Label>Endereço</Label>
+                <Input value={address} onChange={(event) => setAddress(event.target.value)} />
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <Label>Contato no local</Label>
+                <Input value={onSiteContact} onChange={(event) => setOnSiteContact(event.target.value)} />
+              </div>
+            </div>
+          )}
 
           <div className="space-y-1">
             <Label>Total do orçamento (opcional)</Label>

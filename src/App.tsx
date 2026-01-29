@@ -6,7 +6,8 @@ import Home from "@/pages/Home";
 // IMPORTANTE: Agora estamos importando o componente real!
 import Materiais from "@/pages/Materiais"; 
 import Configuracoes from "@/pages/Configuracoes";
-import OsKanbanPage from "@/modules/hub-os/pages/OsKanbanPage";
+import OsArteBoardPage from "@/modules/hub-os/pages/OsArteBoardPage";
+import OsProducaoBoardPage from "@/modules/hub-os/pages/OsProducaoBoardPage";
 import OsDetailPage from "@/modules/hub-os/pages/OsDetailPage";
 import OsCreatePage from "@/modules/hub-os/pages/OsCreatePage";
 import { Route, Switch, Redirect } from "wouter";
@@ -45,8 +46,18 @@ function Router() {
 </Route>
 
       <Route path="/os">
+        <Redirect to="/os/arte" />
+      </Route>
+
+      <Route path="/os/arte">
         <Layout>
-          <OsKanbanPage />
+          <OsArteBoardPage />
+        </Layout>
+      </Route>
+
+      <Route path="/os/producao">
+        <Layout>
+          <OsProducaoBoardPage />
         </Layout>
       </Route>
 

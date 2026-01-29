@@ -8,7 +8,8 @@ import {
   LogOut, 
   Menu,
   Settings,
-  ClipboardList
+  Paintbrush,
+  Factory
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
@@ -40,16 +41,29 @@ export default function Layout({ children }: LayoutProps) {
   // Componente de navegação interno com tipos corretos
   const NavItems = () => (
     <div className="space-y-1">
-      <Link href="/os">
+      <Link href="/os/arte">
         <Button
-          variant={location.startsWith('/os') ? 'secondary' : 'ghost'}
+          variant={location === '/os/arte' ? 'secondary' : 'ghost'}
           className={cn(
             "w-full justify-start",
-            location.startsWith('/os') && "bg-sidebar-accent text-sidebar-accent-foreground"
+            location === '/os/arte' && "bg-sidebar-accent text-sidebar-accent-foreground"
           )}
         >
-          <ClipboardList className="mr-2 h-4 w-4" />
-          OS
+          <Paintbrush className="mr-2 h-4 w-4" />
+          Arte
+        </Button>
+      </Link>
+
+      <Link href="/os/producao">
+        <Button
+          variant={location === '/os/producao' ? 'secondary' : 'ghost'}
+          className={cn(
+            "w-full justify-start",
+            location === '/os/producao' && "bg-sidebar-accent text-sidebar-accent-foreground"
+          )}
+        >
+          <Factory className="mr-2 h-4 w-4" />
+          Produção
         </Button>
       </Link>
 

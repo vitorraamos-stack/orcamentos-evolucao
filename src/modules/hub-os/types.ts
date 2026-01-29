@@ -13,10 +13,26 @@ export type Os = {
   os_number: number | null;
   quote_id: string | null;
   quote_total: number | null;
+  sale_number: string | null;
+  client_name: string;
   customer_name: string;
   customer_phone: string | null;
   title: string;
   description: string | null;
+  delivery_date: string | null;
+  delivery_type: DeliveryType | null;
+  shipping_carrier: string | null;
+  tracking_code: string | null;
+  address: string | null;
+  notes: string | null;
+  installation_date: string | null;
+  installation_time_window: string | null;
+  on_site_contact: string | null;
+  status_arte: string | null;
+  status_producao: string | null;
+  is_reproducao: boolean | null;
+  repro_motivo: string | null;
+  has_letra_caixa: boolean | null;
   folder_path: string | null;
   status_id: string;
   payment_status: PaymentStatus;
@@ -25,6 +41,8 @@ export type Os = {
   created_at: string;
   updated_at: string;
 };
+
+export type DeliveryType = 'RETIRADA' | 'ENTREGA' | 'INSTALACAO';
 
 export type PaymentMethod = 'PIX' | 'CARTAO' | 'AGENDADO' | 'OUTRO';
 

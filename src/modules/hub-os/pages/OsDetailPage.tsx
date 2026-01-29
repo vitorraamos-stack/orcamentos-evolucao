@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRoute } from 'wouter';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Copy, FolderPlus } from 'lucide-react';
 import {
   createOsEvent,
@@ -18,13 +19,13 @@ import {
   fetchOsById,
   fetchOsEvents,
   fetchOsPayments,
-  fetchOsStatuses,
   updateOs,
 } from '../api';
 import { generateFolderPath, resolvePaymentStatus } from '../utils';
-import type { Os, OsEvent, OsPaymentProof, OsStatus, PaymentMethod } from '../types';
+import type { DeliveryType, Os, OsEvent, OsPaymentProof, PaymentMethod } from '../types';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { ARTE_STATUSES, PRODUCAO_STATUSES } from '../statuses';
 
 const paymentSchema = z.object({
   method: z.enum(['PIX', 'CARTAO', 'AGENDADO', 'OUTRO']),
@@ -47,16 +48,31 @@ export default function OsDetailPage() {
   const osId = params?.id;
   const { user } = useAuth();
   const [order, setOrder] = useState<Os | null>(null);
-  const [statuses, setStatuses] = useState<OsStatus[]>([]);
   const [events, setEvents] = useState<OsEvent[]>([]);
   const [payments, setPayments] = useState<OsPaymentProof[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
 
-  const [customerName, setCustomerName] = useState('');
+  const [saleNumber, setSaleNumber] = useState('');
+  const [clientName, setClientName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [deliveryDate, setDeliveryDate] = useState('');
+  const [deliveryType, setDeliveryType] = useState<DeliveryType>('RETIRADA');
+  const [shippingCarrier, setShippingCarrier] = useState('');
+  const [trackingCode, setTrackingCode] = useState('');
+  const [address, setAddress] = useState('');
+  const [notes, setNotes] = useState('');
+  const [installationDate, setInstallationDate] = useState('');
+  const [installationTimeWindow, setInstallationTimeWindow] = useState('');
+  const [onSiteContact, setOnSiteContact] = useState('');
+  const [statusArte, setStatusArte] = useState('');
+  const [statusProducao, setStatusProducao] = useState('');
+  const [isReproducao, setIsReproducao] = useState(false);
+  const [reproMotivo, setReproMotivo] = useState('');
+  const [hasLetraCaixa, setHasLetraCaixa] = useState(false);
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('PIX');
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -68,17 +84,31 @@ export default function OsDetailPage() {
     if (!osId) return;
     try {
       setLoading(true);
-      const [osData, statusData, eventData, paymentData] = await Promise.all([
+      const [osData, eventData, paymentData] = await Promise.all([
         fetchOsById(osId),
-        fetchOsStatuses(),
         fetchOsEvents(osId),
         fetchOsPayments(osId),
       ]);
       setOrder(osData);
-      setCustomerName(osData.customer_name);
+      setSaleNumber(osData.sale_number ?? '');
+      setClientName(osData.client_name ?? osData.customer_name);
       setCustomerPhone(osData.customer_phone ?? '');
+      setTitle(osData.title ?? '');
       setDescription(osData.description ?? '');
-      setStatuses(statusData);
+      setDeliveryDate(osData.delivery_date ?? '');
+      setDeliveryType(osData.delivery_type ?? 'RETIRADA');
+      setShippingCarrier(osData.shipping_carrier ?? '');
+      setTrackingCode(osData.tracking_code ?? '');
+      setAddress(osData.address ?? '');
+      setNotes(osData.notes ?? '');
+      setInstallationDate(osData.installation_date ?? '');
+      setInstallationTimeWindow(osData.installation_time_window ?? '');
+      setOnSiteContact(osData.on_site_contact ?? '');
+      setStatusArte(osData.status_arte ?? ARTE_STATUSES[0]);
+      setStatusProducao(osData.status_producao ?? '');
+      setIsReproducao(Boolean(osData.is_reproducao));
+      setReproMotivo(osData.repro_motivo ?? '');
+      setHasLetraCaixa(Boolean(osData.has_letra_caixa));
       setEvents(eventData);
       setPayments(paymentData);
     } catch (error) {
@@ -93,27 +123,58 @@ export default function OsDetailPage() {
     loadData();
   }, [osId]);
 
-  const currentStatus = useMemo(
-    () => statuses.find((status) => status.id === order?.status_id),
-    [statuses, order]
-  );
-
   const handleSaveDetails = async () => {
     if (!order) return;
     try {
       setSaving(true);
-      const updated = await updateOs(order.id, {
-        customer_name: customerName,
+      const payload = {
+        sale_number: saleNumber,
+        client_name: clientName,
+        customer_name: clientName,
         customer_phone: customerPhone || null,
+        title: title || `${saleNumber} - ${clientName}`,
         description: description || null,
+        delivery_date: deliveryDate || null,
+        delivery_type: deliveryType,
+        shipping_carrier: deliveryType === 'ENTREGA' ? shippingCarrier || null : null,
+        tracking_code: deliveryType === 'ENTREGA' ? trackingCode || null : null,
+        address: deliveryType === 'ENTREGA' || deliveryType === 'INSTALACAO' ? address || null : null,
+        notes: deliveryType === 'ENTREGA' ? notes || null : null,
+        installation_date: deliveryType === 'INSTALACAO' ? installationDate || null : null,
+        installation_time_window: deliveryType === 'INSTALACAO' ? installationTimeWindow || null : null,
+        on_site_contact: deliveryType === 'INSTALACAO' ? onSiteContact || null : null,
+        is_reproducao: isReproducao,
+        repro_motivo: isReproducao ? reproMotivo || null : null,
+        has_letra_caixa: hasLetraCaixa,
         updated_at: new Date().toISOString(),
-      });
+      };
+      const updated = await updateOs(order.id, payload);
+
       await createOsEvent({
         os_id: order.id,
-        type: 'DETAILS_UPDATED',
-        payload: { customer_name: customerName, customer_phone: customerPhone, description },
+        type: 'details_updated',
+        payload: { sale_number: saleNumber, client_name: clientName, delivery_type: deliveryType },
         created_by: user?.id ?? null,
       });
+
+      if (order.delivery_type !== deliveryType) {
+        await createOsEvent({
+          os_id: order.id,
+          type: 'delivery_type_changed',
+          payload: { from: order.delivery_type, to: deliveryType },
+          created_by: user?.id ?? null,
+        });
+      }
+
+      if (order.delivery_date !== deliveryDate || order.installation_date !== installationDate) {
+        await createOsEvent({
+          os_id: order.id,
+          type: 'dates_changed',
+          payload: { delivery_date: deliveryDate, installation_date: installationDate },
+          created_by: user?.id ?? null,
+        });
+      }
+
       setOrder(updated);
       toast.success('Dados atualizados.');
     } catch (error) {
@@ -124,24 +185,69 @@ export default function OsDetailPage() {
     }
   };
 
-  const handleStatusChange = async (statusId: string) => {
+  const handleStatusArteChange = async (nextStatus: string) => {
     if (!order) return;
     try {
       const updated = await updateOs(order.id, {
-        status_id: statusId,
+        status_arte: nextStatus,
         updated_at: new Date().toISOString(),
       });
       await createOsEvent({
         os_id: order.id,
-        type: 'STATUS_CHANGED',
-        payload: { from: order.status_id, to: statusId },
+        type: 'status_arte_changed',
+        payload: { from: order.status_arte, to: nextStatus },
         created_by: user?.id ?? null,
       });
+      setStatusArte(nextStatus);
       setOrder(updated);
       toast.success('Status atualizado.');
     } catch (error) {
       console.error(error);
       toast.error('Erro ao atualizar status.');
+    }
+  };
+
+  const handleStatusProducaoChange = async (nextStatus: string) => {
+    if (!order) return;
+    try {
+      const updated = await updateOs(order.id, {
+        status_producao: nextStatus,
+        updated_at: new Date().toISOString(),
+      });
+      await createOsEvent({
+        os_id: order.id,
+        type: 'status_producao_changed',
+        payload: { from: order.status_producao, to: nextStatus },
+        created_by: user?.id ?? null,
+      });
+      setStatusProducao(nextStatus);
+      setOrder(updated);
+      toast.success('Status atualizado.');
+    } catch (error) {
+      console.error(error);
+      toast.error('Erro ao atualizar status.');
+    }
+  };
+
+  const handleSendToProduction = async () => {
+    if (!order) return;
+    try {
+      const updated = await updateOs(order.id, {
+        status_producao: PRODUCAO_STATUSES[0],
+        updated_at: new Date().toISOString(),
+      });
+      await createOsEvent({
+        os_id: order.id,
+        type: 'sent_to_production',
+        payload: { status_producao: PRODUCAO_STATUSES[0] },
+        created_by: user?.id ?? null,
+      });
+      setStatusProducao(PRODUCAO_STATUSES[0]);
+      setOrder(updated);
+      toast.success('OS enviada para produção.');
+    } catch (error) {
+      console.error(error);
+      toast.error('Erro ao enviar para produção.');
     }
   };
 
@@ -175,13 +281,13 @@ export default function OsDetailPage() {
 
   const handleCopyFinanceMessage = async () => {
     if (!order) return;
-    const titulo = order.title || order.customer_name || '';
+    const titulo = title || clientName || order.title || order.customer_name || '';
     const cadastroText = cadastroCompleto ? 'SIM' : 'NAO';
     const installmentsText = paymentInstallments || '';
     const secondInstallmentText = '';
 
     const message = [
-      'Nº VENDA:',
+      `Nº VENDA: ${saleNumber}`,
       `NOME DA VENDA: ${titulo}`,
       `CADASTRO COMPLETO: ${cadastroText}`,
       `PARCELA: ${installmentsText}`,
@@ -294,17 +400,114 @@ export default function OsDetailPage() {
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1">
+                <Label>Nº da venda</Label>
+                <Input value={saleNumber} onChange={(event) => setSaleNumber(event.target.value)} />
+              </div>
+              <div className="space-y-1">
                 <Label>Cliente</Label>
-                <Input value={customerName} onChange={(event) => setCustomerName(event.target.value)} />
+                <Input value={clientName} onChange={(event) => setClientName(event.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Telefone</Label>
                 <Input value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} />
               </div>
+              <div className="space-y-1">
+                <Label>Data de entrega</Label>
+                <Input type="date" value={deliveryDate} onChange={(event) => setDeliveryDate(event.target.value)} />
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1">
+                <Label>Título</Label>
+                <Input value={title} onChange={(event) => setTitle(event.target.value)} />
+              </div>
             </div>
             <div className="space-y-1">
               <Label>Descrição técnica</Label>
               <Textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} />
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo de saída</Label>
+              <RadioGroup value={deliveryType} onValueChange={(value) => setDeliveryType(value as DeliveryType)}>
+                <label className="flex items-center gap-2 text-sm">
+                  <RadioGroupItem value="RETIRADA" />
+                  Retirada
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <RadioGroupItem value="ENTREGA" />
+                  Entrega
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <RadioGroupItem value="INSTALACAO" />
+                  Instalação
+                </label>
+              </RadioGroup>
+            </div>
+
+            {deliveryType === 'ENTREGA' && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label>Transportadora</Label>
+                  <Input value={shippingCarrier} onChange={(event) => setShippingCarrier(event.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Código de rastreio</Label>
+                  <Input value={trackingCode} onChange={(event) => setTrackingCode(event.target.value)} />
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <Label>Endereço</Label>
+                  <Input value={address} onChange={(event) => setAddress(event.target.value)} />
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <Label>Observações</Label>
+                  <Input value={notes} onChange={(event) => setNotes(event.target.value)} />
+                </div>
+              </div>
+            )}
+
+            {deliveryType === 'INSTALACAO' && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label>Data de instalação</Label>
+                  <Input
+                    type="date"
+                    value={installationDate}
+                    onChange={(event) => setInstallationDate(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Janela de horário</Label>
+                  <Input
+                    value={installationTimeWindow}
+                    onChange={(event) => setInstallationTimeWindow(event.target.value)}
+                    placeholder="Ex: 08h-12h"
+                  />
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <Label>Endereço</Label>
+                  <Input value={address} onChange={(event) => setAddress(event.target.value)} />
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <Label>Contato no local</Label>
+                  <Input value={onSiteContact} onChange={(event) => setOnSiteContact(event.target.value)} />
+                </div>
+              </div>
+            )}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="flex items-center gap-2">
+                <Checkbox checked={isReproducao} onCheckedChange={(checked) => setIsReproducao(Boolean(checked))} />
+                <Label>Reprodução</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox checked={hasLetraCaixa} onCheckedChange={(checked) => setHasLetraCaixa(Boolean(checked))} />
+                <Label>Letra Caixa</Label>
+              </div>
+              {isReproducao && (
+                <div className="space-y-1 md:col-span-2">
+                  <Label>Motivo da reprodução</Label>
+                  <Input value={reproMotivo} onChange={(event) => setReproMotivo(event.target.value)} />
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <Button onClick={handleSaveDetails} disabled={saving}>
@@ -322,22 +525,40 @@ export default function OsDetailPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Status atual</Label>
-              <Select value={order.status_id} onValueChange={handleStatusChange}>
+              <Label>Status Arte</Label>
+              <Select value={statusArte} onValueChange={handleStatusArteChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o status" />
                 </SelectTrigger>
                 <SelectContent>
-                  {statuses.map((status) => (
-                    <SelectItem key={status.id} value={status.id}>
-                      {status.name}
+                  {ARTE_STATUSES.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {status}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {currentStatus?.is_terminal && (
-                <p className="text-xs text-emerald-600">Status final atingido.</p>
+              {statusArte === 'Produzir' && (
+                <Button variant="outline" size="sm" onClick={handleSendToProduction}>
+                  Enviar para Produção
+                </Button>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Status Produção</Label>
+              <Select value={statusProducao} onValueChange={handleStatusProducaoChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRODUCAO_STATUSES.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {status}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <Separator />
