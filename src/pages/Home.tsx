@@ -141,53 +141,6 @@ Quantidade: ${calculation.qty} un.
 Valor Total: ${valorFormatado}`;
   }, [calculation, selectedMaterial]);
 
-  const handleCreateOs = async () => {
-    if (!calculation || !selectedMaterial) return;
-    if (!customerName.trim()) {
-      toast.error('Informe o nome do cliente antes de gerar a OS.');
-      return;
-    }
-
-    try {
-      setCreatingOs(true);
-      const statuses = await fetchOsStatuses();
-      const initialStatus = statuses.find((status) => status.name === 'Caixa de Entrada') ?? statuses[0];
-
-      if (!initialStatus) {
-        toast.error('Status inicial da OS não encontrado.');
-        return;
-      }
-
-      const descriptionText = budgetSummaryText + (observation ? `\nObs: ${observation}` : '');
-      const os = await createOs({
-        quote_id: null,
-        quote_total: calculation.finalPrice,
-        customer_name: customerName,
-        customer_phone: customerPhone || null,
-        title: `OS - ${customerName}`,
-        description: descriptionText,
-        status_id: initialStatus.id,
-        payment_status: 'PENDING',
-        created_by: user?.id ?? null,
-        updated_at: new Date().toISOString(),
-      });
-
-      await createOsEvent({
-        os_id: os.id,
-        type: 'CREATED',
-        payload: { source: 'calculator', material: selectedMaterial.name, total: calculation.finalPrice },
-        created_by: user?.id ?? null,
-      });
-
-      toast.success('OS criada com sucesso!');
-      setLocation(`/os/${os.id}`);
-    } catch (error) {
-      console.error(error);
-      toast.error('Erro ao gerar OS.');
-    } finally {
-      setCreatingOs(false);
-    }
-  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full pb-10">

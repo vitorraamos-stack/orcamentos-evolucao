@@ -74,16 +74,21 @@ export default function OsKanbanPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Hub OS</h1>
           <p className="text-sm text-muted-foreground">
             Acompanhe e mova ordens de serviço pelos status configurados.
           </p>
         </div>
-        <Button variant="outline" onClick={loadData}>
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link href="/os/novo">
+            <Button>Nova OS</Button>
+          </Link>
+          <Button variant="outline" onClick={loadData}>
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">

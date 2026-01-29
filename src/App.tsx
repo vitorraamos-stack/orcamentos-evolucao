@@ -8,6 +8,7 @@ import Materiais from "@/pages/Materiais";
 import Configuracoes from "@/pages/Configuracoes";
 import OsKanbanPage from "@/modules/hub-os/pages/OsKanbanPage";
 import OsDetailPage from "@/modules/hub-os/pages/OsDetailPage";
+import OsCreatePage from "@/modules/hub-os/pages/OsCreatePage";
 import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -46,6 +47,12 @@ function Router() {
       <Route path="/os">
         <Layout>
           <OsKanbanPage />
+        </Layout>
+      </Route>
+
+      <Route path="/os/novo">
+        <Layout>
+          <OsCreatePage />
         </Layout>
       </Route>
 
