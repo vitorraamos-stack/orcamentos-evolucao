@@ -6,6 +6,9 @@ import Home from "@/pages/Home";
 // IMPORTANTE: Agora estamos importando o componente real!
 import Materiais from "@/pages/Materiais"; 
 import Configuracoes from "@/pages/Configuracoes";
+import OsKanbanPage from "@/modules/hub-os/pages/OsKanbanPage";
+import OsDetailPage from "@/modules/hub-os/pages/OsDetailPage";
+import OsCreatePage from "@/modules/hub-os/pages/OsCreatePage";
 import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -40,6 +43,24 @@ function Router() {
     {isAdmin ? <Configuracoes /> : <Redirect to="/" />}
   </Layout>
 </Route>
+
+      <Route path="/os">
+        <Layout>
+          <OsKanbanPage />
+        </Layout>
+      </Route>
+
+      <Route path="/os/novo">
+        <Layout>
+          <OsCreatePage />
+        </Layout>
+      </Route>
+
+      <Route path="/os/:id">
+        <Layout>
+          <OsDetailPage />
+        </Layout>
+      </Route>
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
