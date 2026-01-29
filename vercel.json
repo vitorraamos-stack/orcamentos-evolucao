@@ -1,13 +1,4 @@
 {
-  "crons": [
-    {
-      "path": "/api/conta-azul/sync",
-      "schedule": "*/5 * * * *",
-      "headers": {
-        "x-cron-secret": "@CONTA_AZUL_CRON_SECRET"
-      }
-    }
-  ],
   "routes": [
     { "handle": "filesystem" },
     { "src": "/.*", "dest": "/index.html" }
