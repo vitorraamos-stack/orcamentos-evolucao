@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { DndContext, DragEndEvent } from '@dnd-kit/core';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
 import { ART_COLUMNS, PROD_COLUMNS } from '@/features/hubos/constants';
@@ -168,8 +167,8 @@ export default function HubOS() {
   const renderBoard = (ordersList: OsOrder[], columns: string[], onDragEnd: (event: DragEndEvent) => void) => {
     return (
       <DndContext onDragEnd={onDragEnd}>
-        <ScrollArea className="w-full">
-          <div className="flex w-max gap-4 pb-4">
+        <div className="w-full overflow-x-auto">
+          <div className="flex w-max gap-4 pb-4 pr-4">
             {columns.map((status) => {
               const items = ordersList.filter((order) =>
                 columns === ART_COLUMNS ? order.art_status === status : order.prod_status === status
@@ -192,7 +191,7 @@ export default function HubOS() {
               );
             })}
           </div>
-        </ScrollArea>
+        </div>
       </DndContext>
     );
   };
@@ -201,7 +200,7 @@ export default function HubOS() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Hub OS</h1>
+          <h1 className="text-2xl font-semibold">Hub OS Evolução - Ordens de Serviço</h1>
           <p className="text-sm text-muted-foreground">
             Kanban integrado com tempo real e filtros avançados.
           </p>
