@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { 
   Calculator, 
   ClipboardList,
+  Image,
   Package, 
   LogOut, 
   Menu,
@@ -50,6 +51,19 @@ export default function Layout({ children }: LayoutProps) {
         >
           <ClipboardList className="mr-2 h-4 w-4" />
           Hub OS
+        </Button>
+      </Link>
+
+      <Link href="/galeria">
+        <Button
+          variant={location === '/galeria' ? 'secondary' : 'ghost'}
+          className={cn(
+            "w-full justify-start",
+            location === '/galeria' && "bg-sidebar-accent text-sidebar-accent-foreground"
+          )}
+        >
+          <Image className="mr-2 h-4 w-4" />
+          Galeria
         </Button>
       </Link>
 

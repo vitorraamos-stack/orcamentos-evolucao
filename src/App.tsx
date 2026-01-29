@@ -4,6 +4,7 @@ import NotFound from "@/pages/NotFound";
 import Login from "@/pages/Login";
 import Home from "@/pages/Home";
 import HubOS from "@/pages/HubOS";
+import Galeria from "@/pages/Galeria";
 // IMPORTANTE: Agora estamos importando o componente real!
 import Materiais from "@/pages/Materiais"; 
 import Configuracoes from "@/pages/Configuracoes";
@@ -34,6 +35,12 @@ function Router() {
       <Route path="/hub-os">
         <Layout>
           <HubOS />
+        </Layout>
+      </Route>
+
+      <Route path="/galeria">
+        <Layout>
+          <Galeria />
         </Layout>
       </Route>
       
