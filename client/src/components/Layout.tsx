@@ -11,7 +11,9 @@ import {
   Settings,
   Bug,
   ShieldCheck,
-  ShieldAlert
+  ShieldAlert,
+  LayoutGrid,
+  Factory
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
@@ -66,6 +68,34 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <Package className="mr-2 h-4 w-4" />
         Materiais
       </Button>
+
+      <div className="pt-2 pb-1">
+        <p className="px-2 text-xs font-semibold text-muted-foreground mb-1">
+          Hub OS
+        </p>
+        <Button
+          variant={location === '/hub-os/arte' ? 'secondary' : 'ghost'}
+          className={cn(
+            "w-full justify-start",
+            location === '/hub-os/arte' && "bg-sidebar-accent text-sidebar-accent-foreground"
+          )}
+          onClick={() => setLocation('/hub-os/arte')}
+        >
+          <LayoutGrid className="mr-2 h-4 w-4" />
+          Arte
+        </Button>
+        <Button
+          variant={location === '/hub-os/producao' ? 'secondary' : 'ghost'}
+          className={cn(
+            "w-full justify-start",
+            location === '/hub-os/producao' && "bg-sidebar-accent text-sidebar-accent-foreground"
+          )}
+          onClick={() => setLocation('/hub-os/producao')}
+        >
+          <Factory className="mr-2 h-4 w-4" />
+          Produção
+        </Button>
+      </div>
       
       {/* 
         MODIFICAÇÃO DE DEBUG:

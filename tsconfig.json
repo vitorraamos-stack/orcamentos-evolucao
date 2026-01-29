@@ -1,6 +1,6 @@
 {
-  "include": ["src/**/*", "shared/**/*", "api/**/*", "vite.config.ts"],
-  "exclude": ["node_modules", "build", "dist", "**/*.test.ts", "client/**/*"],
+  "include": ["client/src/**/*", "shared/**/*", "api/**/*", "vite.config.ts"],
+  "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
     "incremental": true,
     "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo",
@@ -16,7 +16,7 @@
     "baseUrl": ".",
     "types": ["node", "vite/client"],
     "paths": {
-      "@/*": ["./src/*"],
+      "@/*": ["./client/src/*"],
       "@shared/*": ["./shared/*"]
     }
   }

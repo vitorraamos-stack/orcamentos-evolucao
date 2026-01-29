@@ -11,7 +11,7 @@ export default defineConfig({
   resolve: {
     alias: {
       // Ajusta os atalhos para a nova posição das pastas na raiz
-      "@": path.resolve(import.meta.dirname, "src"),
+      "@": path.resolve(import.meta.dirname, "client/src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
     },
