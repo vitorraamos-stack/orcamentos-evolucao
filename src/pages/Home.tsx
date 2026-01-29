@@ -229,7 +229,7 @@ Valor Total: ${valorFormatado}`;
                 onValueChange={(value) => {
                   const nextValue = value as Fulfillment;
                   setFulfillment(nextValue);
-                  if (nextValue !== 'instalacao') {
+                  if (nextValue !== 'instalacao' && nextValue !== 'entrega') {
                     setInstallationAddress('');
                   }
                 }}
@@ -255,9 +255,13 @@ Valor Total: ${valorFormatado}`;
               )}
             </div>
 
-            {fulfillment === 'instalacao' && (
+            {(fulfillment === 'instalacao' || fulfillment === 'entrega') && (
               <div className="space-y-1">
-                <Label>Endereço de instalação (obrigatório)</Label>
+                <Label>
+                  {fulfillment === 'instalacao'
+                    ? 'Endereço de instalação (obrigatório)'
+                    : 'Endereço de entrega (obrigatório)'}
+                </Label>
                 <Textarea
                   value={installationAddress}
                   onChange={(event) => setInstallationAddress(event.target.value)}
