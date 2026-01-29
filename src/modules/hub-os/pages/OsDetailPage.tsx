@@ -173,6 +173,25 @@ export default function OsDetailPage() {
     toast.success('Caminho copiado!');
   };
 
+  const handleCopyFinanceMessage = async () => {
+    if (!order) return;
+    const titulo = order.title || order.customer_name || '';
+    const cadastroText = cadastroCompleto ? 'SIM' : 'NAO';
+    const installmentsText = paymentInstallments || '';
+    const secondInstallmentText = '';
+
+    const message = [
+      'Nº VENDA:',
+      `NOME DA VENDA: ${titulo}`,
+      `CADASTRO COMPLETO: ${cadastroText}`,
+      `PARCELA: ${installmentsText}`,
+      `2ª PARCELA = ${secondInstallmentText}`,
+    ].join('\n');
+
+    await navigator.clipboard.writeText(message);
+    toast.success('Mensagem do financeiro copiada!');
+  };
+
   const handlePaymentSubmit = async () => {
     if (!order) return;
 
@@ -404,6 +423,9 @@ export default function OsDetailPage() {
 
             <Button onClick={handlePaymentSubmit} disabled={saving}>
               Enviar comprovante
+            </Button>
+            <Button variant="outline" onClick={handleCopyFinanceMessage}>
+              Copiar mensagem p/ Grupo Financeiro (WhatsApp)
             </Button>
 
             <div className="space-y-2">

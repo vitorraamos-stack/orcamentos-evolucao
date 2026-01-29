@@ -291,7 +291,7 @@ Valor Total: ${valorFormatado}`;
               onClick={handleCopySummary}
               disabled={!calculation}
             >
-              <Copy className="mr-2 h-5 w-5" /> Copiar Resumo
+              <Copy className="mr-2 h-5 w-5" /> Copiar para o Cliente/WhatsApp
             </Button>
           </CardFooter>
         </Card>

@@ -40,7 +40,8 @@ export const resolvePaymentStatus = (params: {
 
   if (method === 'AGENDADO') return 'SCHEDULED';
 
-  const parsedDate = new Date(receivedDate);
+  const [year, month, day] = receivedDate.split('-').map(Number);
+  const parsedDate = new Date(year, (month ?? 1) - 1, day ?? 1);
   const today = new Date();
 
   if (

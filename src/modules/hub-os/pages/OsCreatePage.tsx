@@ -182,7 +182,7 @@ export default function OsCreatePage() {
           </div>
 
           <Button onClick={handleSubmit} disabled={saving}>
-            Criar OS
+            Gerar OS
           </Button>
         </CardContent>
       </Card>
