@@ -31,12 +31,14 @@ export default function Home() {
   const formatTierLabel = (tier: any, unidade: string) => {
     const minArea = parseValue(tier.min_area);
     const maxArea = tier.max_area === null ? null : parseValue(tier.max_area);
+    const price = parseValue(tier.price_per_m2);
     const minText = minArea.toLocaleString('pt-BR');
+    const priceText = price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     if (maxArea === null) {
-      return `Faixa aplicada: acima de ${minText} ${unidade}`;
+      return `Faixa aplicada: acima de ${minText} ${unidade} - ${priceText}`;
     }
     const maxText = maxArea.toLocaleString('pt-BR');
-    return `Faixa aplicada: ${minText} a ${maxText} ${unidade}`;
+    return `Faixa aplicada: ${minText} a ${maxText} ${unidade} - ${priceText}`;
   };
 
   // Função para limpar e converter valores brasileiros (vírgula) para floats de cálculo

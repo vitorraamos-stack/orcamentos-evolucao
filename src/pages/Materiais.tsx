@@ -118,6 +118,19 @@ export default function Materiais() {
     fetchMaterials();
   };
 
+  const handleImageUpload = (file: File | null) => {
+    if (!file) {
+      setImageUrl('');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      setImageUrl(result);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const resetForm = () => {
     setEditingId(null);
     setName('');
@@ -197,12 +210,22 @@ export default function Materiais() {
               </div>
 
               <div className="space-y-2">
-                <Label className="flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Imagem do Material (URL)</Label>
+                <Label className="flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Imagem do Material</Label>
                 <Input
                   type="url"
                   value={imageUrl}
                   onChange={e => setImageUrl(e.target.value)}
-                  placeholder="https://exemplo.com/imagem.jpg"
+                  placeholder="Cole a URL da imagem"
+                />
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="flex-1 border-t" />
+                  <span>ou</span>
+                  <span className="flex-1 border-t" />
+                </div>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={e => handleImageUpload(e.target.files?.[0] ?? null)}
                 />
                 {imageUrl && (
                   <div className="border rounded-md overflow-hidden bg-secondary/20">
