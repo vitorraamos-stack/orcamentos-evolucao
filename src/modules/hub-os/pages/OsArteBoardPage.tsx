@@ -5,16 +5,19 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { fetchOsList, updateOs, createOsEvent } from '../api';
 import type { Os } from '../types';
 import { ARTE_STATUSES, PRODUCAO_STATUSES } from '../statuses';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLocation } from 'wouter';
 
 const formatDateTime = (value: string) =>
   new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
 export default function OsArteBoardPage() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const [orders, setOrders] = useState<Os[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -101,7 +104,17 @@ export default function OsArteBoardPage() {
             Acompanhe o fluxo de arte e envie OS prontas para produção.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <ToggleGroup
+            type="single"
+            value="arte"
+            onValueChange={(value) => value && setLocation(`/os/${value}`)}
+            variant="outline"
+            className="bg-background"
+          >
+            <ToggleGroupItem value="arte">Arte</ToggleGroupItem>
+            <ToggleGroupItem value="producao">Produção</ToggleGroupItem>
+          </ToggleGroup>
           <Link href="/os/novo">
             <Button>Nova OS</Button>
           </Link>

@@ -4,12 +4,11 @@ import { useLocation, Link } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { 
   Calculator, 
+  ClipboardList,
   Package, 
   LogOut, 
   Menu,
-  Settings,
-  Paintbrush,
-  Factory
+  Settings
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
@@ -41,29 +40,16 @@ export default function Layout({ children }: LayoutProps) {
   // Componente de navegação interno com tipos corretos
   const NavItems = () => (
     <div className="space-y-1">
-      <Link href="/os/arte">
+      <Link href="/hub-os">
         <Button
-          variant={location === '/os/arte' ? 'secondary' : 'ghost'}
+          variant={location.startsWith('/hub-os') ? 'secondary' : 'ghost'}
           className={cn(
             "w-full justify-start",
-            location === '/os/arte' && "bg-sidebar-accent text-sidebar-accent-foreground"
+            location.startsWith('/hub-os') && "bg-sidebar-accent text-sidebar-accent-foreground"
           )}
         >
-          <Paintbrush className="mr-2 h-4 w-4" />
-          Arte
-        </Button>
-      </Link>
-
-      <Link href="/os/producao">
-        <Button
-          variant={location === '/os/producao' ? 'secondary' : 'ghost'}
-          className={cn(
-            "w-full justify-start",
-            location === '/os/producao' && "bg-sidebar-accent text-sidebar-accent-foreground"
-          )}
-        >
-          <Factory className="mr-2 h-4 w-4" />
-          Produção
+          <ClipboardList className="mr-2 h-4 w-4" />
+          Hub OS
         </Button>
       </Link>
 
@@ -76,7 +62,7 @@ export default function Layout({ children }: LayoutProps) {
           Calculadora
         </Button>
       </Link>
-      
+
       {isAdmin && (
         <>
           <Link href="/materiais">

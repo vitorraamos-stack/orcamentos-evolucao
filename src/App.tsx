@@ -3,6 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import Login from "@/pages/Login";
 import Home from "@/pages/Home";
+import HubOS from "@/pages/HubOS";
 // IMPORTANTE: Agora estamos importando o componente real!
 import Materiais from "@/pages/Materiais"; 
 import Configuracoes from "@/pages/Configuracoes";
@@ -27,6 +28,12 @@ function Router() {
       <Route path="/">
         <Layout>
           <Home />
+        </Layout>
+      </Route>
+
+      <Route path="/hub-os">
+        <Layout>
+          <HubOS />
         </Layout>
       </Route>
       
