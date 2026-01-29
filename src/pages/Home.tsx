@@ -7,8 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Copy, RefreshCw, Calculator, AlertCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { useLocation } from 'wouter';
+import { createOs, createOsEvent, fetchOsStatuses } from '@/modules/hub-os/api';
 
 export default function Home() {
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
@@ -16,6 +21,9 @@ export default function Home() {
   const [height, setHeight] = useState<string>(''); 
   const [quantity, setQuantity] = useState<string>('1');
   const [observation, setObservation] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [creatingOs, setCreatingOs] = useState(false);
 
   useEffect(() => { fetchMaterials(); }, []);
 
@@ -198,6 +206,25 @@ Valor Total: ${valorFormatado}`;
               />
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Cliente</Label>
+                <Input
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Nome do cliente"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Telefone</Label>
+                <Input
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  placeholder="(00) 00000-0000"
+                />
+              </div>
+            </div>
+
             {selectedMaterial?.equivalence_message && (
               <div className="mt-4 p-4 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-600">
                 <div className="flex gap-2 items-start">
@@ -253,17 +280,27 @@ Valor Total: ${valorFormatado}`;
             )}
           </CardContent>
           <CardFooter className="p-4 bg-sidebar-accent/10 border-t border-sidebar-border/50">
-            <Button 
-              className="w-full h-14 text-lg font-bold" 
-              onClick={() => { 
-                const fullText = budgetSummaryText + (observation ? `\nObs: ${observation}` : "");
-                navigator.clipboard.writeText(fullText); 
-                toast.success('Resumo copiado!'); 
-              }} 
-              disabled={!calculation}
-            >
-              <Copy className="mr-2 h-5 w-5" /> Copiar Resumo
-            </Button>
+            <div className="flex flex-col md:flex-row gap-3 w-full">
+              <Button
+                className="w-full h-14 text-lg font-bold"
+                onClick={handleCreateOs}
+                disabled={!calculation || creatingOs}
+              >
+                Gerar OS
+              </Button>
+              <Button 
+                variant="secondary"
+                className="w-full h-14 text-lg font-bold" 
+                onClick={() => { 
+                  const fullText = budgetSummaryText + (observation ? `\nObs: ${observation}` : "");
+                  navigator.clipboard.writeText(fullText); 
+                  toast.success('Resumo copiado!'); 
+                }} 
+                disabled={!calculation}
+              >
+                <Copy className="mr-2 h-5 w-5" /> Copiar Resumo
+              </Button>
+            </div>
           </CardFooter>
         </Card>
       </div>
