@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Plus, Trash2, Edit, Save, X, Image as ImageIcon, FileText, AlertTriangle, Ruler } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -187,10 +188,11 @@ export default function Materiais() {
 
               <div className="space-y-2">
                 <Label className="flex items-center gap-2 text-red-600 font-bold"><AlertTriangle className="h-4 w-4"/> Aviso de Equivalência</Label>
-                <Input 
+                <Textarea 
                   value={equivalenceMessage} 
                   onChange={e => setEquivalenceMessage(e.target.value)} 
                   placeholder="Ex: O preço para este material é o mesmo para..." 
+                  className="min-h-[80px] text-center"
                 />
               </div>
 
@@ -248,7 +250,7 @@ export default function Materiais() {
             </CardHeader>
             <CardContent>
               {m.equivalence_message && (
-                <div className="text-[10px] bg-red-600 text-white p-2 rounded mb-4 font-bold uppercase leading-tight">
+                <div className="text-[10px] bg-red-600 text-white p-2 rounded mb-4 font-bold leading-tight whitespace-pre-line text-center">
                    {m.equivalence_message}
                 </div>
               )}

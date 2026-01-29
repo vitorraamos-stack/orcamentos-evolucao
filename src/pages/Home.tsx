@@ -185,7 +185,9 @@ Valor Total: ${valorFormatado}`;
               <div className="mt-4 p-4 rounded-lg bg-red-600/10 border border-red-500/30 text-red-600">
                 <div className="flex gap-2 items-start">
                   <Info className="h-5 w-5 shrink-0" />
-                  <p className="text-sm font-bold uppercase leading-tight">{selectedMaterial.equivalence_message}</p>
+                  <p className="text-sm font-bold leading-tight whitespace-pre-line text-center w-full">
+                    {selectedMaterial.equivalence_message}
+                  </p>
                 </div>
               </div>
             )}
