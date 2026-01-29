@@ -19,6 +19,8 @@ type Fulfillment = '' | 'instalacao' | 'retirada' | 'entrega';
 
 type Fulfillment = '' | 'instalacao' | 'retirada' | 'entrega';
 
+type Fulfillment = '' | 'instalacao' | 'retirada' | 'entrega';
+
 export default function Home() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();

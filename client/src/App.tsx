@@ -6,6 +6,8 @@ import Home from "@/pages/Home";
 import Materiais from "@/pages/Materiais";
 import Settings from "@/pages/Settings";
 import Debug from "@/pages/Debug";
+import HubOSArte from "@/pages/HubOSArte";
+import HubOSProducao from "@/pages/HubOSProducao";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -18,6 +20,18 @@ function Router() {
       <Route path="/login" component={Login} />
       
       {/* Protected Routes - Specific routes first */}
+      <Route path="/hub-os/arte">
+        <Layout>
+          <HubOSArte />
+        </Layout>
+      </Route>
+
+      <Route path="/hub-os/producao">
+        <Layout>
+          <HubOSProducao />
+        </Layout>
+      </Route>
+
       <Route path="/materiais">
         <Layout>
           <Materiais />

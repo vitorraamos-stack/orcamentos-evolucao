@@ -164,6 +164,7 @@ export const runContaAzulSync = async (supabaseAdmin: SupabaseClient, now: Date)
         .insert({
           sale_number: String(saleNumber),
           client_name: String(customerName),
+          title: `${saleNumber} - ${customerName}`,
           description: descriptionParts.join('\n'),
           delivery_date: toDateString(deliveryDate),
           logistic_type: 'retirada',
