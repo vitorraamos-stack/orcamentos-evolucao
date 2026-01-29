@@ -1,4 +1,4 @@
-# Evolução Impressos - Sistema de Orçamentos
+# Evolução - Comunicação Visual - Sistema de Orçamentos
 
 Sistema web para cálculo de orçamentos de comunicação visual, desenvolvido com **React + Vite**, **Tailwind** e **Supabase**.
 
