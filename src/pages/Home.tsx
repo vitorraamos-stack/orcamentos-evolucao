@@ -28,6 +28,17 @@ export default function Home() {
 
   const selectedMaterial = useMemo(() => materials.find(m => m.id === selectedMaterialId), [materials, selectedMaterialId]);
 
+  const formatTierLabel = (tier: any, unidade: string) => {
+    const minArea = parseValue(tier.min_area);
+    const maxArea = tier.max_area === null ? null : parseValue(tier.max_area);
+    const minText = minArea.toLocaleString('pt-BR');
+    if (maxArea === null) {
+      return `Faixa aplicada: acima de ${minText} ${unidade}`;
+    }
+    const maxText = maxArea.toLocaleString('pt-BR');
+    return `Faixa aplicada: ${minText} a ${maxText} ${unidade}`;
+  };
+
   // Função para limpar e converter valores brasileiros (vírgula) para floats de cálculo
   const parseValue = (val: string | number | null | undefined) => {
     if (val === null || val === undefined || val === '') return 0;
@@ -86,6 +97,8 @@ export default function Home() {
     const minPrice = parseValue(selectedMaterial.min_price);
     const isUnderMinimumThreshold = minPrice > 0 && finalPrice > 0 && finalPrice < minPrice;
     const isUnderGeneralMinimum = finalPrice > 0 && finalPrice < 100;
+    const unidade = selectedMaterial.tipo_calculo === 'linear' ? 'ml' : 'm²';
+    const appliedTierLabel = appliedTier ? formatTierLabel(appliedTier, unidade) : '';
 
     return { 
       w, h, qty, 
@@ -93,9 +106,10 @@ export default function Home() {
       minPrice,
       isUnderMinimumThreshold,
       isUnderGeneralMinimum,
-      unidade: selectedMaterial.tipo_calculo === 'linear' ? 'ml' : 'm²',
+      unidade,
       widthUnit: parsedWidth.unit,
-      heightUnit: parsedHeight.unit
+      heightUnit: parsedHeight.unit,
+      appliedTierLabel
     };
   }, [selectedMaterial, width, height, quantity]);
 
@@ -182,10 +196,12 @@ Valor Total: ${valorFormatado}`;
             </div>
 
             {selectedMaterial?.equivalence_message && (
-              <div className="mt-4 p-4 rounded-lg bg-red-600/10 border border-red-500/30 text-red-600">
+              <div className="mt-4 p-4 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-600">
                 <div className="flex gap-2 items-start">
                   <Info className="h-5 w-5 shrink-0" />
-                  <p className="text-sm font-bold uppercase leading-tight">{selectedMaterial.equivalence_message}</p>
+                  <p className="text-sm font-bold leading-tight whitespace-pre-line text-center w-full">
+                    {selectedMaterial.equivalence_message}
+                  </p>
                 </div>
               </div>
             )}
@@ -210,7 +226,13 @@ Valor Total: ${valorFormatado}`;
                   {budgetSummaryText}
                   {observation && `\nObs: ${observation}`}
                 </div>
-                
+
+                {calculation.appliedTierLabel && (
+                  <div className="rounded-lg border border-emerald-500/50 bg-emerald-500/20 px-3 py-2 text-[11px] font-semibold uppercase leading-tight text-emerald-100">
+                    {calculation.appliedTierLabel}
+                  </div>
+                )}
+
                 {calculation.isUnderMinimumThreshold && (
                   <div className="flex gap-2 p-3 rounded-lg bg-red-500/20 border border-red-500/50 text-red-100 text-[11px] leading-tight items-start">
                     <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
