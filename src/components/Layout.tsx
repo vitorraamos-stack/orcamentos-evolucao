@@ -7,7 +7,8 @@ import {
   Package, 
   LogOut, 
   Menu,
-  Settings 
+  Settings,
+  ClipboardList
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
@@ -39,6 +40,19 @@ export default function Layout({ children }: LayoutProps) {
   // Componente de navegação interno com tipos corretos
   const NavItems = () => (
     <div className="space-y-1">
+      <Link href="/os">
+        <Button
+          variant={location.startsWith('/os') ? 'secondary' : 'ghost'}
+          className={cn(
+            "w-full justify-start",
+            location.startsWith('/os') && "bg-sidebar-accent text-sidebar-accent-foreground"
+          )}
+        >
+          <ClipboardList className="mr-2 h-4 w-4" />
+          OS
+        </Button>
+      </Link>
+
       <Link href="/">
         <Button 
           variant={location === '/' ? 'secondary' : 'ghost'} 

@@ -133,6 +133,7 @@ Quantidade: ${calculation.qty} un.
 Valor Total: ${valorFormatado}`;
   }, [calculation, selectedMaterial]);
 
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full pb-10">
       <div className="lg:col-span-6 space-y-4">
