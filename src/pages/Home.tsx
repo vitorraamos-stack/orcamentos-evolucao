@@ -218,13 +218,6 @@ Valor Total: ${valorFormatado}`;
                   </div>
                 )}
 
-                {calculation.isUnderGeneralMinimum && (
-                  <div className="flex gap-2 p-3 rounded-lg bg-red-500/20 border border-red-500/50 text-red-100 text-[11px] leading-tight items-start">
-                    <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
-                    <p><strong>ATENÇÃO:</strong> Se esse for o único item da venda, verifique a liberação do valor mínimo com a gestão.</p>
-                  </div>
-                )}
-                
                 <div className="mt-auto text-center border-t border-white/10 pt-6">
                   <p className="text-sm opacity-50 mb-1">Total a cobrar</p>
                   <div className="text-5xl font-bold text-sidebar-primary tracking-tighter">
