@@ -15,10 +15,6 @@ import { createOs, createOsEvent, fetchOsStatuses } from '@/modules/hub-os/api';
 
 type Fulfillment = '' | 'instalacao' | 'retirada' | 'entrega';
 
-type Fulfillment = '' | 'instalacao' | 'retirada' | 'entrega';
-
-type Fulfillment = '' | 'instalacao' | 'retirada' | 'entrega';
-
 export default function Home() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
@@ -29,7 +25,8 @@ export default function Home() {
   const [height, setHeight] = useState<string>(''); 
   const [quantity, setQuantity] = useState<string>('1');
   const [observation, setObservation] = useState('');
-  const customerName = '';
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [fulfillment, setFulfillment] = useState<Fulfillment>('');
   const [installationAddress, setInstallationAddress] = useState<string>('');
 
@@ -316,6 +313,8 @@ Valor Total: ${valorFormatado}`;
                 setHeight('');
                 setQuantity('1');
                 setObservation('');
+                setCustomerName('');
+                setCustomerPhone('');
                 setFulfillment('');
                 setInstallationAddress('');
               }}
