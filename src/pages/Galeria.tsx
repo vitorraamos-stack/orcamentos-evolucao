@@ -15,6 +15,7 @@ import { Loader2, Upload, Link as LinkIcon, Download, Pencil, Trash2 } from 'luc
 
 const PAGE_SIZE = 36;
 const SIGNED_URL_TTL = 60 * 60 * 24 * 7;
+const NO_MATERIAL_VALUE = 'no-material';
 
 type MaterialOption = {
   id: string;
@@ -77,7 +78,7 @@ export default function Galeria() {
   const [materialFilter, setMaterialFilter] = useState('all');
 
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [uploadMaterialId, setUploadMaterialId] = useState('');
+  const [uploadMaterialId, setUploadMaterialId] = useState(NO_MATERIAL_VALUE);
   const [uploadCaption, setUploadCaption] = useState('');
   const [uploadTags, setUploadTags] = useState('');
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
@@ -85,7 +86,7 @@ export default function Galeria() {
 
   const [editCaption, setEditCaption] = useState('');
   const [editTags, setEditTags] = useState('');
-  const [editMaterialId, setEditMaterialId] = useState('');
+  const [editMaterialId, setEditMaterialId] = useState(NO_MATERIAL_VALUE);
   const [savingEdit, setSavingEdit] = useState(false);
 
   const fetchMaterials = async () => {
@@ -183,11 +184,13 @@ export default function Galeria() {
     return photos.length < totalCount;
   }, [photos.length, totalCount]);
 
+  const resolveMaterialId = (value: string) => (value === NO_MATERIAL_VALUE ? null : value);
+
   const handleOpenPhoto = async (photo: PortfolioPhoto) => {
     setSelectedPhoto(photo);
     setEditCaption(photo.caption);
     setEditTags(photo.tags.join(', '));
-    setEditMaterialId(photo.material_id ?? '');
+    setEditMaterialId(photo.material_id ?? NO_MATERIAL_VALUE);
     try {
       const { data, error } = await supabase.storage
         .from('portfolio')
@@ -228,9 +231,10 @@ export default function Galeria() {
 
     try {
       setUploading(true);
-      const material = materials.find((item) => item.id === uploadMaterialId);
+      const resolvedMaterialId = resolveMaterialId(uploadMaterialId);
+      const material = materials.find((item) => item.id === resolvedMaterialId);
       const materialName = material?.name ?? '';
-      const materialSlug = slugify(materialName || uploadMaterialId || 'sem-material');
+      const materialSlug = slugify(materialName || 'sem-material');
       const now = new Date();
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -255,7 +259,7 @@ export default function Galeria() {
         if (thumbError) throw thumbError;
 
         const { error: insertError } = await supabase.from('portfolio_photos').insert({
-          material_id: material?.id ?? null,
+          material_id: resolvedMaterialId,
           material_name: materialName || null,
           caption: uploadCaption,
           tags,
@@ -270,7 +274,7 @@ export default function Galeria() {
       setUploadFiles([]);
       setUploadCaption('');
       setUploadTags('');
-      setUploadMaterialId('');
+      setUploadMaterialId(NO_MATERIAL_VALUE);
       setUploadOpen(false);
       fetchPhotos(true);
     } catch (error) {
@@ -286,13 +290,14 @@ export default function Galeria() {
     try {
       setSavingEdit(true);
       const tags = parseTags(editTags);
-      const material = materials.find((item) => item.id === editMaterialId);
+      const resolvedMaterialId = resolveMaterialId(editMaterialId);
+      const material = materials.find((item) => item.id === resolvedMaterialId);
       const { error } = await supabase
         .from('portfolio_photos')
         .update({
           caption: editCaption,
           tags,
-          material_id: editMaterialId || null,
+          material_id: resolvedMaterialId,
           material_name: material?.name ?? null,
         })
         .eq('id', selectedPhoto.id);
@@ -303,7 +308,7 @@ export default function Galeria() {
         ...selectedPhoto,
         caption: editCaption,
         tags,
-        material_id: editMaterialId || null,
+        material_id: resolvedMaterialId,
         material_name: material?.name ?? null,
       });
       fetchPhotos(true);
@@ -365,7 +370,7 @@ export default function Galeria() {
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Sem material</SelectItem>
+                        <SelectItem value={NO_MATERIAL_VALUE}>Sem material</SelectItem>
                         {materials.map((material) => (
                           <SelectItem key={material.id} value={material.id}>
                             {material.name}
@@ -566,7 +571,7 @@ export default function Galeria() {
                           <SelectValue placeholder="Selecione" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Sem material</SelectItem>
+                          <SelectItem value={NO_MATERIAL_VALUE}>Sem material</SelectItem>
                           {materials.map((material) => (
                             <SelectItem key={material.id} value={material.id}>
                               {material.name}
