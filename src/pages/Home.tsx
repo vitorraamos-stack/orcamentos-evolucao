@@ -9,10 +9,17 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Copy, RefreshCw, Calculator, AlertCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { useLocation } from 'wouter';
+import { createOs, createOsEvent, fetchOsStatuses } from '@/modules/hub-os/api';
+
+type Fulfillment = '' | 'instalacao' | 'retirada' | 'entrega';
 
 type Fulfillment = '' | 'instalacao' | 'retirada' | 'entrega';
 
 export default function Home() {
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
@@ -266,6 +273,25 @@ Valor Total: ${valorFormatado}`;
                 onChange={e => setObservation(e.target.value)} 
                 placeholder="Ex: Refilar e entregar" 
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Cliente</Label>
+                <Input
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Nome do cliente"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Telefone</Label>
+                <Input
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  placeholder="(00) 00000-0000"
+                />
+              </div>
             </div>
 
             {selectedMaterial?.equivalence_message && (
