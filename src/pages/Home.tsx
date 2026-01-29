@@ -141,6 +141,12 @@ Quantidade: ${calculation.qty} un.
 Valor Total: ${valorFormatado}`;
   }, [calculation, selectedMaterial]);
 
+  const handleCopySummary = () => {
+    const fullText = budgetSummaryText + (observation ? `\nObs: ${observation}` : "");
+    navigator.clipboard.writeText(fullText);
+    toast.success('Resumo copiado!');
+  };
+
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full pb-10">
@@ -280,27 +286,13 @@ Valor Total: ${valorFormatado}`;
             )}
           </CardContent>
           <CardFooter className="p-4 bg-sidebar-accent/10 border-t border-sidebar-border/50">
-            <div className="flex flex-col md:flex-row gap-3 w-full">
-              <Button
-                className="w-full h-14 text-lg font-bold"
-                onClick={handleCreateOs}
-                disabled={!calculation || creatingOs}
-              >
-                Gerar OS
-              </Button>
-              <Button 
-                variant="secondary"
-                className="w-full h-14 text-lg font-bold" 
-                onClick={() => { 
-                  const fullText = budgetSummaryText + (observation ? `\nObs: ${observation}` : "");
-                  navigator.clipboard.writeText(fullText); 
-                  toast.success('Resumo copiado!'); 
-                }} 
-                disabled={!calculation}
-              >
-                <Copy className="mr-2 h-5 w-5" /> Copiar Resumo
-              </Button>
-            </div>
+            <Button 
+              className="w-full h-14 text-lg font-bold" 
+              onClick={handleCopySummary}
+              disabled={!calculation}
+            >
+              <Copy className="mr-2 h-5 w-5" /> Copiar Resumo
+            </Button>
           </CardFooter>
         </Card>
       </div>
