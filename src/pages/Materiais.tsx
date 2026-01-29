@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Plus, Trash2, Edit, Save, X, Image as ImageIcon, FileText, AlertTriangle, Ruler } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -117,6 +118,19 @@ export default function Materiais() {
     fetchMaterials();
   };
 
+  const handleImageUpload = (file: File | null) => {
+    if (!file) {
+      setImageUrl('');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      setImageUrl(result);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const resetForm = () => {
     setEditingId(null);
     setName('');
@@ -187,20 +201,31 @@ export default function Materiais() {
 
               <div className="space-y-2">
                 <Label className="flex items-center gap-2 text-red-600 font-bold"><AlertTriangle className="h-4 w-4"/> Aviso de Equivalência</Label>
-                <Input 
+                <Textarea 
                   value={equivalenceMessage} 
                   onChange={e => setEquivalenceMessage(e.target.value)} 
                   placeholder="Ex: O preço para este material é o mesmo para..." 
+                  className="min-h-[80px] text-center"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label className="flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Imagem do Material (URL)</Label>
+                <Label className="flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Imagem do Material</Label>
                 <Input
                   type="url"
                   value={imageUrl}
                   onChange={e => setImageUrl(e.target.value)}
-                  placeholder="https://exemplo.com/imagem.jpg"
+                  placeholder="Cole a URL da imagem"
+                />
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="flex-1 border-t" />
+                  <span>ou</span>
+                  <span className="flex-1 border-t" />
+                </div>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={e => handleImageUpload(e.target.files?.[0] ?? null)}
                 />
                 {imageUrl && (
                   <div className="border rounded-md overflow-hidden bg-secondary/20">
@@ -248,7 +273,7 @@ export default function Materiais() {
             </CardHeader>
             <CardContent>
               {m.equivalence_message && (
-                <div className="text-[10px] bg-red-600 text-white p-2 rounded mb-4 font-bold uppercase leading-tight">
+                <div className="text-[10px] bg-red-600 text-white p-2 rounded mb-4 font-bold leading-tight whitespace-pre-line text-center">
                    {m.equivalence_message}
                 </div>
               )}
