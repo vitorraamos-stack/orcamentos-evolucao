@@ -17,6 +17,8 @@ type Fulfillment = '' | 'instalacao' | 'retirada' | 'entrega';
 
 type Fulfillment = '' | 'instalacao' | 'retirada' | 'entrega';
 
+type Fulfillment = '' | 'instalacao' | 'retirada' | 'entrega';
+
 export default function Home() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
@@ -230,6 +232,7 @@ Valor Total: ${valorFormatado}`;
                 onValueChange={(value) => {
                   const nextValue = value as Fulfillment;
                   setFulfillment(nextValue);
+                  if (nextValue !== 'instalacao') {
                   if (nextValue !== 'instalacao' && nextValue !== 'entrega') {
                     setInstallationAddress('');
                   }
@@ -256,6 +259,9 @@ Valor Total: ${valorFormatado}`;
               )}
             </div>
 
+            {fulfillment === 'instalacao' && (
+              <div className="space-y-1">
+                <Label>Endereço de instalação (obrigatório)</Label>
             {(fulfillment === 'instalacao' || fulfillment === 'entrega') && (
               <div className="space-y-1">
                 <Label>

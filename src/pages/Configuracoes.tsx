@@ -88,6 +88,7 @@ export default function Configuracoes() {
     setContaAzulLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch('/api/conta-azul/sync-admin', {
       const response = await fetch('/api/conta-azul/sync', {
         method: 'POST',
         headers: { Authorization: `Bearer ${session?.access_token}` },

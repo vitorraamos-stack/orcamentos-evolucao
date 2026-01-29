@@ -66,6 +66,18 @@ npm run dev
 
 > Rotas SPA já estão configuradas no `vercel.json`.
 
+### Agendamento Conta Azul (Supabase)
+
+No plano Hobby da Vercel, o cron não roda a cada poucos minutos. Para o polling da Conta Azul, use o scheduler do Supabase.
+
+1. Ative as extensões **pg_cron** e **pg_net** no Supabase.
+2. No Vault do Supabase, crie:
+   - `vercel_sync_url` (ex: `https://SEU-DOMINIO.vercel.app/api/conta-azul/sync`)
+   - `cron_secret` (o mesmo `CONTA_AZUL_CRON_SECRET`)
+3. Execute o SQL `supabase/conta_azul_cron.sql` para criar o agendamento.
+
+Para sincronização manual via UI (admin), o botão usa o endpoint `/api/conta-azul/sync-admin` com autenticação do Supabase.
+
 ---
 
 ## Estrutura do Projeto

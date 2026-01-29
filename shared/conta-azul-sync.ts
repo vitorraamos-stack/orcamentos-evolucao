@@ -1,28 +1,74 @@
-import { getSupabaseAdmin, json } from '../../shared/conta-azul-server';
-import { runContaAzulSync } from '../../shared/conta-azul-sync';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-export default async function handler(req: any, res: any) {
-  if (!['GET', 'POST'].includes(req.method)) return json(res, 405, { error: 'Method Not Allowed' });
+const API_BASE_URL = 'https://api.contaazul.com/v1';
+const TOKEN_URL = 'https://api.contaazul.com/oauth2/token';
+const DEFAULT_SYNC_WINDOW_DAYS = 2;
 
-  const cronSecret = req.headers?.['x-cron-secret'] as string | undefined;
-  const expectedCronSecret = process.env.CONTA_AZUL_CRON_SECRET;
+const toDateString = (value?: string | null) => (value ? value.slice(0, 10) : null);
 
-  if (!cronSecret || !expectedCronSecret || cronSecret !== expectedCronSecret) {
-    return json(res, 401, { error: 'Cron secret inválido.' });
-    const authResult = await requireAdminAuth(req);
-    if (!authResult.ok) return json(res, authResult.status, { error: authResult.error });
+const formatItemLine = (item: any) => {
+  const quantity = item.quantidade ?? item.quantity ?? item.qtd ?? 1;
+  const description = item.descricao ?? item.description ?? item.nome ?? item.name ?? 'Item';
+  const notes = item.observacoes ?? item.observation ?? item.obs ?? '';
+  const suffix = notes ? ` — ${notes}` : '';
+  return `- ${quantity}x ${description}${suffix}`;
+};
+
+const fetchJson = async (url: string, options: RequestInit) => {
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Erro na Conta Azul (${response.status}).`);
+  }
+  return response.json();
+};
+
+const refreshToken = async (refreshTokenValue: string) => {
+  const clientId = process.env.CONTA_AZUL_CLIENT_ID;
+  const clientSecret = process.env.CONTA_AZUL_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    throw new Error('Conta Azul não configurado.');
   }
 
-  const supabaseAdmin = getSupabaseAdmin();
-  const now = new Date();
-  const result = await runContaAzulSync(supabaseAdmin, now);
+  const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: refreshTokenValue,
+  });
 
-  if (!result.ok) {
-    return json(res, 500, { error: result.error });
-  }
+  return fetchJson(TOKEN_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${authHeader}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body,
+  });
+};
 
-  return json(res, 200, { ok: true, imported: result.importedCount });
+const fetchSales = async (accessToken: string, start: string, end: string) => {
+  const params = new URLSearchParams({
+    dataInicial: start,
+    dataFinal: end,
+    tipo: 'VENDA',
+    situacao: 'CONFIRMADO',
+  });
 
+  return fetchJson(`${API_BASE_URL}/venda/busca?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+};
+
+const fetchSaleItems = async (accessToken: string, saleId: string) => {
+  return fetchJson(`${API_BASE_URL}/venda/${saleId}/itens`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export const runContaAzulSync = async (supabaseAdmin: SupabaseClient, now: Date) => {
   let lastError: string | null = null;
   let importedCount = 0;
 
@@ -142,6 +188,7 @@ export default async function handler(req: any, res: any) {
 
       if (importError) throw importError;
       importedCount += 1;
+      await sleep(120);
     }
 
     await supabaseAdmin.from('conta_azul_sync_state').upsert(
@@ -154,7 +201,7 @@ export default async function handler(req: any, res: any) {
       { onConflict: 'id' }
     );
 
-    return json(res, 200, { ok: true, imported: importedCount });
+    return { ok: true, importedCount };
   } catch (error: any) {
     lastError = error?.message || 'Erro ao sincronizar.';
     await supabaseAdmin.from('conta_azul_sync_state').upsert(
@@ -165,6 +212,6 @@ export default async function handler(req: any, res: any) {
       },
       { onConflict: 'id' }
     );
-    return json(res, 500, { error: lastError });
+    return { ok: false, error: lastError };
   }
-}
+};
