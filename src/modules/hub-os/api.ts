@@ -1,0 +1,103 @@
+import { supabase } from '@/lib/supabase';
+import type { Os, OsEvent, OsPaymentProof, OsStatus, PaymentStatus } from './types';
+
+export const fetchOsStatuses = async () => {
+  const { data, error } = await supabase
+    .from('os_status')
+    .select('*')
+    .order('position');
+
+  if (error) throw error;
+  return data as OsStatus[];
+};
+
+export const fetchOsList = async () => {
+  const { data, error } = await supabase
+    .from('os')
+    .select('*')
+    .order('updated_at', { ascending: false });
+
+  if (error) throw error;
+  return data as Os[];
+};
+
+export const fetchOsById = async (id: string) => {
+  const { data, error } = await supabase
+    .from('os')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) throw error;
+  return data as Os;
+};
+
+export const fetchOsEvents = async (osId: string) => {
+  const { data, error } = await supabase
+    .from('os_event')
+    .select('*')
+    .eq('os_id', osId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data as OsEvent[];
+};
+
+export const fetchOsPayments = async (osId: string) => {
+  const { data, error } = await supabase
+    .from('os_payment_proof')
+    .select('*')
+    .eq('os_id', osId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data as OsPaymentProof[];
+};
+
+export const createOs = async (payload: Partial<Os>) => {
+  const { data, error } = await supabase.from('os').insert(payload).select('*').single();
+  if (error) throw error;
+  return data as Os;
+};
+
+export const updateOs = async (id: string, payload: Partial<Os>) => {
+  const { data, error } = await supabase
+    .from('os')
+    .update(payload)
+    .eq('id', id)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as Os;
+};
+
+export const createOsEvent = async (payload: Partial<OsEvent>) => {
+  const { data, error } = await supabase
+    .from('os_event')
+    .insert(payload)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as OsEvent;
+};
+
+export const createPaymentProof = async (payload: Partial<OsPaymentProof>) => {
+  const { data, error } = await supabase
+    .from('os_payment_proof')
+    .insert(payload)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as OsPaymentProof;
+};
+
+export const updateOsPaymentStatus = async (osId: string, status: PaymentStatus) => {
+  const { data, error } = await supabase
+    .from('os')
+    .update({ payment_status: status, updated_at: new Date().toISOString() })
+    .eq('id', osId)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as Os;
+};

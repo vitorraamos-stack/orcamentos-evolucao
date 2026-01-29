@@ -133,6 +133,13 @@ Quantidade: ${calculation.qty} un.
 Valor Total: ${valorFormatado}`;
   }, [calculation, selectedMaterial]);
 
+  const handleCopySummary = () => {
+    const fullText = budgetSummaryText + (observation ? `\nObs: ${observation}` : "");
+    navigator.clipboard.writeText(fullText);
+    toast.success('Resumo copiado!');
+  };
+
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full pb-10">
       <div className="lg:col-span-6 space-y-4">
@@ -254,14 +261,10 @@ Valor Total: ${valorFormatado}`;
           <CardFooter className="p-4 bg-sidebar-accent/10 border-t border-sidebar-border/50">
             <Button 
               className="w-full h-14 text-lg font-bold" 
-              onClick={() => { 
-                const fullText = budgetSummaryText + (observation ? `\nObs: ${observation}` : "");
-                navigator.clipboard.writeText(fullText); 
-                toast.success('Resumo copiado!'); 
-              }} 
+              onClick={handleCopySummary}
               disabled={!calculation}
             >
-              <Copy className="mr-2 h-5 w-5" /> Copiar Resumo
+              <Copy className="mr-2 h-5 w-5" /> Copiar para o Cliente/WhatsApp
             </Button>
           </CardFooter>
         </Card>
