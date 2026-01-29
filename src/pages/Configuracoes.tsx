@@ -11,19 +11,122 @@ import { toast } from 'sonner';
 export default function Configuracoes() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [contaAzulStatus, setContaAzulStatus] = useState<{
+    connected: boolean;
+    token_expires_at: string | null;
+    last_sync_at: string | null;
+    last_success_at: string | null;
+    last_error: string | null;
+  } | null>(null);
+  const [contaAzulLoading, setContaAzulLoading] = useState(false);
   
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState('consultor');
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => {
+    fetchUsers();
+    fetchCurrentUserRole();
+  }, []);
 
   const fetchUsers = async () => {
     const { data, error } = await supabase.from('profiles').select('*').order('created_at');
     if (error) toast.error('Erro ao carregar lista');
     else setUsers(data || []);
     setLoading(false);
+  };
+
+  const fetchCurrentUserRole = async () => {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) return;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userData.user.id)
+      .single();
+    const admin = profile?.role === 'admin';
+    setIsAdmin(admin);
+    if (admin) {
+      fetchContaAzulStatus();
+    }
+  };
+
+  const fetchContaAzulStatus = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch('/api/conta-azul/status', {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Erro ao carregar status.');
+      setContaAzulStatus(result);
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleContaAzulConnect = async () => {
+    setContaAzulLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch('/api/conta-azul/oauth/start?format=json', {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Erro ao iniciar conexão.');
+      window.location.href = result.url;
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setContaAzulLoading(false);
+    }
+  };
+
+  const handleContaAzulSync = async () => {
+    setContaAzulLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch('/api/conta-azul/sync-admin', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Erro ao sincronizar.');
+      toast.success('Sincronização concluída.');
+      fetchContaAzulStatus();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setContaAzulLoading(false);
+    }
+  };
+
+  const handleContaAzulDisconnect = async () => {
+    if (!confirm('Desconectar Conta Azul?')) return;
+    setContaAzulLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch('/api/conta-azul/disconnect', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Erro ao desconectar.');
+      toast.success('Conta Azul desconectada.');
+      setContaAzulStatus({
+        connected: false,
+        token_expires_at: null,
+        last_sync_at: null,
+        last_success_at: null,
+        last_error: null,
+      });
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setContaAzulLoading(false);
+    }
   };
 
   const handleCreateUser = async () => {
@@ -147,6 +250,49 @@ export default function Configuracoes() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ShieldAlert className="h-5 w-5" /> Integração Conta Azul
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!isAdmin && (
+            <p className="text-sm text-muted-foreground">
+              Apenas administradores podem configurar a integração com a Conta Azul.
+            </p>
+          )}
+          {isAdmin && (
+            <>
+              <div className="grid gap-2 text-sm">
+                <p>
+                  Status:{' '}
+                  <span className={contaAzulStatus?.connected ? 'text-emerald-600' : 'text-muted-foreground'}>
+                    {contaAzulStatus?.connected ? 'Conectado' : 'Desconectado'}
+                  </span>
+                </p>
+                <p>Última sincronização: {contaAzulStatus?.last_sync_at ?? '—'}</p>
+                <p>Último sucesso: {contaAzulStatus?.last_success_at ?? '—'}</p>
+                {contaAzulStatus?.last_error && (
+                  <p className="text-destructive">Erro: {contaAzulStatus.last_error}</p>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Button onClick={handleContaAzulConnect} disabled={contaAzulLoading}>
+                  Conectar Conta Azul
+                </Button>
+                <Button variant="outline" onClick={handleContaAzulSync} disabled={contaAzulLoading}>
+                  Sincronizar agora
+                </Button>
+                <Button variant="destructive" onClick={handleContaAzulDisconnect} disabled={contaAzulLoading}>
+                  Desconectar
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
