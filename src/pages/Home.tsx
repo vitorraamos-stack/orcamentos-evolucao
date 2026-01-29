@@ -15,6 +15,8 @@ import { createOs, createOsEvent, fetchOsStatuses } from '@/modules/hub-os/api';
 
 type Fulfillment = '' | 'instalacao' | 'retirada' | 'entrega';
 
+type Fulfillment = '' | 'instalacao' | 'retirada' | 'entrega';
+
 export default function Home() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
@@ -157,15 +159,8 @@ ${fulfillment === 'instalacao' ? `Endereço: ${installationAddress.trim() || '-'
 Valor Total: ${valorFormatado}`;
   }, [calculation, fulfillment, installationAddress, selectedMaterial]);
 
-  const handleCopySummary = () => {
+  const handleCopyResumo = () => {
     if (!calculation || !fulfillmentValid) return;
-    const fullText = budgetSummaryText + (observation ? `\nObs: ${observation}` : "");
-    navigator.clipboard.writeText(fullText);
-    toast.success('Resumo copiado!');
-  };
-
-
-  const handleCopySummary = () => {
     const fullText = budgetSummaryText + (observation ? `\nObs: ${observation}` : "");
     navigator.clipboard.writeText(fullText);
     toast.success('Resumo copiado!');
@@ -367,7 +362,7 @@ Valor Total: ${valorFormatado}`;
           <CardFooter className="p-4 bg-sidebar-accent/10 border-t border-sidebar-border/50">
             <Button 
               className="w-full h-14 text-lg font-bold" 
-              onClick={handleCopySummary}
+              onClick={handleCopyResumo}
               disabled={!calculation || !fulfillmentValid}
             >
               <Copy className="mr-2 h-5 w-5" /> Copiar resumo
