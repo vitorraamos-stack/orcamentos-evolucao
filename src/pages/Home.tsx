@@ -5,8 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Textarea } from '@/components/ui/textarea';
 import { Copy, RefreshCw, Calculator, AlertCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
+
+type Fulfillment = '' | 'instalacao' | 'retirada' | 'entrega';
 
 export default function Home() {
   const [materials, setMaterials] = useState<any[]>([]);
@@ -16,6 +20,8 @@ export default function Home() {
   const [height, setHeight] = useState<string>(''); 
   const [quantity, setQuantity] = useState<string>('1');
   const [observation, setObservation] = useState('');
+  const [fulfillment, setFulfillment] = useState<Fulfillment>('');
+  const [installationAddress, setInstallationAddress] = useState<string>('');
 
   useEffect(() => { fetchMaterials(); }, []);
 
@@ -27,6 +33,9 @@ export default function Home() {
   };
 
   const selectedMaterial = useMemo(() => materials.find(m => m.id === selectedMaterialId), [materials, selectedMaterialId]);
+
+  const fulfillmentValid =
+    fulfillment !== '' && (fulfillment !== 'instalacao' || installationAddress.trim().length > 0);
 
   const formatTierLabel = (tier: any, unidade: string) => {
     const minArea = parseValue(tier.min_area);
@@ -124,14 +133,32 @@ export default function Home() {
     const widthValue = calculation.widthUnit === 'm' ? calculation.w / 100 : calculation.w;
     const heightValue = calculation.heightUnit === 'm' ? calculation.h / 100 : calculation.h;
 
+    const fulfillmentLabel = fulfillment === 'instalacao'
+      ? 'Instalação'
+      : fulfillment === 'retirada'
+        ? 'Retirada'
+        : fulfillment === 'entrega'
+          ? 'Entrega'
+          : 'Não informado';
+
     return `${selectedMaterial.name} - 
 ${descMaterial} - 
 Tamanho: ${widthValue.toLocaleString('pt-BR')} ${calculation.widthUnit} x ${heightValue.toLocaleString('pt-BR')} ${calculation.heightUnit} (larg x alt) - 
 Acabamentos: corte reto
 ---------------------------
 Quantidade: ${calculation.qty} un.
+Logística: ${fulfillmentLabel}
+${fulfillment === 'instalacao' ? `Endereço: ${installationAddress.trim() || '-'}` : ''}
 Valor Total: ${valorFormatado}`;
-  }, [calculation, selectedMaterial]);
+  }, [calculation, fulfillment, installationAddress, selectedMaterial]);
+
+  const handleCopyResumo = () => {
+    if (!calculation || !fulfillmentValid) return;
+    const fullText = budgetSummaryText + (observation ? `\nObs: ${observation}` : "");
+    navigator.clipboard.writeText(fullText);
+    toast.success('Resumo copiado!');
+  };
+
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full pb-10">
@@ -188,6 +215,50 @@ Valor Total: ${valorFormatado}`;
               />
             </div>
 
+            <div className="space-y-3">
+              <Label>Logística (obrigatório)</Label>
+              <RadioGroup
+                value={fulfillment}
+                onValueChange={(value) => {
+                  const nextValue = value as Fulfillment;
+                  setFulfillment(nextValue);
+                  if (nextValue !== 'instalacao') {
+                    setInstallationAddress('');
+                  }
+                }}
+                className="gap-2"
+              >
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <RadioGroupItem value="instalacao" />
+                  Instalação
+                </label>
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <RadioGroupItem value="retirada" />
+                  Retirada
+                </label>
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <RadioGroupItem value="entrega" />
+                  Entrega
+                </label>
+              </RadioGroup>
+              {calculation && fulfillment === '' && (
+                <p className="text-xs text-destructive">
+                  Selecione a logística para liberar o resumo.
+                </p>
+              )}
+            </div>
+
+            {fulfillment === 'instalacao' && (
+              <div className="space-y-1">
+                <Label>Endereço de instalação (obrigatório)</Label>
+                <Textarea
+                  value={installationAddress}
+                  onChange={(event) => setInstallationAddress(event.target.value)}
+                  placeholder="Rua, número, bairro, cidade, ponto de referência…"
+                />
+              </div>
+            )}
+
             <div className="space-y-1">
               <Label>Observações do Orçamento</Label>
               <Input 
@@ -209,7 +280,18 @@ Valor Total: ${valorFormatado}`;
             )}
           </CardContent>
           <CardFooter className="border-t bg-secondary/10 p-4">
-            <Button variant="ghost" onClick={() => { setWidth(''); setHeight(''); setQuantity('1'); setObservation(''); }} className="ml-auto text-muted-foreground">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setWidth('');
+                setHeight('');
+                setQuantity('1');
+                setObservation('');
+                setFulfillment('');
+                setInstallationAddress('');
+              }}
+              className="ml-auto text-muted-foreground"
+            >
               <RefreshCw className="mr-2 h-4 w-4" /> Limpar Tudo
             </Button>
           </CardFooter>
@@ -254,14 +336,10 @@ Valor Total: ${valorFormatado}`;
           <CardFooter className="p-4 bg-sidebar-accent/10 border-t border-sidebar-border/50">
             <Button 
               className="w-full h-14 text-lg font-bold" 
-              onClick={() => { 
-                const fullText = budgetSummaryText + (observation ? `\nObs: ${observation}` : "");
-                navigator.clipboard.writeText(fullText); 
-                toast.success('Resumo copiado!'); 
-              }} 
-              disabled={!calculation}
+              onClick={handleCopyResumo}
+              disabled={!calculation || !fulfillmentValid}
             >
-              <Copy className="mr-2 h-5 w-5" /> Copiar Resumo
+              <Copy className="mr-2 h-5 w-5" /> Copiar resumo
             </Button>
           </CardFooter>
         </Card>
