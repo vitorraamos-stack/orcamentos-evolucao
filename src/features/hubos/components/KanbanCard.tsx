@@ -12,6 +12,7 @@ interface KanbanCardProps {
   logisticType: LogisticType;
   reproducao: boolean;
   letraCaixa: boolean;
+  onOpen?: () => void;
 }
 
 const logisticLabel: Record<LogisticType, string> = {
@@ -28,6 +29,7 @@ export default function KanbanCard({
   logisticType,
   reproducao,
   letraCaixa,
+  onOpen,
 }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useDraggable({ id });
 
@@ -42,8 +44,21 @@ export default function KanbanCard({
       style={style}
       {...listeners}
       {...attributes}
+      role="button"
+      tabIndex={0}
+      onClick={() => {
+        if (!isDragging) {
+          onOpen?.();
+        }
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpen?.();
+        }
+      }}
       className={cn(
-        'space-y-2 rounded-lg border border-border/60 bg-background p-3 shadow-sm',
+        'cursor-pointer space-y-2 rounded-lg border border-border/60 bg-background p-3 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
         isDragging && 'opacity-60'
       )}
     >
