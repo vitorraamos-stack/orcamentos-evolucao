@@ -185,6 +185,8 @@ export default function HubOS() {
                       logisticType={order.logistic_type}
                       reproducao={order.reproducao}
                       letraCaixa={order.letra_caixa}
+                      prodStatus={order.prod_status}
+                      productionTag={order.production_tag}
                       onOpen={() => {
                         setSelectedOrder(order);
                         setDialogOpen(true);
