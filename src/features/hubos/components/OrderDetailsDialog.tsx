@@ -55,6 +55,19 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
     return base.trim();
   }, [saleNumber, clientName]);
 
+  const normalizeDate = (value: string) => {
+    if (!value) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    const parts = value.split('/');
+    if (parts.length === 3) {
+      const [day, month, year] = parts;
+      if (day && month && year) {
+        return `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+    }
+    return value;
+  };
+
   const handleSave = async () => {
     if (!order) return;
     if (!logisticType) {
@@ -68,24 +81,38 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
 
     try {
       setSaving(true);
-      const updated = await updateOrder(order.id, {
+      const normalizedDeliveryDate = normalizeDate(deliveryDate);
+      const payload: Partial<OsOrder> = {
         sale_number: saleNumber,
         client_name: clientName,
         title: title.trim() || defaultTitle,
         description: description || null,
-        delivery_date: deliveryDate || null,
+        delivery_date: normalizedDeliveryDate,
         logistic_type: logisticType,
         address: logisticType === 'retirada' ? null : address.trim() || null,
         production_tag: productionTag || null,
         updated_at: new Date().toISOString(),
         updated_by: user?.id ?? null,
+      };
+
+      if (order.prod_status === 'Produção') {
+        payload.production_tag = productionTag || null;
+      }
+
+      const updated = await updateOrder(order.id, {
+        ...payload,
       });
       onUpdated(updated);
       toast.success('Card atualizado com sucesso.');
       onOpenChange(false);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro ao salvar as alterações.';
-      console.error(error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'object' && error && 'message' in error
+            ? String(error.message)
+            : 'Erro ao salvar as alterações.';
+      console.error('Erro ao salvar alterações do card.', error);
       toast.error(errorMessage);
     } finally {
       setSaving(false);
