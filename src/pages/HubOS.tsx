@@ -25,6 +25,8 @@ const defaultFilters: HubOsFilters = {
 
 const normalize = (value: string) => value.toLowerCase();
 
+const FINAL_PROD_STATUS = PROD_COLUMNS[PROD_COLUMNS.length - 1];
+
 const isOverdue = (order: OsOrder) => {
   if (!order.delivery_date) return false;
   const [year, month, day] = order.delivery_date.split('-').map(Number);
@@ -32,7 +34,7 @@ const isOverdue = (order: OsOrder) => {
   const today = new Date();
   delivery.setHours(0, 0, 0, 0);
   today.setHours(0, 0, 0, 0);
-  return delivery < today && order.prod_status !== 'Finalizados';
+  return delivery < today && order.prod_status !== FINAL_PROD_STATUS;
 };
 
 export default function HubOS() {
@@ -45,6 +47,7 @@ export default function HubOS() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [installationSearch, setInstallationSearch] = useState('');
   const [selectedInstallationId, setSelectedInstallationId] = useState<string | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
 
   const loadOrders = async () => {
     try {
@@ -112,44 +115,33 @@ export default function HubOS() {
     };
   }, [arteOrders, producaoOrders, filteredOrders, orders]);
 
-  const installationInboxOrders = useMemo(() => {
-    const search = normalize(installationSearch);
-    return orders
-      .filter((order) => {
-        if (order.logistic_type !== 'instalacao') return false;
-        if (!search) return true;
-        const description = order.description ?? '';
-        return (
-          normalize(order.sale_number).includes(search) ||
-          normalize(order.client_name).includes(search) ||
-          normalize(description).includes(search)
-        );
-      })
-      .sort((a, b) => {
-        const dateA = a.delivery_date ? new Date(`${a.delivery_date}T00:00:00`).getTime() : null;
-        const dateB = b.delivery_date ? new Date(`${b.delivery_date}T00:00:00`).getTime() : null;
-        if (dateA === null && dateB !== null) return 1;
-        if (dateA !== null && dateB === null) return -1;
-        if (dateA !== null && dateB !== null && dateA !== dateB) return dateA - dateB;
-        const updatedA = new Date(a.updated_at).getTime();
-        const updatedB = new Date(b.updated_at).getTime();
-        return updatedB - updatedA;
-      });
-  }, [orders, installationSearch]);
+  const installationOrders = useMemo(
+    () => orders.filter((order) => order.logistic_type === 'instalacao'),
+    [orders]
+  );
 
   useEffect(() => {
     if (viewMode !== 'instalacoes') return;
-    if (installationInboxOrders.length === 0) {
-      if (selectedInstallationId !== null) {
-        setSelectedInstallationId(null);
-      }
-      return;
-    }
-    const stillExists = installationInboxOrders.some((order) => order.id === selectedInstallationId);
-    if (!selectedInstallationId || !stillExists) {
-      setSelectedInstallationId(installationInboxOrders[0]?.id ?? null);
+    if (installationOrders.length === 0 && selectedInstallationId !== null) {
+      setSelectedInstallationId(null);
     }
   }, [installationInboxOrders, selectedInstallationId, viewMode]);
+
+  useEffect(() => {
+    if (viewMode !== 'kanban' || !highlightId) return;
+    const targetId = highlightId;
+    const scrollTimer = window.setTimeout(() => {
+      const element = document.querySelector(`[data-os-id="${targetId}"]`);
+      element?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 200);
+    const clearTimer = window.setTimeout(() => {
+      setHighlightId(null);
+    }, 2200);
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.clearTimeout(clearTimer);
+    };
+  }, [activeTab, highlightId, viewMode]);
 
   const updateLocalOrder = (updated: OsOrder) => {
     setOrders((prev) => prev.map((order) => (order.id === updated.id ? updated : order)));
@@ -233,6 +225,7 @@ export default function HubOS() {
                       letraCaixa={order.letra_caixa}
                       prodStatus={order.prod_status}
                       productionTag={order.production_tag}
+                      highlightId={highlightId}
                       onOpen={() => {
                         setSelectedOrder(order);
                         setDialogOpen(true);
@@ -303,6 +296,11 @@ export default function HubOS() {
           onEdit={(order) => {
             setSelectedOrder(order);
             setDialogOpen(true);
+          }}
+          onOpenKanban={(order) => {
+            setViewMode('kanban');
+            setActiveTab(order.prod_status ? 'producao' : 'arte');
+            setHighlightId(order.id);
           }}
         />
       )}
