@@ -2,7 +2,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useDraggable } from '@dnd-kit/core';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type { LogisticType } from '../types';
+import type { LogisticType, ProdStatus, ProductionTag } from '../types';
 
 interface KanbanCardProps {
   id: string;
@@ -12,6 +12,8 @@ interface KanbanCardProps {
   logisticType: LogisticType;
   reproducao: boolean;
   letraCaixa: boolean;
+  prodStatus?: ProdStatus | null;
+  productionTag?: ProductionTag | null;
   onOpen?: () => void;
 }
 
@@ -19,6 +21,11 @@ const logisticLabel: Record<LogisticType, string> = {
   retirada: 'Retirada',
   entrega: 'Entrega',
   instalacao: 'Instalação',
+};
+
+const productionTagConfig: Record<ProductionTag, { label: string; className: string }> = {
+  EM_PRODUCAO: { label: 'Em Produção', className: 'bg-orange-500 text-white' },
+  PRONTO: { label: 'Pronto', className: 'bg-emerald-500 text-white' },
 };
 
 export default function KanbanCard({
@@ -29,6 +36,8 @@ export default function KanbanCard({
   logisticType,
   reproducao,
   letraCaixa,
+  prodStatus,
+  productionTag,
   onOpen,
 }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useDraggable({ id });
@@ -46,7 +55,7 @@ export default function KanbanCard({
       {...attributes}
       role="button"
       tabIndex={0}
-      onClick={() => {
+      onDoubleClickCapture={() => {
         if (!isDragging) {
           onOpen?.();
         }
@@ -58,7 +67,7 @@ export default function KanbanCard({
         }
       }}
       className={cn(
-        'cursor-pointer space-y-2 rounded-lg border border-border/60 bg-background p-3 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        'cursor-pointer space-y-2 rounded-lg border border-border/60 bg-background p-3 shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 hover:ring-1 hover:ring-ring/30',
         isDragging && 'opacity-60'
       )}
     >
@@ -71,6 +80,11 @@ export default function KanbanCard({
         {deliveryDate && <Badge variant="secondary">Entrega: {deliveryDate}</Badge>}
         {reproducao && <Badge variant="destructive">Reprodução</Badge>}
         {letraCaixa && <Badge variant="secondary">Letra Caixa</Badge>}
+        {productionTag && prodStatus === 'Produção' && (
+          <Badge className={productionTagConfig[productionTag].className}>
+            {productionTagConfig[productionTag].label}
+          </Badge>
+        )}
       </div>
     </div>
   );

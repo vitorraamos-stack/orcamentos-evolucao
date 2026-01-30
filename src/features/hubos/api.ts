@@ -18,7 +18,7 @@ export const createOrder = async (payload: Partial<OsOrder>) => {
     .select('*')
     .single();
 
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return data as OsOrder;
 };
 
@@ -30,6 +30,6 @@ export const updateOrder = async (id: string, payload: Partial<OsOrder>) => {
     .select('*')
     .single();
 
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return data as OsOrder;
 };

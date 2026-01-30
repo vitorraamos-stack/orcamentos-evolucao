@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { updateOrder } from '../api';
 import { ART_COLUMNS, PROD_COLUMNS } from '../constants';
-import type { LogisticType, OsOrder } from '../types';
+import type { LogisticType, OsOrder, ProductionTag } from '../types';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface OrderDetailsDialogProps {
@@ -34,6 +34,7 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
   const [deliveryDate, setDeliveryDate] = useState('');
   const [logisticType, setLogisticType] = useState<LogisticType>('retirada');
   const [address, setAddress] = useState('');
+  const [productionTag, setProductionTag] = useState<ProductionTag | ''>('');
   const [saving, setSaving] = useState(false);
   const [moving, setMoving] = useState(false);
 
@@ -46,12 +47,26 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
     setDeliveryDate(order.delivery_date ?? '');
     setLogisticType(order.logistic_type ?? 'retirada');
     setAddress(order.address ?? '');
+    setProductionTag(order.production_tag ?? '');
   }, [order, open]);
 
   const defaultTitle = useMemo(() => {
     const base = [saleNumber, clientName].filter(Boolean).join(' - ');
     return base.trim();
   }, [saleNumber, clientName]);
+
+  const normalizeDate = (value: string) => {
+    if (!value) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    const parts = value.split('/');
+    if (parts.length === 3) {
+      const [day, month, year] = parts;
+      if (day && month && year) {
+        return `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+    }
+    return value;
+  };
 
   const handleSave = async () => {
     if (!order) return;
@@ -66,23 +81,38 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
 
     try {
       setSaving(true);
-      const updated = await updateOrder(order.id, {
+      const normalizedDeliveryDate = normalizeDate(deliveryDate);
+      const payload: Partial<OsOrder> = {
         sale_number: saleNumber,
         client_name: clientName,
         title: title.trim() || defaultTitle,
         description: description || null,
-        delivery_date: deliveryDate || null,
+        delivery_date: normalizedDeliveryDate,
         logistic_type: logisticType,
         address: logisticType === 'retirada' ? null : address.trim() || null,
         updated_at: new Date().toISOString(),
         updated_by: user?.id ?? null,
+      };
+
+      if (order.prod_status === 'Produção') {
+        payload.production_tag = productionTag || null;
+      }
+
+      const updated = await updateOrder(order.id, {
+        ...payload,
       });
       onUpdated(updated);
       toast.success('Card atualizado com sucesso.');
       onOpenChange(false);
     } catch (error) {
-      console.error(error);
-      toast.error('Erro ao salvar as alterações.');
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'object' && error && 'message' in error
+            ? String(error.message)
+            : 'Erro ao salvar as alterações.';
+      console.error('Erro ao salvar alterações do card.', error);
+      toast.error(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -191,6 +221,27 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
             <div className="space-y-1">
               <Label>Endereço de instalação</Label>
               <Input value={address} onChange={(event) => setAddress(event.target.value)} />
+            </div>
+          )}
+
+          {order?.prod_status === 'Produção' && (
+            <div className="space-y-2">
+              <Label>Tag de produção</Label>
+              <RadioGroup
+                value={productionTag}
+                onValueChange={(value) => setProductionTag(value as ProductionTag)}
+              >
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <RadioGroupItem value="EM_PRODUCAO" />
+                    Em Produção
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <RadioGroupItem value="PRONTO" />
+                    Pronto
+                  </label>
+                </div>
+              </RadioGroup>
             </div>
           )}
 
