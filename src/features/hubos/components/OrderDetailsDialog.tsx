@@ -301,27 +301,6 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
             </div>
           )}
 
-          {order?.prod_status === 'Produção' && (
-            <div className="space-y-2">
-              <Label>Tag de produção</Label>
-              <RadioGroup
-                value={productionTag}
-                onValueChange={(value) => setProductionTag(value as ProductionTag)}
-              >
-                <div className="flex flex-wrap gap-4">
-                  <label className="flex items-center gap-2 text-sm">
-                    <RadioGroupItem value="EM_PRODUCAO" />
-                    Em Produção
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <RadioGroupItem value="PRONTO" />
-                    Pronto
-                  </label>
-                </div>
-              </RadioGroup>
-            </div>
-          )}
-
           <div className="flex flex-wrap gap-2">
             {!order?.prod_status && (
               <Button variant="secondary" onClick={handleSendToProduction} disabled={moving}>
