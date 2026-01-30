@@ -12,6 +12,7 @@ import KanbanCard from '@/features/hubos/components/KanbanCard';
 import OrderDetailsDialog from '@/features/hubos/components/OrderDetailsDialog';
 import CreateOSDialog from '@/features/hubos/components/CreateOSDialog';
 import FiltersBar from '@/features/hubos/components/FiltersBar';
+import InstallationsInbox from '@/features/hubos/components/InstallationsInbox';
 import MetricsBar from '@/features/hubos/components/MetricsBar';
 
 const defaultFilters: HubOsFilters = {
@@ -38,8 +39,12 @@ export default function HubOS() {
   const [orders, setOrders] = useState<OsOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState(defaultFilters);
+  const [viewMode, setViewMode] = useState<'kanban' | 'instalacoes'>('kanban');
+  const [activeTab, setActiveTab] = useState<'arte' | 'producao'>('arte');
   const [selectedOrder, setSelectedOrder] = useState<OsOrder | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [installationSearch, setInstallationSearch] = useState('');
+  const [selectedInstallationId, setSelectedInstallationId] = useState<string | null>(null);
 
   const loadOrders = async () => {
     try {
@@ -101,9 +106,50 @@ export default function HubOS() {
       overdue: filteredOrders.filter(isOverdue).length,
       paraAprovacao: arteOrders.filter((order) => order.art_status === 'Para Aprovação').length,
       prontoAvisar: producaoOrders.filter((order) => order.prod_status === 'Pronto / Avisar Cliente').length,
-      instalacoes: producaoOrders.filter((order) => order.logistic_type === 'instalacao').length,
+      instalacoes: orders.filter(
+        (order) => order.logistic_type === 'instalacao' && order.prod_status !== 'Finalizados'
+      ).length,
     };
-  }, [arteOrders, producaoOrders, filteredOrders]);
+  }, [arteOrders, producaoOrders, filteredOrders, orders]);
+
+  const installationInboxOrders = useMemo(() => {
+    const search = normalize(installationSearch);
+    return orders
+      .filter((order) => {
+        if (order.logistic_type !== 'instalacao') return false;
+        if (!search) return true;
+        const description = order.description ?? '';
+        return (
+          normalize(order.sale_number).includes(search) ||
+          normalize(order.client_name).includes(search) ||
+          normalize(description).includes(search)
+        );
+      })
+      .sort((a, b) => {
+        const dateA = a.delivery_date ? new Date(`${a.delivery_date}T00:00:00`).getTime() : null;
+        const dateB = b.delivery_date ? new Date(`${b.delivery_date}T00:00:00`).getTime() : null;
+        if (dateA === null && dateB !== null) return 1;
+        if (dateA !== null && dateB === null) return -1;
+        if (dateA !== null && dateB !== null && dateA !== dateB) return dateA - dateB;
+        const updatedA = new Date(a.updated_at).getTime();
+        const updatedB = new Date(b.updated_at).getTime();
+        return updatedB - updatedA;
+      });
+  }, [orders, installationSearch]);
+
+  useEffect(() => {
+    if (viewMode !== 'instalacoes') return;
+    if (installationInboxOrders.length === 0) {
+      if (selectedInstallationId !== null) {
+        setSelectedInstallationId(null);
+      }
+      return;
+    }
+    const stillExists = installationInboxOrders.some((order) => order.id === selectedInstallationId);
+    if (!selectedInstallationId || !stillExists) {
+      setSelectedInstallationId(installationInboxOrders[0]?.id ?? null);
+    }
+  }, [installationInboxOrders, selectedInstallationId, viewMode]);
 
   const updateLocalOrder = (updated: OsOrder) => {
     setOrders((prev) => prev.map((order) => (order.id === updated.id ? updated : order)));
@@ -223,21 +269,43 @@ export default function HubOS() {
         </div>
       </div>
 
-      <MetricsBar {...metrics} />
-      <FiltersBar value={filters} onChange={setFilters} />
+      <MetricsBar
+        {...metrics}
+        onInstalacoesClick={() => {
+          setViewMode('instalacoes');
+        }}
+      />
 
-      <Tabs defaultValue="arte" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="arte">Arte</TabsTrigger>
-          <TabsTrigger value="producao">Produção</TabsTrigger>
-        </TabsList>
-        <TabsContent value="arte" className="space-y-4">
-          {renderBoard(arteOrders, ART_COLUMNS, handleDragEndArte)}
-        </TabsContent>
-        <TabsContent value="producao" className="space-y-4">
-          {renderBoard(producaoOrders, PROD_COLUMNS, handleDragEndProducao)}
-        </TabsContent>
-      </Tabs>
+      {viewMode === 'kanban' ? (
+        <>
+          <FiltersBar value={filters} onChange={setFilters} />
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'arte' | 'producao')} className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="arte">Arte</TabsTrigger>
+              <TabsTrigger value="producao">Produção</TabsTrigger>
+            </TabsList>
+            <TabsContent value="arte" className="space-y-4">
+              {renderBoard(arteOrders, ART_COLUMNS, handleDragEndArte)}
+            </TabsContent>
+            <TabsContent value="producao" className="space-y-4">
+              {renderBoard(producaoOrders, PROD_COLUMNS, handleDragEndProducao)}
+            </TabsContent>
+          </Tabs>
+        </>
+      ) : (
+        <InstallationsInbox
+          orders={installationInboxOrders}
+          selectedId={selectedInstallationId}
+          searchValue={installationSearch}
+          onSearchChange={setInstallationSearch}
+          onSelect={setSelectedInstallationId}
+          onBack={() => setViewMode('kanban')}
+          onEdit={(order) => {
+            setSelectedOrder(order);
+            setDialogOpen(true);
+          }}
+        />
+      )}
 
       <OrderDetailsDialog
         order={selectedOrder}
