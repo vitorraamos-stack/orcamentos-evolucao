@@ -109,9 +109,11 @@ export default function HubOS() {
       overdue: filteredOrders.filter(isOverdue).length,
       paraAprovacao: arteOrders.filter((order) => order.art_status === 'Para Aprovação').length,
       prontoAvisar: producaoOrders.filter((order) => order.prod_status === 'Pronto / Avisar Cliente').length,
-      instalacoes: producaoOrders.filter((order) => order.logistic_type === 'instalacao').length,
+      instalacoes: orders.filter(
+        (order) => order.logistic_type === 'instalacao' && order.prod_status !== 'Finalizados'
+      ).length,
     };
-  }, [arteOrders, producaoOrders, filteredOrders]);
+  }, [arteOrders, producaoOrders, filteredOrders, orders]);
 
   const installationOrders = useMemo(
     () => orders.filter((order) => order.logistic_type === 'instalacao'),
@@ -123,7 +125,7 @@ export default function HubOS() {
     if (installationOrders.length === 0 && selectedInstallationId !== null) {
       setSelectedInstallationId(null);
     }
-  }, [installationOrders, selectedInstallationId, viewMode]);
+  }, [installationInboxOrders, selectedInstallationId, viewMode]);
 
   useEffect(() => {
     if (viewMode !== 'kanban' || !highlightId) return;
@@ -285,7 +287,7 @@ export default function HubOS() {
         </>
       ) : (
         <InstallationsInbox
-          orders={installationOrders}
+          orders={installationInboxOrders}
           selectedId={selectedInstallationId}
           searchValue={installationSearch}
           onSearchChange={setInstallationSearch}
