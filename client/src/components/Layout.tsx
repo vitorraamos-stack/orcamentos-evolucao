@@ -31,6 +31,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [user, loading, setLocation]);
 
+  useEffect(() => {
+    if (!loading && user && isAdmin) {
+      console.log('Layout: User is Admin, Settings button should be visible');
+    }
+  }, [isAdmin, loading, user]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -40,13 +46,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) return null;
-
-  // DEBUG: Mostrar toast se for admin
-  useEffect(() => {
-    if (isAdmin) {
-      console.log('Layout: User is Admin, Settings button should be visible');
-    }
-  }, [isAdmin]);
 
   // Função auxiliar para renderizar os itens de menu
   const renderNavItems = () => (

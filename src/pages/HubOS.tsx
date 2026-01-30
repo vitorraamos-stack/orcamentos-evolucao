@@ -9,6 +9,7 @@ import type { ArtStatus, HubOsFilters, OsOrder, ProdStatus } from '@/features/hu
 import { fetchOrders, updateOrder } from '@/features/hubos/api';
 import KanbanColumn from '@/features/hubos/components/KanbanColumn';
 import KanbanCard from '@/features/hubos/components/KanbanCard';
+import OrderDetailsDialog from '@/features/hubos/components/OrderDetailsDialog';
 import CreateOSDialog from '@/features/hubos/components/CreateOSDialog';
 import FiltersBar from '@/features/hubos/components/FiltersBar';
 import MetricsBar from '@/features/hubos/components/MetricsBar';
@@ -37,6 +38,8 @@ export default function HubOS() {
   const [orders, setOrders] = useState<OsOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState(defaultFilters);
+  const [selectedOrder, setSelectedOrder] = useState<OsOrder | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const loadOrders = async () => {
     try {
@@ -82,15 +85,12 @@ export default function HubOS() {
   }, [orders, filters]);
 
   const arteOrders = useMemo(
-    () => filteredOrders.filter((order) => ART_COLUMNS.includes(order.art_status)),
+    () => filteredOrders.filter((order) => !order.prod_status && ART_COLUMNS.includes(order.art_status)),
     [filteredOrders]
   );
 
   const producaoOrders = useMemo(
-    () =>
-      filteredOrders.filter(
-        (order) => order.art_status === 'Produzir' || order.prod_status !== null
-      ),
+    () => filteredOrders.filter((order) => order.prod_status !== null),
     [filteredOrders]
   );
 
@@ -179,12 +179,16 @@ export default function HubOS() {
                     <KanbanCard
                       key={order.id}
                       id={order.id}
-                      title={`${order.sale_number} - ${order.client_name}`}
+                      title={order.title || `${order.sale_number} - ${order.client_name}`}
                       clientName={order.client_name}
                       deliveryDate={order.delivery_date}
                       logisticType={order.logistic_type}
                       reproducao={order.reproducao}
                       letraCaixa={order.letra_caixa}
+                      onOpen={() => {
+                        setSelectedOrder(order);
+                        setDialogOpen(true);
+                      }}
                     />
                   ))}
                 </KanbanColumn>
@@ -232,6 +236,18 @@ export default function HubOS() {
           {renderBoard(producaoOrders, PROD_COLUMNS, handleDragEndProducao)}
         </TabsContent>
       </Tabs>
+
+      <OrderDetailsDialog
+        order={selectedOrder}
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            setSelectedOrder(null);
+          }
+        }}
+        onUpdated={updateLocalOrder}
+      />
     </div>
   );
 }
