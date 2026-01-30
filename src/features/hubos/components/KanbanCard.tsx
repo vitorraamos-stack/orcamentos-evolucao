@@ -28,6 +28,17 @@ const productionTagConfig: Record<ProductionTag, { label: string; className: str
   PRONTO: { label: 'Pronto', className: 'bg-emerald-500 text-white' },
 };
 
+const formatDeliveryDate = (value?: string | null) => {
+  if (!value) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-');
+    if (year && month && day) {
+      return `${day}/${month}/${year}`;
+    }
+  }
+  return value;
+};
+
 export default function KanbanCard({
   id,
   title,
@@ -77,7 +88,7 @@ export default function KanbanCard({
       </div>
       <div className="flex flex-wrap gap-2">
         <Badge variant="outline">{logisticLabel[logisticType]}</Badge>
-        {deliveryDate && <Badge variant="secondary">Entrega: {deliveryDate}</Badge>}
+        {deliveryDate && <Badge variant="secondary">Entrega: {formatDeliveryDate(deliveryDate)}</Badge>}
         {reproducao && <Badge variant="destructive">Reprodução</Badge>}
         {letraCaixa && <Badge variant="secondary">Letra Caixa</Badge>}
         {productionTag && prodStatus === 'Produção' && (
