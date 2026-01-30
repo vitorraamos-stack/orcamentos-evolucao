@@ -28,6 +28,20 @@ const formatDate = (value: string | null) => {
   return new Intl.DateTimeFormat('pt-BR').format(new Date(year, month - 1, day));
 };
 
+const formatDateWithWeekday = (value: string | null) => {
+  if (!value) return 'Sem data';
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return value;
+  return new Intl.DateTimeFormat('pt-BR', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(
+    new Date(year, month - 1, day)
+  );
+};
+
 const getStatusLabel = (order: OsOrder) =>
   order.prod_status ? `Produção • ${order.prod_status}` : `Arte • ${order.art_status}`;
 
@@ -298,8 +312,20 @@ export default function InstallationsInbox({
                       isOverdue && 'border-l-4 border-l-destructive'
                     )}
                   >
-                    <div className="text-sm font-semibold">
-                      {order.sale_number} - {order.client_name}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-sm font-semibold">
+                        {order.sale_number} - {order.client_name}
+                      </div>
+                      {order.delivery_date && (
+                        <div className="rounded-md border border-yellow-200 bg-yellow-100 px-2 py-1 text-[11px] font-semibold text-yellow-900 animate-pulse [animation-duration:3s]">
+                          {formatDateWithWeekday(order.delivery_date)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <Badge variant="secondary">{getStatusLabel(order)}</Badge>
+                      {isOverdue && <Badge variant="destructive">ATRASADA</Badge>}
+                      {isToday && <Badge>HOJE</Badge>}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <Badge variant="secondary">{getStatusLabel(order)}</Badge>
