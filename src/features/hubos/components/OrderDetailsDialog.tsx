@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { updateOrder } from '../api';
 import { ART_COLUMNS, PROD_COLUMNS } from '../constants';
-import type { LogisticType, OsOrder } from '../types';
+import type { LogisticType, OsOrder, ProductionTag } from '../types';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface OrderDetailsDialogProps {
@@ -34,6 +34,7 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
   const [deliveryDate, setDeliveryDate] = useState('');
   const [logisticType, setLogisticType] = useState<LogisticType>('retirada');
   const [address, setAddress] = useState('');
+  const [productionTag, setProductionTag] = useState<ProductionTag | ''>('');
   const [saving, setSaving] = useState(false);
   const [moving, setMoving] = useState(false);
 
@@ -46,6 +47,7 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
     setDeliveryDate(order.delivery_date ?? '');
     setLogisticType(order.logistic_type ?? 'retirada');
     setAddress(order.address ?? '');
+    setProductionTag(order.production_tag ?? '');
   }, [order, open]);
 
   const defaultTitle = useMemo(() => {
@@ -74,6 +76,7 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
         delivery_date: deliveryDate || null,
         logistic_type: logisticType,
         address: logisticType === 'retirada' ? null : address.trim() || null,
+        production_tag: productionTag || null,
         updated_at: new Date().toISOString(),
         updated_by: user?.id ?? null,
       });
@@ -81,8 +84,9 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
       toast.success('Card atualizado com sucesso.');
       onOpenChange(false);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao salvar as alterações.';
       console.error(error);
-      toast.error('Erro ao salvar as alterações.');
+      toast.error(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -191,6 +195,27 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
             <div className="space-y-1">
               <Label>Endereço de instalação</Label>
               <Input value={address} onChange={(event) => setAddress(event.target.value)} />
+            </div>
+          )}
+
+          {order?.prod_status === 'Produção' && (
+            <div className="space-y-2">
+              <Label>Tag de produção</Label>
+              <RadioGroup
+                value={productionTag}
+                onValueChange={(value) => setProductionTag(value as ProductionTag)}
+              >
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <RadioGroupItem value="EM_PRODUCAO" />
+                    Em Produção
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <RadioGroupItem value="PRONTO" />
+                    Pronto
+                  </label>
+                </div>
+              </RadioGroup>
             </div>
           )}
 
