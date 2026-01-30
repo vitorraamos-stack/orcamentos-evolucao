@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,42 +9,35 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Copy, RefreshCw, Calculator, AlertCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
-import { useLocation } from 'wouter';
-import { createOs, createOsEvent, fetchOsStatuses } from '@/modules/hub-os/api';
-
-type Fulfillment = '' | 'instalacao' | 'retirada' | 'entrega';
-
-type Fulfillment = '' | 'instalacao' | 'retirada' | 'entrega';
-
-type Fulfillment = '' | 'instalacao' | 'retirada' | 'entrega';
 
 type Fulfillment = '' | 'instalacao' | 'retirada' | 'entrega';
 
 export default function Home() {
-  const { user } = useAuth();
-  const [, setLocation] = useLocation();
   const [materials, setMaterials] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
-  const [width, setWidth] = useState<string>(''); 
-  const [height, setHeight] = useState<string>(''); 
+  const [width, setWidth] = useState<string>('');
+  const [height, setHeight] = useState<string>('');
   const [quantity, setQuantity] = useState<string>('1');
   const [observation, setObservation] = useState('');
-  const customerName = '';
   const [fulfillment, setFulfillment] = useState<Fulfillment>('');
   const [installationAddress, setInstallationAddress] = useState<string>('');
 
-  useEffect(() => { fetchMaterials(); }, []);
+  useEffect(() => {
+    fetchMaterials();
+  }, []);
 
   const fetchMaterials = async () => {
-    setLoading(true);
-    const { data: mats } = await supabase.from('materials').select('*, tiers:price_tiers(*)').order('name');
+    const { data: mats } = await supabase
+      .from('materials')
+      .select('*, tiers:price_tiers(*)')
+      .order('name');
     setMaterials(mats || []);
-    setLoading(false);
   };
 
-  const selectedMaterial = useMemo(() => materials.find(m => m.id === selectedMaterialId), [materials, selectedMaterialId]);
+  const selectedMaterial = useMemo(
+    () => materials.find((m) => m.id === selectedMaterialId),
+    [materials, selectedMaterialId]
+  );
 
   const fulfillmentValid =
     fulfillment !== '' && (fulfillment !== 'instalacao' || installationAddress.trim().length > 0);
@@ -62,13 +55,10 @@ export default function Home() {
     return `Faixa aplicada: ${minText} a ${maxText} ${unidade} - ${priceText}`;
   };
 
-  // Função para limpar e converter valores brasileiros (vírgula) para floats de cálculo
   const parseValue = (val: string | number | null | undefined) => {
     if (val === null || val === undefined || val === '') return 0;
     const clean = val.toString().trim();
-    const normalized = clean.includes(',')
-      ? clean.replace(/\./g, '').replace(',', '.')
-      : clean;
+    const normalized = clean.includes(',') ? clean.replace(/\./g, '').replace(',', '.') : clean;
     const parsed = parseFloat(normalized.replace(/[^0-9.-]/g, ''));
     return isNaN(parsed) ? 0 : parsed;
   };
@@ -92,7 +82,7 @@ export default function Home() {
     const parsedHeight = parseDimensionWithUnit(height);
     const w = parsedWidth.valueCm;
     const h = parsedHeight.valueCm;
-    const qty = parseInt(quantity) || 0;
+    const qty = parseInt(quantity, 10) || 0;
 
     if (w <= 0 || h <= 0 || qty <= 0) return null;
 
@@ -100,15 +90,13 @@ export default function Home() {
     const wMetros = w / 100;
     const hMetros = h / 100;
 
-    // LÓGICA DE CÁLCULO: M2 ou Linear
     if (selectedMaterial.tipo_calculo === 'linear') {
       medidaBase = Math.max(wMetros, hMetros) * qty;
     } else {
-      medidaBase = (wMetros * hMetros) * qty;
+      medidaBase = wMetros * hMetros * qty;
     }
 
-    // Busca o preço na faixa correta baseado na medida calculada
-    let appliedTier = selectedMaterial.tiers?.find((t: any) => {
+    const appliedTier = selectedMaterial.tiers?.find((t: any) => {
       const minArea = parseValue(t.min_area);
       const maxArea = t.max_area === null ? null : parseValue(t.max_area);
       return medidaBase >= minArea && (maxArea === null || medidaBase <= maxArea);
@@ -123,8 +111,10 @@ export default function Home() {
     const unidade = selectedMaterial.tipo_calculo === 'linear' ? 'ml' : 'm²';
     const appliedTierLabel = appliedTier ? formatTierLabel(appliedTier, unidade) : '';
 
-    return { 
-      w, h, qty, 
+    return {
+      w,
+      h,
+      qty,
       finalPrice,
       minPrice,
       isUnderMinimumThreshold,
@@ -132,52 +122,81 @@ export default function Home() {
       unidade,
       widthUnit: parsedWidth.unit,
       heightUnit: parsedHeight.unit,
-      appliedTierLabel
+      appliedTierLabel,
     };
   }, [selectedMaterial, width, height, quantity]);
 
-  const budgetSummaryText = useMemo(() => {
-    if (!calculation || !selectedMaterial) return "";
+  const fulfillmentLabel = (value: Fulfillment) => {
+    switch (value) {
+      case 'instalacao':
+        return 'Instalação';
+      case 'retirada':
+        return 'Retirada';
+      case 'entrega':
+        return 'Entrega';
+      default:
+        return 'Não informado';
+    }
+  };
 
-    const valorFormatado = calculation.finalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    const descMaterial = selectedMaterial.description || "Descrição não cadastrada";
-    
+  const budgetSummaryText = useMemo(() => {
+    if (!calculation || !selectedMaterial) return '';
+
+    const valorFormatado = calculation.finalPrice.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    });
+
     const widthValue = calculation.widthUnit === 'm' ? calculation.w / 100 : calculation.w;
     const heightValue = calculation.heightUnit === 'm' ? calculation.h / 100 : calculation.h;
 
-    const fulfillmentLabel = fulfillment === 'instalacao'
-      ? 'Instalação'
-      : fulfillment === 'retirada'
-        ? 'Retirada'
-        : fulfillment === 'entrega'
-          ? 'Entrega'
-          : 'Não informado';
+    const summaryLines = [
+      `Material: ${selectedMaterial.name}`,
+      `Tamanho: ${widthValue.toLocaleString('pt-BR')} ${calculation.widthUnit} x ${heightValue.toLocaleString('pt-BR')} ${calculation.heightUnit}`,
+      `Quantidade: ${calculation.qty}`,
+      `Tipo: ${fulfillmentLabel(fulfillment)}`,
+    ];
 
-    return `${selectedMaterial.name} - 
-${descMaterial} - 
-Tamanho: ${widthValue.toLocaleString('pt-BR')} ${calculation.widthUnit} x ${heightValue.toLocaleString('pt-BR')} ${calculation.heightUnit} (larg x alt) - 
-Acabamentos: corte reto
----------------------------
-Quantidade: ${calculation.qty} un.
-Logística: ${fulfillmentLabel}
-${fulfillment === 'instalacao' ? `Endereço: ${installationAddress.trim() || '-'}` : ''}
-Valor Total: ${valorFormatado}`;
+    if (fulfillment === 'instalacao') {
+      summaryLines.push(`Endereço: ${installationAddress.trim() || '-'}`);
+    }
+
+    summaryLines.push(`Valor Total: ${valorFormatado}`);
+
+    return summaryLines.join('\n');
   }, [calculation, fulfillment, installationAddress, selectedMaterial]);
 
   const handleCopyResumo = () => {
-    if (!calculation || !fulfillmentValid) return;
-    const fullText = budgetSummaryText + (observation ? `\nObs: ${observation}` : "");
+    if (!calculation) {
+      toast.error('Preencha as medidas para gerar o resumo.');
+      return;
+    }
+
+    if (!fulfillment) {
+      toast.error('Selecione o tipo de logística.');
+      return;
+    }
+
+    if (fulfillment === 'instalacao' && !installationAddress.trim()) {
+      toast.error('Informe o endereço de instalação.');
+      return;
+    }
+
+    const fullText = budgetSummaryText + (observation ? `\nObs: ${observation}` : '');
     navigator.clipboard.writeText(fullText);
     toast.success('Resumo copiado!');
   };
 
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full pb-10">
+    <div className="grid grid-cols-1 lg:grid-cols-12 items-start gap-6 pb-10">
       <div className="lg:col-span-6 space-y-4">
-        <Card className="h-full flex flex-col shadow-sm border-border/50">
-          <CardHeader><CardTitle className="flex items-center gap-2 text-primary font-bold"><Calculator className="h-5 w-5"/> Evolução - Calculadora</CardTitle></CardHeader>
-          <CardContent className="space-y-4 flex-1">
+        <Card className="flex flex-col shadow-sm border-border/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-primary font-bold">
+              <Calculator className="h-5 w-5" /> Evolução - Calculadora
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="space-y-1">
               <Label>Material</Label>
               <Select value={selectedMaterialId} onValueChange={setSelectedMaterialId}>
@@ -186,7 +205,9 @@ Valor Total: ${valorFormatado}`;
                 </SelectTrigger>
                 <SelectContent>
                   {materials.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -195,35 +216,35 @@ Valor Total: ${valorFormatado}`;
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label>Largura (cm)</Label>
-                <Input 
-                  type="text" 
+                <Input
+                  type="text"
                   inputMode="decimal"
-                  value={width} 
-                  onChange={e => setWidth(e.target.value)} 
-                  placeholder="0,00 cm ou 0,00 m" 
-                  className="h-12 text-lg" 
+                  value={width}
+                  onChange={(e) => setWidth(e.target.value)}
+                  placeholder="0,00 cm ou 0,00 m"
+                  className="h-12 text-lg"
                 />
               </div>
               <div className="space-y-1">
                 <Label>Altura (cm)</Label>
-                <Input 
-                  type="text" 
+                <Input
+                  type="text"
                   inputMode="decimal"
-                  value={height} 
-                  onChange={e => setHeight(e.target.value)} 
-                  placeholder="0,00 cm ou 0,00 m" 
-                  className="h-12 text-lg" 
+                  value={height}
+                  onChange={(e) => setHeight(e.target.value)}
+                  placeholder="0,00 cm ou 0,00 m"
+                  className="h-12 text-lg"
                 />
               </div>
             </div>
 
             <div className="space-y-1">
               <Label>Quantidade</Label>
-              <Input 
-                type="number" 
-                value={quantity} 
-                onChange={e => setQuantity(e.target.value)} 
-                className="h-12 text-lg" 
+              <Input
+                type="number"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                className="h-12 text-lg"
               />
             </div>
 
@@ -235,7 +256,6 @@ Valor Total: ${valorFormatado}`;
                   const nextValue = value as Fulfillment;
                   setFulfillment(nextValue);
                   if (nextValue !== 'instalacao') {
-                  if (nextValue !== 'instalacao' && nextValue !== 'entrega') {
                     setInstallationAddress('');
                   }
                 }}
@@ -264,13 +284,6 @@ Valor Total: ${valorFormatado}`;
             {fulfillment === 'instalacao' && (
               <div className="space-y-1">
                 <Label>Endereço de instalação (obrigatório)</Label>
-            {(fulfillment === 'instalacao' || fulfillment === 'entrega') && (
-              <div className="space-y-1">
-                <Label>
-                  {fulfillment === 'instalacao'
-                    ? 'Endereço de instalação (obrigatório)'
-                    : 'Endereço de entrega (obrigatório)'}
-                </Label>
                 <Textarea
                   value={installationAddress}
                   onChange={(event) => setInstallationAddress(event.target.value)}
@@ -281,30 +294,11 @@ Valor Total: ${valorFormatado}`;
 
             <div className="space-y-1">
               <Label>Observações do Orçamento</Label>
-              <Input 
-                value={observation} 
-                onChange={e => setObservation(e.target.value)} 
-                placeholder="Ex: Refilar e entregar" 
+              <Input
+                value={observation}
+                onChange={(e) => setObservation(e.target.value)}
+                placeholder="Ex: Refilar e entregar"
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label>Cliente</Label>
-                <Input
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Nome do cliente"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Telefone</Label>
-                <Input
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  placeholder="(00) 00000-0000"
-                />
-              </div>
             </div>
 
             {selectedMaterial?.equivalence_message && (
@@ -338,13 +332,17 @@ Valor Total: ${valorFormatado}`;
       </div>
 
       <div className="lg:col-span-6">
-        <Card className="h-full border-border/50 shadow-lg bg-sidebar text-sidebar-foreground flex flex-col">
-          <CardHeader className="border-b border-sidebar-border/50"><CardTitle>Resumo do Orçamento</CardTitle></CardHeader>
-          <CardContent className="flex-1 py-6 flex flex-col">
+        <Card className="border-border/50 shadow-lg bg-sidebar text-sidebar-foreground flex flex-col">
+          <CardHeader className="border-b border-sidebar-border/50">
+            <CardTitle>Resumo do Orçamento</CardTitle>
+          </CardHeader>
+          <CardContent className="py-6 flex flex-col gap-4">
             {!calculation ? (
-              <div className="text-center text-sidebar-foreground/50 py-20 italic">Informe as medidas acima para ver o preço...</div>
+              <div className="text-center text-sidebar-foreground/50 py-12 italic">
+                Informe as medidas acima para ver o preço...
+              </div>
             ) : (
-              <div className="flex flex-col h-full space-y-4">
+              <>
                 <div className="bg-white/10 p-4 rounded-lg border border-white/10 whitespace-pre-wrap font-sans text-sm leading-relaxed">
                   {budgetSummaryText}
                   {observation && `\nObs: ${observation}`}
@@ -359,22 +357,33 @@ Valor Total: ${valorFormatado}`;
                 {calculation.isUnderMinimumThreshold && (
                   <div className="flex gap-2 p-3 rounded-lg bg-red-500/20 border border-red-500/50 text-red-100 text-[11px] leading-tight items-start">
                     <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
-                    <p><strong>ATENÇÃO:</strong> Valor abaixo do mínimo do produto ({calculation.minPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}). Se este for o único item da venda, verifique a liberação com a gestão.</p>
+                    <p>
+                      <strong>ATENÇÃO:</strong> Valor abaixo do mínimo do produto ({
+                        calculation.minPrice.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })
+                      }). Se este for o único item da venda, verifique a liberação com a
+                      gestão.
+                    </p>
                   </div>
                 )}
 
-                <div className="mt-auto text-center border-t border-white/10 pt-6">
+                <div className="text-center border-t border-white/10 pt-6">
                   <p className="text-sm opacity-50 mb-1">Total a cobrar</p>
                   <div className="text-5xl font-bold text-sidebar-primary tracking-tighter">
-                    {calculation.finalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    {calculation.finalPrice.toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
                   </div>
                 </div>
-              </div>
+              </>
             )}
           </CardContent>
           <CardFooter className="p-4 bg-sidebar-accent/10 border-t border-sidebar-border/50">
-            <Button 
-              className="w-full h-14 text-lg font-bold" 
+            <Button
+              className="w-full h-14 text-lg font-bold"
               onClick={handleCopyResumo}
               disabled={!calculation || !fulfillmentValid}
             >
