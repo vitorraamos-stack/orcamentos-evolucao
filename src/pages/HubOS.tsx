@@ -106,9 +106,50 @@ export default function HubOS() {
       overdue: filteredOrders.filter(isOverdue).length,
       paraAprovacao: arteOrders.filter((order) => order.art_status === 'Para Aprovação').length,
       prontoAvisar: producaoOrders.filter((order) => order.prod_status === 'Pronto / Avisar Cliente').length,
-      instalacoes: producaoOrders.filter((order) => order.logistic_type === 'instalacao').length,
+      instalacoes: orders.filter(
+        (order) => order.logistic_type === 'instalacao' && order.prod_status !== 'Finalizados'
+      ).length,
     };
-  }, [arteOrders, producaoOrders, filteredOrders]);
+  }, [arteOrders, producaoOrders, filteredOrders, orders]);
+
+  const installationOrders = useMemo(() => {
+    const search = normalize(installationSearch);
+    return orders
+      .filter((order) => {
+        if (order.logistic_type !== 'instalacao') return false;
+        if (!search) return true;
+        const description = order.description ?? '';
+        return (
+          normalize(order.sale_number).includes(search) ||
+          normalize(order.client_name).includes(search) ||
+          normalize(description).includes(search)
+        );
+      })
+      .sort((a, b) => {
+        const dateA = a.delivery_date ? new Date(`${a.delivery_date}T00:00:00`).getTime() : null;
+        const dateB = b.delivery_date ? new Date(`${b.delivery_date}T00:00:00`).getTime() : null;
+        if (dateA === null && dateB !== null) return 1;
+        if (dateA !== null && dateB === null) return -1;
+        if (dateA !== null && dateB !== null && dateA !== dateB) return dateA - dateB;
+        const updatedA = new Date(a.updated_at).getTime();
+        const updatedB = new Date(b.updated_at).getTime();
+        return updatedB - updatedA;
+      });
+  }, [orders, installationSearch]);
+
+  useEffect(() => {
+    if (viewMode !== 'instalacoes') return;
+    if (installationOrders.length === 0) {
+      if (selectedInstallationId !== null) {
+        setSelectedInstallationId(null);
+      }
+      return;
+    }
+    const stillExists = installationOrders.some((order) => order.id === selectedInstallationId);
+    if (!selectedInstallationId || !stillExists) {
+      setSelectedInstallationId(installationOrders[0]?.id ?? null);
+    }
+  }, [installationOrders, selectedInstallationId, viewMode]);
 
   const installationOrders = useMemo(() => {
     const search = normalize(installationSearch);
