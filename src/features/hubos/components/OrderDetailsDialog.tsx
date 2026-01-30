@@ -90,6 +90,7 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
         delivery_date: normalizedDeliveryDate,
         logistic_type: logisticType,
         address: logisticType === 'retirada' ? null : address.trim() || null,
+        production_tag: productionTag || null,
         updated_at: new Date().toISOString(),
         updated_by: user?.id ?? null,
       };
