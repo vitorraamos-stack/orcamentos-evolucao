@@ -327,11 +327,6 @@ export default function InstallationsInbox({
                       {isOverdue && <Badge variant="destructive">ATRASADA</Badge>}
                       {isToday && <Badge>HOJE</Badge>}
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <Badge variant="secondary">{getStatusLabel(order)}</Badge>
-                      {isOverdue && <Badge variant="destructive">ATRASADA</Badge>}
-                      {isToday && <Badge>HOJE</Badge>}
-                    </div>
                     <div className="flex flex-wrap items-center gap-2">
                       {order.delivery_date && (
                         <Badge variant="outline">Entrega: {formatDate(order.delivery_date)}</Badge>

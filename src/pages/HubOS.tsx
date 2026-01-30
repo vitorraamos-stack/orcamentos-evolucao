@@ -119,10 +119,11 @@ export default function HubOS() {
     () => orders.filter((order) => order.logistic_type === 'instalacao'),
     [orders]
   );
+  const installationInboxOrders = installationOrders;
 
   useEffect(() => {
     if (viewMode !== 'instalacoes') return;
-    if (installationOrders.length === 0 && selectedInstallationId !== null) {
+    if (installationInboxOrders.length === 0 && selectedInstallationId !== null) {
       setSelectedInstallationId(null);
     }
   }, [installationInboxOrders, selectedInstallationId, viewMode]);
