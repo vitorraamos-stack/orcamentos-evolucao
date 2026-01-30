@@ -6,9 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { ArrowLeft } from 'lucide-react';
 import { updateOrder } from '../api';
 import { ART_COLUMNS, PROD_COLUMNS } from '../constants';
-import type { LogisticType, OsOrder } from '../types';
+import type { LogisticType, OsOrder, ProductionTag } from '../types';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface OrderDetailsDialogProps {
@@ -34,6 +35,8 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
   const [deliveryDate, setDeliveryDate] = useState('');
   const [logisticType, setLogisticType] = useState<LogisticType>('retirada');
   const [address, setAddress] = useState('');
+  const [productionTag, setProductionTag] = useState<ProductionTag | ''>('');
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [moving, setMoving] = useState(false);
 
@@ -43,15 +46,41 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
     setClientName(order.client_name ?? '');
     setTitle(order.title ?? '');
     setDescription(order.description ?? '');
-    setDeliveryDate(order.delivery_date ?? '');
+    setDeliveryDate(formatDateDisplay(order.delivery_date));
     setLogisticType(order.logistic_type ?? 'retirada');
     setAddress(order.address ?? '');
+    setProductionTag(order.production_tag ?? '');
+    setEditing(false);
   }, [order, open]);
 
   const defaultTitle = useMemo(() => {
     const base = [saleNumber, clientName].filter(Boolean).join(' - ');
     return base.trim();
   }, [saleNumber, clientName]);
+
+  const formatDateDisplay = (value?: string | null) => {
+    if (!value) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const [year, month, day] = value.split('-');
+      if (year && month && day) {
+        return `${day}/${month}/${year}`;
+      }
+    }
+    return value;
+  };
+
+  const normalizeDate = (value: string) => {
+    if (!value) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    const parts = value.split('/');
+    if (parts.length === 3) {
+      const [day, month, year] = parts;
+      if (day && month && year) {
+        return `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+    }
+    return null;
+  };
 
   const handleSave = async () => {
     if (!order) return;
@@ -66,23 +95,38 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
 
     try {
       setSaving(true);
-      const updated = await updateOrder(order.id, {
+      const normalizedDeliveryDate = normalizeDate(deliveryDate);
+      const payload: Partial<OsOrder> = {
         sale_number: saleNumber,
         client_name: clientName,
         title: title.trim() || defaultTitle,
         description: description || null,
-        delivery_date: deliveryDate || null,
+        delivery_date: normalizedDeliveryDate,
         logistic_type: logisticType,
         address: logisticType === 'retirada' ? null : address.trim() || null,
         updated_at: new Date().toISOString(),
         updated_by: user?.id ?? null,
+      };
+
+      if (order.prod_status === 'Produção') {
+        payload.production_tag = productionTag || null;
+      }
+
+      const updated = await updateOrder(order.id, {
+        ...payload,
       });
       onUpdated(updated);
       toast.success('Card atualizado com sucesso.');
       onOpenChange(false);
     } catch (error) {
-      console.error(error);
-      toast.error('Erro ao salvar as alterações.');
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'object' && error && 'message' in error
+            ? String(error.message)
+            : 'Erro ao salvar as alterações.';
+      console.error('Erro ao salvar alterações do card.', error);
+      toast.error(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -143,32 +187,64 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
               <Label>Número da venda</Label>
-              <Input value={saleNumber} onChange={(event) => setSaleNumber(event.target.value)} />
+              <Input
+                value={saleNumber}
+                onChange={(event) => setSaleNumber(event.target.value)}
+                disabled={!editing}
+              />
             </div>
             <div className="space-y-1">
               <Label>Cliente</Label>
-              <Input value={clientName} onChange={(event) => setClientName(event.target.value)} />
+              <Input
+                value={clientName}
+                onChange={(event) => setClientName(event.target.value)}
+                disabled={!editing}
+              />
             </div>
           </div>
 
           <div className="space-y-1">
             <Label>Título</Label>
-            <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={defaultTitle} />
+            <Input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder={defaultTitle}
+              disabled={!editing}
+            />
           </div>
 
           <div className="space-y-1">
             <Label>Descrição detalhada do pedido</Label>
-            <Textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} />
+            <Textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              rows={4}
+              disabled={!editing}
+            />
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
               <Label>Data de entrega</Label>
-              <Input type="date" value={deliveryDate} onChange={(event) => setDeliveryDate(event.target.value)} />
+              <Input
+                value={deliveryDate}
+                onChange={(event) => setDeliveryDate(event.target.value)}
+                placeholder="dd/mm/aaaa"
+                inputMode="numeric"
+                disabled={!editing}
+              />
             </div>
             <div className="space-y-2">
               <Label>Tipo de entrega</Label>
-              <RadioGroup value={logisticType} onValueChange={(value) => setLogisticType(value as LogisticType)}>
+              <RadioGroup
+                value={logisticType}
+                onValueChange={(value) => {
+                  if (editing) {
+                    setLogisticType(value as LogisticType);
+                  }
+                }}
+                disabled={!editing}
+              >
                 <div className="flex flex-wrap gap-4">
                   <label className="flex items-center gap-2 text-sm">
                     <RadioGroupItem value="retirada" />
@@ -187,10 +263,40 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
             </div>
           </div>
 
-          {logisticType === 'instalacao' && (
+          {logisticType !== 'retirada' && (
             <div className="space-y-1">
-              <Label>Endereço de instalação</Label>
-              <Input value={address} onChange={(event) => setAddress(event.target.value)} />
+              <Label>Endereço de entrega/instalação</Label>
+              <Input
+                value={address}
+                onChange={(event) => setAddress(event.target.value)}
+                disabled={!editing}
+              />
+            </div>
+          )}
+
+          {order?.prod_status === 'Produção' && (
+            <div className="space-y-2">
+              <Label>Tag de produção</Label>
+              <RadioGroup
+                value={productionTag}
+                onValueChange={(value) => {
+                  if (editing) {
+                    setProductionTag(value as ProductionTag);
+                  }
+                }}
+                disabled={!editing}
+              >
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <RadioGroupItem value="EM_PRODUCAO" />
+                    Em Produção
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <RadioGroupItem value="PRONTO" />
+                    Pronto
+                  </label>
+                </div>
+              </RadioGroup>
             </div>
           )}
 
@@ -201,7 +307,8 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
               </Button>
             )}
             {order?.prod_status && isAdmin && (
-              <Button variant="outline" onClick={handleBackToArte} disabled={moving}>
+              <Button variant="outline" onClick={handleBackToArte} disabled={moving} className="gap-2">
+                <ArrowLeft className="h-4 w-4" />
                 Voltar para Arte
               </Button>
             )}
@@ -211,7 +318,10 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button variant="secondary" onClick={() => setEditing(true)} disabled={editing}>
+              Editar
+            </Button>
+            <Button onClick={handleSave} disabled={saving || !editing}>
               Salvar
             </Button>
           </div>

@@ -1,5 +1,7 @@
 export type LogisticType = 'retirada' | 'entrega' | 'instalacao';
 
+export type ProductionTag = 'EM_PRODUCAO' | 'PRONTO';
+
 export type ArtStatus =
   | 'Caixa de Entrada'
   | 'Em Criação'
@@ -24,6 +26,7 @@ export type OsOrder = {
   delivery_date: string | null;
   logistic_type: LogisticType;
   address: string | null;
+  production_tag: ProductionTag | null;
   art_status: ArtStatus;
   prod_status: ProdStatus | null;
   reproducao: boolean;
