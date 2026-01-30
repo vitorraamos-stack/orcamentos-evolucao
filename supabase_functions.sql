@@ -74,7 +74,7 @@ begin
   -- A melhor abordagem client-side é usar a API de Admin do Supabase (service_role), mas aqui estamos client-side only.
   -- WORKAROUND: O Admin cria o usuário usando supabase.auth.signUp() no frontend? 
   -- NÃO, isso logaria o admin como o novo usuário.
-  -- SOLUÇÃO: Usar a extensão `supabase_functions` ou chamar a API de Auth via pg_net se disponível.
+  -- SOLUÇÃO: Usar a extensão `supabase_functions` ou chamar a API de Auth via Edge Function, se disponível.
   -- MAS, para simplificar e funcionar em qualquer projeto Supabase Free:
   -- Vamos assumir que o Admin usará a interface para criar, mas precisamos de permissão.
   
