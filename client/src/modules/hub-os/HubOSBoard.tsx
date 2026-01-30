@@ -104,9 +104,7 @@ export default function HubOSBoard({ board, columns, title, subtitle }: HubOSBoa
 
   const logisticNeedsAddress = editingLogisticType === "instalacao"
   const canSave =
-    editingTitle.trim().length > 0 &&
-    editingLogisticType !== "" &&
-    (!logisticNeedsAddress || editingAddress.trim().length > 0)
+    editingTitle.trim().length > 0 && (!logisticNeedsAddress || editingAddress.trim().length > 0)
 
   const handleSave = async () => {
     if (!selectedOrder || !canSave) return
