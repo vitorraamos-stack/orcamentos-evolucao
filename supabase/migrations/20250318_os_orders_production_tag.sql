@@ -1,4 +1,5 @@
 alter table public.os_orders
+  add column if not exists title text,
   add column if not exists production_tag text;
 
 do $$
