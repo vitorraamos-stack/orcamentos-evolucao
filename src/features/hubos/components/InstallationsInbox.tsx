@@ -348,9 +348,16 @@ export default function InstallationsInbox({
           ) : (
             <div className="space-y-4">
               <div className="space-y-1">
-                <h3 className="text-xl font-semibold">
-                  {selectedOrder.sale_number} - {selectedOrder.client_name}
-                </h3>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-xl font-semibold">
+                    {selectedOrder.sale_number} - {selectedOrder.client_name}
+                  </h3>
+                  {selectedOrder.delivery_date && (
+                    <div className="rounded-md border border-yellow-200 bg-yellow-100 px-2 py-1 text-[11px] font-semibold text-yellow-900 animate-pulse [animation-duration:3s]">
+                      {formatDateWithWeekday(selectedOrder.delivery_date)}
+                    </div>
+                  )}
+                </div>
                 <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                   <Badge variant="secondary">{getStatusLabel(selectedOrder)}</Badge>
                   {getIsOverdue(selectedOrder) && <Badge variant="destructive">ATRASADA</Badge>}
