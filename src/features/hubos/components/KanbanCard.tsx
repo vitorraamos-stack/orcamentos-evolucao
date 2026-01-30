@@ -14,6 +14,7 @@ interface KanbanCardProps {
   letraCaixa: boolean;
   prodStatus?: ProdStatus | null;
   productionTag?: ProductionTag | null;
+  highlightId?: string | null;
   onOpen?: () => void;
 }
 
@@ -49,6 +50,7 @@ export default function KanbanCard({
   letraCaixa,
   prodStatus,
   productionTag,
+  highlightId,
   onOpen,
 }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useDraggable({ id });
@@ -62,6 +64,7 @@ export default function KanbanCard({
     <div
       ref={setNodeRef}
       style={style}
+      data-os-id={id}
       {...listeners}
       {...attributes}
       role="button"
@@ -79,7 +82,8 @@ export default function KanbanCard({
       }}
       className={cn(
         'cursor-pointer space-y-2 rounded-lg border border-border/60 bg-background p-3 shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 hover:ring-1 hover:ring-ring/30',
-        isDragging && 'opacity-60'
+        isDragging && 'opacity-60',
+        highlightId === id && 'ring-2 ring-primary ring-offset-2 animate-pulse'
       )}
     >
       <div className="space-y-1">
