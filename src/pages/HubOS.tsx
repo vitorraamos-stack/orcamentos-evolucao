@@ -112,7 +112,7 @@ export default function HubOS() {
     };
   }, [arteOrders, producaoOrders, filteredOrders, orders]);
 
-  const installationOrders = useMemo(() => {
+  const installationInboxOrders = useMemo(() => {
     const search = normalize(installationSearch);
     return orders
       .filter((order) => {
@@ -139,56 +139,17 @@ export default function HubOS() {
 
   useEffect(() => {
     if (viewMode !== 'instalacoes') return;
-    if (installationOrders.length === 0) {
+    if (installationInboxOrders.length === 0) {
       if (selectedInstallationId !== null) {
         setSelectedInstallationId(null);
       }
       return;
     }
-    const stillExists = installationOrders.some((order) => order.id === selectedInstallationId);
+    const stillExists = installationInboxOrders.some((order) => order.id === selectedInstallationId);
     if (!selectedInstallationId || !stillExists) {
-      setSelectedInstallationId(installationOrders[0]?.id ?? null);
+      setSelectedInstallationId(installationInboxOrders[0]?.id ?? null);
     }
-  }, [installationOrders, selectedInstallationId, viewMode]);
-
-  const installationOrders = useMemo(() => {
-    const search = normalize(installationSearch);
-    return orders
-      .filter((order) => {
-        if (order.logistic_type !== 'instalacao') return false;
-        if (!search) return true;
-        const description = order.description ?? '';
-        return (
-          normalize(order.sale_number).includes(search) ||
-          normalize(order.client_name).includes(search) ||
-          normalize(description).includes(search)
-        );
-      })
-      .sort((a, b) => {
-        const dateA = a.delivery_date ? new Date(`${a.delivery_date}T00:00:00`).getTime() : null;
-        const dateB = b.delivery_date ? new Date(`${b.delivery_date}T00:00:00`).getTime() : null;
-        if (dateA === null && dateB !== null) return 1;
-        if (dateA !== null && dateB === null) return -1;
-        if (dateA !== null && dateB !== null && dateA !== dateB) return dateA - dateB;
-        const updatedA = new Date(a.updated_at).getTime();
-        const updatedB = new Date(b.updated_at).getTime();
-        return updatedB - updatedA;
-      });
-  }, [orders, installationSearch]);
-
-  useEffect(() => {
-    if (viewMode !== 'instalacoes') return;
-    if (installationOrders.length === 0) {
-      if (selectedInstallationId !== null) {
-        setSelectedInstallationId(null);
-      }
-      return;
-    }
-    const stillExists = installationOrders.some((order) => order.id === selectedInstallationId);
-    if (!selectedInstallationId || !stillExists) {
-      setSelectedInstallationId(installationOrders[0]?.id ?? null);
-    }
-  }, [installationOrders, selectedInstallationId, viewMode]);
+  }, [installationInboxOrders, selectedInstallationId, viewMode]);
 
   const updateLocalOrder = (updated: OsOrder) => {
     setOrders((prev) => prev.map((order) => (order.id === updated.id ? updated : order)));
@@ -333,7 +294,7 @@ export default function HubOS() {
         </>
       ) : (
         <InstallationsInbox
-          orders={installationOrders}
+          orders={installationInboxOrders}
           selectedId={selectedInstallationId}
           searchValue={installationSearch}
           onSearchChange={setInstallationSearch}
