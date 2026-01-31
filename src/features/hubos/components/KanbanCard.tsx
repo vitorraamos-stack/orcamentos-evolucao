@@ -114,7 +114,7 @@ export default function KanbanCard({
           className="rounded-md border border-border/60 p-1 text-muted-foreground hover:text-foreground"
           {...listeners}
           {...attributes}
-          onPointerDown={(event) => event.stopPropagation()}
+          onPointerDownCapture={(event) => event.stopPropagation()}
           role="button"
           tabIndex={0}
           aria-label="Arrastar card"
