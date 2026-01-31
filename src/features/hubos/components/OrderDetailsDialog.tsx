@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ArrowLeft } from 'lucide-react';
-import { updateOrder } from '../api';
+import { createOrderEvent, updateOrder } from '../api';
 import { ART_COLUMNS, PROD_COLUMNS } from '../constants';
 import type { LogisticType, OsOrder, ProductionTag } from '../types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -143,6 +143,30 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
         updated_at: new Date().toISOString(),
         updated_by: user?.id ?? null,
       });
+      try {
+        await createOrderEvent({
+          os_id: order.id,
+          type: 'status_change',
+          payload: {
+            board: 'arte',
+            from: order.art_status,
+            to: 'Produzir',
+          },
+          created_by: user?.id ?? null,
+        });
+        await createOrderEvent({
+          os_id: order.id,
+          type: 'status_change',
+          payload: {
+            board: 'producao',
+            from: order.prod_status,
+            to: PROD_COLUMNS[0],
+          },
+          created_by: user?.id ?? null,
+        });
+      } catch (eventError) {
+        console.error('Erro ao registrar auditoria de status.', eventError);
+      }
       onUpdated(updated);
       toast.success('Card enviado para Produção.');
       onOpenChange(false);
@@ -164,6 +188,20 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
         updated_at: new Date().toISOString(),
         updated_by: user?.id ?? null,
       });
+      try {
+        await createOrderEvent({
+          os_id: order.id,
+          type: 'status_change',
+          payload: {
+            board: 'arte',
+            from: order.art_status,
+            to: ART_COLUMNS[0],
+          },
+          created_by: user?.id ?? null,
+        });
+      } catch (eventError) {
+        console.error('Erro ao registrar auditoria de status.', eventError);
+      }
       onUpdated(updated);
       toast.success('Card movido para Arte.');
       onOpenChange(false);

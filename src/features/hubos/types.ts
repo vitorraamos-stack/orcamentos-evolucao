@@ -31,10 +31,33 @@ export type OsOrder = {
   prod_status: ProdStatus | null;
   reproducao: boolean;
   letra_caixa: boolean;
+  archived: boolean;
+  archived_at: string | null;
+  archived_by: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type OsOrderEvent = {
+  id: string;
+  os_id: string;
+  type: string;
+  payload: Record<string, unknown>;
+  created_by: string | null;
+  created_at: string;
+  os?: {
+    id: string;
+    sale_number: string;
+    client_name: string;
+    title: string | null;
+  } | null;
+  profile?: {
+    id: string;
+    full_name: string | null;
+    email: string | null;
+  } | null;
 };
 
 export type HubOsFilters = {

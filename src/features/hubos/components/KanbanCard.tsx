@@ -1,7 +1,20 @@
 import { CSS } from '@dnd-kit/utilities';
 import { useDraggable } from '@dnd-kit/core';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
+import { GripVertical, Trash2, Archive } from 'lucide-react';
 import type { LogisticType, ProdStatus, ProductionTag } from '../types';
 
 interface KanbanCardProps {
@@ -15,7 +28,11 @@ interface KanbanCardProps {
   prodStatus?: ProdStatus | null;
   productionTag?: ProductionTag | null;
   highlightId?: string | null;
+  isAdmin?: boolean;
+  showArchive?: boolean;
   onOpen?: () => void;
+  onArchive?: () => void;
+  onDelete?: () => void;
 }
 
 const logisticLabel: Record<LogisticType, string> = {
@@ -51,7 +68,11 @@ export default function KanbanCard({
   prodStatus,
   productionTag,
   highlightId,
+  isAdmin = false,
+  showArchive = false,
   onOpen,
+  onArchive,
+  onDelete,
 }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useDraggable({ id });
 
@@ -65,8 +86,6 @@ export default function KanbanCard({
       ref={setNodeRef}
       style={style}
       data-os-id={id}
-      {...listeners}
-      {...attributes}
       role="button"
       tabIndex={0}
       onDoubleClickCapture={() => {
@@ -86,9 +105,22 @@ export default function KanbanCard({
         highlightId === id && 'ring-2 ring-primary ring-offset-2 animate-pulse'
       )}
     >
-      <div className="space-y-1">
-        <p className="text-sm font-semibold">{title}</p>
-        <p className="text-xs text-muted-foreground">{clientName}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-sm font-semibold">{title}</p>
+          <p className="text-xs text-muted-foreground">{clientName}</p>
+        </div>
+        <div
+          className="rounded-md border border-border/60 p-1 text-muted-foreground hover:text-foreground"
+          {...listeners}
+          {...attributes}
+          onPointerDown={(event) => event.stopPropagation()}
+          role="button"
+          tabIndex={0}
+          aria-label="Arrastar card"
+        >
+          <GripVertical className="h-4 w-4" />
+        </div>
       </div>
       <div className="flex flex-wrap gap-2">
         <Badge variant="outline">{logisticLabel[logisticType]}</Badge>
@@ -101,6 +133,78 @@ export default function KanbanCard({
           </Badge>
         )}
       </div>
+      {(isAdmin || showArchive) && (
+        <div className="flex flex-wrap gap-2">
+          {showArchive && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <Archive className="mr-1 h-4 w-4" />
+                  Arquivar
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent onPointerDown={(event) => event.stopPropagation()}>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Arquivar este card?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    O card será removido do Kanban padrão, mas ficará salvo para consulta.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onArchive?.();
+                    }}
+                  >
+                    Confirmar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+          {isAdmin && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <Trash2 className="mr-1 h-4 w-4" />
+                  Excluir
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent onPointerDown={(event) => event.stopPropagation()}>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Essa ação não pode ser desfeita. O card será excluído permanentemente.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDelete?.();
+                    }}
+                  >
+                    Excluir
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
+      )}
     </div>
   );
 }

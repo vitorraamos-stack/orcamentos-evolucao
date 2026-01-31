@@ -12,6 +12,7 @@ import OsArteBoardPage from "@/modules/hub-os/pages/OsArteBoardPage";
 import OsProducaoBoardPage from "@/modules/hub-os/pages/OsProducaoBoardPage";
 import OsDetailPage from "@/modules/hub-os/pages/OsDetailPage";
 import OsCreatePage from "@/modules/hub-os/pages/OsCreatePage";
+import OsAuditPage from "@/modules/hub-os/pages/OsAuditPage";
 import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -35,6 +36,12 @@ function Router() {
       <Route path="/hub-os">
         <Layout>
           <HubOS />
+        </Layout>
+      </Route>
+
+      <Route path="/hub-os/auditoria">
+        <Layout>
+          <OsAuditPage />
         </Layout>
       </Route>
 

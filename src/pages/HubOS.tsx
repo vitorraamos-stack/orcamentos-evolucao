@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
 import { ART_COLUMNS, PROD_COLUMNS } from '@/features/hubos/constants';
 import type { ArtStatus, HubOsFilters, OsOrder, ProdStatus } from '@/features/hubos/types';
-import { fetchOrders, updateOrder } from '@/features/hubos/api';
+import { archiveOrder, createOrderEvent, deleteOrder, fetchOrders, updateOrder } from '@/features/hubos/api';
 import KanbanColumn from '@/features/hubos/components/KanbanColumn';
 import KanbanCard from '@/features/hubos/components/KanbanCard';
 import OrderDetailsDialog from '@/features/hubos/components/OrderDetailsDialog';
@@ -14,6 +14,8 @@ import CreateOSDialog from '@/features/hubos/components/CreateOSDialog';
 import FiltersBar from '@/features/hubos/components/FiltersBar';
 import InstallationsInbox from '@/features/hubos/components/InstallationsInbox';
 import MetricsBar from '@/features/hubos/components/MetricsBar';
+import { Link } from 'wouter';
+import { useAuth } from '@/contexts/AuthContext';
 
 const defaultFilters: HubOsFilters = {
   search: '',
@@ -38,6 +40,7 @@ const isOverdue = (order: OsOrder) => {
 };
 
 export default function HubOS() {
+  const { user, isAdmin } = useAuth();
   const [orders, setOrders] = useState<OsOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState(defaultFilters);
@@ -148,6 +151,64 @@ export default function HubOS() {
     setOrders((prev) => prev.map((order) => (order.id === updated.id ? updated : order)));
   };
 
+  const handleArchive = async (order: OsOrder) => {
+    const previous = orders;
+    setOrders((prev) => prev.filter((item) => item.id !== order.id));
+
+    try {
+      await archiveOrder(order.id, user?.id ?? null);
+      try {
+        await createOrderEvent({
+          os_id: order.id,
+          type: 'archive',
+          payload: { archived: true },
+          created_by: user?.id ?? null,
+        });
+      } catch (eventError) {
+        console.error('Erro ao registrar auditoria de arquivamento.', eventError);
+      }
+      toast.success('Card arquivado.');
+    } catch (error) {
+      console.error(error);
+      setOrders(previous);
+      toast.error('Não foi possível arquivar o card.');
+    }
+  };
+
+  const handleDelete = async (order: OsOrder) => {
+    const previous = orders;
+    setOrders((prev) => prev.filter((item) => item.id !== order.id));
+
+    try {
+      await deleteOrder(order.id);
+      try {
+        await createOrderEvent({
+          os_id: order.id,
+          type: 'delete',
+          payload: {
+            previous: {
+              id: order.id,
+              sale_number: order.sale_number,
+              client_name: order.client_name,
+              title: order.title,
+              art_status: order.art_status,
+              prod_status: order.prod_status,
+            },
+            reason: 'manual_delete',
+          },
+          created_by: user?.id ?? null,
+        });
+      } catch (eventError) {
+        console.error('Erro ao registrar auditoria de exclusão.', eventError);
+      }
+      toast.success('Card excluído.');
+    } catch (error) {
+      console.error(error);
+      setOrders(previous);
+      toast.error('Você não tem permissão para excluir.');
+    }
+  };
+
   const handleDragEndArte = async ({ active, over }: DragEndEvent) => {
     if (!over) return;
     const order = orders.find((item) => item.id === active.id);
@@ -170,8 +231,23 @@ export default function HubOS() {
         art_status: nextStatus,
         prod_status: shouldInitProd ? 'Produção' : order.prod_status,
         updated_at: new Date().toISOString(),
+        updated_by: user?.id ?? null,
       });
       updateLocalOrder(updated);
+      try {
+        await createOrderEvent({
+          os_id: order.id,
+          type: 'status_change',
+          payload: {
+            board: 'arte',
+            from: order.art_status,
+            to: nextStatus,
+          },
+          created_by: user?.id ?? null,
+        });
+      } catch (eventError) {
+        console.error('Erro ao registrar auditoria de status.', eventError);
+      }
     } catch (error) {
       console.error(error);
       toast.error('Erro ao mover card.');
@@ -194,8 +270,23 @@ export default function HubOS() {
       const updated = await updateOrder(order.id, {
         prod_status: nextStatus,
         updated_at: new Date().toISOString(),
+        updated_by: user?.id ?? null,
       });
       updateLocalOrder(updated);
+      try {
+        await createOrderEvent({
+          os_id: order.id,
+          type: 'status_change',
+          payload: {
+            board: 'producao',
+            from: order.prod_status,
+            to: nextStatus,
+          },
+          created_by: user?.id ?? null,
+        });
+      } catch (eventError) {
+        console.error('Erro ao registrar auditoria de status.', eventError);
+      }
     } catch (error) {
       console.error(error);
       toast.error('Erro ao mover card.');
@@ -227,10 +318,14 @@ export default function HubOS() {
                       prodStatus={order.prod_status}
                       productionTag={order.production_tag}
                       highlightId={highlightId}
+                      isAdmin={isAdmin}
+                      showArchive={!isAdmin}
                       onOpen={() => {
                         setSelectedOrder(order);
                         setDialogOpen(true);
                       }}
+                      onArchive={() => handleArchive(order)}
+                      onDelete={() => handleDelete(order)}
                     />
                   ))}
                 </KanbanColumn>
@@ -252,6 +347,11 @@ export default function HubOS() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          {isAdmin && (
+            <Link href="/hub-os/auditoria">
+              <Button variant="secondary">Auditoria</Button>
+            </Link>
+          )}
           <CreateOSDialog
             onCreated={(order) => {
               setOrders((prev) => [order, ...prev]);
