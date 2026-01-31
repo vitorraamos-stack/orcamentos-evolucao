@@ -1,4 +1,5 @@
 import { CSS } from '@dnd-kit/utilities';
+import type { PointerEvent } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -75,6 +76,11 @@ export default function KanbanCard({
   onDelete,
 }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useDraggable({ id });
+  const { onPointerDown, ...dragListeners } = listeners;
+  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    onPointerDown?.(event);
+  };
 
   const style = {
     transform: CSS.Translate.toString(transform),
@@ -112,9 +118,9 @@ export default function KanbanCard({
         </div>
         <div
           className="rounded-md border border-border/60 p-1 text-muted-foreground hover:text-foreground"
-          {...listeners}
+          {...dragListeners}
           {...attributes}
-          onPointerDownCapture={(event) => event.stopPropagation()}
+          onPointerDown={handlePointerDown}
           role="button"
           tabIndex={0}
           aria-label="Arrastar card"
