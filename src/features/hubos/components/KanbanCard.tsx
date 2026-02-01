@@ -133,81 +133,83 @@ export default function KanbanCard({
         )}
       </div>
       {(isAdmin || showArchive) && (
-        <div className="flex flex-wrap gap-2 border-t border-border/60 pt-2">
-          {showArchive && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <Archive className="mr-1 h-4 w-4" />
-                  Arquivar
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent onPointerDown={(event) => event.stopPropagation()}>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Arquivar este card?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    O card será removido do Kanban padrão, mas ficará salvo para consulta.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onPointerDown={(event) => event.stopPropagation()}>
-                    Cancelar
-                  </AlertDialogCancel>
-                  <AlertDialogAction
+        <div className="mt-2 border-t border-border/60 pt-2">
+          <div className="inline-flex w-fit flex-wrap gap-2">
+            {showArchive && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onPointerDown={(event) => event.stopPropagation()}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onArchive?.();
-                    }}
+                    onClick={(event) => event.stopPropagation()}
                   >
-                    Confirmar
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-          {isAdmin && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <Trash2 className="mr-1 h-4 w-4" />
-                  Excluir
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent onPointerDown={(event) => event.stopPropagation()}>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Essa ação não pode ser desfeita. O card será excluído permanentemente.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onPointerDown={(event) => event.stopPropagation()}>
-                    Cancelar
-                  </AlertDialogCancel>
-                  <AlertDialogAction
+                    <Archive className="mr-1 h-4 w-4" />
+                    Arquivar
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent onPointerDown={(event) => event.stopPropagation()}>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Arquivar este card?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      O card será removido do Kanban padrão, mas ficará salvo para consulta.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onPointerDown={(event) => event.stopPropagation()}>
+                      Cancelar
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onArchive?.();
+                      }}
+                    >
+                      Confirmar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            {isAdmin && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    size="sm"
                     onPointerDown={(event) => event.stopPropagation()}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onDelete?.();
-                    }}
+                    onClick={(event) => event.stopPropagation()}
                   >
+                    <Trash2 className="mr-1 h-4 w-4" />
                     Excluir
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent onPointerDown={(event) => event.stopPropagation()}>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Essa ação não pode ser desfeita. O card será excluído permanentemente.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onPointerDown={(event) => event.stopPropagation()}>
+                      Cancelar
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onDelete?.();
+                      }}
+                    >
+                      Confirmar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         </div>
       )}
     </div>
