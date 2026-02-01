@@ -593,7 +593,7 @@ export default function Galeria() {
                         Salvar alterações
                       </Button>
                       <Button variant="destructive" onClick={handleDelete}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                        <Trash2 className="mr-2 h-4 w-4" /> Remover
                       </Button>
                     </div>
                   </div>

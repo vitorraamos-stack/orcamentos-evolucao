@@ -2,11 +2,22 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Trash2 } from 'lucide-react';
 import { createOrderEvent, updateOrder } from '../api';
 import { ART_COLUMNS, PROD_COLUMNS } from '../constants';
 import type { LogisticType, OsOrder, ProductionTag } from '../types';
@@ -17,6 +28,7 @@ interface OrderDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdated: (order: OsOrder) => void;
+  onDelete?: (order: OsOrder) => void;
 }
 
 const formatStatus = (order: OsOrder | null) => {
@@ -26,7 +38,13 @@ const formatStatus = (order: OsOrder | null) => {
   return `${boardLabel} • ${columnLabel}`;
 };
 
-export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdated }: OrderDetailsDialogProps) {
+export default function OrderDetailsDialog({
+  order,
+  open,
+  onOpenChange,
+  onUpdated,
+  onDelete,
+}: OrderDetailsDialogProps) {
   const { user, isAdmin } = useAuth();
   const [saleNumber, setSaleNumber] = useState('');
   const [clientName, setClientName] = useState('');
@@ -353,16 +371,48 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
             )}
           </div>
 
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button variant="secondary" onClick={() => setEditing(true)} disabled={editing}>
-              Editar
-            </Button>
-            <Button onClick={handleSave} disabled={saving || !editing}>
-              Salvar
-            </Button>
+          <div className={isAdmin ? 'flex flex-wrap items-center justify-between gap-2' : 'flex flex-wrap justify-end gap-2'}>
+            {isAdmin && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <Trash2 className="mr-1 h-4 w-4" />
+                    Excluir
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Essa ação não pode ser desfeita. O card será excluído permanentemente.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => {
+                        if (!order) return;
+                        onDelete?.(order);
+                        onOpenChange(false);
+                      }}
+                    >
+                      Confirmar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button variant="secondary" onClick={() => setEditing(true)} disabled={editing}>
+                Editar
+              </Button>
+              <Button onClick={handleSave} disabled={saving || !editing}>
+                Salvar
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

@@ -325,7 +325,6 @@ export default function HubOS() {
                         setDialogOpen(true);
                       }}
                       onArchive={() => handleArchive(order)}
-                      onDelete={() => handleDelete(order)}
                     />
                   ))}
                 </KanbanColumn>
@@ -416,6 +415,11 @@ export default function HubOS() {
           }
         }}
         onUpdated={updateLocalOrder}
+        onDelete={(order) => {
+          handleDelete(order);
+          setDialogOpen(false);
+          setSelectedOrder(null);
+        }}
       />
     </div>
   );
