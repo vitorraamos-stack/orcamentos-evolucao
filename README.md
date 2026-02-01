@@ -78,6 +78,7 @@ npm run dev
 ### Storage (Supabase)
 
 Crie o bucket **`comprovantes-os`** no Supabase Storage para armazenar anexos de comprovantes.
+Crie também o bucket **`os-artes`** para uploads temporários de artes e referências das OS (limpeza feita pelo agente).
 
 Os uploads serão salvos no formato:
 
@@ -86,3 +87,25 @@ Os uploads serão salvos no formato:
 ```
 
 Se você preferir URLs privadas, ajuste o método de geração de URL no módulo `src/modules/hub-os`.
+
+### Agent de Artes/Referências (Windows)
+
+O agente roda na rede local para copiar os arquivos do Supabase Storage para o SMB e limpar o storage após confirmar.
+
+1. Variáveis de ambiente necessárias:
+
+```env
+SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+OS_ASSET_BUCKET=os-artes
+SMB_BASE=\\\\filesrv\\A_Z
+POLL_INTERVAL_SECONDS=10
+```
+
+2. Instalação e execução:
+
+```bash
+cd tools/os-asset-agent
+npm install
+npm run start
+```

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,8 @@ import type { LogisticType, OsOrder } from '../types';
 import { createOrder } from '../api';
 import { ART_COLUMNS } from '../constants';
 import { useAuth } from '@/contexts/AuthContext';
+import { uploadAssetsForOrder, validateFiles } from '@/features/hubos/assets';
+import { MAX_ASSET_FILE_SIZE_BYTES } from '@/features/hubos/assetUtils';
 
 interface CreateOSDialogProps {
   onCreated: (order: OsOrder) => void;
@@ -28,6 +30,8 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   const [reproducao, setReproducao] = useState(false);
   const [letraCaixa, setLetraCaixa] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [assetFiles, setAssetFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const reset = () => {
     setSaleNumber('');
@@ -38,11 +42,47 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     setAddress('');
     setReproducao(false);
     setLetraCaixa(false);
+    setAssetFiles([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const formatFileSize = (size: number) => {
+    if (size < 1024) return `${size} B`;
+    const kb = size / 1024;
+    if (kb < 1024) return `${kb.toFixed(1)} KB`;
+    const mb = kb / 1024;
+    return `${mb.toFixed(1)} MB`;
+  };
+
+  const handleAssetChange = (files: FileList | null) => {
+    if (!files) return;
+    const nextFiles = [...assetFiles, ...Array.from(files)];
+    const validation = validateFiles(nextFiles);
+    if (!validation.ok) {
+      toast.error(validation.error ?? 'Arquivos inválidos.');
+      return;
+    }
+    setAssetFiles(nextFiles);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeAssetFile = (index: number) => {
+    setAssetFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
   };
 
   const handleSubmit = async () => {
     if (!saleNumber || !clientName || !description || !deliveryDate) {
       toast.error('Preencha os campos obrigatórios.');
+      return;
+    }
+
+    const assetValidation = validateFiles(assetFiles);
+    if (!assetValidation.ok) {
+      toast.error(assetValidation.error ?? 'Arquivos inválidos.');
       return;
     }
 
@@ -64,6 +104,20 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
       });
       onCreated(order);
       toast.success('Ordem criada com sucesso.');
+
+      if (assetFiles.length > 0) {
+        try {
+          await uploadAssetsForOrder({
+            osId: order.id,
+            files: assetFiles,
+            userId: user?.id ?? null,
+          });
+          toast.success('Arquivos enviados e aguardando sincronização.');
+        } catch (uploadError) {
+          console.error(uploadError);
+          toast.error('OS criada, mas o envio dos arquivos falhou.');
+        }
+      }
       reset();
       setOpen(false);
     } catch (error) {
@@ -75,7 +129,15 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) {
+          reset();
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button>Gerar Ordem de Serviço</Button>
       </DialogTrigger>
@@ -133,6 +195,40 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
               <Checkbox checked={letraCaixa} onCheckedChange={(checked) => setLetraCaixa(Boolean(checked))} />
               Letra Caixa
             </label>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="os-assets">Arquivos de arte e referências (opcional)</Label>
+            <Input
+              ref={fileInputRef}
+              id="os-assets"
+              type="file"
+              multiple
+              onChange={(event) => handleAssetChange(event.target.files)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Máximo de {Math.round(MAX_ASSET_FILE_SIZE_BYTES / 1024 / 1024)}MB por arquivo.
+            </p>
+            {assetFiles.length > 0 && (
+              <ul className="space-y-2 rounded-md border border-muted p-3 text-sm">
+                {assetFiles.map((file, index) => (
+                  <li key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium">{file.name}</p>
+                      <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeAssetFile(index)}
+                    >
+                      Remover
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <Button onClick={handleSubmit} disabled={saving}>
