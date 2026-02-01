@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,6 +28,7 @@ interface OrderDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdated: (order: OsOrder) => void;
+  onDelete?: (id: string) => Promise<void> | void;
 }
 
 const formatStatus = (order: OsOrder | null) => {
@@ -26,7 +38,13 @@ const formatStatus = (order: OsOrder | null) => {
   return `${boardLabel} • ${columnLabel}`;
 };
 
-export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdated }: OrderDetailsDialogProps) {
+export default function OrderDetailsDialog({
+  order,
+  open,
+  onOpenChange,
+  onUpdated,
+  onDelete,
+}: OrderDetailsDialogProps) {
   const { user, isAdmin } = useAuth();
   const [saleNumber, setSaleNumber] = useState('');
   const [clientName, setClientName] = useState('');
@@ -213,6 +231,16 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
     }
   };
 
+  const handleDelete = async () => {
+    if (!order || !onDelete) return;
+    try {
+      await onDelete(order.id);
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Erro ao excluir o card.', error);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
@@ -354,6 +382,25 @@ export default function OrderDetailsDialog({ order, open, onOpenChange, onUpdate
           </div>
 
           <div className="flex flex-wrap justify-end gap-2">
+            {isAdmin && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive">Excluir</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Essa ação não pode ser desfeita. O card será excluído permanentemente.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete}>Confirmar</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>

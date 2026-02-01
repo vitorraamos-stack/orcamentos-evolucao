@@ -175,7 +175,13 @@ export default function HubOS() {
     }
   };
 
-  const handleDelete = async (order: OsOrder) => {
+  const handleDelete = async (orderId: string) => {
+    if (!isAdmin) {
+      toast.error('Você não tem permissão para excluir.');
+      return;
+    }
+    const order = orders.find((item) => item.id === orderId);
+    if (!order) return;
     const previous = orders;
     setOrders((prev) => prev.filter((item) => item.id !== order.id));
 
@@ -205,7 +211,7 @@ export default function HubOS() {
     } catch (error) {
       console.error(error);
       setOrders(previous);
-      toast.error('Você não tem permissão para excluir.');
+      toast.error('Não foi possível excluir o card.');
     }
   };
 
@@ -318,14 +324,12 @@ export default function HubOS() {
                       prodStatus={order.prod_status}
                       productionTag={order.production_tag}
                       highlightId={highlightId}
-                      isAdmin={isAdmin}
                       showArchive={!isAdmin}
                       onOpen={() => {
                         setSelectedOrder(order);
                         setDialogOpen(true);
                       }}
                       onArchive={() => handleArchive(order)}
-                      onDelete={() => handleDelete(order)}
                     />
                   ))}
                 </KanbanColumn>
@@ -416,6 +420,7 @@ export default function HubOS() {
           }
         }}
         onUpdated={updateLocalOrder}
+        onDelete={(id) => handleDelete(id)}
       />
     </div>
   );
