@@ -1,0 +1,12 @@
+{
+  "name": "os-asset-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node agent.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.93.1"
+  }
+}
