@@ -14,7 +14,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
-import { GripVertical, Trash2, Archive } from 'lucide-react';
+import { GripVertical, Archive } from 'lucide-react';
 import type { LogisticType, ProdStatus, ProductionTag } from '../types';
 
 interface KanbanCardProps {
@@ -28,11 +28,9 @@ interface KanbanCardProps {
   prodStatus?: ProdStatus | null;
   productionTag?: ProductionTag | null;
   highlightId?: string | null;
-  isAdmin?: boolean;
   showArchive?: boolean;
   onOpen?: () => void;
   onArchive?: () => void;
-  onDelete?: () => void;
 }
 
 const logisticLabel: Record<LogisticType, string> = {
@@ -68,11 +66,9 @@ export default function KanbanCard({
   prodStatus,
   productionTag,
   highlightId,
-  isAdmin = false,
   showArchive = false,
   onOpen,
   onArchive,
-  onDelete,
 }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useDraggable({ id });
 
@@ -132,7 +128,7 @@ export default function KanbanCard({
           </Badge>
         )}
       </div>
-      {(isAdmin || showArchive) && (
+      {showArchive && (
         <div className="mt-2 border-t border-border/60 pt-2">
           <div className="inline-flex w-fit flex-wrap gap-2">
             {showArchive && (
@@ -164,43 +160,6 @@ export default function KanbanCard({
                       onClick={(event) => {
                         event.stopPropagation();
                         onArchive?.();
-                      }}
-                    >
-                      Confirmar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
-            {isAdmin && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <Trash2 className="mr-1 h-4 w-4" />
-                    Excluir
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent onPointerDown={(event) => event.stopPropagation()}>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Essa ação não pode ser desfeita. O card será excluído permanentemente.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel onPointerDown={(event) => event.stopPropagation()}>
-                      Cancelar
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                      onPointerDown={(event) => event.stopPropagation()}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onDelete?.();
                       }}
                     >
                       Confirmar
