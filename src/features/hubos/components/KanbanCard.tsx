@@ -1,5 +1,4 @@
 import { CSS } from '@dnd-kit/utilities';
-import type { PointerEvent } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -76,11 +75,6 @@ export default function KanbanCard({
   onDelete,
 }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useDraggable({ id });
-  const { onPointerDown, ...dragListeners } = listeners;
-  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    event.stopPropagation();
-    onPointerDown?.(event);
-  };
 
   const style = {
     transform: CSS.Translate.toString(transform),
@@ -92,6 +86,8 @@ export default function KanbanCard({
       ref={setNodeRef}
       style={style}
       data-os-id={id}
+      {...listeners}
+      {...attributes}
       role="button"
       tabIndex={0}
       onDoubleClickCapture={() => {
@@ -118,9 +114,6 @@ export default function KanbanCard({
         </div>
         <div
           className="rounded-md border border-border/60 p-1 text-muted-foreground hover:text-foreground"
-          {...dragListeners}
-          {...attributes}
-          onPointerDown={handlePointerDown}
           role="button"
           tabIndex={0}
           aria-label="Arrastar card"
@@ -140,7 +133,7 @@ export default function KanbanCard({
         )}
       </div>
       {(isAdmin || showArchive) && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 border-t border-border/60 pt-2">
           {showArchive && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -162,8 +155,11 @@ export default function KanbanCard({
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogCancel onPointerDown={(event) => event.stopPropagation()}>
+                    Cancelar
+                  </AlertDialogCancel>
                   <AlertDialogAction
+                    onPointerDown={(event) => event.stopPropagation()}
                     onClick={(event) => {
                       event.stopPropagation();
                       onArchive?.();
@@ -196,8 +192,11 @@ export default function KanbanCard({
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogCancel onPointerDown={(event) => event.stopPropagation()}>
+                    Cancelar
+                  </AlertDialogCancel>
                   <AlertDialogAction
+                    onPointerDown={(event) => event.stopPropagation()}
                     onClick={(event) => {
                       event.stopPropagation();
                       onDelete?.();
