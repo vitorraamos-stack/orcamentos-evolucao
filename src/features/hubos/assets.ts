@@ -15,7 +15,6 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
     throw new Error(validation.error ?? 'Arquivos inválidos.');
   }
 
-  const uploadedPaths: string[] = [];
   let jobId: string | null = null;
 
   try {
@@ -25,6 +24,7 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
         os_id: osId,
         status: 'UPLOADING',
         created_by: userId,
+        attempt_count: 0,
       })
       .select('id')
       .single();
@@ -37,8 +37,7 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
 
     for (const file of files) {
       const sanitizedName = sanitizeFilename(file.name);
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const objectPath = `os_orders/${osId}/${jobId}/${timestamp}_${sanitizedName}`;
+      const objectPath = `${osId}/${jobId}/${crypto.randomUUID()}-${sanitizedName}`;
 
       const { error: uploadError } = await supabase.storage
         .from(ASSET_BUCKET)
@@ -47,8 +46,6 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
       if (uploadError) {
         throw new Error(uploadError.message);
       }
-
-      uploadedPaths.push(objectPath);
 
       const { error: assetError } = await supabase.from('os_order_assets').insert({
         os_id: osId,
@@ -68,28 +65,20 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
 
     const { error: updateError } = await supabase
       .from('os_order_asset_jobs')
-      .update({ status: 'PENDING' })
+      .update({ status: 'PENDING', updated_at: new Date().toISOString() })
       .eq('id', jobId);
 
     if (updateError) {
       throw new Error(updateError.message);
     }
 
-    return { jobId, assets: uploadedPaths };
+    return { jobId };
   } catch (error) {
-    if (uploadedPaths.length > 0) {
-      await supabase.storage.from(ASSET_BUCKET).remove(uploadedPaths);
-      await supabase
-        .from('os_order_assets')
-        .update({ deleted_from_storage_at: new Date().toISOString() })
-        .in('object_path', uploadedPaths);
-    }
-
     if (jobId) {
       const message = error instanceof Error ? error.message : 'Erro ao enviar arquivos.';
       await supabase
         .from('os_order_asset_jobs')
-        .update({ status: 'ERROR', last_error: message })
+        .update({ status: 'ERROR', last_error: message, attempt_count: 1, updated_at: new Date().toISOString() })
         .eq('id', jobId);
       await supabase.from('os_order_assets').update({ error: message }).eq('job_id', jobId);
     }

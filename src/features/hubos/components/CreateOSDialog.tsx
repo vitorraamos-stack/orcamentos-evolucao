@@ -30,7 +30,9 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   const [reproducao, setReproducao] = useState(false);
   const [letraCaixa, setLetraCaixa] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [assetFiles, setAssetFiles] = useState<File[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadingAssets, setUploadingAssets] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState<OsOrder | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const reset = () => {
@@ -42,7 +44,8 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     setAddress('');
     setReproducao(false);
     setLetraCaixa(false);
-    setAssetFiles([]);
+    setSelectedFiles([]);
+    setPendingOrder(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -58,31 +61,56 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
 
   const handleAssetChange = (files: FileList | null) => {
     if (!files) return;
-    const nextFiles = [...assetFiles, ...Array.from(files)];
+    const nextFiles = [...selectedFiles, ...Array.from(files)];
     const validation = validateFiles(nextFiles);
     if (!validation.ok) {
       toast.error(validation.error ?? 'Arquivos inválidos.');
       return;
     }
-    setAssetFiles(nextFiles);
+    setSelectedFiles(nextFiles);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
   const removeAssetFile = (index: number) => {
-    setAssetFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    setSelectedFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
   };
 
   const handleSubmit = async () => {
-    if (!saleNumber || !clientName || !description || !deliveryDate) {
-      toast.error('Preencha os campos obrigatórios.');
+    const assetValidation = validateFiles(selectedFiles);
+    if (!assetValidation.ok) {
+      toast.error(assetValidation.error ?? 'Arquivos inválidos.');
       return;
     }
 
-    const assetValidation = validateFiles(assetFiles);
-    if (!assetValidation.ok) {
-      toast.error(assetValidation.error ?? 'Arquivos inválidos.');
+    if (pendingOrder) {
+      if (selectedFiles.length === 0) {
+        toast.error('Selecione ao menos um arquivo para reenviar.');
+        return;
+      }
+
+      try {
+        setUploadingAssets(true);
+        await uploadAssetsForOrder({
+          osId: pendingOrder.id,
+          files: selectedFiles,
+          userId: user?.id ?? null,
+        });
+        toast.success('Arquivos enviados e aguardando sincronização.');
+        reset();
+        setOpen(false);
+      } catch (uploadError) {
+        console.error(uploadError);
+        toast.error('Falha ao reenviar os arquivos. Tente novamente.');
+      } finally {
+        setUploadingAssets(false);
+      }
+      return;
+    }
+
+    if (!saleNumber || !clientName || !description || !deliveryDate) {
+      toast.error('Preencha os campos obrigatórios.');
       return;
     }
 
@@ -105,17 +133,22 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
       onCreated(order);
       toast.success('Ordem criada com sucesso.');
 
-      if (assetFiles.length > 0) {
+      if (selectedFiles.length > 0) {
         try {
+          setUploadingAssets(true);
           await uploadAssetsForOrder({
             osId: order.id,
-            files: assetFiles,
+            files: selectedFiles,
             userId: user?.id ?? null,
           });
           toast.success('Arquivos enviados e aguardando sincronização.');
         } catch (uploadError) {
           console.error(uploadError);
-          toast.error('OS criada, mas o envio dos arquivos falhou.');
+          toast.error('OS criada, mas o envio dos arquivos falhou. Reenvie os arquivos.');
+          setPendingOrder(order);
+          return;
+        } finally {
+          setUploadingAssets(false);
         }
       }
       reset();
@@ -149,19 +182,36 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
               <Label>Nº da venda</Label>
-              <Input value={saleNumber} onChange={(event) => setSaleNumber(event.target.value)} />
+              <Input
+                value={saleNumber}
+                onChange={(event) => setSaleNumber(event.target.value)}
+                disabled={Boolean(pendingOrder)}
+              />
             </div>
             <div className="space-y-1">
               <Label>Cliente</Label>
-              <Input value={clientName} onChange={(event) => setClientName(event.target.value)} />
+              <Input
+                value={clientName}
+                onChange={(event) => setClientName(event.target.value)}
+                disabled={Boolean(pendingOrder)}
+              />
             </div>
             <div className="space-y-1">
               <Label>Data de entrega</Label>
-              <Input type="date" value={deliveryDate} onChange={(event) => setDeliveryDate(event.target.value)} />
+              <Input
+                type="date"
+                value={deliveryDate}
+                onChange={(event) => setDeliveryDate(event.target.value)}
+                disabled={Boolean(pendingOrder)}
+              />
             </div>
             <div className="space-y-1">
               <Label>Tipo de logística</Label>
-              <Select value={logisticType} onValueChange={(value) => setLogisticType(value as LogisticType)}>
+              <Select
+                value={logisticType}
+                onValueChange={(value) => setLogisticType(value as LogisticType)}
+                disabled={Boolean(pendingOrder)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
@@ -176,23 +226,40 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
 
           <div className="space-y-1">
             <Label>Descrição</Label>
-            <Textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} />
+            <Textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              rows={4}
+              disabled={Boolean(pendingOrder)}
+            />
           </div>
 
           {logisticType !== 'retirada' && (
             <div className="space-y-1">
               <Label>Endereço (opcional)</Label>
-              <Input value={address} onChange={(event) => setAddress(event.target.value)} />
+              <Input
+                value={address}
+                onChange={(event) => setAddress(event.target.value)}
+                disabled={Boolean(pendingOrder)}
+              />
             </div>
           )}
 
           <div className="flex flex-wrap gap-6">
             <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={reproducao} onCheckedChange={(checked) => setReproducao(Boolean(checked))} />
+              <Checkbox
+                checked={reproducao}
+                onCheckedChange={(checked) => setReproducao(Boolean(checked))}
+                disabled={Boolean(pendingOrder)}
+              />
               Reprodução
             </label>
             <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={letraCaixa} onCheckedChange={(checked) => setLetraCaixa(Boolean(checked))} />
+              <Checkbox
+                checked={letraCaixa}
+                onCheckedChange={(checked) => setLetraCaixa(Boolean(checked))}
+                disabled={Boolean(pendingOrder)}
+              />
               Letra Caixa
             </label>
           </div>
@@ -204,14 +271,15 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
               id="os-assets"
               type="file"
               multiple
+              disabled={uploadingAssets}
               onChange={(event) => handleAssetChange(event.target.files)}
             />
             <p className="text-xs text-muted-foreground">
               Máximo de {Math.round(MAX_ASSET_FILE_SIZE_BYTES / 1024 / 1024)}MB por arquivo.
             </p>
-            {assetFiles.length > 0 && (
+            {selectedFiles.length > 0 && (
               <ul className="space-y-2 rounded-md border border-muted p-3 text-sm">
-                {assetFiles.map((file, index) => (
+                {selectedFiles.map((file, index) => (
                   <li key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-3">
                     <div>
                       <p className="font-medium">{file.name}</p>
@@ -222,6 +290,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
                       variant="ghost"
                       size="sm"
                       onClick={() => removeAssetFile(index)}
+                      disabled={uploadingAssets}
                     >
                       Remover
                     </Button>
@@ -229,10 +298,15 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
                 ))}
               </ul>
             )}
+            {pendingOrder && (
+              <p className="text-xs text-amber-600">
+                A OS foi criada. Reenvie os arquivos para concluir a sincronização.
+              </p>
+            )}
           </div>
 
-          <Button onClick={handleSubmit} disabled={saving}>
-            Gerar Ordem de Serviço
+          <Button onClick={handleSubmit} disabled={saving || uploadingAssets}>
+            {pendingOrder ? 'Enviar arquivos' : 'Gerar Ordem de Serviço'}
           </Button>
         </div>
       </DialogContent>
