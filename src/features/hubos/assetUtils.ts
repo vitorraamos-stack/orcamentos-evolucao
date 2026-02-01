@@ -6,9 +6,7 @@ export const sanitizeFilename = (filename: string) => {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[\\/:*?"<>|]/g, '')
-    .replace(/\s+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '')
+    .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 120);
 
@@ -27,7 +25,7 @@ export const normalizeFirstLetter = (value: string) => {
     .replace(/[\u0300-\u036f]/g, '')
     .trim();
   const firstLetter = normalized.charAt(0).toUpperCase();
-  return /^[A-Z]$/.test(firstLetter) ? firstLetter : '#';
+  return /^[A-Z]$/.test(firstLetter) ? firstLetter : '_';
 };
 
 export const validateFiles = (files: File[]) => {
