@@ -234,9 +234,9 @@ function Update-JobStatusSafe {
     return $true
   } catch {
     $d = Get-HttpErrorDetails $_
-    $payloadJson = $null
+    $payloadJson = '{}'
     try { $payloadJson = ($Payload | ConvertTo-Json -Depth 8) } catch { }
-    Write-Log ("Falha ao atualizar job ({0}) via PATCH: {1} | HTTP {2} {3} | Body: {4} | Payload: {5}" -f $JobId, $_.Exception.Message, $d.StatusCode, $d.StatusDescription, $d.Body, $payloadJson) 'ERROR'
+    Write-Log ("Falha ao atualizar job ({0}) via PATCH: {1} | HTTP {2} {3} | Body: {4} | Payload: {5} | Url: {6}" -f $JobId, $_.Exception.Message, $d.StatusCode, $d.StatusDescription, $d.Body, $payloadJson, $jobUrl) 'ERROR'
     return $false
   }
 }
@@ -340,9 +340,12 @@ try {
   $storageHeaders = $hdr.Storage
 
   Write-Log ("OS Asset Agent iniciado. Poll a cada {0}s. Modo de chave: {1}" -f $pollInterval, $hdr.Mode) 'INFO'
-  Write-Log 'Use um usuário de serviço dedicado e proteja a SUPABASE_SERVICE_ROLE_KEY.' 'WARN'
+  Write-Log 'Use um usuario de servico dedicado e proteja a SUPABASE_SERVICE_ROLE_KEY.' 'WARN'
   if ($hdr.Mode -eq 'JWT') {
     $jwtRole = Get-JwtRole $apiKey
+    $roleLabel = $jwtRole
+    if ([string]::IsNullOrWhiteSpace($roleLabel)) { $roleLabel = 'desconhecida' }
+    Write-Log ("JWT role detectada: {0}" -f $roleLabel) 'INFO'
     if ($jwtRole -and $jwtRole -ne 'service_role') {
       throw ("JWT sem role service_role detectado ({0}). Use a SUPABASE_SERVICE_ROLE_KEY." -f $jwtRole)
     }
