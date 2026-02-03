@@ -27,6 +27,7 @@ interface KanbanCardProps {
   letraCaixa: boolean;
   prodStatus?: ProdStatus | null;
   productionTag?: ProductionTag | null;
+  assetIndicator?: 'processing' | 'done' | null;
   highlightId?: string | null;
   showArchive?: boolean;
   onOpen?: () => void;
@@ -65,6 +66,7 @@ export default function KanbanCard({
   letraCaixa,
   prodStatus,
   productionTag,
+  assetIndicator,
   highlightId,
   showArchive = false,
   onOpen,
@@ -125,6 +127,19 @@ export default function KanbanCard({
         {productionTag && prodStatus === 'Produção' && (
           <Badge className={productionTagConfig[productionTag].className}>
             {productionTagConfig[productionTag].label}
+          </Badge>
+        )}
+        {assetIndicator && (
+          <Badge
+            variant="outline"
+            className={cn(
+              'border text-xs',
+              assetIndicator === 'processing' &&
+                'border-yellow-300 bg-yellow-50 text-yellow-700 animate-pulse [animation-duration:3s] motion-reduce:animate-none',
+              assetIndicator === 'done' && 'border-emerald-300 bg-emerald-50 text-emerald-700'
+            )}
+          >
+            {assetIndicator === 'processing' ? 'Processando' : 'Arquivo OK'}
           </Badge>
         )}
       </div>
