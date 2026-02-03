@@ -192,10 +192,10 @@ function Get-AssetFileName {
 }
 
 function Get-PostgresTimestamp {
-  $now = Get-Date
+  $now = (Get-Date).ToUniversalTime()
   $fraction = $now.ToString('fffffff')
   $fraction = $fraction.Substring(0, 6)
-  return ("{0}.{1}{2}" -f $now.ToString('yyyy-MM-ddTHH:mm:ss'), $fraction, $now.ToString('zzz'))
+  return ("{0}.{1}Z" -f $now.ToString('yyyy-MM-ddTHH:mm:ss'), $fraction)
 }
 
 function Escape-StorageObjectPath {
