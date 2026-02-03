@@ -87,6 +87,24 @@ function Get-HttpErrorDetails {
   $statusDescription = $null
   $body = $null
 
+  if ($ErrorRecord.Exception -and $ErrorRecord.Exception.GetType().FullName -eq 'Microsoft.PowerShell.Commands.HttpResponseException') {
+    $resp = $ErrorRecord.Exception.Response
+    $statusCode = [int]$resp.StatusCode
+    $statusDescription = $resp.ReasonPhrase
+
+    if ($ErrorRecord.ErrorDetails -and $ErrorRecord.ErrorDetails.Message) {
+      $body = $ErrorRecord.ErrorDetails.Message
+    } else {
+      try { $body = $resp.Content.ReadAsStringAsync().Result } catch { }
+    }
+
+    return [pscustomobject]@{
+      StatusCode        = $statusCode
+      StatusDescription = $statusDescription
+      Body              = $body
+    }
+  }
+
   try {
     $resp = $ErrorRecord.Exception.Response
     if ($resp -and ($resp -is [System.Net.HttpWebResponse])) {
