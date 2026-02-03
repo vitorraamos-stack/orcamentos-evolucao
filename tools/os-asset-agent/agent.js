@@ -39,10 +39,44 @@ const sanitizeFilename = (filename) => {
 };
 
 const sanitizeFolderName = (name) => {
-  const normalized = sanitizeFilename(name);
-  const cleaned = normalized.replace(/^[._\s]+/, '').slice(0, 120);
-  return cleaned || 'pasta';
+  const fallback = 'pasta';
+  const normalized = (name ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const withoutLeading = normalized.replace(/^[._\s]+/, '');
+  const withoutTrailing = withoutLeading.replace(/[.\s]+$/, '').trim();
+  if (!withoutTrailing) {
+    return fallback;
+  }
+
+  const limited = withoutTrailing.slice(0, 120).trim();
+  const cleaned = limited.replace(/^[._\s]+/, '').replace(/[.\s]+$/, '').trim();
+  if (!cleaned) {
+    return fallback;
+  }
+
+  const reservedPattern = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
+  if (reservedPattern.test(cleaned)) {
+    return fallback;
+  }
+
+  return cleaned;
 };
+
+if (require.main === module) {
+  console.assert(sanitizeFolderName('Teste Quatro') === 'Teste Quatro', 'sanitizeFolderName: espaços preservados');
+  console.assert(sanitizeFolderName('Vítor José') === 'Vitor Jose', 'sanitizeFolderName: acentos removidos');
+  console.assert(
+    sanitizeFolderName('  Nome   com   espaços  ') === 'Nome com espaços',
+    'sanitizeFolderName: espaços colapsados'
+  );
+  console.assert(sanitizeFolderName('A:B*C?D') === 'ABCD', 'sanitizeFolderName: caracteres inválidos removidos');
+  console.assert(sanitizeFolderName('Nome. ') === 'Nome', 'sanitizeFolderName: sufixo inválido removido');
+  console.assert(sanitizeFolderName(' CON ') === 'pasta', 'sanitizeFolderName: nome reservado');
+}
 
 const normalizeFirstLetter = (value) => {
   const normalized = value
