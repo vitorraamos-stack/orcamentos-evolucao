@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -50,6 +51,31 @@ const normalizeFirstLetter = (value) => {
     .trim();
   const firstLetter = normalized.charAt(0).toUpperCase();
   return /^[A-Z]$/.test(firstLetter) ? firstLetter : '#';
+};
+
+const buildAssetFilename = (asset) => {
+  const originalName = asset.original_name || path.basename(asset.object_path || '');
+  const baseName = path.basename(originalName, path.extname(originalName));
+  const safeBase = sanitizeFilename(baseName) || 'arquivo';
+  const extension = path.extname(originalName);
+  const hashSource = `${asset.id}|${asset.object_path}|${originalName}`;
+  const hash = crypto.createHash('sha256').update(hashSource).digest('hex').slice(0, 8);
+  return `${safeBase}--${hash}${extension}`;
+};
+
+const fileExistsWithSize = async (filePath, expectedSize) => {
+  try {
+    const stats = await fs.promises.stat(filePath);
+    if (Number.isFinite(expectedSize)) {
+      return stats.size === Number(expectedSize);
+    }
+    return true;
+  } catch (error) {
+    if (error && error.code === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
 };
 
 const requeueStaleJobs = async () => {
@@ -161,6 +187,14 @@ const processJob = async (job) => {
   await fs.promises.mkdir(destinationPath, { recursive: true });
 
   for (const asset of assets) {
+    const safeName = buildAssetFilename(asset);
+    const targetPath = path.join(destinationPath, safeName);
+
+    const alreadySynced = await fileExistsWithSize(targetPath, asset.size_bytes);
+    if (alreadySynced) {
+      continue;
+    }
+
     const { data: download, error: downloadError } = await supabase.storage
       .from(BUCKET)
       .download(asset.object_path);
@@ -170,9 +204,6 @@ const processJob = async (job) => {
     }
 
     const fileBuffer = Buffer.from(await download.arrayBuffer());
-    const safeName = sanitizeFilename(asset.original_name || path.basename(asset.object_path));
-    const targetPath = path.join(destinationPath, safeName);
-
     await fs.promises.writeFile(targetPath, fileBuffer);
 
     const stats = await fs.promises.stat(targetPath);
