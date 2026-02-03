@@ -191,6 +191,13 @@ function Get-AssetFileName {
   return ("{0}--{1}{2}" -f $safeBaseName, $hash, $extension)
 }
 
+function Get-PostgresTimestamp {
+  $now = Get-Date
+  $fraction = $now.ToString('fffffff')
+  $fraction = $fraction.Substring(0, 6)
+  return ("{0}.{1}{2}" -f $now.ToString('yyyy-MM-ddTHH:mm:ss'), $fraction, $now.ToString('zzz'))
+}
+
 function Escape-StorageObjectPath {
   param([string]$ObjectPath)
   if ([string]::IsNullOrWhiteSpace($ObjectPath)) { return $ObjectPath }
@@ -369,9 +376,9 @@ try {
       # lock atômico
       $lockPayload = @{
         status                = 'PROCESSING'
-        processing_started_at = (Get-Date).ToString('o')
+        processing_started_at = Get-PostgresTimestamp
         attempt_count         = ([int]$job.attempt_count) + 1
-        updated_at            = (Get-Date).ToString('o')
+        updated_at            = Get-PostgresTimestamp
       }
 
       $lockUrl = ("{0}/rest/v1/os_order_asset_jobs?id=eq.{1}&status=in.(PENDING,DONE_CLEANUP_FAILED)" -f $supabaseUrl, $job.id)
@@ -410,7 +417,7 @@ try {
         $ok = Update-JobStatusSafe -SupabaseUrl $supabaseUrl -Headers $restHeaders -JobId $job.id -Payload @{
           status     = 'DONE_CLEANUP_FAILED'
           last_error = 'Job sem assets.'
-          updated_at = (Get-Date).ToString('o')
+          updated_at = Get-PostgresTimestamp
         }
         Start-Sleep -Seconds $pollInterval
         continue
@@ -440,8 +447,8 @@ try {
       $okDone = Update-JobStatusSafe -SupabaseUrl $supabaseUrl -Headers $restHeaders -JobId $job.id -Payload @{
         status           = 'DONE'
         destination_path = $targetDir
-        completed_at     = (Get-Date).ToString('o')
-        updated_at       = (Get-Date).ToString('o')
+        completed_at     = Get-PostgresTimestamp
+        updated_at       = Get-PostgresTimestamp
       }
 
       # Cleanup storage
@@ -455,8 +462,8 @@ try {
 
           $assetUpdateUrl = ("{0}/rest/v1/os_order_assets?id=eq.{1}" -f $supabaseUrl, $asset.id)
           Invoke-SupabaseRest -Method 'PATCH' -Url $assetUpdateUrl -Body @{
-            deleted_from_storage_at = (Get-Date).ToString('o')
-            synced_at               = (Get-Date).ToString('o')
+            deleted_from_storage_at = Get-PostgresTimestamp
+            synced_at               = Get-PostgresTimestamp
             error                   = $null
           } -Headers $restHeaders | Out-Null
         } catch {
@@ -476,14 +483,14 @@ try {
         Update-JobStatusSafe -SupabaseUrl $supabaseUrl -Headers $restHeaders -JobId $job.id -Payload @{
           status     = 'DONE_CLEANUP_FAILED'
           last_error = 'Falha ao apagar um ou mais objetos.'
-          updated_at = (Get-Date).ToString('o')
+          updated_at = Get-PostgresTimestamp
         } | Out-Null
       } else {
         Update-JobStatusSafe -SupabaseUrl $supabaseUrl -Headers $restHeaders -JobId $job.id -Payload @{
           status     = 'CLEANED'
-          cleaned_at = (Get-Date).ToString('o')
+          cleaned_at = Get-PostgresTimestamp
           last_error = $null
-          updated_at = (Get-Date).ToString('o')
+          updated_at = Get-PostgresTimestamp
         } | Out-Null
       }
 
@@ -499,14 +506,14 @@ try {
         $ok = Update-JobStatusSafe -SupabaseUrl $supabaseUrl -Headers $restHeaders -JobId $job.id -Payload @{
           status     = 'DONE_CLEANUP_FAILED'
           last_error = $message
-          updated_at = (Get-Date).ToString('o')
+          updated_at = Get-PostgresTimestamp
         }
 
         if (-not $ok) {
           # fallback pra não deixar preso
           Update-JobStatusSafe -SupabaseUrl $supabaseUrl -Headers $restHeaders -JobId $job.id -Payload @{
             status     = 'PENDING'
-            updated_at = (Get-Date).ToString('o')
+            updated_at = Get-PostgresTimestamp
           } | Out-Null
         }
       }
