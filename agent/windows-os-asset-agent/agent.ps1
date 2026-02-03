@@ -220,8 +220,9 @@ function Invoke-SupabaseRest {
   }
 
   if ($Body -ne $null) {
-    $params['Body'] = ($Body | ConvertTo-Json -Depth 8)
-    $params['ContentType'] = 'application/json'
+    $jsonBody = $Body | ConvertTo-Json -Depth 8
+    $params['Body'] = [System.Text.Encoding]::UTF8.GetBytes($jsonBody)
+    $params['ContentType'] = 'application/json; charset=utf-8'
   }
 
   return Invoke-RestMethod @params
