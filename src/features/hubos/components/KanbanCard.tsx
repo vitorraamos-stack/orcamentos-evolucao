@@ -139,7 +139,7 @@ export default function KanbanCard({
               assetIndicator === 'done' && 'border-emerald-300 bg-emerald-50 text-emerald-700'
             )}
           >
-            {assetIndicator === 'processing' ? 'Processando' : 'Concluído'}
+            {assetIndicator === 'processing' ? 'Processando' : 'Arquivo OK'}
           </Badge>
         )}
       </div>
