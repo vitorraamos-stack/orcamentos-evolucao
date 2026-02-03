@@ -5,8 +5,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
 import { ART_COLUMNS, PROD_COLUMNS } from '@/features/hubos/constants';
-import type { ArtStatus, HubOsFilters, OsOrder, ProdStatus } from '@/features/hubos/types';
+import type { ArtStatus, AssetJob, HubOsFilters, OsOrder, ProdStatus } from '@/features/hubos/types';
 import { archiveOrder, createOrderEvent, deleteOrder, fetchOrders, updateOrder } from '@/features/hubos/api';
+import { getLatestAssetJobsByOsId } from '@/features/hubos/assetJobs';
 import KanbanColumn from '@/features/hubos/components/KanbanColumn';
 import KanbanCard from '@/features/hubos/components/KanbanCard';
 import OrderDetailsDialog from '@/features/hubos/components/OrderDetailsDialog';
@@ -28,6 +29,7 @@ const defaultFilters: HubOsFilters = {
 const normalize = (value: string) => value.toLowerCase();
 
 const FINAL_PROD_STATUS = PROD_COLUMNS[PROD_COLUMNS.length - 1];
+const DONE_ASSET_STATUSES = new Set(['CLEANED', 'DONE', 'DONE_CLEANUP_FAILED']);
 
 const isOverdue = (order: OsOrder) => {
   if (!order.delivery_date) return false;
@@ -51,6 +53,7 @@ export default function HubOS() {
   const [installationSearch, setInstallationSearch] = useState('');
   const [selectedInstallationId, setSelectedInstallationId] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [assetJobByOsId, setAssetJobByOsId] = useState<Record<string, AssetJob | null>>({});
 
   const loadOrders = async () => {
     try {
@@ -123,6 +126,97 @@ export default function HubOS() {
     [orders]
   );
   const installationInboxOrders = installationOrders;
+
+  const visibleOrders = useMemo(() => {
+    if (viewMode === 'instalacoes') return installationInboxOrders;
+    return activeTab === 'arte' ? arteOrders : producaoOrders;
+  }, [activeTab, arteOrders, installationInboxOrders, producaoOrders, viewMode]);
+
+  const visibleOrderIds = useMemo(() => visibleOrders.map((order) => order.id), [visibleOrders]);
+
+  const assetIndicatorByOsId = useMemo(() => {
+    const indicators: Record<string, 'processing' | 'done' | null> = {};
+    visibleOrderIds.forEach((osId) => {
+      const job = assetJobByOsId[osId];
+      if (!job) {
+        indicators[osId] = null;
+        return;
+      }
+      // "Concluído" when the latest job is finalized; otherwise keep "Processando".
+      indicators[osId] = DONE_ASSET_STATUSES.has(job.status) ? 'done' : 'processing';
+    });
+    return indicators;
+  }, [assetJobByOsId, visibleOrderIds]);
+
+  useEffect(() => {
+    if (visibleOrderIds.length === 0) {
+      setAssetJobByOsId({});
+      return;
+    }
+
+    let active = true;
+
+    const loadLatestAssetJobs = async () => {
+      try {
+        const latestJobs = await getLatestAssetJobsByOsId(visibleOrderIds);
+        if (active) {
+          setAssetJobByOsId(latestJobs);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar jobs de arte.', error);
+      }
+    };
+
+    const shouldReplaceJob = (current: AssetJob | null, incoming: AssetJob) => {
+      if (!current) return true;
+      const incomingCreated = new Date(incoming.created_at).getTime();
+      const currentCreated = new Date(current.created_at).getTime();
+      if (incomingCreated > currentCreated) return true;
+      if (incomingCreated < currentCreated) return false;
+      if (incoming.id === current.id) {
+        const incomingUpdated = new Date(incoming.updated_at ?? incoming.created_at).getTime();
+        const currentUpdated = new Date(current.updated_at ?? current.created_at).getTime();
+        return incomingUpdated > currentUpdated;
+      }
+      return false;
+    };
+
+    loadLatestAssetJobs();
+
+    const channel = supabase
+      .channel('hub-os-asset-jobs')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'os_order_asset_jobs',
+          filter: `os_id=in.(${visibleOrderIds.join(',')})`,
+        },
+        (payload) => {
+          const incoming = payload.new as AssetJob;
+          if (!incoming?.os_id) return;
+          if (!visibleOrderIds.includes(incoming.os_id)) return;
+          setAssetJobByOsId((prev) => {
+            if (!Object.hasOwn(prev, incoming.os_id)) return prev;
+            const current = prev[incoming.os_id] ?? null;
+            if (!shouldReplaceJob(current, incoming)) return prev;
+            return { ...prev, [incoming.os_id]: incoming };
+          });
+        }
+      )
+      .subscribe();
+
+    const pollingInterval = window.setInterval(() => {
+      loadLatestAssetJobs();
+    }, 20000);
+
+    return () => {
+      active = false;
+      window.clearInterval(pollingInterval);
+      supabase.removeChannel(channel);
+    };
+  }, [visibleOrderIds]);
 
   useEffect(() => {
     if (viewMode !== 'instalacoes') return;
@@ -323,6 +417,7 @@ export default function HubOS() {
                       letraCaixa={order.letra_caixa}
                       prodStatus={order.prod_status}
                       productionTag={order.production_tag}
+                      assetIndicator={assetIndicatorByOsId[order.id] ?? null}
                       highlightId={highlightId}
                       showArchive={!isAdmin}
                       onOpen={() => {
