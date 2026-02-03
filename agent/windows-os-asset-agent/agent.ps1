@@ -32,6 +32,29 @@ function Test-IsJwtKey {
   return ($Key -match '^[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+$')
 }
 
+function Get-JwtRole {
+  param([string]$Token)
+  if (-not (Test-IsJwtKey $Token)) { return $null }
+  $parts = $Token.Split('.')
+  if ($parts.Length -lt 2) { return $null }
+
+  $payload = $parts[1].Replace('-', '+').Replace('_', '/')
+  switch ($payload.Length % 4) {
+    2 { $payload += '==' }
+    3 { $payload += '=' }
+  }
+
+  try {
+    $bytes = [Convert]::FromBase64String($payload)
+    $json = [System.Text.Encoding]::UTF8.GetString($bytes)
+    $obj = $json | ConvertFrom-Json
+    if ($obj.role) { return $obj.role }
+    if ($obj.app_metadata -and $obj.app_metadata.role) { return $obj.app_metadata.role }
+  } catch { }
+
+  return $null
+}
+
 function New-SupabaseHeaders {
   param([Parameter(Mandatory = $true)][string]$ApiKey)
 
@@ -142,6 +165,39 @@ function Get-UniqueFilePath {
   return $candidate
 }
 
+function Get-ShortHash {
+  param([string]$Value)
+  if ([string]::IsNullOrWhiteSpace($Value)) { return '00000000' }
+
+  $bytes = [System.Text.Encoding]::UTF8.GetBytes($Value)
+  $sha256 = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    $hashBytes = $sha256.ComputeHash($bytes)
+    return ([BitConverter]::ToString($hashBytes) -replace '-', '').Substring(0, 8).ToLowerInvariant()
+  } finally {
+    $sha256.Dispose()
+  }
+}
+
+function Get-AssetFileName {
+  param([Parameter(Mandatory = $true)]$Asset)
+  $originalName = $Asset.original_name
+  $baseName = [System.IO.Path]::GetFileNameWithoutExtension($originalName)
+  $extension = [System.IO.Path]::GetExtension($originalName)
+  $safeBaseName = Sanitize-WindowsName $baseName
+  if ([string]::IsNullOrWhiteSpace($safeBaseName)) { $safeBaseName = '_' }
+
+  $hash = Get-ShortHash ("{0}|{1}|{2}" -f $Asset.id, $Asset.object_path, $originalName)
+  return ("{0}--{1}{2}" -f $safeBaseName, $hash, $extension)
+}
+
+function Get-PostgresTimestamp {
+  $now = (Get-Date).ToUniversalTime()
+  $fraction = $now.ToString('fffffff')
+  $fraction = $fraction.Substring(0, 6)
+  return ("{0}.{1}Z" -f $now.ToString('yyyy-MM-ddTHH:mm:ss'), $fraction)
+}
+
 function Escape-StorageObjectPath {
   param([string]$ObjectPath)
   if ([string]::IsNullOrWhiteSpace($ObjectPath)) { return $ObjectPath }
@@ -185,7 +241,9 @@ function Update-JobStatusSafe {
     return $true
   } catch {
     $d = Get-HttpErrorDetails $_
-    Write-Log ("Falha ao atualizar job ({0}) via PATCH: {1} | HTTP {2} {3} | Body: {4}" -f $JobId, $_.Exception.Message, $d.StatusCode, $d.StatusDescription, $d.Body) 'ERROR'
+    $payloadJson = '{}'
+    try { $payloadJson = ($Payload | ConvertTo-Json -Depth 8) } catch { }
+    Write-Log ("Falha ao atualizar job ({0}) via PATCH: {1} | HTTP {2} {3} | Body: {4} | Payload: {5} | Url: {6}" -f $JobId, $_.Exception.Message, $d.StatusCode, $d.StatusDescription, $d.Body, $payloadJson, $jobUrl) 'ERROR'
     return $false
   }
 }
@@ -289,6 +347,16 @@ try {
   $storageHeaders = $hdr.Storage
 
   Write-Log ("OS Asset Agent iniciado. Poll a cada {0}s. Modo de chave: {1}" -f $pollInterval, $hdr.Mode) 'INFO'
+  Write-Log 'Use um usuario de servico dedicado e proteja a SUPABASE_SERVICE_ROLE_KEY.' 'WARN'
+  if ($hdr.Mode -eq 'JWT') {
+    $jwtRole = Get-JwtRole $apiKey
+    $roleLabel = $jwtRole
+    if ([string]::IsNullOrWhiteSpace($roleLabel)) { $roleLabel = 'desconhecida' }
+    Write-Log ("JWT role detectada: {0}" -f $roleLabel) 'INFO'
+    if ($jwtRole -and $jwtRole -ne 'service_role') {
+      throw ("JWT sem role service_role detectado ({0}). Use a SUPABASE_SERVICE_ROLE_KEY." -f $jwtRole)
+    }
+  }
 
   while ($true) {
     $job = $null
@@ -308,9 +376,9 @@ try {
       # lock atômico
       $lockPayload = @{
         status                = 'PROCESSING'
-        processing_started_at = (Get-Date).ToString('o')
+        processing_started_at = Get-PostgresTimestamp
         attempt_count         = ([int]$job.attempt_count) + 1
-        updated_at            = (Get-Date).ToString('o')
+        updated_at            = Get-PostgresTimestamp
       }
 
       $lockUrl = ("{0}/rest/v1/os_order_asset_jobs?id=eq.{1}&status=in.(PENDING,DONE_CLEANUP_FAILED)" -f $supabaseUrl, $job.id)
@@ -349,7 +417,7 @@ try {
         $ok = Update-JobStatusSafe -SupabaseUrl $supabaseUrl -Headers $restHeaders -JobId $job.id -Payload @{
           status     = 'DONE_CLEANUP_FAILED'
           last_error = 'Job sem assets.'
-          updated_at = (Get-Date).ToString('o')
+          updated_at = Get-PostgresTimestamp
         }
         Start-Sleep -Seconds $pollInterval
         continue
@@ -359,14 +427,19 @@ try {
       New-Item -Path $tempRoot -ItemType Directory -Force | Out-Null
 
       foreach ($asset in $assets) {
-        $originalName = Sanitize-WindowsName $asset.original_name
-        $tempFile = Join-Path $tempRoot $originalName
+        $assetFileName = Get-AssetFileName $asset
+        $tempFile = Join-Path $tempRoot $assetFileName
         $objectPath = ($asset.object_path).Trim()
+        $destinationPath = Join-Path $targetDir $assetFileName
+
+        if (Test-Path -Path $destinationPath) {
+          Write-Log ("Arquivo já existe para {0} (destino: {1}). Pulando cópia." -f $objectPath, $destinationPath) 'INFO'
+          continue
+        }
 
         Write-Log ("Baixando {0} para {1}" -f $objectPath, $tempFile) 'INFO'
         Invoke-StorageDownload -SupabaseUrl $supabaseUrl -Bucket $bucket -ObjectPath $objectPath -Headers $storageHeaders -OutFile $tempFile | Out-Null
 
-        $destinationPath = Get-UniqueFilePath -Directory $targetDir -FileName $originalName
         Copy-Item -Path $tempFile -Destination $destinationPath -Force
       }
 
@@ -374,8 +447,8 @@ try {
       $okDone = Update-JobStatusSafe -SupabaseUrl $supabaseUrl -Headers $restHeaders -JobId $job.id -Payload @{
         status           = 'DONE'
         destination_path = $targetDir
-        completed_at     = (Get-Date).ToString('o')
-        updated_at       = (Get-Date).ToString('o')
+        completed_at     = Get-PostgresTimestamp
+        updated_at       = Get-PostgresTimestamp
       }
 
       # Cleanup storage
@@ -389,8 +462,8 @@ try {
 
           $assetUpdateUrl = ("{0}/rest/v1/os_order_assets?id=eq.{1}" -f $supabaseUrl, $asset.id)
           Invoke-SupabaseRest -Method 'PATCH' -Url $assetUpdateUrl -Body @{
-            deleted_from_storage_at = (Get-Date).ToString('o')
-            synced_at               = (Get-Date).ToString('o')
+            deleted_from_storage_at = Get-PostgresTimestamp
+            synced_at               = Get-PostgresTimestamp
             error                   = $null
           } -Headers $restHeaders | Out-Null
         } catch {
@@ -410,14 +483,14 @@ try {
         Update-JobStatusSafe -SupabaseUrl $supabaseUrl -Headers $restHeaders -JobId $job.id -Payload @{
           status     = 'DONE_CLEANUP_FAILED'
           last_error = 'Falha ao apagar um ou mais objetos.'
-          updated_at = (Get-Date).ToString('o')
+          updated_at = Get-PostgresTimestamp
         } | Out-Null
       } else {
         Update-JobStatusSafe -SupabaseUrl $supabaseUrl -Headers $restHeaders -JobId $job.id -Payload @{
           status     = 'CLEANED'
-          cleaned_at = (Get-Date).ToString('o')
+          cleaned_at = Get-PostgresTimestamp
           last_error = $null
-          updated_at = (Get-Date).ToString('o')
+          updated_at = Get-PostgresTimestamp
         } | Out-Null
       }
 
@@ -433,14 +506,14 @@ try {
         $ok = Update-JobStatusSafe -SupabaseUrl $supabaseUrl -Headers $restHeaders -JobId $job.id -Payload @{
           status     = 'DONE_CLEANUP_FAILED'
           last_error = $message
-          updated_at = (Get-Date).ToString('o')
+          updated_at = Get-PostgresTimestamp
         }
 
         if (-not $ok) {
           # fallback pra não deixar preso
           Update-JobStatusSafe -SupabaseUrl $supabaseUrl -Headers $restHeaders -JobId $job.id -Payload @{
             status     = 'PENDING'
-            updated_at = (Get-Date).ToString('o')
+            updated_at = Get-PostgresTimestamp
           } | Out-Null
         }
       }
