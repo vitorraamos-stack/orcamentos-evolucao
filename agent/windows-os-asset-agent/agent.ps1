@@ -32,6 +32,29 @@ function Test-IsJwtKey {
   return ($Key -match '^[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+$')
 }
 
+function Get-JwtRole {
+  param([string]$Token)
+  if (-not (Test-IsJwtKey $Token)) { return $null }
+  $parts = $Token.Split('.')
+  if ($parts.Length -lt 2) { return $null }
+
+  $payload = $parts[1].Replace('-', '+').Replace('_', '/')
+  switch ($payload.Length % 4) {
+    2 { $payload += '==' }
+    3 { $payload += '=' }
+  }
+
+  try {
+    $bytes = [Convert]::FromBase64String($payload)
+    $json = [System.Text.Encoding]::UTF8.GetString($bytes)
+    $obj = $json | ConvertFrom-Json
+    if ($obj.role) { return $obj.role }
+    if ($obj.app_metadata -and $obj.app_metadata.role) { return $obj.app_metadata.role }
+  } catch { }
+
+  return $null
+}
+
 function New-SupabaseHeaders {
   param([Parameter(Mandatory = $true)][string]$ApiKey)
 
@@ -211,7 +234,9 @@ function Update-JobStatusSafe {
     return $true
   } catch {
     $d = Get-HttpErrorDetails $_
-    Write-Log ("Falha ao atualizar job ({0}) via PATCH: {1} | HTTP {2} {3} | Body: {4}" -f $JobId, $_.Exception.Message, $d.StatusCode, $d.StatusDescription, $d.Body) 'ERROR'
+    $payloadJson = $null
+    try { $payloadJson = ($Payload | ConvertTo-Json -Depth 8) } catch { }
+    Write-Log ("Falha ao atualizar job ({0}) via PATCH: {1} | HTTP {2} {3} | Body: {4} | Payload: {5}" -f $JobId, $_.Exception.Message, $d.StatusCode, $d.StatusDescription, $d.Body, $payloadJson) 'ERROR'
     return $false
   }
 }
@@ -316,6 +341,12 @@ try {
 
   Write-Log ("OS Asset Agent iniciado. Poll a cada {0}s. Modo de chave: {1}" -f $pollInterval, $hdr.Mode) 'INFO'
   Write-Log 'Use um usuário de serviço dedicado e proteja a SUPABASE_SERVICE_ROLE_KEY.' 'WARN'
+  if ($hdr.Mode -eq 'JWT') {
+    $jwtRole = Get-JwtRole $apiKey
+    if ($jwtRole -and $jwtRole -ne 'service_role') {
+      throw ("JWT sem role service_role detectado ({0}). Use a SUPABASE_SERVICE_ROLE_KEY." -f $jwtRole)
+    }
+  }
 
   while ($true) {
     $job = $null
