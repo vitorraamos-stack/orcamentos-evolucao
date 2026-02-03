@@ -39,9 +39,15 @@ const sanitizeFilename = (filename) => {
 };
 
 const sanitizeFolderName = (name) => {
-  const normalized = sanitizeFilename(name);
-  const cleaned = normalized.replace(/^[._\s]+/, '').slice(0, 120);
-  return cleaned || 'pasta';
+  const normalized = (name ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const cleaned = normalized.replace(/^[.\s]+/, '').trim();
+  const limited = cleaned.slice(0, 120).trim();
+  return limited.length > 0 ? limited : 'pasta';
 };
 
 const normalizeFirstLetter = (value) => {
