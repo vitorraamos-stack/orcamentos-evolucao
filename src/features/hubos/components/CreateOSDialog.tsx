@@ -227,7 +227,9 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               rows={4}
-              placeholder="Descrição detalhada do pedido:\nMaterial:\nOrientações para a criação de arte:"
+              placeholder={`Descrição detalhada do pedido:
+Material:
+Orientações para a criação de arte:`}
               disabled={Boolean(pendingOrder)}
             />
           </div>
