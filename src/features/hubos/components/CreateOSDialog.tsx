@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import type { LogisticType, OsOrder } from '../types';
 import { createOrder } from '../api';
@@ -27,13 +26,13 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   const [deliveryDate, setDeliveryDate] = useState('');
   const [logisticType, setLogisticType] = useState<LogisticType>('retirada');
   const [address, setAddress] = useState('');
-  const [reproducao, setReproducao] = useState(false);
-  const [letraCaixa, setLetraCaixa] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadingAssets, setUploadingAssets] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<OsOrder | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const reproducao = false;
+  const letraCaixa = false;
 
   const reset = () => {
     setSaleNumber('');
@@ -42,8 +41,6 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     setDeliveryDate('');
     setLogisticType('retirada');
     setAddress('');
-    setReproducao(false);
-    setLetraCaixa(false);
     setSelectedFiles([]);
     setPendingOrder(null);
     if (fileInputRef.current) {
@@ -230,6 +227,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               rows={4}
+              placeholder="Descrição detalhada do pedido:\nMaterial:\nOrientações para a criação de arte:"
               disabled={Boolean(pendingOrder)}
             />
           </div>
@@ -244,25 +242,6 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
               />
             </div>
           )}
-
-          <div className="flex flex-wrap gap-6">
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={reproducao}
-                onCheckedChange={(checked) => setReproducao(Boolean(checked))}
-                disabled={Boolean(pendingOrder)}
-              />
-              Reprodução
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={letraCaixa}
-                onCheckedChange={(checked) => setLetraCaixa(Boolean(checked))}
-                disabled={Boolean(pendingOrder)}
-              />
-              Letra Caixa
-            </label>
-          </div>
 
           <div className="space-y-2">
             <Label htmlFor="os-assets">Arquivos de arte e referências (opcional)</Label>
