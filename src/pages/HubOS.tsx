@@ -198,7 +198,6 @@ export default function HubOS() {
           if (!incoming?.os_id) return;
           if (!visibleOrderIds.includes(incoming.os_id)) return;
           setAssetJobByOsId((prev) => {
-            if (!Object.hasOwn(prev, incoming.os_id)) return prev;
             const current = prev[incoming.os_id] ?? null;
             if (!shouldReplaceJob(current, incoming)) return prev;
             return { ...prev, [incoming.os_id]: incoming };
