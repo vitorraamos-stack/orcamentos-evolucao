@@ -67,3 +67,21 @@ export type HubOsFilters = {
   logisticType: 'all' | LogisticType;
   overdueOnly: boolean;
 };
+
+export type AssetJobStatus =
+  | 'UPLOADING'
+  | 'PENDING'
+  | 'PROCESSING'
+  | 'DONE'
+  | 'DONE_CLEANUP_FAILED'
+  | 'CLEANED'
+  | 'ERROR';
+
+export type AssetJob = {
+  id: string;
+  os_id: string;
+  status: AssetJobStatus;
+  created_at: string;
+  updated_at: string;
+  last_error: string | null;
+};
