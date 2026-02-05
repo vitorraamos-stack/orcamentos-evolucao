@@ -73,6 +73,43 @@ export const createOrderEvent = async (payload: Partial<OsOrderEvent>) => {
   return data as OsOrderEvent;
 };
 
+
+type AuditUser = { id: string; full_name: string | null; email: string | null };
+
+type UserDisplayResponse = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+};
+
+const fetchUserDisplayMap = async (userIds: string[]) => {
+  if (userIds.length === 0) {
+    return new Map<string, AuditUser>();
+  }
+
+  const { data, error } = await supabase.rpc('get_user_display_names', { user_ids: userIds });
+
+  if (error || !data) {
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, email')
+      .in('id', userIds);
+
+    if (profileError) {
+      return new Map<string, AuditUser>();
+    }
+
+    return new Map(
+      (profileData ?? []).map((profile) => [
+        profile.id,
+        { id: profile.id, full_name: profile.email ?? null, email: profile.email ?? null },
+      ])
+    );
+  }
+
+  return new Map((data as UserDisplayResponse[]).map((user) => [user.id, user as AuditUser]));
+};
+
 type AuditFilters = {
   search?: string;
   type?: string;
@@ -136,19 +173,14 @@ export const fetchAuditEvents = async ({
   const osIds = Array.from(new Set(events.map((event) => event.os_id).filter(Boolean)));
   const userIds = Array.from(new Set(events.map((event) => event.created_by).filter(Boolean))) as string[];
 
-  const [ordersResponse, profilesResponse] = await Promise.all([
+  const [ordersResponse, usersById] = await Promise.all([
     osIds.length
       ? supabase
           .from('os_orders')
           .select('id, sale_number, client_name, title')
           .in('id', osIds)
       : Promise.resolve({ data: [], error: null }),
-    userIds.length
-      ? supabase
-          .from('profiles')
-          .select('id, full_name, email')
-          .in('id', userIds)
-      : Promise.resolve({ data: [], error: null }),
+    fetchUserDisplayMap(userIds),
   ]);
 
   if (ordersResponse.error) {
@@ -156,7 +188,6 @@ export const fetchAuditEvents = async ({
   }
 
   const orderById = new Map((ordersResponse.data ?? []).map((order) => [order.id, order]));
-  const profileById = new Map((profilesResponse.data ?? []).map((profile) => [profile.id, profile]));
 
   const dataWithRelations = events.map((event) => {
     const payload = event.payload as Record<string, unknown> | null;
@@ -166,7 +197,7 @@ export const fetchAuditEvents = async ({
       ...event,
       os: orderById.get(event.os_id) ?? null,
       profile: event.created_by
-        ? profileById.get(event.created_by) ?? (actorName ? { id: event.created_by, full_name: actorName, email: null } : null)
+        ? usersById.get(event.created_by) ?? (actorName ? { id: event.created_by, full_name: actorName, email: null } : null)
         : null,
     };
   });
@@ -193,19 +224,16 @@ export const fetchAuditUsers = async () => {
     if (actorName) actorNamesByUserId.set(event.created_by, actorName);
   });
 
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, full_name, email')
-    .in('id', userIds)
-    .order('full_name');
+  const usersById = await fetchUserDisplayMap(userIds);
 
-  if (!error && data) {
-    return data as { id: string; full_name: string | null; email: string | null }[];
-  }
-
-  return userIds.map((id) => ({
-    id,
-    full_name: actorNamesByUserId.get(id) ?? null,
-    email: null,
-  }));
+  return userIds
+    .map((id) => {
+      const user = usersById.get(id);
+      return {
+        id,
+        full_name: user?.full_name ?? actorNamesByUserId.get(id) ?? null,
+        email: user?.email ?? null,
+      };
+    })
+    .sort((a, b) => (a.full_name ?? a.email ?? '').localeCompare(b.full_name ?? b.email ?? '', 'pt-BR'));
 };
