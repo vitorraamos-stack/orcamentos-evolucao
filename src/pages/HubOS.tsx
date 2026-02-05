@@ -254,7 +254,10 @@ export default function HubOS() {
         await createOrderEvent({
           os_id: order.id,
           type: 'archive',
-          payload: { archived: true },
+          payload: {
+            archived: true,
+            actor_name: user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
+          },
           created_by: user?.id ?? null,
         });
       } catch (eventError) {
@@ -294,6 +297,7 @@ export default function HubOS() {
               prod_status: order.prod_status,
             },
             reason: 'manual_delete',
+            actor_name: user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
           },
           created_by: user?.id ?? null,
         });
@@ -341,6 +345,7 @@ export default function HubOS() {
             board: 'arte',
             from: order.art_status,
             to: nextStatus,
+            actor_name: user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
           },
           created_by: user?.id ?? null,
         });
@@ -380,6 +385,7 @@ export default function HubOS() {
             board: 'producao',
             from: order.prod_status,
             to: nextStatus,
+            actor_name: user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
           },
           created_by: user?.id ?? null,
         });
