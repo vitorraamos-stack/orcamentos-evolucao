@@ -1,15 +1,9 @@
 import { createClient } from 'npm:@supabase/supabase-js';
-import { DeleteObjectsCommand, S3Client } from 'npm:@aws-sdk/client-s3';
-
-type DeletePayload = {
-  keys: string[];
-  bucket?: string;
-};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Max-Age': '86400',
 };
 
@@ -62,24 +56,24 @@ const extractBearerToken = (request: Request) => {
 
 const requireUser = async (request: Request) => {
   const token = extractBearerToken(request);
-  console.log('[r2-delete-objects] auth header present:', Boolean(token));
+  console.log('[r2-health] auth header present:', Boolean(token));
 
   if (!token) {
     const gatewayUserId = extractGatewayUserId(request);
-    console.log('[r2-delete-objects] gateway user header present:', Boolean(gatewayUserId));
+    console.log('[r2-health] gateway user header present:', Boolean(gatewayUserId));
 
     if (gatewayUserId) {
       return { user: { id: gatewayUserId } };
     }
 
-    console.error('[r2-delete-objects] missing Authorization bearer token');
+    console.error('[r2-health] missing Authorization bearer token');
     return { error: jsonResponse(401, { error: 'Unauthorized: missing Authorization Bearer token' }) };
   }
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('[r2-delete-objects] supabase env missing for auth');
+    console.error('[r2-health] supabase env missing for auth');
     return {
       error: jsonResponse(500, {
         error: 'Supabase env not configured: SUPABASE_URL/SUPABASE_ANON_KEY missing',
@@ -94,26 +88,26 @@ const requireUser = async (request: Request) => {
 
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data?.user) {
-    console.error('[r2-delete-objects] getUser failed', {
+    console.error('[r2-health] getUser failed', {
       reason: error?.message ?? 'user-not-found',
       status: error?.status,
     });
     return { error: jsonResponse(401, { error: 'Invalid JWT' }) };
   }
 
-  console.log('[r2-delete-objects] getUser success', { userId: data.user.id });
+  console.log('[r2-health] getUser success', { userId: data.user.id });
   return { user: data.user };
 };
 
 Deno.serve(async (request) => {
   try {
-    console.log('[r2-delete-objects] request', { method: request.method });
+    console.log('[r2-health] request', { method: request.method });
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders });
     }
 
-    if (request.method !== 'POST') {
+    if (request.method !== 'GET') {
       return jsonResponse(405, { error: 'Method not allowed' });
     }
 
@@ -122,62 +116,23 @@ Deno.serve(async (request) => {
       return auth.error;
     }
 
-    let payload: DeletePayload;
-    try {
-      payload = await request.json();
-    } catch {
-      return jsonResponse(400, { error: 'Invalid JSON body.' });
-    }
-
-    const keys = Array.isArray(payload.keys) ? payload.keys.filter(Boolean) : [];
-    if (keys.length === 0) {
-      return jsonResponse(400, { error: 'No keys provided.' });
-    }
-
-    if (keys.some((key) => !key.startsWith('os_orders/') || key.includes('..'))) {
-      return jsonResponse(400, { error: 'Invalid object key.' });
-    }
-
     const accountId = Deno.env.get('R2_ACCOUNT_ID');
     const accessKeyId = Deno.env.get('R2_ACCESS_KEY_ID');
     const secretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY');
-    const defaultBucket = Deno.env.get('R2_BUCKET') || 'os-artes';
+    const bucket = Deno.env.get('R2_BUCKET') || 'os-artes';
 
-    if (!accountId || !accessKeyId || !secretAccessKey) {
-      console.error('[r2-delete-objects] r2 env missing');
-      return jsonResponse(500, { error: 'R2 env not configured' });
-    }
-
-    const client = new S3Client({
-      region: 'auto',
-      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-      forcePathStyle: true,
-      credentials: {
-        accessKeyId,
-        secretAccessKey,
+    return jsonResponse(200, {
+      ok: true,
+      bucket,
+      envConfigured: {
+        r2AccountId: Boolean(accountId),
+        r2AccessKeyId: Boolean(accessKeyId),
+        r2SecretAccessKey: Boolean(secretAccessKey),
       },
     });
-
-    const command = new DeleteObjectsCommand({
-      Bucket: payload.bucket || defaultBucket,
-      Delete: {
-        Objects: keys.map((key) => ({ Key: key })),
-        Quiet: false,
-      },
-    });
-
-    const result = await client.send(command);
-    const deletedCount = result.Deleted?.length ?? 0;
-    const errors = result.Errors?.map((error) => ({
-      key: error.Key,
-      code: error.Code,
-      message: error.Message,
-    })) ?? [];
-
-    return jsonResponse(200, { deleted: deletedCount, errors });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error.';
-    console.error('[r2-delete-objects] unexpected error', { message });
+    console.error('[r2-health] unexpected error', { message });
     return jsonResponse(500, { error: message });
   }
 });
