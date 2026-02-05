@@ -69,7 +69,7 @@ const toStartOfDay = (value: string) => new Date(`${value}T00:00:00`).toISOStrin
 const toEndOfDay = (value: string) => new Date(`${value}T23:59:59.999`).toISOString();
 
 export default function OsAuditPage() {
-  const { isAdmin, loading } = useAuth();
+  const { hubPermissions, loading } = useAuth();
   const [, setLocation] = useLocation();
   const [events, setEvents] = useState<OsOrderEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
@@ -86,14 +86,14 @@ export default function OsAuditPage() {
 
   useEffect(() => {
     if (loading) return;
-    if (!isAdmin) {
+    if (!hubPermissions.canViewAudit) {
       toast.error('Você não tem permissão para acessar a auditoria.');
       setLocation('/hub-os');
     }
-  }, [isAdmin, loading, setLocation]);
+  }, [hubPermissions.canViewAudit, loading, setLocation]);
 
   const loadUsers = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!hubPermissions.canViewAudit) return;
     try {
       setLoadingUsers(true);
       const data = await fetchAuditUsers();
@@ -104,11 +104,11 @@ export default function OsAuditPage() {
     } finally {
       setLoadingUsers(false);
     }
-  }, [isAdmin]);
+  }, [hubPermissions.canViewAudit]);
 
   const loadEvents = useCallback(
     async (reset = false) => {
-      if (!isAdmin) return;
+      if (!hubPermissions.canViewAudit) return;
       try {
         setLoadingEvents(true);
         const offset = reset ? 0 : events.length;
@@ -130,7 +130,7 @@ export default function OsAuditPage() {
         setLoadingEvents(false);
       }
     },
-    [events.length, filters, isAdmin]
+    [events.length, filters, hubPermissions.canViewAudit]
   );
 
   useEffect(() => {
@@ -138,13 +138,13 @@ export default function OsAuditPage() {
   }, [loadUsers]);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!hubPermissions.canViewAudit) return;
     loadEvents(true);
-  }, [filters, isAdmin, loadEvents]);
+  }, [filters, hubPermissions.canViewAudit, loadEvents]);
 
   const userOptions = useMemo(() => users.filter((user) => user.full_name || user.email), [users]);
 
-  if (!isAdmin) {
+  if (!hubPermissions.canViewAudit) {
     return null;
   }
 
