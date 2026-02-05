@@ -108,10 +108,7 @@ export const fetchAuditEvents = async ({
 
   let query = supabase
     .from('os_orders_event')
-    .select(
-      '*, os:os_id (id, sale_number, client_name, title), profile:created_by (id, full_name, email)',
-      { count: 'exact' }
-    )
+    .select('*', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -134,15 +131,62 @@ export const fetchAuditEvents = async ({
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
 
-  return { data: (data ?? []) as OsOrderEvent[], count: count ?? 0 };
+  const events = (data ?? []) as OsOrderEvent[];
+
+  const osIds = Array.from(new Set(events.map((event) => event.os_id).filter(Boolean)));
+  const userIds = Array.from(new Set(events.map((event) => event.created_by).filter(Boolean))) as string[];
+
+  const [ordersResponse, profilesResponse] = await Promise.all([
+    osIds.length
+      ? supabase
+          .from('os_orders')
+          .select('id, sale_number, client_name, title')
+          .in('id', osIds)
+      : Promise.resolve({ data: [], error: null }),
+    userIds.length
+      ? supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', userIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (ordersResponse.error) {
+    throw new Error(ordersResponse.error.message);
+  }
+
+  const orderById = new Map((ordersResponse.data ?? []).map((order) => [order.id, order]));
+  const profileById = new Map((profilesResponse.data ?? []).map((profile) => [profile.id, profile]));
+
+  const dataWithRelations = events.map((event) => ({
+    ...event,
+    os: orderById.get(event.os_id) ?? null,
+    profile: event.created_by ? profileById.get(event.created_by) ?? null : null,
+  }));
+
+  return { data: dataWithRelations, count: count ?? 0 };
 };
 
 export const fetchAuditUsers = async () => {
+  const { data: eventUsers, error: eventUsersError } = await supabase
+    .from('os_orders_event')
+    .select('created_by')
+    .not('created_by', 'is', null);
+
+  if (eventUsersError) throw new Error(eventUsersError.message);
+
+  const userIds = Array.from(new Set((eventUsers ?? []).map((event) => event.created_by).filter(Boolean))) as string[];
+  if (userIds.length === 0) return [];
+
   const { data, error } = await supabase
     .from('profiles')
     .select('id, full_name, email')
+    .in('id', userIds)
     .order('full_name');
 
-  if (error) throw new Error(error.message);
-  return data as { id: string; full_name: string | null; email: string | null }[];
+  if (!error && data) {
+    return data as { id: string; full_name: string | null; email: string | null }[];
+  }
+
+  return userIds.map((id) => ({ id, full_name: null, email: null }));
 };
