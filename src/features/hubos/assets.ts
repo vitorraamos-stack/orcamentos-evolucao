@@ -45,6 +45,8 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
 
     uploadedPaths = [];
 
+    uploadedPaths = [];
+
     for (const file of files) {
       const sanitizedName = sanitizeFilename(file.name);
       const objectPath = buildAssetObjectPath(osId, currentJobId, file.name);
