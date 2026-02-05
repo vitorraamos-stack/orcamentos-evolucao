@@ -75,22 +75,19 @@ npm run dev
 
 ## Hub OS (Ordens de Serviço)
 
-### Storage (Supabase)
+### Storage
 
 Crie o bucket **`comprovantes-os`** no Supabase Storage para armazenar anexos de comprovantes.
-Crie também o bucket **`os-artes`** para uploads temporários de artes e referências das OS (limpeza feita pelo agente).
 
-Os uploads serão salvos no formato:
+Os arquivos de artes/referências das OS são enviados para o **Cloudflare R2** (bucket `os-artes`), com upload direto do browser via URL pré-assinada. As chaves seguem o padrão:
 
 ```
-/os/{os_id}/{timestamp}-{filename}
+os_orders/{os_id}/{job_id}/{timestamp}_{filename}
 ```
-
-Se você preferir URLs privadas, ajuste o método de geração de URL no módulo `src/modules/hub-os`.
 
 ### Agent de Artes/Referências (Windows)
 
-O agente roda na rede local para copiar os arquivos do Supabase Storage para o SMB e limpar o storage após confirmar.
+O agente roda na rede local para copiar os arquivos do R2 (ou Supabase Storage para registros antigos) para o SMB e limpar o storage após confirmar.
 
 1. Variáveis de ambiente necessárias:
 
@@ -100,6 +97,11 @@ SUPABASE_SERVICE_ROLE_KEY=...
 OS_ASSET_BUCKET=os-artes
 SMB_BASE=\\\\filesrv\\A_Z
 POLL_INTERVAL_SECONDS=10
+R2_ACCOUNT_ID=...
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET=os-artes
+# R2_ENDPOINT opcional (default: https://<ACCOUNT_ID>.r2.cloudflarestorage.com)
 ```
 
 2. Instalação e execução:
@@ -109,3 +111,49 @@ cd tools/os-asset-agent
 npm install
 npm run start
 ```
+
+### Cloudflare R2
+
+1. Crie um bucket no Cloudflare R2 (ex: `os-artes`).
+2. Crie uma **Access Key (S3 API)** e guarde as credenciais em segurança.
+3. Configure o CORS do bucket para permitir upload direto do browser. Exemplo:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://seu-dominio.com"],
+    "AllowedMethods": ["PUT"],
+    "AllowedHeaders": ["Content-Type"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3000
+  }
+]
+```
+
+4. Configure as variáveis de ambiente das Edge Functions (Supabase):
+
+```bash
+supabase secrets set \
+  R2_ACCOUNT_ID=... \
+  R2_ACCESS_KEY_ID=... \
+  R2_SECRET_ACCESS_KEY=... \
+  R2_BUCKET=os-artes
+```
+
+5. Publique as funções:
+
+```bash
+supabase functions deploy r2-presign-upload
+supabase functions deploy r2-delete-objects
+```
+
+> As funções exigem usuário autenticado (JWT) e geram URLs pré-assinadas com expiração curta (10 min).
+
+### Smoke test (R2)
+
+1. Crie uma OS com um arquivo pequeno.
+2. Verifique:
+   - O objeto apareceu no R2 com a key esperada.
+   - `os_order_asset_jobs`: **PENDING → PROCESSING → DONE → CLEANED**.
+   - O arquivo existe no SMB.
+   - O objeto foi removido do R2 e `deleted_from_storage_at` está preenchido.
