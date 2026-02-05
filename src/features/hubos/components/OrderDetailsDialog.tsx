@@ -169,6 +169,7 @@ export default function OrderDetailsDialog({
             board: 'arte',
             from: order.art_status,
             to: 'Produzir',
+            actor_name: user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
           },
           created_by: user?.id ?? null,
         });
@@ -179,6 +180,7 @@ export default function OrderDetailsDialog({
             board: 'producao',
             from: order.prod_status,
             to: PROD_COLUMNS[0],
+            actor_name: user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
           },
           created_by: user?.id ?? null,
         });
@@ -214,6 +216,7 @@ export default function OrderDetailsDialog({
             board: 'arte',
             from: order.art_status,
             to: ART_COLUMNS[0],
+            actor_name: user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
           },
           created_by: user?.id ?? null,
         });

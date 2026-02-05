@@ -158,11 +158,18 @@ export const fetchAuditEvents = async ({
   const orderById = new Map((ordersResponse.data ?? []).map((order) => [order.id, order]));
   const profileById = new Map((profilesResponse.data ?? []).map((profile) => [profile.id, profile]));
 
-  const dataWithRelations = events.map((event) => ({
-    ...event,
-    os: orderById.get(event.os_id) ?? null,
-    profile: event.created_by ? profileById.get(event.created_by) ?? null : null,
-  }));
+  const dataWithRelations = events.map((event) => {
+    const payload = event.payload as Record<string, unknown> | null;
+    const actorName = typeof payload?.actor_name === 'string' ? payload.actor_name : null;
+
+    return {
+      ...event,
+      os: orderById.get(event.os_id) ?? null,
+      profile: event.created_by
+        ? profileById.get(event.created_by) ?? (actorName ? { id: event.created_by, full_name: actorName, email: null } : null)
+        : null,
+    };
+  });
 
   return { data: dataWithRelations, count: count ?? 0 };
 };
@@ -170,13 +177,21 @@ export const fetchAuditEvents = async ({
 export const fetchAuditUsers = async () => {
   const { data: eventUsers, error: eventUsersError } = await supabase
     .from('os_orders_event')
-    .select('created_by')
+    .select('created_by, payload')
     .not('created_by', 'is', null);
 
   if (eventUsersError) throw new Error(eventUsersError.message);
 
   const userIds = Array.from(new Set((eventUsers ?? []).map((event) => event.created_by).filter(Boolean))) as string[];
   if (userIds.length === 0) return [];
+
+  const actorNamesByUserId = new Map<string, string>();
+  (eventUsers ?? []).forEach((event) => {
+    if (!event.created_by || actorNamesByUserId.has(event.created_by)) return;
+    const payload = event.payload as Record<string, unknown> | null;
+    const actorName = typeof payload?.actor_name === 'string' ? payload.actor_name : null;
+    if (actorName) actorNamesByUserId.set(event.created_by, actorName);
+  });
 
   const { data, error } = await supabase
     .from('profiles')
@@ -188,5 +203,9 @@ export const fetchAuditUsers = async () => {
     return data as { id: string; full_name: string | null; email: string | null }[];
   }
 
-  return userIds.map((id) => ({ id, full_name: null, email: null }));
+  return userIds.map((id) => ({
+    id,
+    full_name: actorNamesByUserId.get(id) ?? null,
+    email: null,
+  }));
 };
