@@ -41,12 +41,15 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
     }
 
     jobId = job.id;
+    const currentJobId = job.id;
+
+    uploadedPaths = [];
 
     uploadedPaths = [];
 
     for (const file of files) {
       const sanitizedName = sanitizeFilename(file.name);
-      const objectPath = buildAssetObjectPath(osId, jobId, file.name);
+      const objectPath = buildAssetObjectPath(osId, currentJobId, file.name);
       const contentType = resolveAssetContentType(file);
 
       const { data: presignData, error: presignError } = await supabase.functions.invoke('r2-presign-upload', {
@@ -78,7 +81,7 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
 
       const { error: assetError } = await supabase.from('os_order_assets').insert({
         os_id: osId,
-        job_id: jobId,
+        job_id: currentJobId,
         bucket: presignData.bucket ?? ASSET_BUCKET,
         storage_bucket: presignData.bucket ?? ASSET_BUCKET,
         storage_provider: 'r2',
