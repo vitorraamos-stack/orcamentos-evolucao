@@ -1,12 +1,16 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { getHubPermissions, normalizeRole, type HubRole } from '@/lib/hubRoles';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
   isAdmin: boolean;
+  role: string | null;
+  hubRole: HubRole | null;
+  hubPermissions: ReturnType<typeof getHubPermissions>;
   signOut: () => Promise<void>;
 }
 
@@ -15,6 +19,9 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   loading: true,
   isAdmin: false,
+  role: null,
+  hubRole: null,
+  hubPermissions: getHubPermissions(null),
   signOut: async () => {},
 });
 
@@ -25,9 +32,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check active session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -35,8 +42,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    // Listen for changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       checkUserRole(session?.user);
@@ -46,34 +54,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const checkUserRole = async (user: User | null | undefined) => {
-    if (!user) {
+  const checkUserRole = async (currentUser: User | null | undefined) => {
+    if (!currentUser) {
       setIsAdmin(false);
+      setRole(null);
       return;
     }
-    
-    // Check if user has admin role in public.profiles or similar
-    // For now, we'll assume a simple metadata check or a specific email for simplicity
-    // In a real app, you'd query a 'profiles' table.
-    // Let's implement a basic check: if email contains 'admin', it's admin (for demo purposes)
-    // OR query a profiles table if it exists.
-    
+
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('role')
-        .eq('id', user.id)
+        .eq('id', currentUser.id)
         .single();
-        
-      if (data && data.role === 'admin') {
-        setIsAdmin(true);
-      } else {
-        // Fallback for demo: check email domain or specific email
-        setIsAdmin(user.email?.includes('admin') || false);
-      }
-    } catch (e) {
-      // If table doesn't exist or error, fallback to false
+
+      const rawRole = data?.role ?? null;
+      const normalizedRole = normalizeRole(rawRole);
+      setRole(rawRole);
+      setIsAdmin(normalizedRole === 'gerente' || currentUser.email?.includes('admin') || false);
+    } catch {
       setIsAdmin(false);
+      setRole(null);
     }
   };
 
@@ -81,8 +82,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const hubPermissions = getHubPermissions(role);
+
   return (
-    <AuthContext.Provider value={{ user, session, loading, isAdmin, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        loading,
+        isAdmin,
+        role,
+        hubRole: hubPermissions.normalizedRole,
+        hubPermissions,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

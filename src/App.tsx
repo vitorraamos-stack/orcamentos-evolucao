@@ -18,9 +18,10 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Layout from "./components/Layout";
+import HubOsAccessGuard from "./components/HubOsAccessGuard";
 
 function Router() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, hubPermissions } = useAuth();
 
   return (
     <Switch>
@@ -41,7 +42,7 @@ function Router() {
 
       <Route path="/hub-os/auditoria">
         <Layout>
-          <OsAuditPage />
+          <HubOsAccessGuard scope="audit"><OsAuditPage /></HubOsAccessGuard>
         </Layout>
       </Route>
 
@@ -62,7 +63,7 @@ function Router() {
       <Route path="/configuracoes">
   <Layout>
     {/* Se for Admin entra, se não for, é chutado para a Home */}
-    {isAdmin ? <Configuracoes /> : <Redirect to="/" />}
+    {hubPermissions.canManageUsers ? <Configuracoes /> : <Redirect to="/" />}
   </Layout>
 </Route>
 
@@ -72,19 +73,19 @@ function Router() {
 
       <Route path="/os/arte">
         <Layout>
-          <OsArteBoardPage />
+          <HubOsAccessGuard scope="arte"><OsArteBoardPage /></HubOsAccessGuard>
         </Layout>
       </Route>
 
       <Route path="/os/producao">
         <Layout>
-          <OsProducaoBoardPage />
+          <HubOsAccessGuard scope="producao"><OsProducaoBoardPage /></HubOsAccessGuard>
         </Layout>
       </Route>
 
       <Route path="/os/novo">
         <Layout>
-          <OsCreatePage />
+          <HubOsAccessGuard scope="create"><OsCreatePage /></HubOsAccessGuard>
         </Layout>
       </Route>
 

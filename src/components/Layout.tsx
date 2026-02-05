@@ -13,13 +13,14 @@ import {
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
+import { getRoleLabel } from '@/lib/hubRoles';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const { user, loading, signOut, isAdmin } = useAuth();
+  const { user, loading, signOut, isAdmin, role, hubPermissions } = useAuth();
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
@@ -89,15 +90,17 @@ export default function Layout({ children }: LayoutProps) {
             </Button>
           </Link>
 
-          <Link href="/configuracoes">
-            <Button 
-              variant={location === '/configuracoes' ? 'secondary' : 'ghost'} 
-              className={cn("w-full justify-start", location === '/configuracoes' && "bg-sidebar-accent text-sidebar-accent-foreground")}
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              Configurações
-            </Button>
-          </Link>
+          {hubPermissions.canManageUsers && (
+            <Link href="/configuracoes">
+              <Button
+                variant={location === '/configuracoes' ? 'secondary' : 'ghost'}
+                className={cn("w-full justify-start", location === '/configuracoes' && "bg-sidebar-accent text-sidebar-accent-foreground")}
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                Configurações
+              </Button>
+            </Link>
+          )}
         </>
       )}
     </div>
@@ -126,7 +129,7 @@ export default function Layout({ children }: LayoutProps) {
             </div>
             <div className="overflow-hidden">
               <p className="text-sm font-medium truncate">{user.email}</p>
-              <p className="text-xs text-muted-foreground truncate">{isAdmin ? 'Administrador' : 'Consultor'}</p>
+              <p className="text-xs text-muted-foreground truncate">{getRoleLabel(role)}</p>
             </div>
           </div>
           <Button variant="outline" className="w-full justify-start border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" onClick={() => signOut()}>

@@ -42,7 +42,7 @@ const isOverdue = (order: OsOrder) => {
 };
 
 export default function HubOS() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, hubPermissions } = useAuth();
   const [orders, setOrders] = useState<OsOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState(defaultFilters);
@@ -54,6 +54,16 @@ export default function HubOS() {
   const [selectedInstallationId, setSelectedInstallationId] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [assetJobByOsId, setAssetJobByOsId] = useState<Record<string, AssetJob | null>>({});
+
+  useEffect(() => {
+    if (hubPermissions.canViewArteBoard && !hubPermissions.canViewProducaoBoard) {
+      setActiveTab('arte');
+    }
+    if (!hubPermissions.canViewArteBoard && hubPermissions.canViewProducaoBoard) {
+      setActiveTab('producao');
+    }
+  }, [hubPermissions.canViewArteBoard, hubPermissions.canViewProducaoBoard]);
+
 
   const loadOrders = async () => {
     try {
@@ -314,6 +324,10 @@ export default function HubOS() {
 
   const handleDragEndArte = async ({ active, over }: DragEndEvent) => {
     if (!over) return;
+    if (!hubPermissions.canMoveArteBoard) {
+      toast.error('Você não tem permissão para mover cards de Arte.');
+      return;
+    }
     const order = orders.find((item) => item.id === active.id);
     if (!order) return;
     const nextStatus = over.id as ArtStatus;
@@ -361,6 +375,10 @@ export default function HubOS() {
 
   const handleDragEndProducao = async ({ active, over }: DragEndEvent) => {
     if (!over) return;
+    if (!hubPermissions.canMoveProducaoBoard) {
+      toast.error('Você não tem permissão para mover cards de Produção.');
+      return;
+    }
     const order = orders.find((item) => item.id === active.id);
     if (!order) return;
     const nextStatus = over.id as ProdStatus;
@@ -441,6 +459,15 @@ export default function HubOS() {
     );
   };
 
+  if (!hubPermissions.canViewHubOS) {
+    return (
+      <div className="space-y-2">
+        <h1 className="text-2xl font-semibold">Hub OS</h1>
+        <p className="text-sm text-muted-foreground">Sem permissão para acessar o módulo Hub OS.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -451,16 +478,18 @@ export default function HubOS() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {isAdmin && (
+          {hubPermissions.canViewAudit && (
             <Link href="/hub-os/auditoria">
               <Button variant="secondary">Auditoria</Button>
             </Link>
           )}
-          <CreateOSDialog
-            onCreated={(order) => {
-              setOrders((prev) => [order, ...prev]);
-            }}
-          />
+          {hubPermissions.canCreateOs && (
+            <CreateOSDialog
+              onCreated={(order) => {
+                setOrders((prev) => [order, ...prev]);
+              }}
+            />
+          )}
           <Button variant="outline" onClick={loadOrders} disabled={loading}>
             Atualizar
           </Button>
@@ -479,15 +508,22 @@ export default function HubOS() {
           <FiltersBar value={filters} onChange={setFilters} />
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'arte' | 'producao')} className="space-y-4">
             <TabsList>
-              <TabsTrigger value="arte">Arte</TabsTrigger>
-              <TabsTrigger value="producao">Produção</TabsTrigger>
+              {hubPermissions.canViewArteBoard && <TabsTrigger value="arte">Arte</TabsTrigger>}
+              {hubPermissions.canViewProducaoBoard && <TabsTrigger value="producao">Produção</TabsTrigger>}
             </TabsList>
-            <TabsContent value="arte" className="space-y-4">
-              {renderBoard(arteOrders, ART_COLUMNS, handleDragEndArte)}
-            </TabsContent>
-            <TabsContent value="producao" className="space-y-4">
-              {renderBoard(producaoOrders, PROD_COLUMNS, handleDragEndProducao)}
-            </TabsContent>
+            {!hubPermissions.canViewArteBoard && !hubPermissions.canViewProducaoBoard && (
+              <p className="text-sm text-muted-foreground">Sem acesso aos boards do Hub OS.</p>
+            )}
+            {hubPermissions.canViewArteBoard && (
+              <TabsContent value="arte" className="space-y-4">
+                {renderBoard(arteOrders, ART_COLUMNS, handleDragEndArte)}
+              </TabsContent>
+            )}
+            {hubPermissions.canViewProducaoBoard && (
+              <TabsContent value="producao" className="space-y-4">
+                {renderBoard(producaoOrders, PROD_COLUMNS, handleDragEndProducao)}
+              </TabsContent>
+            )}
           </Tabs>
         </>
       ) : (
