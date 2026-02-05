@@ -2,11 +2,18 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
+const { DeleteObjectsCommand, GetObjectCommand, S3Client } = require('@aws-sdk/client-s3');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const BUCKET = process.env.OS_ASSET_BUCKET || 'os-artes';
 const SMB_BASE = process.env.SMB_BASE;
+const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
+const R2_BUCKET = process.env.R2_BUCKET || 'os-artes';
+const R2_ENDPOINT =
+  process.env.R2_ENDPOINT || (R2_ACCOUNT_ID ? `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : null);
 const POLL_INTERVAL_SECONDS = Number(process.env.POLL_INTERVAL_SECONDS || 10);
 const PROCESSING_TIMEOUT_MINUTES = 30;
 
@@ -22,6 +29,19 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+const r2Client =
+  R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_ENDPOINT
+    ? new S3Client({
+        region: 'auto',
+        endpoint: R2_ENDPOINT,
+        forcePathStyle: true,
+        credentials: {
+          accessKeyId: R2_ACCESS_KEY_ID,
+          secretAccessKey: R2_SECRET_ACCESS_KEY,
+        },
+      })
+    : null;
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const sanitizeFilename = (filename) => {
@@ -36,6 +56,21 @@ const sanitizeFilename = (filename) => {
     .slice(0, 120);
 
   return normalized.length > 0 ? normalized : 'arquivo';
+};
+
+const ensureR2Client = () => {
+  if (!r2Client) {
+    throw new Error('R2 não configurado. Defina R2_ACCOUNT_ID, R2_ACCESS_KEY_ID e R2_SECRET_ACCESS_KEY.');
+  }
+  return r2Client;
+};
+
+const streamToBuffer = async (stream) => {
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
 };
 
 const sanitizeFolderName = (name) => {
@@ -132,7 +167,7 @@ const requeueStaleJobs = async () => {
 const cleanupJob = async (job) => {
   const { data: assets, error: assetsError } = await supabase
     .from('os_order_assets')
-    .select('id, object_path')
+    .select('id, object_path, storage_provider, storage_bucket, bucket')
     .eq('job_id', job.id)
     .is('deleted_from_storage_at', null);
 
@@ -140,8 +175,8 @@ const cleanupJob = async (job) => {
     throw new Error(assetsError.message);
   }
 
-  const objectPaths = (assets ?? []).map((asset) => asset.object_path);
-  if (objectPaths.length === 0) {
+  const pendingAssets = assets ?? [];
+  if (pendingAssets.length === 0) {
     await supabase
       .from('os_order_asset_jobs')
       .update({ status: 'CLEANED', cleaned_at: new Date().toISOString(), last_error: null })
@@ -149,20 +184,65 @@ const cleanupJob = async (job) => {
     return;
   }
 
-  const { error: removeError } = await supabase.storage.from(BUCKET).remove(objectPaths);
-  if (removeError) {
-    await supabase
-      .from('os_order_asset_jobs')
-      .update({ status: 'DONE_CLEANUP_FAILED', last_error: removeError.message })
-      .eq('id', job.id);
-    return;
+  const r2Assets = pendingAssets.filter((asset) => asset.storage_provider === 'r2');
+  const supabaseAssets = pendingAssets.filter((asset) => asset.storage_provider !== 'r2');
+
+  if (r2Assets.length > 0) {
+    const client = ensureR2Client();
+    const byBucket = new Map();
+    for (const asset of r2Assets) {
+      const bucket = asset.storage_bucket || asset.bucket || R2_BUCKET;
+      const list = byBucket.get(bucket) || [];
+      list.push({ Key: asset.object_path });
+      byBucket.set(bucket, list);
+    }
+
+    for (const [bucket, objects] of byBucket.entries()) {
+      const result = await client.send(
+        new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: { Objects: objects, Quiet: false },
+        })
+      );
+      if (result.Errors && result.Errors.length > 0) {
+        await supabase
+          .from('os_order_asset_jobs')
+          .update({ status: 'DONE_CLEANUP_FAILED', last_error: result.Errors[0].Message })
+          .eq('id', job.id);
+        return;
+      }
+    }
+  }
+
+  if (supabaseAssets.length > 0) {
+    const byBucket = new Map();
+    for (const asset of supabaseAssets) {
+      const bucket = asset.bucket || BUCKET;
+      const list = byBucket.get(bucket) || [];
+      list.push(asset.object_path);
+      byBucket.set(bucket, list);
+    }
+
+    for (const [bucket, objectPaths] of byBucket.entries()) {
+      const { error: removeError } = await supabase.storage.from(bucket).remove(objectPaths);
+      if (removeError) {
+        await supabase
+          .from('os_order_asset_jobs')
+          .update({ status: 'DONE_CLEANUP_FAILED', last_error: removeError.message })
+          .eq('id', job.id);
+        return;
+      }
+    }
   }
 
   const deletedAt = new Date().toISOString();
   await supabase
     .from('os_order_assets')
     .update({ deleted_from_storage_at: deletedAt })
-    .in('object_path', objectPaths);
+    .in(
+      'object_path',
+      pendingAssets.map((asset) => asset.object_path)
+    );
   await supabase
     .from('os_order_asset_jobs')
     .update({ status: 'CLEANED', cleaned_at: deletedAt, last_error: null })
@@ -229,15 +309,33 @@ const processJob = async (job) => {
       continue;
     }
 
-    const { data: download, error: downloadError } = await supabase.storage
-      .from(BUCKET)
-      .download(asset.object_path);
+    let fileBuffer;
 
-    if (downloadError || !download) {
-      throw new Error(downloadError?.message ?? 'Falha ao baixar arquivo.');
+    if (asset.storage_provider === 'r2') {
+      const client = ensureR2Client();
+      const bucket = asset.storage_bucket || asset.bucket || R2_BUCKET;
+      const response = await client.send(
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: asset.object_path,
+        })
+      );
+      if (!response.Body) {
+        throw new Error('Falha ao baixar arquivo do R2.');
+      }
+      fileBuffer = await streamToBuffer(response.Body);
+    } else {
+      const { data: download, error: downloadError } = await supabase.storage
+        .from(asset.bucket || BUCKET)
+        .download(asset.object_path);
+
+      if (downloadError || !download) {
+        throw new Error(downloadError?.message ?? 'Falha ao baixar arquivo.');
+      }
+
+      fileBuffer = Buffer.from(await download.arrayBuffer());
     }
 
-    const fileBuffer = Buffer.from(await download.arrayBuffer());
     await fs.promises.writeFile(targetPath, fileBuffer);
 
     const stats = await fs.promises.stat(targetPath);
