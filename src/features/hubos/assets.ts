@@ -15,16 +15,73 @@ type UploadAssetsParams = {
   userId: string | null;
 };
 
+class PresignInvokeError extends Error {
+  status?: number;
+  details?: string;
+}
 
-const getAccessTokenOrThrow = async () => {
+const getSessionOrThrow = async () => {
   const { data, error } = await supabase.auth.getSession();
-  const accessToken = data.session?.access_token;
+  const session = data.session;
 
-  if (error || !accessToken) {
-    throw new Error('Sessão expirada. Faça login novamente.');
+  if (error || !session?.access_token) {
+    throw new Error('Sessão inválida/expirada. Faça login novamente.');
   }
 
-  return accessToken;
+  return session;
+};
+
+const mapPresignError = (status?: number, details?: string) => {
+  if (status === 401 || /invalid jwt/i.test(details ?? '')) {
+    return 'Sessão expirada ou projeto Supabase incorreto. Faça login novamente.';
+  }
+
+  if (status === 404) {
+    return 'Edge Function r2-presign-upload não publicada neste projeto Supabase.';
+  }
+
+  if (status === 500 && /r2 env not configured/i.test(details ?? '')) {
+    return 'Secrets do R2 não configurados no Supabase.';
+  }
+
+  return null;
+};
+
+const buildPresignInvokeError = async (presignError: unknown) => {
+  const invokeError = new PresignInvokeError('R2 não configurado ou falha ao gerar URL de upload.');
+
+  if (!presignError || typeof presignError !== 'object') {
+    return invokeError;
+  }
+
+  const errorLike = presignError as {
+    message?: string;
+    context?: Response;
+  };
+
+  const status = errorLike.context?.status;
+  let details = errorLike.message;
+
+  if (!details && errorLike.context) {
+    try {
+      const body = await errorLike.context.clone().json();
+      if (body && typeof body.error === 'string') {
+        details = body.error;
+      }
+    } catch {
+      // noop
+    }
+  }
+
+  const mappedMessage = mapPresignError(status, details);
+  if (mappedMessage) {
+    invokeError.message = mappedMessage;
+  }
+
+  invokeError.status = status;
+  invokeError.details = details;
+
+  return invokeError;
 };
 
 export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssetsParams) => {
@@ -56,7 +113,7 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
     const currentJobId = job.id;
 
     uploadedPaths = [];
-    const accessToken = await getAccessTokenOrThrow();
+    const session = await getSessionOrThrow();
 
     for (const file of files) {
       const sanitizedName = sanitizeFilename(file.name);
@@ -70,12 +127,12 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
           sizeBytes: file.size,
         },
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
       });
 
       if (presignError || !presignData?.uploadUrl) {
-        throw new Error('R2 não configurado ou falha ao gerar URL de upload.');
+        throw await buildPresignInvokeError(presignError);
       }
 
       const uploadResponse = await fetch(presignData.uploadUrl, {
@@ -136,11 +193,11 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
           .map((asset) => asset.object_path);
         const pathsToDelete = Array.from(new Set([...uploadedPaths, ...storedPaths]));
         if (pathsToDelete.length > 0) {
-          const accessToken = await getAccessTokenOrThrow();
+          const activeSession = await getSessionOrThrow();
           await supabase.functions.invoke('r2-delete-objects', {
             body: { keys: pathsToDelete, bucket: ASSET_BUCKET },
             headers: {
-              Authorization: `Bearer ${accessToken}`,
+              Authorization: `Bearer ${activeSession.access_token}`,
             },
           });
           await supabase

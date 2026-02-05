@@ -116,13 +116,16 @@ npm run start
 
 1. Crie um bucket no Cloudflare R2 (ex: `os-artes`).
 2. Crie uma **Access Key (S3 API)** e guarde as credenciais em segurança.
-3. Configure o CORS do bucket para permitir upload direto do browser. Exemplo:
+3. Configure o CORS do bucket para permitir upload direto do browser (incluindo leitura do `ETag` após `PUT`). JSON recomendado:
 
 ```json
 [
   {
-    "AllowedOrigins": ["https://seu-dominio.com"],
-    "AllowedMethods": ["PUT"],
+    "AllowedOrigins": [
+      "https://seu-projeto.vercel.app",
+      "http://localhost:5173"
+    ],
+    "AllowedMethods": ["PUT", "HEAD"],
     "AllowedHeaders": ["Content-Type"],
     "ExposeHeaders": ["ETag"],
     "MaxAgeSeconds": 3000
@@ -145,9 +148,35 @@ supabase secrets set \
 ```bash
 supabase functions deploy r2-presign-upload
 supabase functions deploy r2-delete-objects
+supabase functions deploy r2-health
 ```
 
 > As funções exigem usuário autenticado (JWT) e geram URLs pré-assinadas com expiração curta (10 min).
+
+### Diagnóstico rápido (R2/Edge Functions)
+
+1. **401 Invalid JWT no `r2-presign-upload`**
+   - Causa comum: sessão expirada ou `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` apontando para projeto diferente do deploy da function.
+   - Ação: faça logout/login e valide que URL e anon key pertencem ao mesmo projeto Supabase.
+
+2. **404 no `r2-presign-upload`**
+   - Causa: função não publicada nesse projeto.
+   - Ação: execute `supabase functions deploy r2-presign-upload` no projeto correto.
+
+3. **500 com `R2 env not configured`**
+   - Causa: secrets do R2 ausentes no Supabase.
+   - Ação: configure `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` e `R2_BUCKET`.
+
+4. **Como validar rapidamente se URL/anon key pertencem ao mesmo projeto**
+   - Compare o `project-ref` presente em `VITE_SUPABASE_URL` com o project ref onde as funções foram publicadas.
+   - Se o front chama `https://<ref-A>.supabase.co/functions/v1/...` e a função foi deployada em `ref-B`, você verá 401/404 inconsistentes.
+
+5. **Forçar refresh de sessão no browser**
+   - Faça logout/login no app.
+   - Se necessário, limpe o localStorage do domínio (chaves do Supabase) e recarregue a página para gerar novo JWT.
+
+6. **Healthcheck autenticado da configuração R2**
+   - Chame `GET /functions/v1/r2-health` com `Authorization: Bearer <jwt>` para confirmar autenticação + presença de envs R2 sem expor secrets.
 
 ### Smoke test (R2)
 
