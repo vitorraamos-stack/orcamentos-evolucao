@@ -15,6 +15,18 @@ type UploadAssetsParams = {
   userId: string | null;
 };
 
+
+const getAccessTokenOrThrow = async () => {
+  const { data, error } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+
+  if (error || !accessToken) {
+    throw new Error('Sessão expirada. Faça login novamente.');
+  }
+
+  return accessToken;
+};
+
 export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssetsParams) => {
   const validation = validateFiles(files);
   if (!validation.ok) {
@@ -44,8 +56,7 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
     const currentJobId = job.id;
 
     uploadedPaths = [];
-
-    uploadedPaths = [];
+    const accessToken = await getAccessTokenOrThrow();
 
     for (const file of files) {
       const sanitizedName = sanitizeFilename(file.name);
@@ -57,6 +68,9 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
           key: objectPath,
           contentType,
           sizeBytes: file.size,
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
         },
       });
 
@@ -122,8 +136,12 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
           .map((asset) => asset.object_path);
         const pathsToDelete = Array.from(new Set([...uploadedPaths, ...storedPaths]));
         if (pathsToDelete.length > 0) {
+          const accessToken = await getAccessTokenOrThrow();
           await supabase.functions.invoke('r2-delete-objects', {
             body: { keys: pathsToDelete, bucket: ASSET_BUCKET },
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
           });
           await supabase
             .from('os_order_assets')
