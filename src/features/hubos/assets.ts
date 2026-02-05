@@ -128,6 +128,7 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
         },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
         },
       });
 
@@ -198,6 +199,7 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
             body: { keys: pathsToDelete, bucket: ASSET_BUCKET },
             headers: {
               Authorization: `Bearer ${activeSession.access_token}`,
+              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
             },
           });
           await supabase
