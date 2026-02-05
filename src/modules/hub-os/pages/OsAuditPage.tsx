@@ -27,8 +27,12 @@ const EVENT_OPTIONS = [
 const formatDateTime = (value: string) =>
   new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
-const formatUser = (event: OsOrderEvent) =>
-  event.profile?.full_name || event.profile?.email || event.created_by || '—';
+const formatUser = (event: OsOrderEvent) => {
+  const payload = event.payload as Record<string, unknown> | null;
+  const actorName = typeof payload?.actor_name === 'string' ? payload.actor_name : null;
+
+  return actorName || event.profile?.full_name || event.profile?.email || event.created_by || '—';
+};
 
 const formatOs = (event: OsOrderEvent) => {
   if (event.os) {
