@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      await loadUserData(session?.user ?? null);
+      void loadUserData(session?.user ?? null);
       setLoading(false);
     });
 
@@ -53,9 +53,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      setLoading(true);
-      await loadUserData(session?.user ?? null);
       setLoading(false);
+      void loadUserData(session?.user ?? null);
     });
 
     return () => subscription.unsubscribe();
