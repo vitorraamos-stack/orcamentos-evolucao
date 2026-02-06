@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { APP_MODULE_KEYS, CONFIG_MODULE_KEY, type AppModuleKey } from '../src/constants/modules';
 
 const ALLOWED_ROLES = [
   'consultor_vendas',
@@ -24,18 +25,37 @@ function json(res: any, status: number, payload: any) {
   res.end(JSON.stringify(payload));
 }
 
+function jsonOk(res: any, status: number, data: any) {
+  return json(res, status, { ok: true, data });
+}
+
+function jsonError(res: any, status: number, code: string, message: string) {
+  return json(res, status, { ok: false, error: { code, message } });
+}
+
+const parseModules = (modules: unknown) => {
+  if (modules === undefined) return undefined;
+  if (!Array.isArray(modules)) return { error: 'Modules deve ser um array.' } as const;
+  const normalized = modules.map((module) => String(module));
+  const invalid = normalized.filter((module) => !(APP_MODULE_KEYS as readonly string[]).includes(module));
+  if (invalid.length > 0) {
+    return { error: `Módulos inválidos: ${invalid.join(', ')}.` } as const;
+  }
+  return { value: normalized as AppModuleKey[] } as const;
+};
+
 async function requireAdminAuth(req: any, res: any, supabaseAdmin: ReturnType<typeof createClient>) {
   const authHeader = (req.headers?.authorization || req.headers?.Authorization || '') as string;
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
   if (!token) {
-    json(res, 401, { error: 'Token não fornecido.' });
+    jsonError(res, 401, 'unauthorized', 'Token não fornecido.');
     return null;
   }
 
   const { data: userData, error: authError } = await supabaseAdmin.auth.getUser(token);
   const user = userData?.user;
   if (authError || !user) {
-    json(res, 401, { error: 'Usuário não autenticado.' });
+    jsonError(res, 401, 'unauthorized', 'Usuário não autenticado.');
     return null;
   }
 
@@ -46,13 +66,13 @@ async function requireAdminAuth(req: any, res: any, supabaseAdmin: ReturnType<ty
     .maybeSingle();
 
   if (profileError) {
-    json(res, 403, { error: 'Não foi possível validar permissões.' });
+    jsonError(res, 403, 'forbidden', 'Não foi possível validar permissões.');
     return null;
   }
 
   const normalizedRole = normalizeRole(profile?.role ?? null);
   if (normalizedRole !== 'gerente') {
-    json(res, 403, { error: 'Acesso negado. Apenas gerente.' });
+    jsonError(res, 403, 'forbidden', 'Acesso negado. Apenas gerente.');
     return null;
   }
 
@@ -64,10 +84,12 @@ export default async function handler(req: any, res: any) {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
-    return json(res, 500, {
-      error:
-        'Configuração inválida: defina SUPABASE_URL (ou VITE_SUPABASE_URL) e SUPABASE_SERVICE_ROLE_KEY nas variáveis de ambiente do projeto.',
-    });
+    return jsonError(
+      res,
+      500,
+      'server_config',
+      'Configuração inválida: defina SUPABASE_URL (ou VITE_SUPABASE_URL) e SUPABASE_SERVICE_ROLE_KEY nas variáveis de ambiente do projeto.'
+    );
   }
 
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
@@ -88,6 +110,20 @@ export default async function handler(req: any, res: any) {
       if (listError) throw listError;
       const authById = new Map((authUsers.users || []).map((item) => [item.id, item]));
 
+      const { data: moduleAccessRows, error: moduleError } = await supabaseAdmin
+        .from('user_module_access')
+        .select('user_id, module_key');
+      if (moduleError) throw moduleError;
+
+      const modulesByUser = new Map<string, AppModuleKey[]>();
+      (moduleAccessRows || []).forEach((row) => {
+        const current = modulesByUser.get(row.user_id) || [];
+        if ((APP_MODULE_KEYS as readonly string[]).includes(row.module_key)) {
+          current.push(row.module_key as AppModuleKey);
+          modulesByUser.set(row.user_id, current);
+        }
+      });
+
       const users = (profiles || []).map((profile) => {
         const authUser = authById.get(profile.id);
         return {
@@ -98,22 +134,27 @@ export default async function handler(req: any, res: any) {
           created_at: profile.created_at,
           last_sign_in_at: authUser?.last_sign_in_at || null,
           status: authUser?.banned_until ? 'bloqueado' : 'ativo',
+          modules: modulesByUser.get(profile.id) || [],
         };
       });
 
-      return json(res, 200, { users });
+      return jsonOk(res, 200, { users });
     }
 
     if (req.method === 'POST') {
-      const { email, password, role, name } = body || {};
+      const { email, password, role, name, modules } = body || {};
       const normalizedRole = normalizeRole(role);
+      const parsedModules = parseModules(modules);
 
       if (!email || !password || !name) {
-        return json(res, 400, { error: 'Informe email, password, name e role.' });
+        return jsonError(res, 400, 'validation_error', 'Informe email, password, name e role.');
       }
-      if (!normalizedRole) return json(res, 400, { error: 'Role inválido.' });
+      if (!normalizedRole) return jsonError(res, 400, 'validation_error', 'Role inválido.');
+      if (parsedModules && 'error' in parsedModules) {
+        return jsonError(res, 400, 'validation_error', parsedModules.error);
+      }
       if (String(password).length < 6) {
-        return json(res, 400, { error: 'A senha deve ter ao menos 6 caracteres.' });
+        return jsonError(res, 400, 'validation_error', 'A senha deve ter ao menos 6 caracteres.');
       }
 
       const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -131,20 +172,127 @@ export default async function handler(req: any, res: any) {
       });
       if (upsertError) throw upsertError;
 
-      return json(res, 200, { message: 'Usuário criado com sucesso.' });
+      const moduleList = parsedModules && 'value' in parsedModules ? parsedModules.value : [];
+      const nextModules =
+        normalizedRole === 'gerente' && !moduleList.includes(CONFIG_MODULE_KEY)
+          ? [...moduleList, CONFIG_MODULE_KEY]
+          : moduleList;
+
+      if (nextModules.length > 0) {
+        const { error: moduleInsertError } = await supabaseAdmin.from('user_module_access').insert(
+          nextModules.map((moduleKey) => ({
+            user_id: created.user.id,
+            module_key: moduleKey,
+          }))
+        );
+        if (moduleInsertError) throw moduleInsertError;
+      }
+
+      return jsonOk(res, 200, { message: 'Usuário criado com sucesso.' });
     }
 
     if (req.method === 'PATCH') {
-      const { userId, role, newPassword, setActive, name } = body || {};
-      if (!userId) return json(res, 400, { error: 'Informe userId.' });
+      const { userId, role, newPassword, setActive, name, modules } = body || {};
+      if (!userId) return jsonError(res, 400, 'validation_error', 'Informe userId.');
       if (userId === currentUser.id && setActive === false) {
-        return json(res, 400, { error: 'Você não pode desativar sua própria conta.' });
+        return jsonError(res, 400, 'validation_error', 'Você não pode desativar sua própria conta.');
       }
 
       const normalizedRole = role === undefined ? undefined : normalizeRole(role);
-      if (role !== undefined && !normalizedRole) return json(res, 400, { error: 'Role inválido.' });
+      if (role !== undefined && !normalizedRole) return jsonError(res, 400, 'validation_error', 'Role inválido.');
+      const parsedModules = parseModules(modules);
+      if (parsedModules && 'error' in parsedModules) {
+        return jsonError(res, 400, 'validation_error', parsedModules.error);
+      }
       if (newPassword !== undefined && String(newPassword).length < 6) {
-        return json(res, 400, { error: 'A nova senha deve ter ao menos 6 caracteres.' });
+        return jsonError(res, 400, 'validation_error', 'A nova senha deve ter ao menos 6 caracteres.');
+      }
+
+      const { data: currentProfile, error: currentProfileError } = await supabaseAdmin
+        .from('profiles')
+        .select('id, role')
+        .eq('id', userId)
+        .single();
+      if (currentProfileError) throw currentProfileError;
+
+      const currentRoleNormalized = normalizeRole(currentProfile?.role ?? null);
+
+      if (userId === currentUser.id && parsedModules && 'value' in parsedModules) {
+        if (!parsedModules.value.includes(CONFIG_MODULE_KEY)) {
+          return jsonError(
+            res,
+            400,
+            'validation_error',
+            'Você não pode remover o acesso ao módulo de Configurações da sua conta.'
+          );
+        }
+      }
+
+      const { data: managerProfiles, error: managerError } = await supabaseAdmin
+        .from('profiles')
+        .select('id, role')
+        .in('role', ['gerente', 'admin']);
+      if (managerError) throw managerError;
+
+      const managerIds = new Set((managerProfiles || []).map((profile) => profile.id));
+      const isTargetManager = currentRoleNormalized === 'gerente' || managerIds.has(userId);
+      const nextRoleIsManager = normalizedRole === undefined ? isTargetManager : normalizedRole === 'gerente';
+
+      if (isTargetManager && !nextRoleIsManager && managerIds.size <= 1) {
+        return jsonError(res, 400, 'validation_error', 'O sistema precisa de ao menos um gerente ativo.');
+      }
+
+      if (isTargetManager && setActive === false && managerIds.size <= 1) {
+        return jsonError(res, 400, 'validation_error', 'O sistema precisa de ao menos um gerente ativo.');
+      }
+
+      if (parsedModules && 'value' in parsedModules && isTargetManager) {
+        const { data: configAccessRows, error: configAccessError } = await supabaseAdmin
+          .from('user_module_access')
+          .select('user_id')
+          .eq('module_key', CONFIG_MODULE_KEY);
+        if (configAccessError) throw configAccessError;
+
+        const managerWithConfig = new Set(
+          (configAccessRows || []).map((row) => row.user_id).filter((id) => managerIds.has(id))
+        );
+        const nextModules = parsedModules.value;
+        const nextHasConfig = nextModules.includes(CONFIG_MODULE_KEY);
+
+        if (!nextHasConfig) {
+          managerWithConfig.delete(userId);
+        } else {
+          managerWithConfig.add(userId);
+        }
+
+        if (managerWithConfig.size === 0) {
+          return jsonError(
+            res,
+            400,
+            'validation_error',
+            'É necessário manter ao menos um gerente com acesso ao módulo de Configurações.'
+          );
+        }
+      }
+
+      let ensureManagerConfigModules: AppModuleKey[] | null = null;
+
+      if (normalizedRole === 'gerente' && !(parsedModules && 'value' in parsedModules)) {
+        const { data: existingModules, error: existingModulesError } = await supabaseAdmin
+          .from('user_module_access')
+          .select('module_key')
+          .eq('user_id', userId);
+        if (existingModulesError) throw existingModulesError;
+
+        const currentModules = (existingModules || [])
+          .map((module) => module.module_key)
+          .filter((moduleKey): moduleKey is AppModuleKey =>
+            (APP_MODULE_KEYS as readonly string[]).includes(moduleKey)
+          );
+
+        if (!currentModules.includes(CONFIG_MODULE_KEY)) {
+          ensureManagerConfigModules = [...currentModules, CONFIG_MODULE_KEY];
+        }
       }
 
       if (normalizedRole) {
@@ -153,6 +301,28 @@ export default async function handler(req: any, res: any) {
           .update({ role: normalizedRole })
           .eq('id', userId);
         if (profileUpdateError) throw profileUpdateError;
+      }
+
+      if (parsedModules && 'value' in parsedModules) {
+        const nextModules =
+          (normalizedRole === 'gerente' || (normalizedRole === undefined && isTargetManager)) &&
+          !parsedModules.value.includes(CONFIG_MODULE_KEY)
+            ? [...parsedModules.value, CONFIG_MODULE_KEY]
+            : parsedModules.value;
+
+        const { error: moduleUpdateError } = await supabaseAdmin.rpc('set_user_modules', {
+          target_user_id: userId,
+          module_keys: nextModules,
+        });
+        if (moduleUpdateError) throw moduleUpdateError;
+      }
+
+      if (ensureManagerConfigModules) {
+        const { error: moduleUpdateError } = await supabaseAdmin.rpc('set_user_modules', {
+          target_user_id: userId,
+          module_keys: ensureManagerConfigModules,
+        });
+        if (moduleUpdateError) throw moduleUpdateError;
       }
 
       const authPayload: Record<string, unknown> = {};
@@ -166,11 +336,11 @@ export default async function handler(req: any, res: any) {
         if (authUpdateError) throw authUpdateError;
       }
 
-      return json(res, 200, { message: 'Usuário atualizado com sucesso.' });
+      return jsonOk(res, 200, { message: 'Usuário atualizado com sucesso.' });
     }
 
-    return json(res, 405, { error: 'Method Not Allowed' });
+    return jsonError(res, 405, 'method_not_allowed', 'Method Not Allowed');
   } catch (err: any) {
-    return json(res, 400, { error: err?.message || 'Erro inesperado.' });
+    return jsonError(res, 400, 'unexpected_error', err?.message || 'Erro inesperado.');
   }
 }

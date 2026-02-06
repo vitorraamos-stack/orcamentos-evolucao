@@ -19,9 +19,10 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Layout from "./components/Layout";
 import HubOsAccessGuard from "./components/HubOsAccessGuard";
+import RequireModule from "./components/RequireModule";
 
 function Router() {
-  const { user, isAdmin, hubPermissions } = useAuth();
+  const { isAdmin, hubPermissions } = useAuth();
 
   return (
     <Switch>
@@ -30,25 +31,33 @@ function Router() {
       {/* Rota Principal */}
       <Route path="/">
         <Layout>
-          <Home />
+          <RequireModule moduleKey="calculadora">
+            <Home />
+          </RequireModule>
         </Layout>
       </Route>
 
       <Route path="/hub-os">
         <Layout>
-          <HubOS />
+          <RequireModule moduleKey="hub_os">
+            <HubOS />
+          </RequireModule>
         </Layout>
       </Route>
 
       <Route path="/hub-os/auditoria">
         <Layout>
-          <HubOsAccessGuard scope="audit"><OsAuditPage /></HubOsAccessGuard>
+          <RequireModule moduleKey="hub_os">
+            <HubOsAccessGuard scope="audit"><OsAuditPage /></HubOsAccessGuard>
+          </RequireModule>
         </Layout>
       </Route>
 
       <Route path="/galeria">
         <Layout>
-          <Galeria />
+          <RequireModule moduleKey="galeria">
+            <Galeria />
+          </RequireModule>
         </Layout>
       </Route>
       
@@ -56,16 +65,20 @@ function Router() {
       <Route path="/materiais">
         <Layout>
           {/* Só permite acesso se for Admin, senão volta para a Home */}
-          {isAdmin ? <Materiais /> : <Redirect to="/" />}
+          <RequireModule moduleKey="materiais">
+            {isAdmin ? <Materiais /> : <Redirect to="/" />}
+          </RequireModule>
         </Layout>
       </Route>
       
       <Route path="/configuracoes">
-  <Layout>
-    {/* Se for Admin entra, se não for, é chutado para a Home */}
-    {hubPermissions.canManageUsers ? <Configuracoes /> : <Redirect to="/" />}
-  </Layout>
-</Route>
+        <Layout>
+          <RequireModule moduleKey="configuracoes">
+            {/* Se for Admin entra, se não for, é chutado para a Home */}
+            {hubPermissions.canManageUsers ? <Configuracoes /> : <Redirect to="/" />}
+          </RequireModule>
+        </Layout>
+      </Route>
 
       <Route path="/os">
         <Redirect to="/os/arte" />
@@ -73,25 +86,33 @@ function Router() {
 
       <Route path="/os/arte">
         <Layout>
-          <HubOsAccessGuard scope="arte"><OsArteBoardPage /></HubOsAccessGuard>
+          <RequireModule moduleKey="hub_os">
+            <HubOsAccessGuard scope="arte"><OsArteBoardPage /></HubOsAccessGuard>
+          </RequireModule>
         </Layout>
       </Route>
 
       <Route path="/os/producao">
         <Layout>
-          <HubOsAccessGuard scope="producao"><OsProducaoBoardPage /></HubOsAccessGuard>
+          <RequireModule moduleKey="hub_os">
+            <HubOsAccessGuard scope="producao"><OsProducaoBoardPage /></HubOsAccessGuard>
+          </RequireModule>
         </Layout>
       </Route>
 
       <Route path="/os/novo">
         <Layout>
-          <HubOsAccessGuard scope="create"><OsCreatePage /></HubOsAccessGuard>
+          <RequireModule moduleKey="hub_os">
+            <HubOsAccessGuard scope="create"><OsCreatePage /></HubOsAccessGuard>
+          </RequireModule>
         </Layout>
       </Route>
 
       <Route path="/os/:id">
         <Layout>
-          <OsDetailPage />
+          <RequireModule moduleKey="hub_os">
+            <OsDetailPage />
+          </RequireModule>
         </Layout>
       </Route>
 
