@@ -20,7 +20,7 @@ interface LayoutProps {
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const { user, loading, signOut, isAdmin, role, hubPermissions } = useAuth();
+  const { user, loading, signOut, isAdmin, role, hubPermissions, hasModuleAccess } = useAuth();
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
@@ -40,45 +40,57 @@ export default function Layout({ children }: LayoutProps) {
   if (!user) return null;
 
   // Componente de navegação interno com tipos corretos
+  const canViewHubOs = hubPermissions.canViewHubOS && hasModuleAccess('hub_os');
+  const canViewGaleria = hasModuleAccess('galeria');
+  const canViewCalculadora = hasModuleAccess('calculadora');
+  const canViewMateriais = isAdmin && hasModuleAccess('materiais');
+  const canViewConfiguracoes = hubPermissions.canManageUsers && hasModuleAccess('configuracoes');
+
   const NavItems = () => (
     <div className="space-y-1">
-      <Link href="/hub-os">
-        <Button
-          variant={location.startsWith('/hub-os') ? 'secondary' : 'ghost'}
-          className={cn(
-            "w-full justify-start",
-            location.startsWith('/hub-os') && "bg-sidebar-accent text-sidebar-accent-foreground"
-          )}
-        >
-          <ClipboardList className="mr-2 h-4 w-4" />
-          Hub OS
-        </Button>
-      </Link>
+      {canViewHubOs && (
+        <Link href="/hub-os">
+          <Button
+            variant={location.startsWith('/hub-os') ? 'secondary' : 'ghost'}
+            className={cn(
+              "w-full justify-start",
+              location.startsWith('/hub-os') && "bg-sidebar-accent text-sidebar-accent-foreground"
+            )}
+          >
+            <ClipboardList className="mr-2 h-4 w-4" />
+            Hub OS
+          </Button>
+        </Link>
+      )}
 
-      <Link href="/galeria">
-        <Button
-          variant={location === '/galeria' ? 'secondary' : 'ghost'}
-          className={cn(
-            "w-full justify-start",
-            location === '/galeria' && "bg-sidebar-accent text-sidebar-accent-foreground"
-          )}
-        >
-          <Image className="mr-2 h-4 w-4" />
-          Galeria
-        </Button>
-      </Link>
+      {canViewGaleria && (
+        <Link href="/galeria">
+          <Button
+            variant={location === '/galeria' ? 'secondary' : 'ghost'}
+            className={cn(
+              "w-full justify-start",
+              location === '/galeria' && "bg-sidebar-accent text-sidebar-accent-foreground"
+            )}
+          >
+            <Image className="mr-2 h-4 w-4" />
+            Galeria
+          </Button>
+        </Link>
+      )}
 
-      <Link href="/">
-        <Button 
-          variant={location === '/' ? 'secondary' : 'ghost'} 
-          className={cn("w-full justify-start", location === '/' && "bg-sidebar-accent text-sidebar-accent-foreground")}
-        >
-          <Calculator className="mr-2 h-4 w-4" />
-          Calculadora
-        </Button>
-      </Link>
+      {canViewCalculadora && (
+        <Link href="/">
+          <Button 
+            variant={location === '/' ? 'secondary' : 'ghost'} 
+            className={cn("w-full justify-start", location === '/' && "bg-sidebar-accent text-sidebar-accent-foreground")}
+          >
+            <Calculator className="mr-2 h-4 w-4" />
+            Calculadora
+          </Button>
+        </Link>
+      )}
 
-      {isAdmin && (
+      {canViewMateriais && (
         <>
           <Link href="/materiais">
             <Button 
@@ -89,19 +101,19 @@ export default function Layout({ children }: LayoutProps) {
               Materiais
             </Button>
           </Link>
-
-          {hubPermissions.canManageUsers && (
-            <Link href="/configuracoes">
-              <Button
-                variant={location === '/configuracoes' ? 'secondary' : 'ghost'}
-                className={cn("w-full justify-start", location === '/configuracoes' && "bg-sidebar-accent text-sidebar-accent-foreground")}
-              >
-                <Settings className="mr-2 h-4 w-4" />
-                Configurações
-              </Button>
-            </Link>
-          )}
         </>
+      )}
+
+      {canViewConfiguracoes && (
+        <Link href="/configuracoes">
+          <Button
+            variant={location === '/configuracoes' ? 'secondary' : 'ghost'}
+            className={cn("w-full justify-start", location === '/configuracoes' && "bg-sidebar-accent text-sidebar-accent-foreground")}
+          >
+            <Settings className="mr-2 h-4 w-4" />
+            Configurações
+          </Button>
+        </Link>
       )}
     </div>
   );

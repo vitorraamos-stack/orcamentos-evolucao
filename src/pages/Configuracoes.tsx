@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -19,6 +19,7 @@ import { Edit, KeyRound, Power, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { HUB_ROLE_LABEL, HUB_ROLE_VALUES, type HubRole } from '@/lib/hubRoles';
+import { APP_MODULES, type AppModuleKey } from '@/constants/modules';
 
 type AdminUser = {
   id: string;
@@ -28,12 +29,18 @@ type AdminUser = {
   created_at: string | null;
   last_sign_in_at: string | null;
   status: 'ativo' | 'bloqueado';
+  modules: AppModuleKey[];
 };
 
 const formatDate = (value: string | null) => {
   if (!value) return '—';
   return new Date(value).toLocaleString('pt-BR');
 };
+
+const moduleLabelByKey = APP_MODULES.reduce<Record<string, string>>((acc, module) => {
+  acc[module.key] = module.label;
+  return acc;
+}, {});
 
 export default function Configuracoes() {
   const { session, hubPermissions } = useAuth();
@@ -47,11 +54,13 @@ export default function Configuracoes() {
   const [newPassword, setNewPassword] = useState('');
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState<HubRole>('consultor_vendas');
+  const [newModules, setNewModules] = useState<AppModuleKey[]>([]);
 
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editName, setEditName] = useState('');
   const [editRole, setEditRole] = useState<HubRole>('consultor_vendas');
+  const [editModules, setEditModules] = useState<AppModuleKey[]>([]);
 
   const [passwordUser, setPasswordUser] = useState<AdminUser | null>(null);
   const [savingPassword, setSavingPassword] = useState(false);
@@ -69,8 +78,8 @@ export default function Configuracoes() {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Erro ao carregar usuários.');
-      setUsers(result.users || []);
+      if (!response.ok) throw new Error(result.error?.message || 'Erro ao carregar usuários.');
+      setUsers(result.data?.users || []);
     } catch (error: any) {
       toast.error(error.message || 'Erro ao carregar usuários.');
     } finally {
@@ -91,6 +100,17 @@ export default function Configuracoes() {
     });
   }, [search, users]);
 
+  const toggleModule = (
+    moduleKey: AppModuleKey,
+    checked: boolean,
+    setter: Dispatch<SetStateAction<AppModuleKey[]>>
+  ) => {
+    setter((prev) => {
+      if (checked) return Array.from(new Set([...prev, moduleKey]));
+      return prev.filter((key) => key !== moduleKey);
+    });
+  };
+
   const handleCreateUser = async () => {
     if (!newEmail.includes('@')) return toast.error('Informe um e-mail válido.');
     if (newPassword.length < 6) return toast.error('A senha deve ter ao menos 6 caracteres.');
@@ -109,16 +129,18 @@ export default function Configuracoes() {
           password: newPassword,
           name: newName.trim(),
           role: newRole,
+          modules: newModules,
         }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Erro ao criar usuário.');
+      if (!response.ok) throw new Error(result.error?.message || 'Erro ao criar usuário.');
 
       toast.success('Usuário criado com sucesso.');
       setNewEmail('');
       setNewPassword('');
       setNewName('');
       setNewRole('consultor_vendas');
+      setNewModules([]);
       setCreateOpen(false);
       fetchUsers();
     } catch (error: any) {
@@ -144,10 +166,11 @@ export default function Configuracoes() {
           userId: editingUser.id,
           name: editName.trim(),
           role: editRole,
+          modules: editModules,
         }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Erro ao editar usuário.');
+      if (!response.ok) throw new Error(result.error?.message || 'Erro ao editar usuário.');
       toast.success('Usuário atualizado com sucesso.');
       setEditingUser(null);
       fetchUsers();
@@ -174,7 +197,7 @@ export default function Configuracoes() {
         body: JSON.stringify({ userId: passwordUser.id, newPassword: password }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Erro ao redefinir senha.');
+      if (!response.ok) throw new Error(result.error?.message || 'Erro ao redefinir senha.');
       toast.success('Senha redefinida com sucesso.');
       setPasswordUser(null);
       setPassword('');
@@ -201,7 +224,7 @@ export default function Configuracoes() {
         body: JSON.stringify({ userId: user.id, setActive: nextActive }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Erro ao alterar status.');
+      if (!response.ok) throw new Error(result.error?.message || 'Erro ao alterar status.');
       toast.success(`Usuário ${nextActive ? 'reativado' : 'desativado'} com sucesso.`);
       fetchUsers();
     } catch (error: any) {
@@ -262,6 +285,35 @@ export default function Configuracoes() {
                   ))}
                 </SelectContent>
               </Select>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Módulos</span>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setNewModules(APP_MODULES.map((module) => module.key))}
+                    >
+                      Selecionar todos
+                    </Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setNewModules([])}>
+                      Limpar
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {APP_MODULES.map((module) => (
+                    <label key={module.key} className="flex items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={newModules.includes(module.key)}
+                        onCheckedChange={(checked) => toggleModule(module.key, Boolean(checked), setNewModules)}
+                      />
+                      {module.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setCreateOpen(false)}>
@@ -292,6 +344,7 @@ export default function Configuracoes() {
                 <TableHead>Nome</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Papel</TableHead>
+                <TableHead>Módulos</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Último login</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -300,13 +353,13 @@ export default function Configuracoes() {
             <TableBody>
               {loadingUsers ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
                     Carregando usuários...
                   </TableCell>
                 </TableRow>
               ) : filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
                     Nenhum usuário encontrado.
                   </TableCell>
                 </TableRow>
@@ -316,6 +369,19 @@ export default function Configuracoes() {
                     <TableCell>{user.name || '—'}</TableCell>
                     <TableCell>{user.email || '—'}</TableCell>
                     <TableCell>{HUB_ROLE_LABEL[user.role]}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-2">
+                        {user.modules?.length ? (
+                          user.modules.map((moduleKey) => (
+                            <Badge key={moduleKey} variant="outline">
+                              {moduleLabelByKey[moduleKey] || moduleKey}
+                            </Badge>
+                          ))
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Sem permissão</span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Badge variant={user.status === 'ativo' ? 'default' : 'secondary'}>{user.status}</Badge>
                     </TableCell>
@@ -329,6 +395,7 @@ export default function Configuracoes() {
                             setEditingUser(user);
                             setEditName(user.name || '');
                             setEditRole(user.role);
+                            setEditModules(user.modules || []);
                           }}
                         >
                           <Edit className="h-4 w-4" />
@@ -373,6 +440,35 @@ export default function Configuracoes() {
                 ))}
               </SelectContent>
             </Select>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Módulos</span>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditModules(APP_MODULES.map((module) => module.key))}
+                  >
+                    Selecionar todos
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setEditModules([])}>
+                    Limpar
+                  </Button>
+                </div>
+              </div>
+              <div className="grid gap-2 md:grid-cols-2">
+                {APP_MODULES.map((module) => (
+                  <label key={module.key} className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={editModules.includes(module.key)}
+                      onCheckedChange={(checked) => toggleModule(module.key, Boolean(checked), setEditModules)}
+                    />
+                    {module.label}
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingUser(null)}>
