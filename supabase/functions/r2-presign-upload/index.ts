@@ -114,6 +114,11 @@ const requireUser = async (request: Request) => {
       reason: error?.message ?? 'user-not-found',
       status: error?.status,
     });
+    const gatewayUserId = extractGatewayUserId(request);
+    if (gatewayUserId) {
+      console.log('[r2-presign-upload] fallback to gateway user id', { userId: gatewayUserId });
+      return { user: { id: gatewayUserId } };
+    }
     return { error: jsonResponse(401, { error: 'Invalid JWT' }) };
   }
 
