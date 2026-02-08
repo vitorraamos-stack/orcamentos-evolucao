@@ -377,7 +377,14 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
                   <button
                     key={tag}
                     type="button"
-                    onClick={() => setSelectedArtDirectionTag(tag)}
+                    onClick={() => {
+                      setSelectedArtDirectionTag(tag);
+                      if (tag === 'URGENTE') {
+                        toast.warning(
+                          'Use essa tag para pedidos que são realmente urgentes. Ex: Pedido para o dia seguinte.'
+                        );
+                      }
+                    }}
                     disabled={Boolean(pendingOrder)}
                     className="rounded-full border px-3 py-1 text-xs font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                     style={{
