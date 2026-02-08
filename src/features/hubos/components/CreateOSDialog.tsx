@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Bold, Italic, List, ListOrdered, Underline } from 'lucide-react';
 import { toast } from 'sonner';
 import type { LogisticType, OsOrder } from '../types';
 import { createOrder } from '../api';
@@ -31,6 +32,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   const [uploadingAssets, setUploadingAssets] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<OsOrder | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
   const reproducao = false;
   const letraCaixa = false;
 
@@ -72,6 +74,46 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
 
   const removeAssetFile = (index: number) => {
     setSelectedFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const applyWrap = (prefix: string, suffix = prefix) => {
+    const textarea = descriptionRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? 0;
+    const before = description.slice(0, start);
+    const selection = description.slice(start, end);
+    const after = description.slice(end);
+    const nextValue = `${before}${prefix}${selection}${suffix}${after}`;
+    setDescription(nextValue);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      const cursorStart = start + prefix.length;
+      const cursorEnd = cursorStart + selection.length;
+      textarea.setSelectionRange(cursorStart, cursorEnd);
+    });
+  };
+
+  const applyLinePrefix = (prefix: string) => {
+    const textarea = descriptionRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? 0;
+    const value = description;
+    const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+    const lineEndIndex = value.indexOf('\n', end);
+    const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
+    const block = value.slice(lineStart, lineEnd);
+    const nextBlock = block
+      .split('\n')
+      .map((line) => (line.trim() ? `${prefix}${line}` : line))
+      .join('\n');
+    const nextValue = `${value.slice(0, lineStart)}${nextBlock}${value.slice(lineEnd)}`;
+    setDescription(nextValue);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(lineStart, lineStart + nextBlock.length);
+    });
   };
 
   const handleSubmit = async () => {
@@ -223,15 +265,72 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
 
           <div className="space-y-1">
             <Label>Descrição</Label>
-            <Textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              rows={4}
-              placeholder={`Descrição detalhada do pedido:
+            <div className="rounded-md border border-input bg-background">
+              <div className="flex flex-wrap items-center gap-1 border-b border-input px-2 py-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => applyWrap('**')}
+                  disabled={Boolean(pendingOrder)}
+                  aria-label="Aplicar negrito"
+                >
+                  <Bold className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => applyWrap('*')}
+                  disabled={Boolean(pendingOrder)}
+                  aria-label="Aplicar itálico"
+                >
+                  <Italic className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => applyWrap('__')}
+                  disabled={Boolean(pendingOrder)}
+                  aria-label="Aplicar sublinhado"
+                >
+                  <Underline className="h-4 w-4" />
+                </Button>
+                <div className="h-5 w-px bg-border" aria-hidden="true" />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => applyLinePrefix('- ')}
+                  disabled={Boolean(pendingOrder)}
+                  aria-label="Aplicar lista com marcadores"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => applyLinePrefix('1. ')}
+                  disabled={Boolean(pendingOrder)}
+                  aria-label="Aplicar lista numerada"
+                >
+                  <ListOrdered className="h-4 w-4" />
+                </Button>
+              </div>
+              <Textarea
+                ref={descriptionRef}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                rows={4}
+                placeholder={`Descrição detalhada do pedido:
 Material:
 Orientações para a criação de arte:`}
-              disabled={Boolean(pendingOrder)}
-            />
+                disabled={Boolean(pendingOrder)}
+                className="min-h-[120px] rounded-none border-0 shadow-none focus-visible:border-transparent focus-visible:ring-0"
+              />
+            </div>
           </div>
 
           {logisticType !== 'retirada' && (
