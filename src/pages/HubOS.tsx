@@ -5,13 +5,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
 import { ART_COLUMNS, PROD_COLUMNS } from '@/features/hubos/constants';
-import type { ArtStatus, AssetJob, HubOsFilters, OsOrder, ProdStatus } from '@/features/hubos/types';
+import type { ArtDirectionTag, ArtStatus, AssetJob, HubOsFilters, OsOrder, ProdStatus } from '@/features/hubos/types';
 import { archiveOrder, createOrderEvent, deleteOrder, fetchOrders, updateOrder } from '@/features/hubos/api';
 import { getLatestAssetJobsByOsId } from '@/features/hubos/assetJobs';
 import KanbanColumn from '@/features/hubos/components/KanbanColumn';
 import KanbanCard from '@/features/hubos/components/KanbanCard';
 import OrderDetailsDialog from '@/features/hubos/components/OrderDetailsDialog';
 import CreateOSDialog from '@/features/hubos/components/CreateOSDialog';
+import ArtDirectionTagPopup from '@/features/hubos/components/ArtDirectionTagPopup';
 import FiltersBar from '@/features/hubos/components/FiltersBar';
 import InstallationsInbox from '@/features/hubos/components/InstallationsInbox';
 import MetricsBar from '@/features/hubos/components/MetricsBar';
@@ -50,6 +51,8 @@ export default function HubOS() {
   const [activeTab, setActiveTab] = useState<'arte' | 'producao'>('arte');
   const [selectedOrder, setSelectedOrder] = useState<OsOrder | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [artDirectionPopupOpen, setArtDirectionPopupOpen] = useState(false);
+  const [artDirectionPopupTag, setArtDirectionPopupTag] = useState<ArtDirectionTag | null>(null);
   const [installationSearch, setInstallationSearch] = useState('');
   const [selectedInstallationId, setSelectedInstallationId] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -333,6 +336,8 @@ export default function HubOS() {
     const nextStatus = over.id as ArtStatus;
     if (order.art_status === nextStatus) return;
 
+    const inboxStatus = ART_COLUMNS[0];
+    const inCreationStatus = ART_COLUMNS[1];
     const previous = order;
     const shouldInitProd = nextStatus === 'Produzir' && !order.prod_status;
     const optimistic = {
@@ -351,6 +356,14 @@ export default function HubOS() {
         updated_by: user?.id ?? null,
       });
       updateLocalOrder(updated);
+      if (
+        order.art_status === inboxStatus &&
+        nextStatus === inCreationStatus &&
+        updated.art_direction_tag
+      ) {
+        setArtDirectionPopupTag(updated.art_direction_tag);
+        setArtDirectionPopupOpen(true);
+      }
       try {
         await createOrderEvent({
           os_id: order.id,
@@ -440,6 +453,7 @@ export default function HubOS() {
                       letraCaixa={order.letra_caixa}
                       prodStatus={order.prod_status}
                       productionTag={order.production_tag}
+                      artDirectionTag={order.art_direction_tag}
                       assetIndicator={assetIndicatorByOsId[order.id] ?? null}
                       highlightId={highlightId}
                       showArchive={!isAdmin}
@@ -558,6 +572,18 @@ export default function HubOS() {
         onUpdated={updateLocalOrder}
         onDelete={(id) => handleDelete(id)}
       />
+      {artDirectionPopupTag && (
+        <ArtDirectionTagPopup
+          open={artDirectionPopupOpen}
+          onOpenChange={(open) => {
+            setArtDirectionPopupOpen(open);
+            if (!open) {
+              setArtDirectionPopupTag(null);
+            }
+          }}
+          tag={artDirectionPopupTag}
+        />
+      )}
     </div>
   );
 }
