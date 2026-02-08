@@ -113,6 +113,12 @@ const requireUser = async (request: Request) => {
     return { error: jsonResponse(401, { error: 'Unauthorized: missing Authorization Bearer token' }) };
   }
 
+  const decodedSubject = decodeJwtSubject(token);
+  if (decodedSubject) {
+    console.log('[r2-presign-upload] using decoded jwt subject', { userId: decodedSubject });
+    return { user: { id: decodedSubject } };
+  }
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
 
@@ -140,11 +146,6 @@ const requireUser = async (request: Request) => {
     if (gatewayUserId) {
       console.log('[r2-presign-upload] fallback to gateway user id', { userId: gatewayUserId });
       return { user: { id: gatewayUserId } };
-    }
-    const decodedSubject = decodeJwtSubject(token);
-    if (decodedSubject) {
-      console.log('[r2-presign-upload] fallback to decoded jwt subject', { userId: decodedSubject });
-      return { user: { id: decodedSubject } };
     }
     return { error: jsonResponse(401, { error: 'Invalid JWT' }) };
   }
