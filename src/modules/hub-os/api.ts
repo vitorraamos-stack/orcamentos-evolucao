@@ -91,6 +91,22 @@ export const createPaymentProof = async (payload: Partial<OsPaymentProof>) => {
   return data as OsPaymentProof;
 };
 
+export const updatePaymentProof = async (id: string, payload: Partial<OsPaymentProof>) => {
+  const { data, error } = await supabase
+    .from('os_payment_proof')
+    .update(payload)
+    .eq('id', id)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as OsPaymentProof;
+};
+
+export const deletePaymentProof = async (id: string) => {
+  const { error } = await supabase.from('os_payment_proof').delete().eq('id', id);
+  if (error) throw error;
+};
+
 export const updateOsPaymentStatus = async (osId: string, status: PaymentStatus) => {
   const { data, error } = await supabase
     .from('os')
