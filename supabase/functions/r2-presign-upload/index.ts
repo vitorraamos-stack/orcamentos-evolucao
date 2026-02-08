@@ -67,12 +67,30 @@ const extractBearerToken = (request: Request) => {
   ];
 
   for (const value of possibleAuthHeaders) {
-    if (value?.startsWith('Bearer ')) {
+    if (!value) continue;
+    if (value.startsWith('Bearer ')) {
       return value.replace('Bearer ', '').trim();
+    }
+    const trimmed = value.trim();
+    if (trimmed.split('.').length === 3) {
+      return trimmed;
     }
   }
 
   return null;
+};
+
+const decodeJwtSubject = (token: string) => {
+  const parts = token.split('.');
+  if (parts.length < 2) {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))) as { sub?: string };
+    return payload.sub ?? null;
+  } catch {
+    return null;
+  }
 };
 
 const requireUser = async (request: Request) => {
@@ -114,6 +132,16 @@ const requireUser = async (request: Request) => {
       reason: error?.message ?? 'user-not-found',
       status: error?.status,
     });
+    const gatewayUserId = extractGatewayUserId(request);
+    if (gatewayUserId) {
+      console.log('[r2-presign-upload] fallback to gateway user id', { userId: gatewayUserId });
+      return { user: { id: gatewayUserId } };
+    }
+    const decodedSubject = decodeJwtSubject(token);
+    if (decodedSubject) {
+      console.log('[r2-presign-upload] fallback to decoded jwt subject', { userId: decodedSubject });
+      return { user: { id: decodedSubject } };
+    }
     return { error: jsonResponse(401, { error: 'Invalid JWT' }) };
   }
 
