@@ -251,6 +251,10 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
               : 'OS criada, mas o envio dos arquivos falhou. Reenvie os arquivos.'
           );
           setPendingOrder(order);
+          setFinancialDocs([]);
+          if (financialDocInputRef.current) {
+            financialDocInputRef.current.value = '';
+          }
           return;
         } finally {
           setUploadingAssets(false);
