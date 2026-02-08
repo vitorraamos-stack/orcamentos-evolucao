@@ -52,7 +52,11 @@ const extractGatewayUserId = (request: Request) => {
   return (
     request.headers.get('x-supabase-auth-user') ??
     request.headers.get('x-supabase-auth-user-id') ??
+    request.headers.get('x-supabase-user') ??
     request.headers.get('x-sb-user-id') ??
+    request.headers.get('x-sb-user') ??
+    request.headers.get('x-sb-auth-user') ??
+    request.headers.get('x-sb-auth-user-id') ??
     parseClaimsHeader(request)
   );
 };
