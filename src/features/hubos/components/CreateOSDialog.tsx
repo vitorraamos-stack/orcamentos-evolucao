@@ -203,7 +203,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
         setOpen(false);
       } catch (uploadError) {
         console.error(uploadError);
-        toast.error('Falha ao reenviar os arquivos. Tente novamente.');
+        toast.error(uploadError instanceof Error ? uploadError.message : 'Falha ao reenviar os arquivos. Tente novamente.');
       } finally {
         setUploadingAssets(false);
       }
@@ -245,7 +245,11 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
           toast.success('Arquivos enviados e aguardando sincronização.');
         } catch (uploadError) {
           console.error(uploadError);
-          toast.error('OS criada, mas o envio dos arquivos falhou. Reenvie os arquivos.');
+          toast.error(
+            uploadError instanceof Error
+              ? uploadError.message
+              : 'OS criada, mas o envio dos arquivos falhou. Reenvie os arquivos.'
+          );
           setPendingOrder(order);
           setFinancialDocs([]);
           if (financialDocInputRef.current) {
@@ -267,7 +271,11 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
           toast.success('Documentos financeiros enviados e aguardando sincronização.');
         } catch (financialError) {
           console.error(financialError);
-          toast.error('OS criada, mas houve erro ao enviar documentos financeiros.');
+          toast.error(
+            financialError instanceof Error
+              ? financialError.message
+              : 'OS criada, mas houve erro ao enviar documentos financeiros.'
+          );
         } finally {
           setUploadingAssets(false);
         }

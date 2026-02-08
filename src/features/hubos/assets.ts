@@ -35,9 +35,17 @@ class PresignInvokeError extends Error {
 
 const getSessionOrThrow = async () => {
   const { data, error } = await supabase.auth.getSession();
-  const session = data.session;
+  let session = data.session;
 
-  if (error || !session?.access_token) {
+  if (!session?.access_token) {
+    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+    session = refreshed.session;
+    if (refreshError || !session?.access_token) {
+      throw new Error('Sessão inválida/expirada. Faça login novamente.');
+    }
+  }
+
+  if (error) {
     throw new Error('Sessão inválida/expirada. Faça login novamente.');
   }
 
