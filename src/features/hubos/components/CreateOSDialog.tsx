@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,8 +13,9 @@ import type { LogisticType, OsOrder } from '../types';
 import { createOrder } from '../api';
 import { ART_COLUMNS } from '../constants';
 import { useAuth } from '@/contexts/AuthContext';
-import { uploadAssetsForOrder, validateFiles } from '@/features/hubos/assets';
-import { MAX_ASSET_FILE_SIZE_BYTES } from '@/features/hubos/assetUtils';
+import { uploadAssetsForOrder, uploadFinancialDocsForOrder, validateFiles } from '@/features/hubos/assets';
+import { ACCEPTED_ASSET_CONTENT_TYPES, MAX_ASSET_FILE_SIZE_BYTES } from '@/features/hubos/assetUtils';
+import type { FinancialDoc, FinancialDocType } from '@/features/hubos/assets';
 
 interface CreateOSDialogProps {
   onCreated: (order: OsOrder) => void;
@@ -30,9 +32,12 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   const [address, setAddress] = useState('');
   const [saving, setSaving] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [financialDocs, setFinancialDocs] = useState<FinancialDoc[]>([]);
+  const [selectedFinancialDocType, setSelectedFinancialDocType] = useState<FinancialDocType>('PAYMENT_PROOF');
   const [uploadingAssets, setUploadingAssets] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<OsOrder | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const financialDocInputRef = useRef<HTMLInputElement | null>(null);
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
   const reproducao = false;
   const letraCaixa = false;
@@ -45,9 +50,14 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     setLogisticType('retirada');
     setAddress('');
     setSelectedFiles([]);
+    setFinancialDocs([]);
+    setSelectedFinancialDocType('PAYMENT_PROOF');
     setPendingOrder(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+    if (financialDocInputRef.current) {
+      financialDocInputRef.current.value = '';
     }
   };
 
@@ -75,6 +85,41 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
 
   const removeAssetFile = (index: number) => {
     setSelectedFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const handleFinancialDocChange = (files: FileList | null) => {
+    if (!files) return;
+    const nextFiles = [...financialDocs.map((doc) => doc.file), ...Array.from(files)];
+    const validation = validateFiles(nextFiles);
+    if (!validation.ok) {
+      toast.error(validation.error ?? 'Arquivos inválidos.');
+      return;
+    }
+    setFinancialDocs((current) => [
+      ...current,
+      ...Array.from(files).map((file) => ({
+        file,
+        type: selectedFinancialDocType,
+      })),
+    ]);
+    if (financialDocInputRef.current) {
+      financialDocInputRef.current.value = '';
+    }
+  };
+
+  const removeFinancialDoc = (index: number) => {
+    setFinancialDocs((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const updateFinancialDocType = (index: number, newType: FinancialDocType) => {
+    setFinancialDocs((current) =>
+      current.map((doc, itemIndex) => (itemIndex === index ? { ...doc, type: newType } : doc))
+    );
+  };
+
+  const financialTypeLabels: Record<FinancialDocType, string> = {
+    PAYMENT_PROOF: 'Comprovante',
+    PURCHASE_ORDER: 'Ordem de compra',
   };
 
   const applyWrap = (prefix: string, suffix = prefix) => {
@@ -121,6 +166,11 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     const assetValidation = validateFiles(selectedFiles);
     if (!assetValidation.ok) {
       toast.error(assetValidation.error ?? 'Arquivos inválidos.');
+      return;
+    }
+    const financialValidation = validateFiles(financialDocs.map((doc) => doc.file));
+    if (!financialValidation.ok) {
+      toast.error(financialValidation.error ?? 'Documentos financeiros inválidos.');
       return;
     }
 
@@ -186,7 +236,27 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
           console.error(uploadError);
           toast.error('OS criada, mas o envio dos arquivos falhou. Reenvie os arquivos.');
           setPendingOrder(order);
+          setFinancialDocs([]);
+          if (financialDocInputRef.current) {
+            financialDocInputRef.current.value = '';
+          }
           return;
+        } finally {
+          setUploadingAssets(false);
+        }
+      }
+      if (financialDocs.length > 0) {
+        try {
+          setUploadingAssets(true);
+          await uploadFinancialDocsForOrder({
+            orderId: order.id,
+            docs: financialDocs,
+            userId: user?.id ?? null,
+          });
+          toast.success('Documentos financeiros enviados e aguardando sincronização.');
+        } catch (financialError) {
+          console.error(financialError);
+          toast.error('OS criada, mas houve erro ao enviar documentos financeiros.');
         } finally {
           setUploadingAssets(false);
         }
@@ -358,7 +428,8 @@ Orientações para a criação de arte:`}
               id="os-assets"
               type="file"
               multiple
-              disabled={uploadingAssets}
+              accept={ACCEPTED_ASSET_CONTENT_TYPES.join(',')}
+              disabled={uploadingAssets || Boolean(pendingOrder)}
               onChange={(event) => handleAssetChange(event.target.files)}
             />
             <p className="text-xs text-muted-foreground">
@@ -389,6 +460,82 @@ Orientações para a criação de arte:`}
               <p className="text-xs text-amber-600">
                 A OS foi criada. Reenvie os arquivos para concluir a sincronização.
               </p>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <Label>Documentos Financeiros (opcional)</Label>
+              <p className="text-xs text-muted-foreground">
+                Selecione comprovantes e ordens de compra para acompanhar a OS.
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <Label>Tipo do documento</Label>
+                <Select
+                  value={selectedFinancialDocType}
+                  onValueChange={(value) => setSelectedFinancialDocType(value as FinancialDocType)}
+                  disabled={uploadingAssets || Boolean(pendingOrder)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PAYMENT_PROOF">Comprovante de pagamento</SelectItem>
+                    <SelectItem value="PURCHASE_ORDER">Ordem de compra</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="financial-docs">Anexar documento(s)</Label>
+                <Input
+                  ref={financialDocInputRef}
+                  id="financial-docs"
+                  type="file"
+                  multiple
+                  accept={ACCEPTED_ASSET_CONTENT_TYPES.join(',')}
+                  disabled={uploadingAssets || Boolean(pendingOrder)}
+                  onChange={(event) => handleFinancialDocChange(event.target.files)}
+                />
+              </div>
+            </div>
+            {financialDocs.length > 0 && (
+              <ul className="space-y-2 rounded-md border border-muted p-3 text-sm">
+                {financialDocs.map((doc, index) => (
+                  <li key={`${doc.file.name}-${doc.file.lastModified}`} className="flex flex-wrap items-center gap-3">
+                    <div className="min-w-[200px] flex-1">
+                      <p className="font-medium">{doc.file.name}</p>
+                      <p className="text-xs text-muted-foreground">{formatFileSize(doc.file.size)}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{financialTypeLabels[doc.type]}</Badge>
+                      <Select
+                        value={doc.type}
+                        onValueChange={(value) => updateFinancialDocType(index, value as FinancialDocType)}
+                        disabled={uploadingAssets || Boolean(pendingOrder)}
+                      >
+                        <SelectTrigger className="h-8 w-[180px] text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="PAYMENT_PROOF">Comprovante</SelectItem>
+                          <SelectItem value="PURCHASE_ORDER">Ordem de compra</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFinancialDoc(index)}
+                        disabled={uploadingAssets || Boolean(pendingOrder)}
+                      >
+                        Remover
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
 

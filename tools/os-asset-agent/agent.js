@@ -302,7 +302,16 @@ const processJob = async (job) => {
 
   for (const asset of assets) {
     const safeName = buildAssetFilename(asset);
-    const targetPath = path.join(destinationPath, safeName);
+    const assetType = asset.asset_type || 'CLIENT_FILE';
+    const subdir =
+      assetType === 'PAYMENT_PROOF'
+        ? path.join('Financeiro', 'Comprovantes')
+        : assetType === 'PURCHASE_ORDER'
+          ? path.join('Financeiro', 'OrdensCompra')
+          : '';
+    const targetDir = subdir ? path.join(destinationPath, subdir) : destinationPath;
+    await fs.promises.mkdir(targetDir, { recursive: true });
+    const targetPath = path.join(targetDir, safeName);
 
     const alreadySynced = await fileExistsWithSize(targetPath, asset.size_bytes);
     if (alreadySynced) {
