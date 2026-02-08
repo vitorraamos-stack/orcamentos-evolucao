@@ -77,9 +77,7 @@ npm run dev
 
 ### Storage
 
-Crie o bucket **`comprovantes-os`** no Supabase Storage para armazenar anexos de comprovantes.
-
-Os arquivos de artes/referências das OS são enviados para o **Cloudflare R2** (bucket `os-artes`), com upload direto do browser via URL pré-assinada. As chaves seguem o padrão:
+Os arquivos de artes/referências **e comprovantes de pagamento** são enviados para o **Cloudflare R2** (bucket `os-artes`), com upload direto do browser via URL pré-assinada. As chaves seguem o padrão:
 
 ```
 os_orders/{os_id}/{job_id}/{timestamp}_{filename}
@@ -147,6 +145,7 @@ supabase secrets set \
 
 ```bash
 supabase functions deploy r2-presign-upload
+supabase functions deploy r2-presign-download
 supabase functions deploy r2-delete-objects
 supabase functions deploy r2-health
 ```
