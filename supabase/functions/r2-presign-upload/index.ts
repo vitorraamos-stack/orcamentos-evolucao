@@ -67,8 +67,13 @@ const extractBearerToken = (request: Request) => {
   ];
 
   for (const value of possibleAuthHeaders) {
-    if (value?.startsWith('Bearer ')) {
+    if (!value) continue;
+    if (value.startsWith('Bearer ')) {
       return value.replace('Bearer ', '').trim();
+    }
+    const trimmed = value.trim();
+    if (trimmed.split('.').length === 3) {
+      return trimmed;
     }
   }
 
