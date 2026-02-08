@@ -9,9 +9,10 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Bold, Italic, List, ListOrdered, Underline } from 'lucide-react';
 import { toast } from 'sonner';
-import type { LogisticType, OsOrder } from '../types';
+import type { ArtDirectionTag, LogisticType, OsOrder } from '../types';
 import { createOrder } from '../api';
 import { ART_COLUMNS } from '../constants';
+import { ART_DIRECTION_TAG_CONFIG, ART_DIRECTION_TAGS } from '../artDirectionTagConfig';
 import { useAuth } from '@/contexts/AuthContext';
 import { uploadAssetsForOrder, uploadFinancialDocsForOrder, validateFiles } from '@/features/hubos/assets';
 import { ACCEPTED_ASSET_CONTENT_TYPES, MAX_ASSET_FILE_SIZE_BYTES } from '@/features/hubos/assetUtils';
@@ -30,6 +31,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   const [deliveryDate, setDeliveryDate] = useState('');
   const [logisticType, setLogisticType] = useState<LogisticType>('retirada');
   const [address, setAddress] = useState('');
+  const [selectedArtDirectionTag, setSelectedArtDirectionTag] = useState<ArtDirectionTag | null>(null);
   const [saving, setSaving] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [financialDocs, setFinancialDocs] = useState<FinancialDoc[]>([]);
@@ -49,6 +51,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     setDeliveryDate('');
     setLogisticType('retirada');
     setAddress('');
+    setSelectedArtDirectionTag(null);
     setSelectedFiles([]);
     setFinancialDocs([]);
     setSelectedFinancialDocType('PAYMENT_PROOF');
@@ -214,6 +217,10 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
       toast.error('Preencha os campos obrigatórios.');
       return;
     }
+    if (!selectedArtDirectionTag) {
+      toast.error('Selecione a tag de direcionamento de arte.');
+      return;
+    }
 
     try {
       setSaving(true);
@@ -226,6 +233,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
         address: logisticType === 'retirada' ? null : address || null,
         art_status: ART_COLUMNS[0],
         prod_status: null,
+        art_direction_tag: selectedArtDirectionTag,
         reproducao,
         letra_caixa: letraCaixa,
         created_by: user?.id ?? null,
@@ -356,6 +364,32 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
                   </label>
                 </div>
               </RadioGroup>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Tag de direcionamento</Label>
+            <div className="flex flex-wrap gap-2">
+              {ART_DIRECTION_TAGS.map((tag) => {
+                const config = ART_DIRECTION_TAG_CONFIG[tag];
+                const isSelected = selectedArtDirectionTag === tag;
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setSelectedArtDirectionTag(tag)}
+                    disabled={Boolean(pendingOrder)}
+                    className="rounded-full border px-3 py-1 text-xs font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                    style={{
+                      borderColor: config.color,
+                      backgroundColor: isSelected ? config.color : 'transparent',
+                      color: isSelected ? '#FFFFFF' : config.color,
+                    }}
+                  >
+                    {config.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
