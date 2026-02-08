@@ -58,6 +58,11 @@ export type OsPaymentProof = {
   cadastro_completo: boolean;
   attachment_path: string | null;
   attachment_url: string | null;
+  storage_provider?: string | null;
+  storage_bucket?: string | null;
+  r2_etag?: string | null;
+  content_type?: string | null;
+  size_bytes?: number | null;
   status: PaymentProofStatus;
   created_by: string | null;
   created_at: string;
