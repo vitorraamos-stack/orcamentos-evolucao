@@ -10,6 +10,7 @@ export const ALLOWED_R2_CONTENT_TYPES = new Set([
   'image/jpg',
   'image/webp',
 ]);
+export const ACCEPTED_ASSET_CONTENT_TYPES = Array.from(ALLOWED_R2_CONTENT_TYPES);
 
 export const sanitizeFilename = (filename: string) => {
   const normalized = filename
@@ -76,6 +77,14 @@ export const validateFiles = (files: File[]) => {
     }
     if (file.size > MAX_ASSET_FILE_SIZE_BYTES) {
       return { ok: false, error: 'Arquivo acima de 500MB.' };
+    }
+    try {
+      resolveAssetContentType(file);
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'Tipo de arquivo não permitido.',
+      };
     }
   }
   return { ok: true };
