@@ -63,6 +63,8 @@ export type OsPaymentProof = {
   r2_etag?: string | null;
   content_type?: string | null;
   size_bytes?: number | null;
+  synced_to_smb_at?: string | null;
+  smb_path?: string | null;
   status: PaymentProofStatus;
   created_by: string | null;
   created_at: string;
