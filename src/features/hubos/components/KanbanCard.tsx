@@ -15,7 +15,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { GripVertical, Archive } from 'lucide-react';
-import type { LogisticType, ProdStatus, ProductionTag } from '../types';
+import type { ArtDirectionTag, LogisticType, ProdStatus, ProductionTag } from '../types';
+import { ART_DIRECTION_TAG_CONFIG } from '../artDirectionTagConfig';
 
 interface KanbanCardProps {
   id: string;
@@ -27,6 +28,7 @@ interface KanbanCardProps {
   letraCaixa: boolean;
   prodStatus?: ProdStatus | null;
   productionTag?: ProductionTag | null;
+  artDirectionTag?: ArtDirectionTag | null;
   assetIndicator?: 'processing' | 'done' | null;
   highlightId?: string | null;
   showArchive?: boolean;
@@ -66,6 +68,7 @@ export default function KanbanCard({
   letraCaixa,
   prodStatus,
   productionTag,
+  artDirectionTag,
   assetIndicator,
   highlightId,
   showArchive = false,
@@ -127,6 +130,14 @@ export default function KanbanCard({
         {productionTag && prodStatus === 'Produção' && (
           <Badge className={productionTagConfig[productionTag].className}>
             {productionTagConfig[productionTag].label}
+          </Badge>
+        )}
+        {artDirectionTag && (
+          <Badge
+            className="border-0 text-white"
+            style={{ backgroundColor: ART_DIRECTION_TAG_CONFIG[artDirectionTag].color }}
+          >
+            {ART_DIRECTION_TAG_CONFIG[artDirectionTag].label}
           </Badge>
         )}
         {assetIndicator && (
