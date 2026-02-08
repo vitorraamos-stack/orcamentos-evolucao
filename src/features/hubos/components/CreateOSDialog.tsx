@@ -175,19 +175,30 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     }
 
     if (pendingOrder) {
-      if (selectedFiles.length === 0) {
+      if (selectedFiles.length === 0 && financialDocs.length === 0) {
         toast.error('Selecione ao menos um arquivo para reenviar.');
         return;
       }
 
       try {
-        setUploadingAssets(true);
-        await uploadAssetsForOrder({
-          osId: pendingOrder.id,
-          files: selectedFiles,
-          userId: user?.id ?? null,
-        });
-        toast.success('Arquivos enviados e aguardando sincronização.');
+        if (selectedFiles.length > 0) {
+          setUploadingAssets(true);
+          await uploadAssetsForOrder({
+            osId: pendingOrder.id,
+            files: selectedFiles,
+            userId: user?.id ?? null,
+          });
+          toast.success('Arquivos enviados e aguardando sincronização.');
+        }
+        if (financialDocs.length > 0) {
+          setUploadingAssets(true);
+          await uploadFinancialDocsForOrder({
+            orderId: pendingOrder.id,
+            docs: financialDocs,
+            userId: user?.id ?? null,
+          });
+          toast.success('Documentos financeiros enviados e aguardando sincronização.');
+        }
         reset();
         setOpen(false);
       } catch (uploadError) {
