@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { EdgeFunctionInvokeError, invokeEdgeFunction } from '@/lib/supabase/invokeEdgeFunction';
 import {
   ASSET_BUCKET,
   buildAssetObjectPath,
@@ -33,28 +34,9 @@ class PresignInvokeError extends Error {
   details?: string;
 }
 
-const getSessionOrThrow = async () => {
-  const { data, error } = await supabase.auth.getSession();
-  let session = data.session;
-
-  if (!session?.access_token) {
-    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
-    session = refreshed.session;
-    if (refreshError || !session?.access_token) {
-      throw new Error('Sessão inválida/expirada. Faça login novamente.');
-    }
-  }
-
-  if (error) {
-    throw new Error('Sessão inválida/expirada. Faça login novamente.');
-  }
-
-  return session;
-};
-
 const mapPresignError = (status?: number, details?: string) => {
   if (status === 401 || /invalid jwt/i.test(details ?? '')) {
-    return 'Sessão expirada ou projeto Supabase incorreto. Faça login novamente.';
+    return 'Sessão expirada. Faça login novamente.';
   }
 
   if (status === 404) {
@@ -78,10 +60,21 @@ const buildPresignInvokeError = async (presignError: unknown) => {
   const errorLike = presignError as {
     message?: string;
     context?: Response;
+    status?: number;
+    details?: string;
   };
 
-  const status = errorLike.context?.status;
-  let details = errorLike.message;
+  let status = errorLike.status;
+  let details = errorLike.details ?? errorLike.message;
+
+  if (presignError instanceof EdgeFunctionInvokeError) {
+    status = presignError.status;
+    details = presignError.details ?? presignError.message;
+  }
+
+  if (errorLike.context) {
+    status = errorLike.context.status;
+  }
 
   if (!details && errorLike.context) {
     try {
@@ -147,27 +140,26 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
     const currentJobId = job.id;
 
     uploadedPaths = [];
-    const session = await getSessionOrThrow();
 
     for (const file of files) {
       const sanitizedName = sanitizeFilename(file.name);
       const objectPath = buildAssetObjectPath(osId, currentJobId, file.name);
       const contentType = resolveAssetContentType(file);
 
-      const { data: presignData, error: presignError } = await supabase.functions.invoke('r2-presign-upload', {
-        body: {
+      let presignData: { uploadUrl: string; bucket?: string } | null = null;
+
+      try {
+        presignData = await invokeEdgeFunction<{ uploadUrl: string; bucket?: string }>(supabase, 'r2-presign-upload', {
           key: objectPath,
           contentType,
           sizeBytes: file.size,
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-        },
-      });
-
-      if (presignError || !presignData?.uploadUrl) {
+        });
+      } catch (presignError) {
         throw await buildPresignInvokeError(presignError);
+      }
+
+      if (!presignData?.uploadUrl) {
+        throw await buildPresignInvokeError(null);
       }
 
       const uploadResponse = await fetch(presignData.uploadUrl, {
@@ -229,13 +221,9 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
           .map((asset) => asset.object_path);
         const pathsToDelete = Array.from(new Set([...uploadedPaths, ...storedPaths]));
         if (pathsToDelete.length > 0) {
-          const activeSession = await getSessionOrThrow();
-          await supabase.functions.invoke('r2-delete-objects', {
-            body: { keys: pathsToDelete, bucket: ASSET_BUCKET },
-            headers: {
-              Authorization: `Bearer ${activeSession.access_token}`,
-              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-            },
+          await invokeEdgeFunction<void>(supabase, 'r2-delete-objects', {
+            keys: pathsToDelete,
+            bucket: ASSET_BUCKET,
           });
           await supabase
             .from('os_order_assets')
@@ -286,7 +274,6 @@ export const uploadFinancialDocsForOrder = async ({ orderId, docs, userId }: Upl
     const currentJobId = job.id;
 
     uploadedPaths = [];
-    const session = await getSessionOrThrow();
 
     for (const doc of docs) {
       const { file, type } = doc;
@@ -314,20 +301,20 @@ export const uploadFinancialDocsForOrder = async ({ orderId, docs, userId }: Upl
         throw new Error(assetError?.message ?? 'Erro ao registrar o documento financeiro.');
       }
 
-      const { data: presignData, error: presignError } = await supabase.functions.invoke('r2-presign-upload', {
-        body: {
+      let presignData: { uploadUrl: string; bucket?: string } | null = null;
+
+      try {
+        presignData = await invokeEdgeFunction<{ uploadUrl: string; bucket?: string }>(supabase, 'r2-presign-upload', {
           key: objectPath,
           contentType,
           sizeBytes: file.size,
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-        },
-      });
-
-      if (presignError || !presignData?.uploadUrl) {
+        });
+      } catch (presignError) {
         throw await buildPresignInvokeError(presignError);
+      }
+
+      if (!presignData?.uploadUrl) {
+        throw await buildPresignInvokeError(null);
       }
 
       const uploadResponse = await fetch(presignData.uploadUrl, {
@@ -389,13 +376,9 @@ export const uploadFinancialDocsForOrder = async ({ orderId, docs, userId }: Upl
           .map((asset) => asset.object_path);
         const pathsToDelete = Array.from(new Set([...uploadedPaths, ...storedPaths]));
         if (pathsToDelete.length > 0) {
-          const activeSession = await getSessionOrThrow();
-          await supabase.functions.invoke('r2-delete-objects', {
-            body: { keys: pathsToDelete, bucket: ASSET_BUCKET },
-            headers: {
-              Authorization: `Bearer ${activeSession.access_token}`,
-              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-            },
+          await invokeEdgeFunction<void>(supabase, 'r2-delete-objects', {
+            keys: pathsToDelete,
+            bucket: ASSET_BUCKET,
           });
           await supabase
             .from('os_order_assets')
