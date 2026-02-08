@@ -29,6 +29,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { ARTE_STATUSES, PRODUCAO_STATUSES } from '../statuses';
 import { MAX_ASSET_FILE_SIZE_BYTES, resolveAssetContentType, sanitizeFilename } from '@/features/hubos/assetUtils';
+import { invokeEdgeFunction } from '@/lib/supabase/invokeEdgeFunction';
 
 const paymentSchema = z.object({
   method: z.enum(['PIX', 'CARTAO', 'AGENDADO', 'OUTRO']),
@@ -97,12 +98,12 @@ export default function OsDetailPage() {
 
     try {
       setOpeningPaymentId(payment.id);
-      const { data, error } = await supabase.functions.invoke('r2-presign-download', {
-        body: { key: payment.attachment_path },
+      const data = await invokeEdgeFunction<{ downloadUrl: string }>(supabase, 'r2-presign-download', {
+        key: payment.attachment_path,
       });
 
-      if (error || !data?.downloadUrl) {
-        throw new Error(error?.message ?? 'Falha ao gerar URL de download.');
+      if (!data?.downloadUrl) {
+        throw new Error('Falha ao gerar URL de download.');
       }
 
       window.open(data.downloadUrl, '_blank', 'noreferrer');
@@ -381,16 +382,18 @@ export default function OsDetailPage() {
         const sanitizedName = sanitizeFilename(paymentFile.name);
         const key = `os_orders/${order.id}/payment_proofs/${proof.id}/Financeiro/Comprovante/${Date.now()}-${sanitizedName}`;
 
-        const { data: presignData, error: presignError } = await supabase.functions.invoke('r2-presign-upload', {
-          body: {
+        const presignData = await invokeEdgeFunction<{ uploadUrl: string; bucket?: string }>(
+          supabase,
+          'r2-presign-upload',
+          {
             key,
             contentType,
             sizeBytes,
-          },
-        });
+          }
+        );
 
-        if (presignError || !presignData?.uploadUrl) {
-          throw new Error(presignError?.message ?? 'Falha ao gerar URL de upload (R2).');
+        if (!presignData?.uploadUrl) {
+          throw new Error('Falha ao gerar URL de upload (R2).');
         }
 
         const uploadResponse = await fetch(presignData.uploadUrl, {
