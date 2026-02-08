@@ -246,20 +246,26 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
             </div>
             <div className="space-y-1">
               <Label>Tipo de logística</Label>
-              <Select
+              <RadioGroup
                 value={logisticType}
                 onValueChange={(value) => setLogisticType(value as LogisticType)}
                 disabled={Boolean(pendingOrder)}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="retirada">Retirada</SelectItem>
-                  <SelectItem value="entrega">Entrega</SelectItem>
-                  <SelectItem value="instalacao">Instalação</SelectItem>
-                </SelectContent>
-              </Select>
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <RadioGroupItem value="retirada" />
+                    Retirada
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <RadioGroupItem value="entrega" />
+                    Entrega
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <RadioGroupItem value="instalacao" />
+                    Instalação
+                  </label>
+                </div>
+              </RadioGroup>
             </div>
           </div>
 
