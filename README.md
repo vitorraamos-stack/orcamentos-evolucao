@@ -77,15 +77,25 @@ npm run dev
 
 ### Storage
 
-Os arquivos de artes/referências **e comprovantes de pagamento** são enviados para o **Cloudflare R2** (bucket `os-artes`), com upload direto do browser via URL pré-assinada. As chaves seguem o padrão:
+Os arquivos de artes/referências são enviados para o **Cloudflare R2** (bucket `os-artes`), com upload direto do browser via URL pré-assinada. As chaves seguem o padrão:
 
 ```
 os_orders/{os_id}/{job_id}/{timestamp}_{filename}
 ```
 
+Os comprovantes de pagamento também ficam no R2 e seguem o padrão:
+
+```
+os_orders/{os_id}/payment_proofs/{payment_proof_id}/Financeiro/Comprovante/{timestamp}-{filename}
+```
+
 ### Agent de Artes/Referências (Windows)
 
-O agente roda na rede local para copiar os arquivos do R2 (ou Supabase Storage para registros antigos) para o SMB e limpar o storage após confirmar.
+O agente roda na rede local para copiar os arquivos do R2 (ou Supabase Storage para registros antigos) para o SMB e limpar o storage após confirmar. Comprovantes são sincronizados para:
+
+```
+<folder_path>\Financeiro\Comprovante
+```
 
 1. Variáveis de ambiente necessárias:
 

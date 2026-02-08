@@ -16,36 +16,19 @@ import { Copy, FolderPlus } from 'lucide-react';
 import {
   createOsEvent,
   createPaymentProof,
+  deletePaymentProof,
   fetchOsById,
   fetchOsEvents,
   fetchOsPayments,
   updateOs,
+  updatePaymentProof,
 } from '../api';
 import { generateFolderPath, resolvePaymentStatus } from '../utils';
 import type { DeliveryType, Os, OsEvent, OsPaymentProof, PaymentMethod } from '../types';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { ARTE_STATUSES, PRODUCAO_STATUSES } from '../statuses';
-import { buildAssetObjectPath, MAX_ASSET_FILE_SIZE_BYTES, resolveAssetContentType } from '@/features/hubos/assetUtils';
-
-const getSessionOrThrow = async () => {
-  const { data, error } = await supabase.auth.getSession();
-  let session = data.session;
-
-  if (!session?.access_token) {
-    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
-    session = refreshed.session;
-    if (refreshError || !session?.access_token) {
-      throw new Error('Sessão inválida/expirada. Faça login novamente.');
-    }
-  }
-
-  if (error) {
-    throw new Error('Sessão inválida/expirada. Faça login novamente.');
-  }
-
-  return session;
-};
+import { MAX_ASSET_FILE_SIZE_BYTES, resolveAssetContentType, sanitizeFilename } from '@/features/hubos/assetUtils';
 
 const paymentSchema = z.object({
   method: z.enum(['PIX', 'CARTAO', 'AGENDADO', 'OUTRO']),
@@ -73,6 +56,7 @@ export default function OsDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
+  const [openingPaymentId, setOpeningPaymentId] = useState<string | null>(null);
 
   const [saleNumber, setSaleNumber] = useState('');
   const [clientName, setClientName] = useState('');
@@ -112,13 +96,9 @@ export default function OsDetailPage() {
     }
 
     try {
-      const session = await getSessionOrThrow();
+      setOpeningPaymentId(payment.id);
       const { data, error } = await supabase.functions.invoke('r2-presign-download', {
         body: { key: payment.attachment_path },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-        },
       });
 
       if (error || !data?.downloadUrl) {
@@ -129,6 +109,8 @@ export default function OsDetailPage() {
     } catch (downloadError) {
       console.error(downloadError);
       toast.error(downloadError instanceof Error ? downloadError.message : 'Falha ao abrir comprovante.');
+    } finally {
+      setOpeningPaymentId((current) => (current === payment.id ? null : current));
     }
   };
 
@@ -366,37 +348,44 @@ export default function OsDetailPage() {
       return;
     }
 
+    let createdProof: OsPaymentProof | null = null;
+    let uploadedKey: string | null = null;
+
     try {
       setSaving(true);
-      let attachmentPath: string | null = null;
-      let attachmentUrl: string | null = null;
-      let storageProvider: string | null = null;
-      let storageBucket: string | null = null;
-      let r2Etag: string | null = null;
-      let contentType: string | null = null;
-      let sizeBytes: number | null = null;
+      let proof = await createPaymentProof({
+        os_id: order.id,
+        method: parsed.data.method,
+        amount: parsed.data.amount,
+        received_date: parsed.data.received_date,
+        installments: parsed.data.installments ?? null,
+        cadastro_completo: parsed.data.cadastro_completo,
+        attachment_path: null,
+        attachment_url: null,
+        storage_provider: 'r2',
+        storage_bucket: null,
+        r2_etag: null,
+        content_type: null,
+        size_bytes: null,
+        created_by: user?.id ?? null,
+      });
+      createdProof = proof;
 
       if (paymentFile) {
         if (paymentFile.size > MAX_ASSET_FILE_SIZE_BYTES) {
           throw new Error('Arquivo acima de 500MB.');
         }
 
-        contentType = resolveAssetContentType(paymentFile);
-        sizeBytes = paymentFile.size;
-
-        const jobId = `payment_proof/${crypto.randomUUID()}`;
-        const key = buildAssetObjectPath(order.id, jobId, paymentFile.name);
-        const session = await getSessionOrThrow();
+        const contentType = resolveAssetContentType(paymentFile);
+        const sizeBytes = paymentFile.size;
+        const sanitizedName = sanitizeFilename(paymentFile.name);
+        const key = `os_orders/${order.id}/payment_proofs/${proof.id}/Financeiro/Comprovante/${Date.now()}-${sanitizedName}`;
 
         const { data: presignData, error: presignError } = await supabase.functions.invoke('r2-presign-upload', {
           body: {
             key,
             contentType,
             sizeBytes,
-          },
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
           },
         });
 
@@ -417,29 +406,19 @@ export default function OsDetailPage() {
           throw new Error(`Falha ao enviar arquivo (HTTP ${uploadResponse.status}): ${responseBody || 'sem detalhes'}`);
         }
 
-        r2Etag = uploadResponse.headers.get('etag')?.replace(/"/g, '') ?? null;
-        attachmentPath = key;
-        attachmentUrl = null;
-        storageProvider = 'r2';
-        storageBucket = presignData.bucket ?? null;
-      }
+        const r2Etag = uploadResponse.headers.get('etag')?.replace(/"/g, '') ?? null;
+        uploadedKey = key;
 
-      const proof = await createPaymentProof({
-        os_id: order.id,
-        method: parsed.data.method,
-        amount: parsed.data.amount,
-        received_date: parsed.data.received_date,
-        installments: parsed.data.installments ?? null,
-        cadastro_completo: parsed.data.cadastro_completo,
-        attachment_path: attachmentPath,
-        attachment_url: attachmentUrl,
-        storage_provider: storageProvider,
-        storage_bucket: storageBucket,
-        r2_etag: r2Etag,
-        content_type: contentType,
-        size_bytes: sizeBytes,
-        created_by: user?.id ?? null,
-      });
+        proof = await updatePaymentProof(proof.id, {
+          attachment_path: key,
+          attachment_url: null,
+          storage_provider: 'r2',
+          storage_bucket: presignData.bucket ?? null,
+          r2_etag: r2Etag,
+          content_type: contentType,
+          size_bytes: sizeBytes,
+        });
+      }
 
       const nextStatus = resolvePaymentStatus({
         method: parsed.data.method,
@@ -470,6 +449,13 @@ export default function OsDetailPage() {
       toast.success('Comprovante enviado.');
     } catch (error) {
       console.error(error);
+      if (createdProof && paymentFile && !uploadedKey) {
+        try {
+          await deletePaymentProof(createdProof.id);
+        } catch (cleanupError) {
+          console.error('Falha ao limpar comprovante pendente:', cleanupError);
+        }
+      }
       toast.error(error instanceof Error ? error.message : 'Erro ao enviar comprovante.');
     } finally {
       setSaving(false);
@@ -764,14 +750,14 @@ export default function OsDetailPage() {
                         {formatCurrency(payment.amount)} • {payment.received_date}
                       </div>
                       {(payment.attachment_url ||
-                        payment.storage_provider === 'r2' ||
                         payment.attachment_path?.startsWith('os_orders/')) && (
                         <button
                           type="button"
                           onClick={() => handleOpenPaymentAttachment(payment)}
-                          className="text-primary underline"
+                          className="text-primary underline disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={openingPaymentId === payment.id}
                         >
-                          Ver comprovante
+                          {openingPaymentId === payment.id ? 'Gerando link…' : 'Ver comprovante'}
                         </button>
                       )}
                     </div>

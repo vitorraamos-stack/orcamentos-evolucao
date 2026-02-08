@@ -16,6 +16,7 @@ const R2_ENDPOINT =
   process.env.R2_ENDPOINT || (R2_ACCOUNT_ID ? `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : null);
 const POLL_INTERVAL_SECONDS = Number(process.env.POLL_INTERVAL_SECONDS || 10);
 const PROCESSING_TIMEOUT_MINUTES = 30;
+const PAYMENT_PROOF_BATCH_SIZE = Number(process.env.PAYMENT_PROOF_BATCH_SIZE || 5);
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são obrigatórios.');
@@ -144,6 +145,93 @@ const fileExistsWithSize = async (filePath, expectedSize) => {
       return false;
     }
     throw error;
+  }
+};
+
+const syncPaymentProof = async (payment) => {
+  const folderPath = payment.os?.folder_path;
+  if (!folderPath) {
+    console.warn(`Comprovante ${payment.id} sem folder_path. Ignorando.`);
+    return;
+  }
+
+  if (!payment.attachment_path) {
+    console.warn(`Comprovante ${payment.id} sem attachment_path. Ignorando.`);
+    return;
+  }
+
+  const key = payment.attachment_path;
+  const filename = sanitizeFilename(path.basename(key));
+  const destDir = path.join(folderPath, 'Financeiro', 'Comprovante');
+  const destFile = path.join(destDir, filename);
+  const expectedSize = payment.size_bytes;
+  const alreadySyncedPath = payment.smb_path || destFile;
+
+  const alreadySynced = await fileExistsWithSize(alreadySyncedPath, expectedSize);
+  if (alreadySynced) {
+    await supabase
+      .from('os_payment_proof')
+      .update({ synced_to_smb_at: new Date().toISOString(), smb_path: alreadySyncedPath })
+      .eq('id', payment.id);
+    return;
+  }
+
+  await fs.promises.mkdir(destDir, { recursive: true });
+
+  let fileBuffer;
+  try {
+    const client = ensureR2Client();
+    const bucket = payment.storage_bucket || R2_BUCKET;
+    const response = await client.send(
+      new GetObjectCommand({
+        Bucket: bucket,
+        Key: key,
+      })
+    );
+    if (!response.Body) {
+      console.warn(`Comprovante ${payment.id} sem corpo no R2.`);
+      return;
+    }
+    fileBuffer = await streamToBuffer(response.Body);
+  } catch (error) {
+    console.error(`Erro ao baixar comprovante ${payment.id} do R2:`, error instanceof Error ? error.message : error);
+    return;
+  }
+
+  await fs.promises.writeFile(destFile, fileBuffer);
+
+  await supabase
+    .from('os_payment_proof')
+    .update({ synced_to_smb_at: new Date().toISOString(), smb_path: destFile })
+    .eq('id', payment.id);
+};
+
+const syncPaymentProofs = async () => {
+  const { data: payments, error } = await supabase
+    .from('os_payment_proof')
+    .select(
+      'id, os_id, attachment_path, storage_provider, storage_bucket, size_bytes, smb_path, created_at, os:os_id ( folder_path )'
+    )
+    .eq('storage_provider', 'r2')
+    .not('attachment_path', 'is', null)
+    .is('synced_to_smb_at', null)
+    .order('created_at', { ascending: true })
+    .limit(PAYMENT_PROOF_BATCH_SIZE);
+
+  if (error) {
+    console.error('Erro ao buscar comprovantes pendentes:', error.message);
+    return;
+  }
+
+  for (const payment of payments ?? []) {
+    try {
+      await syncPaymentProof(payment);
+    } catch (error) {
+      console.error(
+        `Erro ao sincronizar comprovante ${payment.id}:`,
+        error instanceof Error ? error.message : error
+      );
+    }
   }
 };
 
@@ -395,6 +483,7 @@ const loop = async () => {
   }
 
   if (!job) {
+    await syncPaymentProofs();
     return;
   }
 
@@ -409,6 +498,8 @@ const loop = async () => {
       .eq('id', job.id);
     await supabase.from('os_order_assets').update({ error: message }).eq('job_id', job.id);
   }
+
+  await syncPaymentProofs();
 };
 
 const run = async () => {
