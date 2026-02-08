@@ -26,6 +26,26 @@ import type { DeliveryType, Os, OsEvent, OsPaymentProof, PaymentMethod } from '.
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { ARTE_STATUSES, PRODUCAO_STATUSES } from '../statuses';
+import { buildAssetObjectPath, MAX_ASSET_FILE_SIZE_BYTES, resolveAssetContentType } from '@/features/hubos/assetUtils';
+
+const getSessionOrThrow = async () => {
+  const { data, error } = await supabase.auth.getSession();
+  let session = data.session;
+
+  if (!session?.access_token) {
+    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+    session = refreshed.session;
+    if (refreshError || !session?.access_token) {
+      throw new Error('Sessão inválida/expirada. Faça login novamente.');
+    }
+  }
+
+  if (error) {
+    throw new Error('Sessão inválida/expirada. Faça login novamente.');
+  }
+
+  return session;
+};
 
 const paymentSchema = z.object({
   method: z.enum(['PIX', 'CARTAO', 'AGENDADO', 'OUTRO']),
@@ -79,6 +99,38 @@ export default function OsDetailPage() {
   const [paymentDate, setPaymentDate] = useState('');
   const [paymentInstallments, setPaymentInstallments] = useState('');
   const [cadastroCompleto, setCadastroCompleto] = useState(false);
+
+  const handleOpenPaymentAttachment = async (payment: OsPaymentProof) => {
+    if (payment.attachment_url) {
+      window.open(payment.attachment_url, '_blank', 'noreferrer');
+      return;
+    }
+
+    if (!payment.attachment_path || !payment.attachment_path.startsWith('os_orders/')) {
+      toast.error('Comprovante indisponível para download.');
+      return;
+    }
+
+    try {
+      const session = await getSessionOrThrow();
+      const { data, error } = await supabase.functions.invoke('r2-presign-download', {
+        body: { key: payment.attachment_path },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+        },
+      });
+
+      if (error || !data?.downloadUrl) {
+        throw new Error(error?.message ?? 'Falha ao gerar URL de download.');
+      }
+
+      window.open(data.downloadUrl, '_blank', 'noreferrer');
+    } catch (downloadError) {
+      console.error(downloadError);
+      toast.error(downloadError instanceof Error ? downloadError.message : 'Falha ao abrir comprovante.');
+    }
+  };
 
   const loadData = async () => {
     if (!osId) return;
@@ -318,16 +370,58 @@ export default function OsDetailPage() {
       setSaving(true);
       let attachmentPath: string | null = null;
       let attachmentUrl: string | null = null;
+      let storageProvider: string | null = null;
+      let storageBucket: string | null = null;
+      let r2Etag: string | null = null;
+      let contentType: string | null = null;
+      let sizeBytes: number | null = null;
 
       if (paymentFile) {
-        const path = `os/${order.id}/${Date.now()}-${paymentFile.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from('comprovantes-os')
-          .upload(path, paymentFile);
-        if (uploadError) throw uploadError;
-        const { data } = supabase.storage.from('comprovantes-os').getPublicUrl(path);
-        attachmentPath = path;
-        attachmentUrl = data.publicUrl;
+        if (paymentFile.size > MAX_ASSET_FILE_SIZE_BYTES) {
+          throw new Error('Arquivo acima de 500MB.');
+        }
+
+        contentType = resolveAssetContentType(paymentFile);
+        sizeBytes = paymentFile.size;
+
+        const jobId = `payment_proof/${crypto.randomUUID()}`;
+        const key = buildAssetObjectPath(order.id, jobId, paymentFile.name);
+        const session = await getSessionOrThrow();
+
+        const { data: presignData, error: presignError } = await supabase.functions.invoke('r2-presign-upload', {
+          body: {
+            key,
+            contentType,
+            sizeBytes,
+          },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+          },
+        });
+
+        if (presignError || !presignData?.uploadUrl) {
+          throw new Error(presignError?.message ?? 'Falha ao gerar URL de upload (R2).');
+        }
+
+        const uploadResponse = await fetch(presignData.uploadUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': contentType,
+          },
+          body: paymentFile,
+        });
+
+        if (!uploadResponse.ok) {
+          const responseBody = await uploadResponse.text();
+          throw new Error(`Falha ao enviar arquivo (HTTP ${uploadResponse.status}): ${responseBody || 'sem detalhes'}`);
+        }
+
+        r2Etag = uploadResponse.headers.get('etag')?.replace(/"/g, '') ?? null;
+        attachmentPath = key;
+        attachmentUrl = null;
+        storageProvider = 'r2';
+        storageBucket = presignData.bucket ?? null;
       }
 
       const proof = await createPaymentProof({
@@ -339,6 +433,11 @@ export default function OsDetailPage() {
         cadastro_completo: parsed.data.cadastro_completo,
         attachment_path: attachmentPath,
         attachment_url: attachmentUrl,
+        storage_provider: storageProvider,
+        storage_bucket: storageBucket,
+        r2_etag: r2Etag,
+        content_type: contentType,
+        size_bytes: sizeBytes,
         created_by: user?.id ?? null,
       });
 
@@ -371,7 +470,7 @@ export default function OsDetailPage() {
       toast.success('Comprovante enviado.');
     } catch (error) {
       console.error(error);
-      toast.error('Erro ao enviar comprovante.');
+      toast.error(error instanceof Error ? error.message : 'Erro ao enviar comprovante.');
     } finally {
       setSaving(false);
     }
@@ -664,15 +763,16 @@ export default function OsDetailPage() {
                       <div className="text-muted-foreground">
                         {formatCurrency(payment.amount)} • {payment.received_date}
                       </div>
-                      {payment.attachment_url && (
-                        <a
-                          href={payment.attachment_url}
-                          target="_blank"
-                          rel="noreferrer"
+                      {(payment.attachment_url ||
+                        payment.storage_provider === 'r2' ||
+                        payment.attachment_path?.startsWith('os_orders/')) && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenPaymentAttachment(payment)}
                           className="text-primary underline"
                         >
                           Ver comprovante
-                        </a>
+                        </button>
                       )}
                     </div>
                   ))}
