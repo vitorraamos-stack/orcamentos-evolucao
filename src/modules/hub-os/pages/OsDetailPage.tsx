@@ -30,25 +30,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ARTE_STATUSES, PRODUCAO_STATUSES } from '../statuses';
 import { MAX_ASSET_FILE_SIZE_BYTES, resolveAssetContentType, sanitizeFilename } from '@/features/hubos/assetUtils';
 
-const getSessionOrThrow = async () => {
-  const { data, error } = await supabase.auth.getSession();
-  let session = data.session;
-
-  if (!session?.access_token) {
-    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
-    session = refreshed.session;
-    if (refreshError || !session?.access_token) {
-      throw new Error('Sessão inválida/expirada. Faça login novamente.');
-    }
-  }
-
-  if (error) {
-    throw new Error('Sessão inválida/expirada. Faça login novamente.');
-  }
-
-  return session;
-};
-
 const paymentSchema = z.object({
   method: z.enum(['PIX', 'CARTAO', 'AGENDADO', 'OUTRO']),
   amount: z.preprocess((value) => Number(value), z.number().positive()),
@@ -116,13 +97,8 @@ export default function OsDetailPage() {
 
     try {
       setOpeningPaymentId(payment.id);
-      const session = await getSessionOrThrow();
       const { data, error } = await supabase.functions.invoke('r2-presign-download', {
         body: { key: payment.attachment_path },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-        },
       });
 
       if (error || !data?.downloadUrl) {
@@ -404,17 +380,12 @@ export default function OsDetailPage() {
         const sizeBytes = paymentFile.size;
         const sanitizedName = sanitizeFilename(paymentFile.name);
         const key = `os_orders/${order.id}/payment_proofs/${proof.id}/Financeiro/Comprovante/${Date.now()}-${sanitizedName}`;
-        const session = await getSessionOrThrow();
 
         const { data: presignData, error: presignError } = await supabase.functions.invoke('r2-presign-upload', {
           body: {
             key,
             contentType,
             sizeBytes,
-          },
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
           },
         });
 
