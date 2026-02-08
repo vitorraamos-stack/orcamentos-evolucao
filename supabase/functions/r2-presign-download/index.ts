@@ -1,25 +1,12 @@
 import { createClient } from 'npm:@supabase/supabase-js';
-import { PutObjectCommand, S3Client } from 'npm:@aws-sdk/client-s3';
+import { GetObjectCommand, S3Client } from 'npm:@aws-sdk/client-s3';
 import { getSignedUrl } from 'npm:@aws-sdk/s3-request-presigner';
 
-type PresignPayload = {
+type PresignDownloadPayload = {
   bucket?: string;
   key: string;
-  contentType: string;
-  sizeBytes: number;
+  expiresIn?: number;
 };
-
-const MAX_SIZE_BYTES = 500 * 1024 * 1024;
-const ALLOWED_CONTENT_TYPES = new Set([
-  'application/pdf',
-  'application/postscript',
-  'application/vnd.adobe.illustrator',
-  'application/vnd.corel-draw',
-  'image/png',
-  'image/jpeg',
-  'image/jpg',
-  'image/webp',
-]);
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -95,25 +82,25 @@ const decodeJwtSubject = (token: string) => {
 
 const requireUser = async (request: Request) => {
   const token = extractBearerToken(request);
-  console.log('[r2-presign-upload] auth header present:', Boolean(token));
+  console.log('[r2-presign-download] auth header present:', Boolean(token));
 
   if (!token) {
     const gatewayUserId = extractGatewayUserId(request);
-    console.log('[r2-presign-upload] gateway user header present:', Boolean(gatewayUserId));
+    console.log('[r2-presign-download] gateway user header present:', Boolean(gatewayUserId));
 
     if (gatewayUserId) {
       return { user: { id: gatewayUserId } };
     }
 
-    console.error('[r2-presign-upload] missing Authorization bearer token');
-    return { error: jsonResponse(401, { error: 'Unauthorized: missing Authorization Bearer token' }) };
+    console.error('[r2-presign-download] missing Authorization token');
+    return { error: jsonResponse(401, { error: 'Unauthorized: missing Authorization token' }) };
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('[r2-presign-upload] supabase env missing for auth');
+    console.error('[r2-presign-download] supabase env missing for auth');
     return {
       error: jsonResponse(500, {
         error: 'Supabase env not configured: SUPABASE_URL/SUPABASE_ANON_KEY missing',
@@ -128,30 +115,30 @@ const requireUser = async (request: Request) => {
 
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data?.user) {
-    console.error('[r2-presign-upload] getUser failed', {
+    console.error('[r2-presign-download] getUser failed', {
       reason: error?.message ?? 'user-not-found',
       status: error?.status,
     });
     const gatewayUserId = extractGatewayUserId(request);
     if (gatewayUserId) {
-      console.log('[r2-presign-upload] fallback to gateway user id', { userId: gatewayUserId });
+      console.log('[r2-presign-download] fallback to gateway user id', { userId: gatewayUserId });
       return { user: { id: gatewayUserId } };
     }
     const decodedSubject = decodeJwtSubject(token);
     if (decodedSubject) {
-      console.log('[r2-presign-upload] fallback to decoded jwt subject', { userId: decodedSubject });
+      console.log('[r2-presign-download] fallback to decoded jwt subject', { userId: decodedSubject });
       return { user: { id: decodedSubject } };
     }
     return { error: jsonResponse(401, { error: 'Invalid JWT' }) };
   }
 
-  console.log('[r2-presign-upload] getUser success', { userId: data.user.id });
+  console.log('[r2-presign-download] getUser success', { userId: data.user.id });
   return { user: data.user };
 };
 
 Deno.serve(async (request) => {
   try {
-    console.log('[r2-presign-upload] request', { method: request.method });
+    console.log('[r2-presign-download] request', { method: request.method });
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders });
@@ -166,25 +153,17 @@ Deno.serve(async (request) => {
       return auth.error;
     }
 
-    let payload: PresignPayload;
+    let payload: PresignDownloadPayload;
     try {
       payload = await request.json();
     } catch {
       return jsonResponse(400, { error: 'Invalid JSON body.' });
     }
 
-    const { key, contentType, sizeBytes, bucket } = payload;
+    const { key, bucket, expiresIn } = payload;
 
     if (!key || !key.startsWith('os_orders/') || key.includes('..')) {
       return jsonResponse(400, { error: 'Invalid object key.' });
-    }
-
-    if (!contentType || !ALLOWED_CONTENT_TYPES.has(contentType)) {
-      return jsonResponse(400, { error: 'Content-Type not allowed.' });
-    }
-
-    if (!Number.isFinite(sizeBytes) || sizeBytes > MAX_SIZE_BYTES) {
-      return jsonResponse(400, { error: 'File exceeds 500MB limit.' });
     }
 
     const accountId = Deno.env.get('R2_ACCOUNT_ID');
@@ -193,7 +172,7 @@ Deno.serve(async (request) => {
     const defaultBucket = Deno.env.get('R2_BUCKET') || 'os-artes';
 
     if (!accountId || !accessKeyId || !secretAccessKey) {
-      console.error('[r2-presign-upload] r2 env missing');
+      console.error('[r2-presign-download] r2 env missing');
       return jsonResponse(500, { error: 'R2 env not configured' });
     }
 
@@ -209,24 +188,22 @@ Deno.serve(async (request) => {
       },
     });
 
-    const command = new PutObjectCommand({
+    const command = new GetObjectCommand({
       Bucket: resolvedBucket,
       Key: key,
-      ContentType: contentType,
-      ContentLength: sizeBytes,
     });
 
-    const uploadUrl = await getSignedUrl(client, command, { expiresIn: 600 });
+    const downloadUrl = await getSignedUrl(client, command, { expiresIn: expiresIn ?? 600 });
 
     return jsonResponse(200, {
-      uploadUrl,
-      publicKey: key,
+      downloadUrl,
       bucket: resolvedBucket,
-      expiresIn: 600,
+      key,
+      expiresIn: expiresIn ?? 600,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error.';
-    console.error('[r2-presign-upload] unexpected error', { message });
+    console.error('[r2-presign-download] unexpected error', { message });
     return jsonResponse(500, { error: message });
   }
 });
