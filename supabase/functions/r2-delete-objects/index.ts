@@ -8,7 +8,8 @@ type DeletePayload = {
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, x-forwarded-authorization, x-supabase-authorization, x-supabase-auth-token, x-supabase-auth-user, x-supabase-auth-user-id, x-sb-user-id, x-jwt-claims, x-supabase-auth',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 };
@@ -37,7 +38,11 @@ const extractGatewayUserId = (request: Request) => {
   return (
     request.headers.get('x-supabase-auth-user') ??
     request.headers.get('x-supabase-auth-user-id') ??
+    request.headers.get('x-supabase-user') ??
     request.headers.get('x-sb-user-id') ??
+    request.headers.get('x-sb-user') ??
+    request.headers.get('x-sb-auth-user') ??
+    request.headers.get('x-sb-auth-user-id') ??
     parseClaimsHeader(request)
   );
 };
@@ -52,8 +57,13 @@ const extractBearerToken = (request: Request) => {
   ];
 
   for (const value of possibleAuthHeaders) {
-    if (value?.startsWith('Bearer ')) {
+    if (!value) continue;
+    if (value.startsWith('Bearer ')) {
       return value.replace('Bearer ', '').trim();
+    }
+    const trimmed = value.trim();
+    if (trimmed.split('.').length === 3) {
+      return trimmed;
     }
   }
 
@@ -62,12 +72,14 @@ const extractBearerToken = (request: Request) => {
 
 const requireUser = async (request: Request) => {
   const token = extractBearerToken(request);
-  console.log('[r2-delete-objects] auth header present:', Boolean(token));
+  const gatewayUserId = extractGatewayUserId(request);
+  console.log('[r2-delete-objects] auth context', {
+    method: request.method,
+    hasToken: Boolean(token),
+    hasGatewayUserId: Boolean(gatewayUserId),
+  });
 
   if (!token) {
-    const gatewayUserId = extractGatewayUserId(request);
-    console.log('[r2-delete-objects] gateway user header present:', Boolean(gatewayUserId));
-
     if (gatewayUserId) {
       return { user: { id: gatewayUserId } };
     }
@@ -98,6 +110,10 @@ const requireUser = async (request: Request) => {
       reason: error?.message ?? 'user-not-found',
       status: error?.status,
     });
+    if (gatewayUserId) {
+      console.log('[r2-delete-objects] fallback to gateway user id', { userId: gatewayUserId });
+      return { user: { id: gatewayUserId } };
+    }
     return { error: jsonResponse(401, { error: 'Invalid JWT' }) };
   }
 

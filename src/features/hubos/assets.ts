@@ -36,7 +36,7 @@ class PresignInvokeError extends Error {
 
 const mapPresignError = (status?: number, details?: string) => {
   if (status === 401 || /invalid jwt/i.test(details ?? '')) {
-    return 'Sessão expirada. Faça login novamente.';
+    return 'Sessão expirada ou projeto Supabase incorreto. Faça login novamente.';
   }
 
   if (status === 404) {
@@ -107,8 +107,24 @@ const buildFinancialDocObjectPath = (
 ) => {
   const sanitizedName = sanitizeFilename(filename);
   const timestamp = now.toISOString().replace(/[:.]/g, '-');
-  const subdir = docType === 'PAYMENT_PROOF' ? 'payment_proof' : 'purchase_order';
-  return `os_orders/${osId}/financeiro/${subdir}/${jobId}/${timestamp}_${sanitizedName}`;
+  if (docType === 'PAYMENT_PROOF') {
+    return `os_orders/${osId}/Financeiro/Comprovante/${timestamp}_${sanitizedName}`;
+  }
+  return `os_orders/${osId}/financeiro/purchase_order/${jobId}/${timestamp}_${sanitizedName}`;
+};
+
+type UploadReceiptParams = {
+  osId: string;
+  file: File;
+  userId: string | null;
+};
+
+export const uploadReceiptForOrder = async ({ osId, file, userId }: UploadReceiptParams) => {
+  return uploadFinancialDocsForOrder({
+    orderId: osId,
+    docs: [{ file, type: 'PAYMENT_PROOF' }],
+    userId,
+  });
 };
 
 export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssetsParams) => {
