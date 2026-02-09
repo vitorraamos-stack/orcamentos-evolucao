@@ -10,7 +10,8 @@ type PresignDownloadPayload = {
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, apikey, x-client-info, content-type, accept, x-forwarded-authorization, x-supabase-authorization, x-supabase-auth-token, x-supabase-auth-user, x-supabase-auth-user-id, x-supabase-user, x-sb-user-id, x-sb-user, x-sb-auth-user, x-sb-auth-user-id, x-jwt-claims, x-supabase-auth',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 };
@@ -86,24 +87,23 @@ const decodeJwtSubject = (token: string) => {
 
 const requireUser = async (request: Request) => {
   const token = extractBearerToken(request);
-  console.log('[r2-presign-download] auth header present:', Boolean(token));
+  const gatewayUserId = extractGatewayUserId(request);
+  console.log('[r2-presign-download] auth context', {
+    method: request.method,
+    hasToken: Boolean(token),
+    hasGatewayUserId: Boolean(gatewayUserId),
+    hasAuthorizationHeader: Boolean(request.headers.get('authorization') || request.headers.get('Authorization')),
+    hasForwardedAuthorization: Boolean(request.headers.get('x-forwarded-authorization')),
+    hasSupabaseAuthToken: Boolean(request.headers.get('x-supabase-auth-token')),
+  });
 
   if (!token) {
-    const gatewayUserId = extractGatewayUserId(request);
-    console.log('[r2-presign-download] gateway user header present:', Boolean(gatewayUserId));
-
     if (gatewayUserId) {
       return { user: { id: gatewayUserId } };
     }
 
-    console.error('[r2-presign-download] missing Authorization token');
-    return { error: jsonResponse(401, { error: 'Unauthorized: missing Authorization token' }) };
-  }
-
-  const decodedSubject = decodeJwtSubject(token);
-  if (decodedSubject) {
-    console.log('[r2-presign-download] using decoded jwt subject', { userId: decodedSubject });
-    return { user: { id: decodedSubject } };
+    console.error('[r2-presign-download] missing Authorization bearer token');
+    return { error: jsonResponse(401, { error: 'Unauthorized: missing Authorization Bearer token' }) };
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -125,14 +125,19 @@ const requireUser = async (request: Request) => {
 
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data?.user) {
+    const decodedSubject = decodeJwtSubject(token);
     console.error('[r2-presign-download] getUser failed', {
       reason: error?.message ?? 'user-not-found',
       status: error?.status,
+      hasDecodedSubject: Boolean(decodedSubject),
     });
-    const gatewayUserId = extractGatewayUserId(request);
     if (gatewayUserId) {
       console.log('[r2-presign-download] fallback to gateway user id', { userId: gatewayUserId });
       return { user: { id: gatewayUserId } };
+    }
+    if (decodedSubject) {
+      console.log('[r2-presign-download] fallback to decoded jwt subject', { userId: decodedSubject });
+      return { user: { id: decodedSubject } };
     }
     return { error: jsonResponse(401, { error: 'Invalid JWT' }) };
   }
@@ -193,18 +198,23 @@ Deno.serve(async (request) => {
       },
     });
 
+    const resolvedExpiresIn =
+      Number.isFinite(expiresIn) && (expiresIn as number) > 0 && (expiresIn as number) <= 3600
+        ? (expiresIn as number)
+        : 600;
+
     const command = new GetObjectCommand({
       Bucket: resolvedBucket,
       Key: key,
     });
 
-    const downloadUrl = await getSignedUrl(client, command, { expiresIn: expiresIn ?? 600 });
+    const downloadUrl = await getSignedUrl(client, command, { expiresIn: resolvedExpiresIn });
 
     return jsonResponse(200, {
       downloadUrl,
       bucket: resolvedBucket,
       key,
-      expiresIn: expiresIn ?? 600,
+      expiresIn: resolvedExpiresIn,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error.';

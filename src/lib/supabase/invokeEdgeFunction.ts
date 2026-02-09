@@ -25,22 +25,56 @@ export class EdgeFunctionInvokeError extends Error {
 }
 
 const SESSION_EXPIRED_MESSAGE = 'Sessão expirada. Faça login novamente.';
+const MISSING_ANON_KEY_MESSAGE =
+  'Ambiente Supabase mal configurado: VITE_SUPABASE_ANON_KEY ausente.';
+const INVALID_ANON_KEY_MESSAGE =
+  'VITE_SUPABASE_ANON_KEY não parece um JWT válido. Use a chave anon/service_role ou desative verify_jwt na Edge Function.';
+
+const getAnonKey = () => {
+  const envKey = import.meta.env?.VITE_SUPABASE_ANON_KEY;
+  if (envKey) {
+    return envKey;
+  }
+  if (typeof process !== 'undefined') {
+    return process.env.VITE_SUPABASE_ANON_KEY;
+  }
+  return undefined;
+};
+
+const ensureAnonKey = () => {
+  const anonKey = getAnonKey();
+  if (!anonKey) {
+    throw new Error(MISSING_ANON_KEY_MESSAGE);
+  }
+  if (anonKey.startsWith('sb_publishable_') || anonKey.split('.').length !== 3) {
+    throw new Error(INVALID_ANON_KEY_MESSAGE);
+  }
+  return anonKey;
+};
 
 const getSessionOrThrow = async (supabase: SupabaseClient) => {
   const { data, error } = await supabase.auth.getSession();
-  const session = data.session;
+  let session = data.session;
 
   if (error || !session?.access_token) {
+    const refresh = await supabase.auth.refreshSession();
+    session = refresh.data.session;
+  }
+
+  if (!session?.access_token) {
     throw new Error(SESSION_EXPIRED_MESSAGE);
   }
 
   return session;
 };
 
-const buildHeaders = (accessToken: string) => ({
-  Authorization: `Bearer ${accessToken}`,
-  apikey: import.meta.env.VITE_SUPABASE_ANON_KEY ?? '',
-});
+const buildHeaders = (accessToken: string) => {
+  const anonKey = ensureAnonKey();
+  return {
+    Authorization: `Bearer ${accessToken}`,
+    apikey: anonKey,
+  };
+};
 
 const extractErrorDetails = async (error: unknown) => {
   let status: number | undefined;
@@ -74,13 +108,36 @@ const extractErrorDetails = async (error: unknown) => {
   return { status, details };
 };
 
+const describeAuthIssue = (details?: string) => {
+  if (!details) {
+    return 'Falha de autenticação (missing Authorization ou JWT inválido).';
+  }
+
+  if (/missing authorization/i.test(details)) {
+    return 'Missing Authorization header.';
+  }
+
+  if (/invalid jwt|jwt/i.test(details)) {
+    return 'Invalid JWT. Verifique se a chave anon é JWT e se o projeto corresponde.';
+  }
+
+  if (/env/i.test(details)) {
+    return 'Supabase env missing.';
+  }
+
+  if (/project/i.test(details)) {
+    return 'Project mismatch ou JWT de outro projeto.';
+  }
+
+  return details;
+};
+
 export const invokeEdgeFunction = async <T>(
   supabase: SupabaseClient,
   name: string,
   body: unknown
 ): Promise<T> => {
   const session = await getSessionOrThrow(supabase);
-  const headers = buildHeaders(session.access_token);
 
   const invoke = (accessToken: string) =>
     supabase.functions.invoke<T>(name, {
@@ -111,9 +168,10 @@ export const invokeEdgeFunction = async <T>(
 
   if (error) {
     const info = await extractErrorDetails(error);
+    const authHint = info.status === 401 ? describeAuthIssue(info.details) : null;
     const message =
       info.status === 401
-        ? SESSION_EXPIRED_MESSAGE
+        ? `${SESSION_EXPIRED_MESSAGE} ${authHint ?? ''}`.trim()
         : `Falha ao invocar ${name} (HTTP ${info.status ?? 'desconhecido'}): ${info.details ?? 'Sem detalhes.'}`;
 
     console.error('Edge function error', {
@@ -133,4 +191,4 @@ export const invokeEdgeFunction = async <T>(
   return data as T;
 };
 
-export { SESSION_EXPIRED_MESSAGE };
+export { buildHeaders, ensureAnonKey, SESSION_EXPIRED_MESSAGE };
