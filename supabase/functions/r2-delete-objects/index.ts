@@ -9,7 +9,7 @@ type DeletePayload = {
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
-    'authorization, apikey, x-client-info, content-type, accept, x-forwarded-authorization, x-supabase-authorization, x-supabase-auth-token, x-supabase-auth-user, x-supabase-auth-user-id, x-supabase-user, x-sb-user-id, x-sb-user, x-sb-auth-user, x-sb-auth-user-id, x-jwt-claims, x-supabase-auth',
+    'authorization, apikey, x-client-info, content-type, accept, x-forwarded-authorization, x-supabase-authorization, x-supabase-auth-token, x-supabase-auth-user, x-supabase-auth-user-id, x-supabase-user, x-supabase-user-id, x-sb-user-id, x-sb-user, x-sb-auth-user, x-sb-auth-user-id, x-sb-authorization, x-sb-auth-token, x-jwt-claims, x-supabase-auth',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 };
@@ -39,6 +39,7 @@ const extractGatewayUserId = (request: Request) => {
     request.headers.get('x-supabase-auth-user') ??
     request.headers.get('x-supabase-auth-user-id') ??
     request.headers.get('x-supabase-user') ??
+    request.headers.get('x-supabase-user-id') ??
     request.headers.get('x-sb-user-id') ??
     request.headers.get('x-sb-user') ??
     request.headers.get('x-sb-auth-user') ??
@@ -54,6 +55,8 @@ const extractBearerToken = (request: Request) => {
     request.headers.get('x-forwarded-authorization'),
     request.headers.get('x-supabase-authorization'),
     request.headers.get('x-supabase-auth-token'),
+    request.headers.get('x-sb-authorization'),
+    request.headers.get('x-sb-auth-token'),
   ];
 
   for (const value of possibleAuthHeaders) {
@@ -93,6 +96,7 @@ const requireUser = async (request: Request) => {
     hasAuthorizationHeader: Boolean(request.headers.get('authorization') || request.headers.get('Authorization')),
     hasForwardedAuthorization: Boolean(request.headers.get('x-forwarded-authorization')),
     hasSupabaseAuthToken: Boolean(request.headers.get('x-supabase-auth-token')),
+    hasApiKeyHeader: Boolean(request.headers.get('apikey')),
   });
 
   if (!token) {
