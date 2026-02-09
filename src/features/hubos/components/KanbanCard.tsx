@@ -110,7 +110,10 @@ export default function KanbanCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
-          <p className="text-sm font-semibold">{title}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold">{title}</p>
+            <Badge variant="outline">{logisticLabel[logisticType]}</Badge>
+          </div>
           <p className="text-xs text-muted-foreground">{clientName}</p>
         </div>
         <div
@@ -123,7 +126,6 @@ export default function KanbanCard({
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Badge variant="outline">{logisticLabel[logisticType]}</Badge>
         {deliveryDate && <Badge variant="secondary">Entrega: {formatDeliveryDate(deliveryDate)}</Badge>}
         {reproducao && <Badge variant="destructive">Reprodução</Badge>}
         {letraCaixa && <Badge variant="secondary">Letra Caixa</Badge>}
