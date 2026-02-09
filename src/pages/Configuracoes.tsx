@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Edit, KeyRound, Power, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { HUB_ROLE_LABEL, HUB_ROLE_VALUES, type HubRole } from '@/lib/hubRoles';
 import { APP_MODULES, type AppModuleKey } from '@/constants/modules';
 
@@ -69,14 +70,46 @@ export default function Configuracoes() {
 
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
+  const buildAuthHeaders = (accessToken: string, extra?: HeadersInit) => {
+    const headers = new Headers(extra);
+    headers.set('Authorization', `Bearer ${accessToken}`);
+    return headers;
+  };
+
+  const requestAdminUsers = async (options: RequestInit) => {
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+
+    const doFetch = (token: string) =>
+      fetch('/api/admin-users', {
+        ...options,
+        headers: buildAuthHeaders(token, options.headers),
+      });
+
+    let response = await doFetch(accessToken);
+
+    if (response.status === 401) {
+      const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+      const refreshedToken = refreshed.session?.access_token;
+
+      if (!refreshError && refreshedToken) {
+        response = await doFetch(refreshedToken);
+      }
+    }
+
+    return response;
+  };
+
   const fetchUsers = async () => {
-    if (!session?.access_token) return;
+    if (!session?.access_token) {
+      setLoadingUsers(false);
+      return;
+    }
     setLoadingUsers(true);
     try {
-      const response = await fetch('/api/admin-users', {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
+      const response = await requestAdminUsers({ method: 'GET' });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error?.message || 'Erro ao carregar usuários.');
       setUsers(result.data?.users || []);
@@ -118,12 +151,9 @@ export default function Configuracoes() {
 
     setCreating(true);
     try {
-      const response = await fetch('/api/admin-users', {
+      const response = await requestAdminUsers({
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: newEmail.trim().toLowerCase(),
           password: newPassword,
@@ -156,12 +186,9 @@ export default function Configuracoes() {
 
     setSavingEdit(true);
     try {
-      const response = await fetch('/api/admin-users', {
+      const response = await requestAdminUsers({
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: editingUser.id,
           name: editName.trim(),
@@ -188,12 +215,9 @@ export default function Configuracoes() {
 
     setSavingPassword(true);
     try {
-      const response = await fetch('/api/admin-users', {
+      const response = await requestAdminUsers({
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: passwordUser.id, newPassword: password }),
       });
       const result = await response.json();
@@ -215,12 +239,9 @@ export default function Configuracoes() {
 
     setTogglingId(user.id);
     try {
-      const response = await fetch('/api/admin-users', {
+      const response = await requestAdminUsers({
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, setActive: nextActive }),
       });
       const result = await response.json();
