@@ -23,7 +23,8 @@ const ALLOWED_CONTENT_TYPES = new Set([
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, x-forwarded-authorization, x-supabase-authorization, x-supabase-auth-token, x-supabase-auth-user, x-supabase-auth-user-id, x-sb-user-id, x-jwt-claims, x-supabase-auth',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 };
@@ -84,39 +85,22 @@ const extractBearerToken = (request: Request) => {
   return null;
 };
 
-const decodeJwtSubject = (token: string) => {
-  const parts = token.split('.');
-  if (parts.length < 2) {
-    return null;
-  }
-  try {
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))) as { sub?: string };
-    return payload.sub ?? null;
-  } catch {
-    return null;
-  }
-};
-
 const requireUser = async (request: Request) => {
   const token = extractBearerToken(request);
-  console.log('[r2-presign-upload] auth header present:', Boolean(token));
+  const gatewayUserId = extractGatewayUserId(request);
+  console.log('[r2-presign-upload] auth context', {
+    method: request.method,
+    hasToken: Boolean(token),
+    hasGatewayUserId: Boolean(gatewayUserId),
+  });
 
   if (!token) {
-    const gatewayUserId = extractGatewayUserId(request);
-    console.log('[r2-presign-upload] gateway user header present:', Boolean(gatewayUserId));
-
     if (gatewayUserId) {
       return { user: { id: gatewayUserId } };
     }
 
     console.error('[r2-presign-upload] missing Authorization bearer token');
     return { error: jsonResponse(401, { error: 'Unauthorized: missing Authorization Bearer token' }) };
-  }
-
-  const decodedSubject = decodeJwtSubject(token);
-  if (decodedSubject) {
-    console.log('[r2-presign-upload] using decoded jwt subject', { userId: decodedSubject });
-    return { user: { id: decodedSubject } };
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -142,7 +126,6 @@ const requireUser = async (request: Request) => {
       reason: error?.message ?? 'user-not-found',
       status: error?.status,
     });
-    const gatewayUserId = extractGatewayUserId(request);
     if (gatewayUserId) {
       console.log('[r2-presign-upload] fallback to gateway user id', { userId: gatewayUserId });
       return { user: { id: gatewayUserId } };
