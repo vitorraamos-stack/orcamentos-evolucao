@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -487,155 +488,184 @@ Orientações para a criação de arte:`}
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="os-assets">Arquivos de arte e referências (opcional)</Label>
-            <Input
-              ref={fileInputRef}
-              id="os-assets"
-              type="file"
-              multiple
-              accept={ACCEPTED_ASSET_CONTENT_TYPES.join(',')}
-              disabled={uploadingAssets || Boolean(pendingOrder)}
-              onChange={(event) => handleAssetChange(event.target.files)}
-              className="sr-only"
-            />
-            <label
-              htmlFor="os-assets"
-              className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
-            >
-              <UploadCloud className="h-6 w-6" />
-              <div className="space-y-1">
-                <p className="font-medium text-foreground">Clique para adicionar arquivos</p>
-                <p className="text-xs text-muted-foreground">
-                  {selectedFiles.length > 0
-                    ? `${selectedFiles.length} arquivo(s) selecionado(s).`
-                    : 'Arraste e solte ou selecione no seu computador.'}
-                </p>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Máximo de {Math.round(MAX_ASSET_FILE_SIZE_BYTES / 1024 / 1024)}MB por arquivo.
-              </p>
-            </label>
-            {selectedFiles.length > 0 && (
-              <ul className="space-y-2 rounded-md border border-muted p-3 text-sm">
-                {selectedFiles.map((file, index) => (
-                  <li key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="font-medium">{file.name}</p>
-                      <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeAssetFile(index)}
-                      disabled={uploadingAssets}
-                    >
-                      Remover
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {pendingOrder && (
-              <p className="text-xs text-amber-600">
-                A OS foi criada. Reenvie os arquivos para concluir a sincronização.
-              </p>
-            )}
-          </div>
-
           <div className="space-y-3">
             <div>
-              <Label>Documentos Financeiros (opcional)</Label>
+              <Label>Anexos (opcional)</Label>
               <p className="text-xs text-muted-foreground">
-                Selecione comprovantes e ordens de compra para acompanhar a OS.
+                Anexe arquivos de arte, referências e documentos financeiros relacionados à OS.
               </p>
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-1">
-                <Label>Tipo do documento</Label>
-                <Select
-                  value={selectedFinancialDocType}
-                  onValueChange={(value) => setSelectedFinancialDocType(value as FinancialDocType)}
-                  disabled={uploadingAssets || Boolean(pendingOrder)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="PAYMENT_PROOF">Comprovante de pagamento</SelectItem>
-                    <SelectItem value="PURCHASE_ORDER">Ordem de compra</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="financial-docs">Anexar documento(s)</Label>
-              <Input
-                ref={financialDocInputRef}
-                id="financial-docs"
-                type="file"
-                multiple
-                accept={ACCEPTED_ASSET_CONTENT_TYPES.join(',')}
-                disabled={uploadingAssets || Boolean(pendingOrder)}
-                onChange={(event) => handleFinancialDocChange(event.target.files)}
-                className="sr-only"
-              />
-              <label
-                htmlFor="financial-docs"
-                className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
-              >
-                <UploadCloud className="h-6 w-6" />
-                <div className="space-y-1">
-                  <p className="font-medium text-foreground">Clique para adicionar documentos</p>
-                  <p className="text-xs text-muted-foreground">
-                    {financialDocs.length > 0
-                      ? `${financialDocs.length} arquivo(s) anexado(s).`
-                      : 'Arraste e solte ou selecione no seu computador.'}
-                  </p>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Máximo de {Math.round(MAX_ASSET_FILE_SIZE_BYTES / 1024 / 1024)}MB por arquivo.
-                </p>
-              </label>
-            </div>
-            {financialDocs.length > 0 && (
-              <ul className="space-y-2 rounded-md border border-muted p-3 text-sm">
-                {financialDocs.map((doc, index) => (
-                  <li key={`${doc.file.name}-${doc.file.lastModified}`} className="flex flex-wrap items-center gap-3">
-                    <div className="min-w-[200px] flex-1">
-                      <p className="font-medium">{doc.file.name}</p>
-                      <p className="text-xs text-muted-foreground">{formatFileSize(doc.file.size)}</p>
+            <Accordion type="multiple" defaultValue={['art-assets', 'financial-docs']} className="space-y-2">
+              <AccordionItem value="art-assets" className="rounded-lg border border-muted px-4">
+                <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
+                  <span>
+                    Arte e referências ({selectedFiles.length} arquivo{selectedFiles.length === 1 ? '' : 's'})
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent className="pt-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="os-assets" className="text-xs text-muted-foreground">
+                      Arquivos de arte e referências
+                    </Label>
+                    <Input
+                      ref={fileInputRef}
+                      id="os-assets"
+                      type="file"
+                      multiple
+                      accept={ACCEPTED_ASSET_CONTENT_TYPES.join(',')}
+                      disabled={uploadingAssets || Boolean(pendingOrder)}
+                      onChange={(event) => handleAssetChange(event.target.files)}
+                      className="sr-only"
+                    />
+                    <label
+                      htmlFor="os-assets"
+                      className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
+                    >
+                      <UploadCloud className="h-6 w-6" />
+                      <div className="space-y-1">
+                        <p className="font-medium text-foreground">Clique para adicionar arquivos</p>
+                        <p className="text-xs text-muted-foreground">
+                          {selectedFiles.length > 0
+                            ? `${selectedFiles.length} arquivo(s) selecionado(s).`
+                            : 'Arraste e solte ou selecione no seu computador.'}
+                        </p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Máximo de {Math.round(MAX_ASSET_FILE_SIZE_BYTES / 1024 / 1024)}MB por arquivo.
+                      </p>
+                    </label>
+                    {selectedFiles.length > 0 && (
+                      <ul className="space-y-2 rounded-md border border-muted p-3 text-sm">
+                        {selectedFiles.map((file, index) => (
+                          <li key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="font-medium">{file.name}</p>
+                              <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeAssetFile(index)}
+                              disabled={uploadingAssets}
+                            >
+                              Remover
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {pendingOrder && (
+                      <p className="text-xs text-amber-600">
+                        A OS foi criada. Reenvie os arquivos para concluir a sincronização.
+                      </p>
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="financial-docs" className="rounded-lg border border-muted px-4">
+                <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
+                  <span>
+                    Documentos financeiros ({financialDocs.length} arquivo{financialDocs.length === 1 ? '' : 's'})
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent className="pt-2">
+                  <div className="space-y-3">
+                    <div>
+                      <Label>Documentos Financeiros</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Selecione comprovantes e ordens de compra para acompanhar a OS.
+                      </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary">{financialTypeLabels[doc.type]}</Badge>
-                      <Select
-                        value={doc.type}
-                        onValueChange={(value) => updateFinancialDocType(index, value as FinancialDocType)}
-                        disabled={uploadingAssets || Boolean(pendingOrder)}
-                      >
-                        <SelectTrigger className="h-8 w-[180px] text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="PAYMENT_PROOF">Comprovante</SelectItem>
-                          <SelectItem value="PURCHASE_ORDER">Ordem de compra</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFinancialDoc(index)}
-                        disabled={uploadingAssets || Boolean(pendingOrder)}
-                      >
-                        Remover
-                      </Button>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label>Tipo do documento</Label>
+                        <Select
+                          value={selectedFinancialDocType}
+                          onValueChange={(value) => setSelectedFinancialDocType(value as FinancialDocType)}
+                          disabled={uploadingAssets || Boolean(pendingOrder)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="PAYMENT_PROOF">Comprovante de pagamento</SelectItem>
+                            <SelectItem value="PURCHASE_ORDER">Ordem de compra</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+                    <div className="space-y-1">
+                      <Label htmlFor="financial-docs">Anexar documento(s)</Label>
+                      <Input
+                        ref={financialDocInputRef}
+                        id="financial-docs"
+                        type="file"
+                        multiple
+                        accept={ACCEPTED_ASSET_CONTENT_TYPES.join(',')}
+                        disabled={uploadingAssets || Boolean(pendingOrder)}
+                        onChange={(event) => handleFinancialDocChange(event.target.files)}
+                        className="sr-only"
+                      />
+                      <label
+                        htmlFor="financial-docs"
+                        className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
+                      >
+                        <UploadCloud className="h-6 w-6" />
+                        <div className="space-y-1">
+                          <p className="font-medium text-foreground">Clique para adicionar documentos</p>
+                          <p className="text-xs text-muted-foreground">
+                            {financialDocs.length > 0
+                              ? `${financialDocs.length} arquivo(s) anexado(s).`
+                              : 'Arraste e solte ou selecione no seu computador.'}
+                          </p>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Máximo de {Math.round(MAX_ASSET_FILE_SIZE_BYTES / 1024 / 1024)}MB por arquivo.
+                        </p>
+                      </label>
+                    </div>
+                    {financialDocs.length > 0 && (
+                      <ul className="space-y-2 rounded-md border border-muted p-3 text-sm">
+                        {financialDocs.map((doc, index) => (
+                          <li key={`${doc.file.name}-${doc.file.lastModified}`} className="flex flex-wrap items-center gap-3">
+                            <div className="min-w-[200px] flex-1">
+                              <p className="font-medium">{doc.file.name}</p>
+                              <p className="text-xs text-muted-foreground">{formatFileSize(doc.file.size)}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary">{financialTypeLabels[doc.type]}</Badge>
+                              <Select
+                                value={doc.type}
+                                onValueChange={(value) => updateFinancialDocType(index, value as FinancialDocType)}
+                                disabled={uploadingAssets || Boolean(pendingOrder)}
+                              >
+                                <SelectTrigger className="h-8 w-[180px] text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="PAYMENT_PROOF">Comprovante</SelectItem>
+                                  <SelectItem value="PURCHASE_ORDER">Ordem de compra</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeFinancialDoc(index)}
+                                disabled={uploadingAssets || Boolean(pendingOrder)}
+                              >
+                                Remover
+                              </Button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </div>
 
         </div>
