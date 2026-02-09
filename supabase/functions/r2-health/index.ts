@@ -55,10 +55,10 @@ const extractBearerToken = (request: Request) => {
 
   for (const value of possibleAuthHeaders) {
     if (!value) continue;
-    if (value.startsWith('Bearer ')) {
-      return value.replace('Bearer ', '').trim();
-    }
     const trimmed = value.trim();
+    if (/^bearer\s+/i.test(trimmed)) {
+      return trimmed.replace(/^bearer\s+/i, '').trim();
+    }
     if (trimmed.split('.').length === 3) {
       return trimmed;
     }
@@ -95,6 +95,7 @@ const requireUser = async (request: Request) => {
 
   if (!token) {
     if (gatewayUserId) {
+      console.log('[r2-health] fallback to gateway user id (no token)', { userId: gatewayUserId });
       return { user: { id: gatewayUserId } };
     }
 

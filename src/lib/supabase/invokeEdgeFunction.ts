@@ -25,8 +25,7 @@ export class EdgeFunctionInvokeError extends Error {
 }
 
 const SESSION_EXPIRED_MESSAGE = 'Sessão expirada. Faça login novamente.';
-const MISSING_ANON_KEY_MESSAGE =
-  'Ambiente Supabase mal configurado: VITE_SUPABASE_ANON_KEY ausente.';
+const MISSING_ANON_KEY_MESSAGE = 'VITE_SUPABASE_ANON_KEY não configurada no build.';
 const INVALID_ANON_KEY_MESSAGE =
   'VITE_SUPABASE_ANON_KEY não parece um JWT válido. Use a chave anon/service_role ou desative verify_jwt na Edge Function.';
 
@@ -171,13 +170,15 @@ export const invokeEdgeFunction = async <T>(
     const authHint = info.status === 401 ? describeAuthIssue(info.details) : null;
     const message =
       info.status === 401
-        ? `${SESSION_EXPIRED_MESSAGE} ${authHint ?? ''}`.trim()
+        ? `Falha de autenticação ao invocar ${name}: ${info.details ?? authHint ?? 'Sem detalhes.'}`
         : `Falha ao invocar ${name} (HTTP ${info.status ?? 'desconhecido'}): ${info.details ?? 'Sem detalhes.'}`;
 
     console.error('Edge function error', {
       name,
       status: info.status,
-      message: info.details ?? message,
+      details: info.details,
+      message,
+      authHint,
     });
 
     throw new EdgeFunctionInvokeError({
