@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Bold, Italic, List, ListOrdered, Underline } from 'lucide-react';
+import { Bold, Italic, List, ListOrdered, Underline, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ArtDirectionTag, LogisticType, OsOrder } from '../types';
 import { createOrder } from '../api';
@@ -380,38 +380,6 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
                 </div>
               )}
 
-              <div className="space-y-2">
-                <Label>Tag de direcionamento</Label>
-                <div className="flex flex-wrap gap-2">
-                  {ART_DIRECTION_TAGS.map((tag) => {
-                    const config = ART_DIRECTION_TAG_CONFIG[tag];
-                    const isSelected = selectedArtDirectionTag === tag;
-                    return (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => {
-                          setSelectedArtDirectionTag(tag);
-                          if (tag === 'URGENTE') {
-                            toast.warning(
-                              'Use essa tag para pedidos que são realmente urgentes. Ex: Pedido para o dia seguinte.'
-                            );
-                          }
-                        }}
-                        disabled={Boolean(pendingOrder)}
-                        className="rounded-full border px-3 py-1 text-xs font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                        style={{
-                          borderColor: config.color,
-                          backgroundColor: isSelected ? config.color : 'transparent',
-                          color: isSelected ? '#FFFFFF' : config.color,
-                        }}
-                      >
-                        {config.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
             </div>
 
             <div className="space-y-4">
@@ -484,6 +452,38 @@ Orientações para a criação de arte:`}
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label>Tag de direcionamento</Label>
+                <div className="flex flex-wrap gap-2">
+                  {ART_DIRECTION_TAGS.map((tag) => {
+                    const config = ART_DIRECTION_TAG_CONFIG[tag];
+                    const isSelected = selectedArtDirectionTag === tag;
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => {
+                          setSelectedArtDirectionTag(tag);
+                          if (tag === 'URGENTE') {
+                            toast.warning(
+                              'Use essa tag para pedidos que são realmente urgentes. Ex: Pedido para o dia seguinte.'
+                            );
+                          }
+                        }}
+                        disabled={Boolean(pendingOrder)}
+                        className="rounded-full border px-3 py-1 text-xs font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                        style={{
+                          borderColor: config.color,
+                          backgroundColor: isSelected ? config.color : 'transparent',
+                          color: isSelected ? '#FFFFFF' : config.color,
+                        }}
+                      >
+                        {config.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -497,10 +497,25 @@ Orientações para a criação de arte:`}
               accept={ACCEPTED_ASSET_CONTENT_TYPES.join(',')}
               disabled={uploadingAssets || Boolean(pendingOrder)}
               onChange={(event) => handleAssetChange(event.target.files)}
+              className="sr-only"
             />
-            <p className="text-xs text-muted-foreground">
-              Máximo de {Math.round(MAX_ASSET_FILE_SIZE_BYTES / 1024 / 1024)}MB por arquivo.
-            </p>
+            <label
+              htmlFor="os-assets"
+              className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
+            >
+              <UploadCloud className="h-6 w-6" />
+              <div className="space-y-1">
+                <p className="font-medium text-foreground">Clique para adicionar arquivos</p>
+                <p className="text-xs text-muted-foreground">
+                  {selectedFiles.length > 0
+                    ? `${selectedFiles.length} arquivo(s) selecionado(s).`
+                    : 'Arraste e solte ou selecione no seu computador.'}
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Máximo de {Math.round(MAX_ASSET_FILE_SIZE_BYTES / 1024 / 1024)}MB por arquivo.
+              </p>
+            </label>
             {selectedFiles.length > 0 && (
               <ul className="space-y-2 rounded-md border border-muted p-3 text-sm">
                 {selectedFiles.map((file, index) => (
@@ -553,18 +568,36 @@ Orientações para a criação de arte:`}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="financial-docs">Anexar documento(s)</Label>
-                <Input
-                  ref={financialDocInputRef}
-                  id="financial-docs"
-                  type="file"
-                  multiple
-                  accept={ACCEPTED_ASSET_CONTENT_TYPES.join(',')}
-                  disabled={uploadingAssets || Boolean(pendingOrder)}
-                  onChange={(event) => handleFinancialDocChange(event.target.files)}
-                />
-              </div>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="financial-docs">Anexar documento(s)</Label>
+              <Input
+                ref={financialDocInputRef}
+                id="financial-docs"
+                type="file"
+                multiple
+                accept={ACCEPTED_ASSET_CONTENT_TYPES.join(',')}
+                disabled={uploadingAssets || Boolean(pendingOrder)}
+                onChange={(event) => handleFinancialDocChange(event.target.files)}
+                className="sr-only"
+              />
+              <label
+                htmlFor="financial-docs"
+                className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
+              >
+                <UploadCloud className="h-6 w-6" />
+                <div className="space-y-1">
+                  <p className="font-medium text-foreground">Clique para adicionar documentos</p>
+                  <p className="text-xs text-muted-foreground">
+                    {financialDocs.length > 0
+                      ? `${financialDocs.length} arquivo(s) anexado(s).`
+                      : 'Arraste e solte ou selecione no seu computador.'}
+                  </p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Máximo de {Math.round(MAX_ASSET_FILE_SIZE_BYTES / 1024 / 1024)}MB por arquivo.
+                </p>
+              </label>
             </div>
             {financialDocs.length > 0 && (
               <ul className="space-y-2 rounded-md border border-muted p-3 text-sm">
