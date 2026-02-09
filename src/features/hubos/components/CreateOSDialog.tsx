@@ -495,7 +495,7 @@ Orientações para a criação de arte:`}
                 Anexe arquivos de arte, referências e documentos financeiros relacionados à OS.
               </p>
             </div>
-            <Accordion type="multiple" defaultValue={['art-assets', 'financial-docs']} className="space-y-2">
+            <Accordion type="multiple" className="space-y-2">
               <AccordionItem value="art-assets" className="rounded-lg border border-muted px-4">
                 <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
                   <span>
@@ -571,12 +571,9 @@ Orientações para a criação de arte:`}
                 </AccordionTrigger>
                 <AccordionContent className="pt-2">
                   <div className="space-y-3">
-                    <div>
-                      <Label>Documentos Financeiros</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Selecione comprovantes e ordens de compra para acompanhar a OS.
-                      </p>
-                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Selecione comprovantes e ordens de compra para acompanhar a OS.
+                    </p>
                     <div className="grid gap-3 md:grid-cols-2">
                       <div className="space-y-1">
                         <Label>Tipo do documento</Label>
