@@ -311,7 +311,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
       <DialogTrigger asChild>
         <Button>Gerar Ordem de Serviço</Button>
       </DialogTrigger>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-h-[90vh] w-[95vw] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nova Ordem de Serviço</DialogTitle>
         </DialogHeader>
