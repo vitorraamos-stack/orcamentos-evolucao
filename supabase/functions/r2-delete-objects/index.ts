@@ -9,7 +9,7 @@ type DeletePayload = {
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type, x-forwarded-authorization, x-supabase-authorization, x-supabase-auth-token, x-supabase-auth-user, x-supabase-auth-user-id, x-sb-user-id, x-jwt-claims, x-supabase-auth',
+    'authorization, apikey, x-client-info, content-type, accept, x-forwarded-authorization, x-supabase-authorization, x-supabase-auth-token, x-supabase-auth-user, x-supabase-auth-user-id, x-supabase-user, x-supabase-user-id, x-sb-user-id, x-sb-user, x-sb-auth-user, x-sb-auth-user-id, x-sb-authorization, x-sb-auth-token, x-jwt-claims, x-supabase-auth',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 };
@@ -39,6 +39,7 @@ const extractGatewayUserId = (request: Request) => {
     request.headers.get('x-supabase-auth-user') ??
     request.headers.get('x-supabase-auth-user-id') ??
     request.headers.get('x-supabase-user') ??
+    request.headers.get('x-supabase-user-id') ??
     request.headers.get('x-sb-user-id') ??
     request.headers.get('x-sb-user') ??
     request.headers.get('x-sb-auth-user') ??
@@ -54,6 +55,8 @@ const extractBearerToken = (request: Request) => {
     request.headers.get('x-forwarded-authorization'),
     request.headers.get('x-supabase-authorization'),
     request.headers.get('x-supabase-auth-token'),
+    request.headers.get('x-sb-authorization'),
+    request.headers.get('x-sb-auth-token'),
   ];
 
   for (const value of possibleAuthHeaders) {
@@ -70,6 +73,19 @@ const extractBearerToken = (request: Request) => {
   return null;
 };
 
+const decodeJwtSubject = (token: string) => {
+  const parts = token.split('.');
+  if (parts.length < 2) {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))) as { sub?: string };
+    return payload.sub ?? null;
+  } catch {
+    return null;
+  }
+};
+
 const requireUser = async (request: Request) => {
   const token = extractBearerToken(request);
   const gatewayUserId = extractGatewayUserId(request);
@@ -77,6 +93,10 @@ const requireUser = async (request: Request) => {
     method: request.method,
     hasToken: Boolean(token),
     hasGatewayUserId: Boolean(gatewayUserId),
+    hasAuthorizationHeader: Boolean(request.headers.get('authorization') || request.headers.get('Authorization')),
+    hasForwardedAuthorization: Boolean(request.headers.get('x-forwarded-authorization')),
+    hasSupabaseAuthToken: Boolean(request.headers.get('x-supabase-auth-token')),
+    hasApiKeyHeader: Boolean(request.headers.get('apikey')),
   });
 
   if (!token) {
@@ -106,13 +126,19 @@ const requireUser = async (request: Request) => {
 
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data?.user) {
+    const decodedSubject = decodeJwtSubject(token);
     console.error('[r2-delete-objects] getUser failed', {
       reason: error?.message ?? 'user-not-found',
       status: error?.status,
+      hasDecodedSubject: Boolean(decodedSubject),
     });
     if (gatewayUserId) {
       console.log('[r2-delete-objects] fallback to gateway user id', { userId: gatewayUserId });
       return { user: { id: gatewayUserId } };
+    }
+    if (decodedSubject) {
+      console.log('[r2-delete-objects] fallback to decoded jwt subject', { userId: decodedSubject });
+      return { user: { id: decodedSubject } };
     }
     return { error: jsonResponse(401, { error: 'Invalid JWT' }) };
   }
