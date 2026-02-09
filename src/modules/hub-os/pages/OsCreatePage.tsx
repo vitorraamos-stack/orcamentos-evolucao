@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
 import { useLocation } from 'wouter';
 import { toast } from 'sonner';
@@ -13,6 +13,41 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { fetchOsStatuses, createOs, createOsEvent } from '../api';
 import type { DeliveryType, OsStatus } from '../types';
 import { useAuth } from '@/contexts/AuthContext';
+
+type ArtFileItem = {
+  id: string;
+  file: File;
+  url: string;
+};
+
+type FinancialDocumentItem = {
+  id: string;
+  type: string;
+  file?: File;
+};
+
+const financialDocumentOptions = [
+  'Boleto',
+  'Nota fiscal',
+  'Comprovante de pagamento',
+  'Contrato',
+  'Outro',
+];
+
+const formatBytes = (bytes: number) => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${Number((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+};
+
+const createId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
 
 const createSchema = z.object({
   sale_number: z.string().min(1, 'Informe o número da venda.'),
@@ -52,6 +87,11 @@ export default function OsCreatePage() {
   const [isReproducao, setIsReproducao] = useState(false);
   const [reproMotivo, setReproMotivo] = useState('');
   const [hasLetraCaixa, setHasLetraCaixa] = useState(false);
+  const [artFiles, setArtFiles] = useState<ArtFileItem[]>([]);
+  const [financialDocuments, setFinancialDocuments] = useState<FinancialDocumentItem[]>([
+    { id: createId(), type: '' },
+  ]);
+  const artFilesRef = useRef<ArtFileItem[]>([]);
 
   useEffect(() => {
     const loadStatuses = async () => {
@@ -72,6 +112,16 @@ export default function OsCreatePage() {
     };
 
     loadStatuses();
+  }, []);
+
+  useEffect(() => {
+    artFilesRef.current = artFiles;
+  }, [artFiles]);
+
+  useEffect(() => {
+    return () => {
+      artFilesRef.current.forEach((item) => URL.revokeObjectURL(item.url));
+    };
   }, []);
 
   useEffect(() => {
@@ -149,6 +199,46 @@ export default function OsCreatePage() {
     }
   };
 
+  const handleArtFilesChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) return;
+    const nextItems = files.map((file) => ({
+      id: createId(),
+      file,
+      url: URL.createObjectURL(file),
+    }));
+    setArtFiles((prev) => [...prev, ...nextItems]);
+    event.target.value = '';
+  };
+
+  const handleRemoveArtFile = (id: string) => {
+    setArtFiles((prev) => {
+      const item = prev.find((fileItem) => fileItem.id === id);
+      if (item) URL.revokeObjectURL(item.url);
+      return prev.filter((fileItem) => fileItem.id !== id);
+    });
+  };
+
+  const handleAddFinancialDocument = () => {
+    setFinancialDocuments((prev) => [...prev, { id: createId(), type: '' }]);
+  };
+
+  const handleRemoveFinancialDocument = (id: string) => {
+    setFinancialDocuments((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleDocumentTypeChange = (id: string, value: string) => {
+    setFinancialDocuments((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, type: value } : item))
+    );
+  };
+
+  const handleDocumentFileChange = (id: string, file?: File) => {
+    setFinancialDocuments((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, file } : item))
+    );
+  };
+
   if (loading) {
     return <div className="text-muted-foreground">Carregando formulário...</div>;
   }
@@ -214,6 +304,124 @@ export default function OsCreatePage() {
               rows={5}
               placeholder="Resumo técnico do orçamento (copie da calculadora, se necessário)."
             />
+          </div>
+
+          <div className="space-y-6 rounded-lg border border-border/60 p-4">
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold">Anexos</h2>
+              <p className="text-sm text-muted-foreground">Organize arquivos de arte e documentos financeiros.</p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium">Arquivos de arte e referências (opcional)</p>
+                <p className="text-xs text-muted-foreground">
+                  📎 Dropzone: “Arraste e solte ou clique para anexar”
+                </p>
+              </div>
+              <label
+                htmlFor="art-files"
+                className="flex min-h-[96px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/30 text-sm text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
+              >
+                <span className="text-base">📎</span>
+                <span>Arraste e solte ou clique para anexar</span>
+                <span className="text-xs">Formatos aceitos: PDF, JPG, PNG, AI, PSD.</span>
+              </label>
+              <Input id="art-files" type="file" multiple className="hidden" onChange={handleArtFilesChange} />
+
+              <div className="rounded-lg border border-border/60">
+                <div className="grid grid-cols-[1.4fr_0.6fr_0.6fr_0.6fr] gap-3 border-b border-border/60 bg-muted/40 px-4 py-2 text-xs font-semibold uppercase text-muted-foreground">
+                  <span>Nome</span>
+                  <span>Tamanho</span>
+                  <span>Tipo</span>
+                  <span>Ações</span>
+                </div>
+                {artFiles.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-muted-foreground">Nenhum arquivo anexado.</div>
+                ) : (
+                  <div className="divide-y divide-border/60">
+                    {artFiles.map((item) => (
+                      <div
+                        key={item.id}
+                        className="grid grid-cols-[1.4fr_0.6fr_0.6fr_0.6fr] items-center gap-3 px-4 py-2 text-sm"
+                      >
+                        <span className="truncate">{item.file.name}</span>
+                        <span>{formatBytes(item.file.size)}</span>
+                        <span className="uppercase">{item.file.type || '—'}</span>
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleRemoveArtFile(item.id)}>
+                            Remover
+                          </Button>
+                          <Button asChild variant="ghost" size="sm">
+                            <a href={item.url} download={item.file.name}>
+                              Baixar
+                            </a>
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium">Documentos financeiros (opcional)</p>
+                  <p className="text-xs text-muted-foreground">Organize boletos, notas e comprovantes.</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleAddFinancialDocument}>
+                  + Adicionar documento
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                {financialDocuments.map((document, index) => (
+                  <div key={document.id} className="rounded-lg border border-border/60 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold">Documento {index + 1}</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveFinancialDocument(document.id)}
+                      >
+                        Remover
+                      </Button>
+                    </div>
+                    <div className="mt-3 grid gap-4 md:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label>Tipo do documento</Label>
+                        <Select value={document.type} onValueChange={(value) => handleDocumentTypeChange(document.id, value)}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {financialDocumentOptions.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Arquivo (upload)</Label>
+                        <Input
+                          type="file"
+                          onChange={(event) =>
+                            handleDocumentFileChange(document.id, event.target.files?.[0])
+                          }
+                        />
+                        {document.file && (
+                          <p className="text-xs text-muted-foreground">Selecionado: {document.file.name}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="space-y-2">
