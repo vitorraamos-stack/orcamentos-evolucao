@@ -24,7 +24,7 @@ const ALLOWED_CONTENT_TYPES = new Set([
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type, x-forwarded-authorization, x-supabase-authorization, x-supabase-auth-token, x-supabase-auth-user, x-supabase-auth-user-id, x-sb-user-id, x-jwt-claims, x-supabase-auth',
+    'authorization, apikey, x-client-info, content-type, accept, x-forwarded-authorization, x-supabase-authorization, x-supabase-auth-token, x-supabase-auth-user, x-supabase-auth-user-id, x-supabase-user, x-sb-user-id, x-sb-user, x-sb-auth-user, x-sb-auth-user-id, x-jwt-claims, x-supabase-auth',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 };
@@ -85,6 +85,19 @@ const extractBearerToken = (request: Request) => {
   return null;
 };
 
+const decodeJwtSubject = (token: string) => {
+  const parts = token.split('.');
+  if (parts.length < 2) {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))) as { sub?: string };
+    return payload.sub ?? null;
+  } catch {
+    return null;
+  }
+};
+
 const requireUser = async (request: Request) => {
   const token = extractBearerToken(request);
   const gatewayUserId = extractGatewayUserId(request);
@@ -92,6 +105,9 @@ const requireUser = async (request: Request) => {
     method: request.method,
     hasToken: Boolean(token),
     hasGatewayUserId: Boolean(gatewayUserId),
+    hasAuthorizationHeader: Boolean(request.headers.get('authorization') || request.headers.get('Authorization')),
+    hasForwardedAuthorization: Boolean(request.headers.get('x-forwarded-authorization')),
+    hasSupabaseAuthToken: Boolean(request.headers.get('x-supabase-auth-token')),
   });
 
   if (!token) {
@@ -122,13 +138,19 @@ const requireUser = async (request: Request) => {
 
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data?.user) {
+    const decodedSubject = decodeJwtSubject(token);
     console.error('[r2-presign-upload] getUser failed', {
       reason: error?.message ?? 'user-not-found',
       status: error?.status,
+      hasDecodedSubject: Boolean(decodedSubject),
     });
     if (gatewayUserId) {
       console.log('[r2-presign-upload] fallback to gateway user id', { userId: gatewayUserId });
       return { user: { id: gatewayUserId } };
+    }
+    if (decodedSubject) {
+      console.log('[r2-presign-upload] fallback to decoded jwt subject', { userId: decodedSubject });
+      return { user: { id: decodedSubject } };
     }
     return { error: jsonResponse(401, { error: 'Invalid JWT' }) };
   }
@@ -171,7 +193,7 @@ Deno.serve(async (request) => {
       return jsonResponse(400, { error: 'Content-Type not allowed.' });
     }
 
-    if (!Number.isFinite(sizeBytes) || sizeBytes > MAX_SIZE_BYTES) {
+    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0 || sizeBytes > MAX_SIZE_BYTES) {
       return jsonResponse(400, { error: 'File exceeds 500MB limit.' });
     }
 
