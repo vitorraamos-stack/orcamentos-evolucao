@@ -311,175 +311,181 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
       <DialogTrigger asChild>
         <Button>Gerar Ordem de Serviço</Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] w-[95vw] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[calc(100vh-2rem)] w-[95vw] overflow-y-auto sm:max-w-4xl lg:max-w-5xl">
         <DialogHeader>
           <DialogTitle>Nova Ordem de Serviço</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4">
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="space-y-1">
-              <Label>Nº da venda</Label>
-              <Input
-                value={saleNumber}
-                onChange={(event) => setSaleNumber(event.target.value)}
-                disabled={Boolean(pendingOrder)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Cliente</Label>
-              <Input
-                value={clientName}
-                onChange={(event) => setClientName(event.target.value)}
-                disabled={Boolean(pendingOrder)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Data de entrega</Label>
-              <Input
-                type="date"
-                value={deliveryDate}
-                onChange={(event) => setDeliveryDate(event.target.value)}
-                disabled={Boolean(pendingOrder)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Tipo de logística</Label>
-              <RadioGroup
-                value={logisticType}
-                onValueChange={(value) => setLogisticType(value as LogisticType)}
-                disabled={Boolean(pendingOrder)}
-              >
-                <div className="flex flex-wrap gap-4">
-                  <label className="flex items-center gap-2 text-sm">
-                    <RadioGroupItem value="retirada" />
-                    Retirada
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <RadioGroupItem value="entrega" />
-                    Entrega
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <RadioGroupItem value="instalacao" />
-                    Instalação
-                  </label>
-                </div>
-              </RadioGroup>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Tag de direcionamento</Label>
-            <div className="flex flex-wrap gap-2">
-              {ART_DIRECTION_TAGS.map((tag) => {
-                const config = ART_DIRECTION_TAG_CONFIG[tag];
-                const isSelected = selectedArtDirectionTag === tag;
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => {
-                      setSelectedArtDirectionTag(tag);
-                      if (tag === 'URGENTE') {
-                        toast.warning(
-                          'Use essa tag para pedidos que são realmente urgentes. Ex: Pedido para o dia seguinte.'
-                        );
-                      }
-                    }}
+        <div className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label>Nº da venda</Label>
+                  <Input
+                    value={saleNumber}
+                    onChange={(event) => setSaleNumber(event.target.value)}
                     disabled={Boolean(pendingOrder)}
-                    className="rounded-full border px-3 py-1 text-xs font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                    style={{
-                      borderColor: config.color,
-                      backgroundColor: isSelected ? config.color : 'transparent',
-                      color: isSelected ? '#FFFFFF' : config.color,
-                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Cliente</Label>
+                  <Input
+                    value={clientName}
+                    onChange={(event) => setClientName(event.target.value)}
+                    disabled={Boolean(pendingOrder)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Data de entrega</Label>
+                  <Input
+                    type="date"
+                    value={deliveryDate}
+                    onChange={(event) => setDeliveryDate(event.target.value)}
+                    disabled={Boolean(pendingOrder)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Tipo de logística</Label>
+                  <RadioGroup
+                    value={logisticType}
+                    onValueChange={(value) => setLogisticType(value as LogisticType)}
+                    disabled={Boolean(pendingOrder)}
                   >
-                    {config.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <Label>Descrição</Label>
-            <div className="rounded-md border border-input bg-background">
-              <div className="flex flex-wrap items-center gap-1 border-b border-input px-2 py-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => applyWrap('**')}
-                  disabled={Boolean(pendingOrder)}
-                  aria-label="Aplicar negrito"
-                >
-                  <Bold className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => applyWrap('*')}
-                  disabled={Boolean(pendingOrder)}
-                  aria-label="Aplicar itálico"
-                >
-                  <Italic className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => applyWrap('__')}
-                  disabled={Boolean(pendingOrder)}
-                  aria-label="Aplicar sublinhado"
-                >
-                  <Underline className="h-4 w-4" />
-                </Button>
-                <div className="h-5 w-px bg-border" aria-hidden="true" />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => applyLinePrefix('- ')}
-                  disabled={Boolean(pendingOrder)}
-                  aria-label="Aplicar lista com marcadores"
-                >
-                  <List className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => applyLinePrefix('1. ')}
-                  disabled={Boolean(pendingOrder)}
-                  aria-label="Aplicar lista numerada"
-                >
-                  <ListOrdered className="h-4 w-4" />
-                </Button>
+                    <div className="flex flex-wrap gap-4">
+                      <label className="flex items-center gap-2 text-sm">
+                        <RadioGroupItem value="retirada" />
+                        Retirada
+                      </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <RadioGroupItem value="entrega" />
+                        Entrega
+                      </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <RadioGroupItem value="instalacao" />
+                        Instalação
+                      </label>
+                    </div>
+                  </RadioGroup>
+                </div>
               </div>
-              <Textarea
-                ref={descriptionRef}
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                rows={4}
-                placeholder={`Descrição detalhada do pedido:
+
+              {logisticType !== 'retirada' && (
+                <div className="space-y-1">
+                  <Label>Endereço (opcional)</Label>
+                  <Input
+                    value={address}
+                    onChange={(event) => setAddress(event.target.value)}
+                    disabled={Boolean(pendingOrder)}
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>Tag de direcionamento</Label>
+                <div className="flex flex-wrap gap-2">
+                  {ART_DIRECTION_TAGS.map((tag) => {
+                    const config = ART_DIRECTION_TAG_CONFIG[tag];
+                    const isSelected = selectedArtDirectionTag === tag;
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => {
+                          setSelectedArtDirectionTag(tag);
+                          if (tag === 'URGENTE') {
+                            toast.warning(
+                              'Use essa tag para pedidos que são realmente urgentes. Ex: Pedido para o dia seguinte.'
+                            );
+                          }
+                        }}
+                        disabled={Boolean(pendingOrder)}
+                        className="rounded-full border px-3 py-1 text-xs font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                        style={{
+                          borderColor: config.color,
+                          backgroundColor: isSelected ? config.color : 'transparent',
+                          color: isSelected ? '#FFFFFF' : config.color,
+                        }}
+                      >
+                        {config.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label>Descrição</Label>
+                <div className="rounded-md border border-input bg-background">
+                  <div className="flex flex-wrap items-center gap-1 border-b border-input px-2 py-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => applyWrap('**')}
+                      disabled={Boolean(pendingOrder)}
+                      aria-label="Aplicar negrito"
+                    >
+                      <Bold className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => applyWrap('*')}
+                      disabled={Boolean(pendingOrder)}
+                      aria-label="Aplicar itálico"
+                    >
+                      <Italic className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => applyWrap('__')}
+                      disabled={Boolean(pendingOrder)}
+                      aria-label="Aplicar sublinhado"
+                    >
+                      <Underline className="h-4 w-4" />
+                    </Button>
+                    <div className="h-5 w-px bg-border" aria-hidden="true" />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => applyLinePrefix('- ')}
+                      disabled={Boolean(pendingOrder)}
+                      aria-label="Aplicar lista com marcadores"
+                    >
+                      <List className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => applyLinePrefix('1. ')}
+                      disabled={Boolean(pendingOrder)}
+                      aria-label="Aplicar lista numerada"
+                    >
+                      <ListOrdered className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Textarea
+                    ref={descriptionRef}
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    rows={4}
+                    placeholder={`Descrição detalhada do pedido:
 Material:
 Orientações para a criação de arte:`}
-                disabled={Boolean(pendingOrder)}
-                className="min-h-[120px] rounded-none border-0 shadow-none focus-visible:border-transparent focus-visible:ring-0"
-              />
+                    disabled={Boolean(pendingOrder)}
+                    className="min-h-[120px] rounded-none border-0 shadow-none focus-visible:border-transparent focus-visible:ring-0"
+                  />
+                </div>
+              </div>
             </div>
           </div>
-
-          {logisticType !== 'retirada' && (
-            <div className="space-y-1">
-              <Label>Endereço (opcional)</Label>
-              <Input
-                value={address}
-                onChange={(event) => setAddress(event.target.value)}
-                disabled={Boolean(pendingOrder)}
-              />
-            </div>
-          )}
 
           <div className="space-y-2">
             <Label htmlFor="os-assets">Arquivos de arte e referências (opcional)</Label>
@@ -599,6 +605,8 @@ Orientações para a criação de arte:`}
             )}
           </div>
 
+        </div>
+        <div className="sticky bottom-0 border-t bg-background pt-4">
           <Button onClick={handleSubmit} disabled={saving || uploadingAssets}>
             {pendingOrder ? 'Enviar arquivos' : 'Gerar Ordem de Serviço'}
           </Button>
