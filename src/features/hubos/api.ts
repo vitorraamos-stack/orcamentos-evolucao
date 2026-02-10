@@ -48,13 +48,10 @@ export type OptimizeInstallationRouteResponse = {
   }>;
 };
 
-export const optimizeInstallationRoute = async (
+const callOptimizeInstallationsApi = async (
+  token: string,
   payload: OptimizeInstallationRoutePayload
 ) => {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (!token) throw new Error("Sessão expirada. Faça login novamente.");
-
   const response = await fetch("/api/hub-os/optimize-installations", {
     method: "POST",
     headers: {
@@ -65,61 +62,41 @@ export const optimizeInstallationRoute = async (
   });
 
   const json = await response.json();
+  return { response, json };
+};
+
+export const optimizeInstallationRoute = async (
+  payload: OptimizeInstallationRoutePayload
+) => {
+  const { data } = await supabase.auth.getSession();
+  let token = data.session?.access_token;
+
+  if (!token) {
+    const refreshed = await supabase.auth.refreshSession();
+    token = refreshed.data.session?.access_token;
+  }
+
+  if (!token) throw new Error("Sessão expirada. Faça login novamente.");
+
+  let { response, json } = await callOptimizeInstallationsApi(token, payload);
+
+  if (response.status === 401) {
+    const refreshed = await supabase.auth.refreshSession();
+    const refreshedToken = refreshed.data.session?.access_token;
+
+    if (refreshedToken) {
+      const retry = await callOptimizeInstallationsApi(refreshedToken, payload);
+      response = retry.response;
+      json = retry.json;
+    }
+  }
+
   if (!response.ok) {
     throw new Error(json?.error || "Erro ao otimizar rota.");
   }
 
   return json as OptimizeInstallationRouteResponse;
 };
-
-
-export type OptimizeInstallationRoutePayload = {
-  date: string;
-  orderIds?: string[];
-  startAddress?: string;
-  endAddress?: string;
-  roundtrip?: boolean;
-};
-
-export type OptimizeInstallationRouteResponse = {
-  date: string;
-  provider: 'mapbox';
-  limit: {
-    maxStops: number;
-  };
-  route: {
-    distance_m: number;
-    duration_s: number;
-  };
-  stops: Array<
-    | {
-        type: 'start' | 'end';
-        address: string;
-        lat: number;
-        lng: number;
-      }
-    | {
-        type: 'order';
-        orderId: string;
-        clientName: string;
-        address: string;
-        lat: number;
-        lng: number;
-        sequence: number;
-      }
-  >;
-  links: {
-    googleMaps: string | null;
-    waze: string | null;
-  };
-  skipped: Array<{
-    orderId: string;
-    reason: string;
-  }>;
-};
-
-export const optimizeInstallationRoute = async (payload: OptimizeInstallationRoutePayload) =>
-  invokeEdgeFunction<OptimizeInstallationRouteResponse>(supabase, 'optimize-installation-route', payload);
 
 export const fetchOrders = async () => {
   const { data, error } = await supabase
