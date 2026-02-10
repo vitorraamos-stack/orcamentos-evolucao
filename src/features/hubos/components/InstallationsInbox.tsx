@@ -148,6 +148,15 @@ export default function InstallationsInbox({
     });
   }, [orders, searchValue]);
 
+  const routeOrders = useMemo(
+    () => orders.filter((order) => order.delivery_date === routeDate),
+    [orders, routeDate]
+  );
+
+  useEffect(() => {
+    setSelectedOrderIds(routeOrders.map((order) => order.id));
+  }, [routeDate, optimizeOpen, routeOrders]);
+
   const getIsToday = useCallback(
     (order: OsOrder) => {
       const delivery = parseDeliveryDate(order.delivery_date);
