@@ -65,6 +65,7 @@ import type { FinancialDoc, FinancialDocType, FinancialInstallmentLabel } from "
 
 const DEFAULT_FINANCIAL_DOC_TYPE: FinancialDocType = "PAYMENT_PROOF";
 const DEFAULT_INSTALLMENT_LABEL: FinancialInstallmentLabel = '1/1';
+const OS_DRAFT_STORAGE_KEY = 'hubos:create-os-draft';
 
 interface CreateOSDialogProps {
   onCreated: (order: OsOrder) => void;
@@ -92,6 +93,31 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
   const reproducao = false;
   const letraCaixa = false;
+
+  const saveDraft = () => {
+    try {
+      const payload = {
+        saleNumber,
+        clientName,
+        description,
+        deliveryDate,
+        logisticType,
+        address,
+        selectedArtDirectionTag,
+      };
+      localStorage.setItem(OS_DRAFT_STORAGE_KEY, JSON.stringify(payload));
+    } catch (error) {
+      console.error('Erro ao salvar rascunho local da OS.', error);
+    }
+  };
+
+  const clearDraft = () => {
+    try {
+      localStorage.removeItem(OS_DRAFT_STORAGE_KEY);
+    } catch (error) {
+      console.error('Erro ao limpar rascunho local da OS.', error);
+    }
+  };
 
   const reset = () => {
     setSaleNumber("");
@@ -929,13 +955,16 @@ Orientações para a criação de arte:`}
                                     </SelectContent>
                                   </Select>
                                   {(doc.installmentLabel ?? DEFAULT_INSTALLMENT_LABEL) === '1/2' && (
-                                    <Input
-                                      type="date"
-                                      className="h-8 w-[170px] text-xs"
-                                      value={doc.secondDueDate ?? ''}
-                                      onChange={(event) => updateSecondDueDate(index, event.target.value)}
-                                      disabled={uploadingAssets || Boolean(pendingOrder)}
-                                    />
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-medium text-foreground">Data 2ª Parcela:</span>
+                                      <Input
+                                        type="date"
+                                        className="h-8 w-[170px] text-xs"
+                                        value={doc.secondDueDate ?? ''}
+                                        onChange={(event) => updateSecondDueDate(index, event.target.value)}
+                                        disabled={uploadingAssets || Boolean(pendingOrder)}
+                                      />
+                                    </div>
                                   )}
                                 </>
                               )}
