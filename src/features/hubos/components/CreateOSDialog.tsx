@@ -64,17 +64,6 @@ import {
 import type { FinancialDoc, FinancialDocType } from "@/features/hubos/assets";
 
 const DEFAULT_FINANCIAL_DOC_TYPE: FinancialDocType = "PAYMENT_PROOF";
-const DRAFT_STORAGE_KEY = "hubos:create-os-draft";
-
-interface CreateOsDraft {
-  saleNumber: string;
-  clientName: string;
-  description: string;
-  deliveryDate: string;
-  logisticType: LogisticType;
-  address: string;
-  selectedArtDirectionTag: ArtDirectionTag | null;
-}
 
 interface CreateOSDialogProps {
   onCreated: (order: OsOrder) => void;
@@ -122,42 +111,10 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     }
   };
 
-  const saveDraft = () => {
-    const draft: CreateOsDraft = {
-      saleNumber,
-      clientName,
-      description,
-      deliveryDate,
-      logisticType,
-      address,
-      selectedArtDirectionTag,
-    };
-    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-  };
-
-  const clearDraft = () => {
-    localStorage.removeItem(DRAFT_STORAGE_KEY);
-  };
-
-  const loadDraft = () => {
-    const draftRaw = localStorage.getItem(DRAFT_STORAGE_KEY);
-    if (!draftRaw) return;
-
-    try {
-      const draft = JSON.parse(draftRaw) as Partial<CreateOsDraft>;
-      setSaleNumber(draft.saleNumber ?? "");
-      setClientName(draft.clientName ?? "");
-      setDescription(draft.description ?? "");
-      setDeliveryDate(draft.deliveryDate ?? "");
-      setLogisticType((draft.logisticType as LogisticType) ?? "retirada");
-      setAddress(draft.address ?? "");
-      setSelectedArtDirectionTag(
-        (draft.selectedArtDirectionTag as ArtDirectionTag | null) ?? null
-      );
-      toast.message("Rascunho da OS carregado.");
-    } catch {
-      clearDraft();
-    }
+  const closeDialogAfterConfirmation = () => {
+    setConfirmDraftDialogOpen(false);
+    setOpen(false);
+    reset();
   };
 
   const confirmSaveDraftAndCreateCard = async () => {
@@ -529,12 +486,6 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     <Dialog
       open={open}
       onOpenChange={nextOpen => {
-        if (nextOpen) {
-          loadDraft();
-          setOpen(true);
-          return;
-        }
-
         if (!nextOpen && confirmDraftDialogOpen) {
           return;
         }
@@ -956,16 +907,16 @@ Orientações para a criação de arte:`}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Salvar como rascunho?</AlertDialogTitle>
+            <AlertDialogTitle>Tem certeza que deseja fechar?</AlertDialogTitle>
             <AlertDialogDescription>
-              Clique em "Sim" para salvar os dados preenchidos e fechar a tela.
-              Clique em "Não" para continuar editando.
+              Para evitar perda acidental de informações, confirme se deseja
+              fechar a tela de Nova Ordem de Serviço.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Não</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSaveDraftAndCreateCard}>
-              Sim
+            <AlertDialogCancel>Continuar editando</AlertDialogCancel>
+            <AlertDialogAction onClick={closeDialogAfterConfirmation}>
+              Fechar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
