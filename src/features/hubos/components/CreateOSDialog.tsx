@@ -1,25 +1,69 @@
-import { useRef, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Bold, Italic, List, ListOrdered, Underline, UploadCloud } from 'lucide-react';
-import { toast } from 'sonner';
-import type { ArtDirectionTag, LogisticType, OsOrder } from '../types';
-import { createOrder } from '../api';
-import { ART_COLUMNS } from '../constants';
-import { ART_DIRECTION_TAG_CONFIG, ART_DIRECTION_TAGS } from '../artDirectionTagConfig';
-import { useAuth } from '@/contexts/AuthContext';
-import { uploadAssetsForOrder, uploadFinancialDocsForOrder, validateFiles } from '@/features/hubos/assets';
-import { ACCEPTED_ASSET_CONTENT_TYPES, MAX_ASSET_FILE_SIZE_BYTES } from '@/features/hubos/assetUtils';
-import type { FinancialDoc, FinancialDocType } from '@/features/hubos/assets';
+import { useRef, useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Bold,
+  Italic,
+  List,
+  ListOrdered,
+  Underline,
+  UploadCloud,
+} from "lucide-react";
+import { toast } from "sonner";
+import type { ArtDirectionTag, LogisticType, OsOrder } from "../types";
+import { createOrder } from "../api";
+import { ART_COLUMNS } from "../constants";
+import {
+  ART_DIRECTION_TAG_CONFIG,
+  ART_DIRECTION_TAGS,
+} from "../artDirectionTagConfig";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  uploadAssetsForOrder,
+  uploadFinancialDocsForOrder,
+  validateFiles,
+} from "@/features/hubos/assets";
+import {
+  ACCEPTED_ASSET_CONTENT_TYPES,
+  MAX_ASSET_FILE_SIZE_BYTES,
+} from "@/features/hubos/assetUtils";
+import type { FinancialDoc, FinancialDocType } from "@/features/hubos/assets";
 
-const DEFAULT_FINANCIAL_DOC_TYPE: FinancialDocType = 'PAYMENT_PROOF';
+const DEFAULT_FINANCIAL_DOC_TYPE: FinancialDocType = "PAYMENT_PROOF";
 
 interface CreateOSDialogProps {
   onCreated: (order: OsOrder) => void;
@@ -28,13 +72,15 @@ interface CreateOSDialogProps {
 export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
-  const [saleNumber, setSaleNumber] = useState('');
-  const [clientName, setClientName] = useState('');
-  const [description, setDescription] = useState('');
-  const [deliveryDate, setDeliveryDate] = useState('');
-  const [logisticType, setLogisticType] = useState<LogisticType>('retirada');
-  const [address, setAddress] = useState('');
-  const [selectedArtDirectionTag, setSelectedArtDirectionTag] = useState<ArtDirectionTag | null>(null);
+  const [confirmDraftDialogOpen, setConfirmDraftDialogOpen] = useState(false);
+  const [saleNumber, setSaleNumber] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [description, setDescription] = useState("");
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [logisticType, setLogisticType] = useState<LogisticType>("retirada");
+  const [address, setAddress] = useState("");
+  const [selectedArtDirectionTag, setSelectedArtDirectionTag] =
+    useState<ArtDirectionTag | null>(null);
   const [saving, setSaving] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [financialDocs, setFinancialDocs] = useState<FinancialDoc[]>([]);
@@ -47,22 +93,28 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   const letraCaixa = false;
 
   const reset = () => {
-    setSaleNumber('');
-    setClientName('');
-    setDescription('');
-    setDeliveryDate('');
-    setLogisticType('retirada');
-    setAddress('');
+    setSaleNumber("");
+    setClientName("");
+    setDescription("");
+    setDeliveryDate("");
+    setLogisticType("retirada");
+    setAddress("");
     setSelectedArtDirectionTag(null);
     setSelectedFiles([]);
     setFinancialDocs([]);
     setPendingOrder(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
     if (financialDocInputRef.current) {
-      financialDocInputRef.current.value = '';
+      financialDocInputRef.current.value = "";
     }
+  };
+
+  const closeDialogAfterConfirmation = () => {
+    setConfirmDraftDialogOpen(false);
+    setOpen(false);
+    reset();
   };
 
   const formatFileSize = (size: number) => {
@@ -78,52 +130,61 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     const nextFiles = [...selectedFiles, ...Array.from(files)];
     const validation = validateFiles(nextFiles);
     if (!validation.ok) {
-      toast.error(validation.error ?? 'Arquivos inválidos.');
+      toast.error(validation.error ?? "Arquivos inválidos.");
       return;
     }
     setSelectedFiles(nextFiles);
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
   const removeAssetFile = (index: number) => {
-    setSelectedFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    setSelectedFiles(current =>
+      current.filter((_, itemIndex) => itemIndex !== index)
+    );
   };
 
   const handleFinancialDocChange = (files: FileList | null) => {
     if (!files) return;
-    const nextFiles = [...financialDocs.map((doc) => doc.file), ...Array.from(files)];
+    const nextFiles = [
+      ...financialDocs.map(doc => doc.file),
+      ...Array.from(files),
+    ];
     const validation = validateFiles(nextFiles);
     if (!validation.ok) {
-      toast.error(validation.error ?? 'Arquivos inválidos.');
+      toast.error(validation.error ?? "Arquivos inválidos.");
       return;
     }
-    setFinancialDocs((current) => [
+    setFinancialDocs(current => [
       ...current,
-      ...Array.from(files).map((file) => ({
+      ...Array.from(files).map(file => ({
         file,
         type: DEFAULT_FINANCIAL_DOC_TYPE,
       })),
     ]);
     if (financialDocInputRef.current) {
-      financialDocInputRef.current.value = '';
+      financialDocInputRef.current.value = "";
     }
   };
 
   const removeFinancialDoc = (index: number) => {
-    setFinancialDocs((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    setFinancialDocs(current =>
+      current.filter((_, itemIndex) => itemIndex !== index)
+    );
   };
 
   const updateFinancialDocType = (index: number, newType: FinancialDocType) => {
-    setFinancialDocs((current) =>
-      current.map((doc, itemIndex) => (itemIndex === index ? { ...doc, type: newType } : doc))
+    setFinancialDocs(current =>
+      current.map((doc, itemIndex) =>
+        itemIndex === index ? { ...doc, type: newType } : doc
+      )
     );
   };
 
   const financialTypeLabels: Record<FinancialDocType, string> = {
-    PAYMENT_PROOF: 'Comprovante',
-    PURCHASE_ORDER: 'Ordem de compra',
+    PAYMENT_PROOF: "Comprovante",
+    PURCHASE_ORDER: "Ordem de compra",
   };
 
   const applyWrap = (prefix: string, suffix = prefix) => {
@@ -150,14 +211,14 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     const start = textarea.selectionStart ?? 0;
     const end = textarea.selectionEnd ?? 0;
     const value = description;
-    const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-    const lineEndIndex = value.indexOf('\n', end);
+    const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+    const lineEndIndex = value.indexOf("\n", end);
     const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
     const block = value.slice(lineStart, lineEnd);
     const nextBlock = block
-      .split('\n')
-      .map((line) => (line.trim() ? `${prefix}${line}` : line))
-      .join('\n');
+      .split("\n")
+      .map(line => (line.trim() ? `${prefix}${line}` : line))
+      .join("\n");
     const nextValue = `${value.slice(0, lineStart)}${nextBlock}${value.slice(lineEnd)}`;
     setDescription(nextValue);
     requestAnimationFrame(() => {
@@ -169,18 +230,22 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   const handleSubmit = async () => {
     const assetValidation = validateFiles(selectedFiles);
     if (!assetValidation.ok) {
-      toast.error(assetValidation.error ?? 'Arquivos inválidos.');
+      toast.error(assetValidation.error ?? "Arquivos inválidos.");
       return;
     }
-    const financialValidation = validateFiles(financialDocs.map((doc) => doc.file));
+    const financialValidation = validateFiles(
+      financialDocs.map(doc => doc.file)
+    );
     if (!financialValidation.ok) {
-      toast.error(financialValidation.error ?? 'Documentos financeiros inválidos.');
+      toast.error(
+        financialValidation.error ?? "Documentos financeiros inválidos."
+      );
       return;
     }
 
     if (pendingOrder) {
       if (selectedFiles.length === 0 && financialDocs.length === 0) {
-        toast.error('Selecione ao menos um arquivo para reenviar.');
+        toast.error("Selecione ao menos um arquivo para reenviar.");
         return;
       }
 
@@ -192,7 +257,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
             files: selectedFiles,
             userId: user?.id ?? null,
           });
-          toast.success('Arquivos enviados e aguardando sincronização.');
+          toast.success("Arquivos enviados e aguardando sincronização.");
         }
         if (financialDocs.length > 0) {
           setUploadingAssets(true);
@@ -201,13 +266,19 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
             docs: financialDocs,
             userId: user?.id ?? null,
           });
-          toast.success('Documentos financeiros enviados e aguardando sincronização.');
+          toast.success(
+            "Documentos financeiros enviados e aguardando sincronização."
+          );
         }
         reset();
         setOpen(false);
       } catch (uploadError) {
         console.error(uploadError);
-        toast.error(uploadError instanceof Error ? uploadError.message : 'Falha ao reenviar os arquivos. Tente novamente.');
+        toast.error(
+          uploadError instanceof Error
+            ? uploadError.message
+            : "Falha ao reenviar os arquivos. Tente novamente."
+        );
       } finally {
         setUploadingAssets(false);
       }
@@ -215,11 +286,11 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     }
 
     if (!saleNumber || !clientName || !description || !deliveryDate) {
-      toast.error('Preencha os campos obrigatórios.');
+      toast.error("Preencha os campos obrigatórios.");
       return;
     }
     if (!selectedArtDirectionTag) {
-      toast.error('Selecione a tag de direcionamento de arte.');
+      toast.error("Selecione a tag de direcionamento de arte.");
       return;
     }
 
@@ -231,7 +302,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
         description,
         delivery_date: deliveryDate,
         logistic_type: logisticType,
-        address: logisticType === 'retirada' ? null : address || null,
+        address: logisticType === "retirada" ? null : address || null,
         art_status: ART_COLUMNS[0],
         prod_status: null,
         art_direction_tag: selectedArtDirectionTag,
@@ -241,7 +312,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
         updated_by: user?.id ?? null,
       });
       onCreated(order);
-      toast.success('Ordem criada com sucesso.');
+      toast.success("Ordem criada com sucesso.");
 
       if (selectedFiles.length > 0) {
         try {
@@ -251,18 +322,18 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
             files: selectedFiles,
             userId: user?.id ?? null,
           });
-          toast.success('Arquivos enviados e aguardando sincronização.');
+          toast.success("Arquivos enviados e aguardando sincronização.");
         } catch (uploadError) {
           console.error(uploadError);
           toast.error(
             uploadError instanceof Error
               ? uploadError.message
-              : 'OS criada, mas o envio dos arquivos falhou. Reenvie os arquivos.'
+              : "OS criada, mas o envio dos arquivos falhou. Reenvie os arquivos."
           );
           setPendingOrder(order);
           setFinancialDocs([]);
           if (financialDocInputRef.current) {
-            financialDocInputRef.current.value = '';
+            financialDocInputRef.current.value = "";
           }
           return;
         } finally {
@@ -277,13 +348,15 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
             docs: financialDocs,
             userId: user?.id ?? null,
           });
-          toast.success('Documentos financeiros enviados e aguardando sincronização.');
+          toast.success(
+            "Documentos financeiros enviados e aguardando sincronização."
+          );
         } catch (financialError) {
           console.error(financialError);
           toast.error(
             financialError instanceof Error
               ? financialError.message
-              : 'OS criada, mas houve erro ao enviar documentos financeiros.'
+              : "OS criada, mas houve erro ao enviar documentos financeiros."
           );
         } finally {
           setUploadingAssets(false);
@@ -293,7 +366,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
       setOpen(false);
     } catch (error) {
       console.error(error);
-      toast.error('Erro ao criar ordem de serviço.');
+      toast.error("Erro ao criar ordem de serviço.");
     } finally {
       setSaving(false);
     }
@@ -302,7 +375,11 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   return (
     <Dialog
       open={open}
-      onOpenChange={(nextOpen) => {
+      onOpenChange={nextOpen => {
+        if (!nextOpen && confirmDraftDialogOpen) {
+          return;
+        }
+
         setOpen(nextOpen);
         if (!nextOpen) {
           reset();
@@ -312,7 +389,13 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
       <DialogTrigger asChild>
         <Button>Gerar Ordem de Serviço</Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[calc(100vh-2rem)] w-[95vw] overflow-y-auto sm:max-w-4xl lg:max-w-5xl">
+      <DialogContent
+        className="max-h-[calc(100vh-2rem)] w-[95vw] overflow-y-auto sm:max-w-4xl lg:max-w-5xl"
+        onInteractOutside={event => {
+          event.preventDefault();
+          setConfirmDraftDialogOpen(true);
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Nova Ordem de Serviço</DialogTitle>
         </DialogHeader>
@@ -324,7 +407,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
                   <Label>Nº da venda</Label>
                   <Input
                     value={saleNumber}
-                    onChange={(event) => setSaleNumber(event.target.value)}
+                    onChange={event => setSaleNumber(event.target.value)}
                     disabled={Boolean(pendingOrder)}
                   />
                 </div>
@@ -332,7 +415,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
                   <Label>Cliente</Label>
                   <Input
                     value={clientName}
-                    onChange={(event) => setClientName(event.target.value)}
+                    onChange={event => setClientName(event.target.value)}
                     disabled={Boolean(pendingOrder)}
                   />
                 </div>
@@ -341,7 +424,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
                   <Input
                     type="date"
                     value={deliveryDate}
-                    onChange={(event) => setDeliveryDate(event.target.value)}
+                    onChange={event => setDeliveryDate(event.target.value)}
                     disabled={Boolean(pendingOrder)}
                   />
                 </div>
@@ -349,7 +432,9 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
                   <Label>Tipo de logística</Label>
                   <RadioGroup
                     value={logisticType}
-                    onValueChange={(value) => setLogisticType(value as LogisticType)}
+                    onValueChange={value =>
+                      setLogisticType(value as LogisticType)
+                    }
                     disabled={Boolean(pendingOrder)}
                   >
                     <div className="flex flex-wrap gap-4">
@@ -370,17 +455,16 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
                 </div>
               </div>
 
-              {logisticType !== 'retirada' && (
+              {logisticType !== "retirada" && (
                 <div className="space-y-1">
                   <Label>Endereço (opcional)</Label>
                   <Input
                     value={address}
-                    onChange={(event) => setAddress(event.target.value)}
+                    onChange={event => setAddress(event.target.value)}
                     disabled={Boolean(pendingOrder)}
                   />
                 </div>
               )}
-
             </div>
 
             <div className="space-y-4">
@@ -392,7 +476,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      onClick={() => applyWrap('**')}
+                      onClick={() => applyWrap("**")}
                       disabled={Boolean(pendingOrder)}
                       aria-label="Aplicar negrito"
                     >
@@ -402,7 +486,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      onClick={() => applyWrap('*')}
+                      onClick={() => applyWrap("*")}
                       disabled={Boolean(pendingOrder)}
                       aria-label="Aplicar itálico"
                     >
@@ -412,7 +496,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      onClick={() => applyWrap('__')}
+                      onClick={() => applyWrap("__")}
                       disabled={Boolean(pendingOrder)}
                       aria-label="Aplicar sublinhado"
                     >
@@ -423,7 +507,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      onClick={() => applyLinePrefix('- ')}
+                      onClick={() => applyLinePrefix("- ")}
                       disabled={Boolean(pendingOrder)}
                       aria-label="Aplicar lista com marcadores"
                     >
@@ -433,7 +517,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      onClick={() => applyLinePrefix('1. ')}
+                      onClick={() => applyLinePrefix("1. ")}
                       disabled={Boolean(pendingOrder)}
                       aria-label="Aplicar lista numerada"
                     >
@@ -443,7 +527,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
                   <Textarea
                     ref={descriptionRef}
                     value={description}
-                    onChange={(event) => setDescription(event.target.value)}
+                    onChange={event => setDescription(event.target.value)}
                     rows={4}
                     placeholder={`Descrição detalhada do pedido:
 Material:
@@ -456,7 +540,7 @@ Orientações para a criação de arte:`}
               <div className="space-y-2">
                 <Label>Tag de direcionamento</Label>
                 <div className="flex flex-wrap gap-2">
-                  {ART_DIRECTION_TAGS.map((tag) => {
+                  {ART_DIRECTION_TAGS.map(tag => {
                     const config = ART_DIRECTION_TAG_CONFIG[tag];
                     const isSelected = selectedArtDirectionTag === tag;
                     return (
@@ -465,9 +549,9 @@ Orientações para a criação de arte:`}
                         type="button"
                         onClick={() => {
                           setSelectedArtDirectionTag(tag);
-                          if (tag === 'URGENTE') {
+                          if (tag === "URGENTE") {
                             toast.warning(
-                              'Use essa tag para pedidos que são realmente urgentes. Ex: Pedido para o dia seguinte.'
+                              "Use essa tag para pedidos que são realmente urgentes. Ex: Pedido para o dia seguinte."
                             );
                           }
                         }}
@@ -475,8 +559,10 @@ Orientações para a criação de arte:`}
                         className="rounded-full border px-3 py-1 text-xs font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                         style={{
                           borderColor: config.color,
-                          backgroundColor: isSelected ? config.color : 'transparent',
-                          color: isSelected ? '#FFFFFF' : config.color,
+                          backgroundColor: isSelected
+                            ? config.color
+                            : "transparent",
+                          color: isSelected ? "#FFFFFF" : config.color,
                         }}
                       >
                         {config.label}
@@ -492,19 +578,27 @@ Orientações para a criação de arte:`}
             <div>
               <Label>Anexos (opcional)</Label>
               <p className="text-xs text-muted-foreground">
-                Anexe arquivos de arte, referências e documentos financeiros relacionados à OS.
+                Anexe arquivos de arte, referências e documentos financeiros
+                relacionados à OS.
               </p>
             </div>
             <Accordion type="multiple" className="space-y-2">
-              <AccordionItem value="art-assets" className="rounded-lg border border-muted px-4">
+              <AccordionItem
+                value="art-assets"
+                className="rounded-lg border border-muted px-4"
+              >
                 <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
                   <span>
-                    Arte e referências ({selectedFiles.length} arquivo{selectedFiles.length === 1 ? '' : 's'})
+                    Arte e referências ({selectedFiles.length} arquivo
+                    {selectedFiles.length === 1 ? "" : "s"})
                   </span>
                 </AccordionTrigger>
                 <AccordionContent className="pt-2">
                   <div className="space-y-2">
-                    <Label htmlFor="os-assets" className="text-xs text-muted-foreground">
+                    <Label
+                      htmlFor="os-assets"
+                      className="text-xs text-muted-foreground"
+                    >
                       Arquivos de arte e referências
                     </Label>
                     <Input
@@ -512,9 +606,9 @@ Orientações para a criação de arte:`}
                       id="os-assets"
                       type="file"
                       multiple
-                      accept={ACCEPTED_ASSET_CONTENT_TYPES.join(',')}
+                      accept={ACCEPTED_ASSET_CONTENT_TYPES.join(",")}
                       disabled={uploadingAssets || Boolean(pendingOrder)}
-                      onChange={(event) => handleAssetChange(event.target.files)}
+                      onChange={event => handleAssetChange(event.target.files)}
                       className="sr-only"
                     />
                     <label
@@ -523,24 +617,33 @@ Orientações para a criação de arte:`}
                     >
                       <UploadCloud className="h-6 w-6" />
                       <div className="space-y-1">
-                        <p className="font-medium text-foreground">Clique para adicionar arquivos</p>
+                        <p className="font-medium text-foreground">
+                          Clique para adicionar arquivos
+                        </p>
                         <p className="text-xs text-muted-foreground">
                           {selectedFiles.length > 0
                             ? `${selectedFiles.length} arquivo(s) selecionado(s).`
-                            : 'Arraste e solte ou selecione no seu computador.'}
+                            : "Arraste e solte ou selecione no seu computador."}
                         </p>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Máximo de {Math.round(MAX_ASSET_FILE_SIZE_BYTES / 1024 / 1024)}MB por arquivo.
+                        Máximo de{" "}
+                        {Math.round(MAX_ASSET_FILE_SIZE_BYTES / 1024 / 1024)}MB
+                        por arquivo.
                       </p>
                     </label>
                     {selectedFiles.length > 0 && (
                       <ul className="space-y-2 rounded-md border border-muted p-3 text-sm">
                         {selectedFiles.map((file, index) => (
-                          <li key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-3">
+                          <li
+                            key={`${file.name}-${file.lastModified}`}
+                            className="flex items-center justify-between gap-3"
+                          >
                             <div>
                               <p className="font-medium">{file.name}</p>
-                              <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatFileSize(file.size)}
+                              </p>
                             </div>
                             <Button
                               type="button"
@@ -557,33 +660,43 @@ Orientações para a criação de arte:`}
                     )}
                     {pendingOrder && (
                       <p className="text-xs text-amber-600">
-                        A OS foi criada. Reenvie os arquivos para concluir a sincronização.
+                        A OS foi criada. Reenvie os arquivos para concluir a
+                        sincronização.
                       </p>
                     )}
                   </div>
                 </AccordionContent>
               </AccordionItem>
-              <AccordionItem value="financial-docs" className="rounded-lg border border-muted px-4">
+              <AccordionItem
+                value="financial-docs"
+                className="rounded-lg border border-muted px-4"
+              >
                 <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
                   <span>
-                    Documentos financeiros ({financialDocs.length} arquivo{financialDocs.length === 1 ? '' : 's'})
+                    Documentos financeiros ({financialDocs.length} arquivo
+                    {financialDocs.length === 1 ? "" : "s"})
                   </span>
                 </AccordionTrigger>
                 <AccordionContent className="pt-2">
                   <div className="space-y-3">
                     <p className="text-xs text-muted-foreground">
-                      Selecione comprovantes e ordens de compra para acompanhar a OS.
+                      Selecione comprovantes e ordens de compra para acompanhar
+                      a OS.
                     </p>
                     <div className="space-y-1">
-                      <Label htmlFor="financial-docs">Anexar documento(s)</Label>
+                      <Label htmlFor="financial-docs">
+                        Anexar documento(s)
+                      </Label>
                       <Input
                         ref={financialDocInputRef}
                         id="financial-docs"
                         type="file"
                         multiple
-                        accept={ACCEPTED_ASSET_CONTENT_TYPES.join(',')}
+                        accept={ACCEPTED_ASSET_CONTENT_TYPES.join(",")}
                         disabled={uploadingAssets || Boolean(pendingOrder)}
-                        onChange={(event) => handleFinancialDocChange(event.target.files)}
+                        onChange={event =>
+                          handleFinancialDocChange(event.target.files)
+                        }
                         className="sr-only"
                       />
                       <label
@@ -592,39 +705,61 @@ Orientações para a criação de arte:`}
                       >
                         <UploadCloud className="h-6 w-6" />
                         <div className="space-y-1">
-                          <p className="font-medium text-foreground">Clique para adicionar documentos</p>
+                          <p className="font-medium text-foreground">
+                            Clique para adicionar documentos
+                          </p>
                           <p className="text-xs text-muted-foreground">
                             {financialDocs.length > 0
                               ? `${financialDocs.length} arquivo(s) anexado(s).`
-                              : 'Arraste e solte ou selecione no seu computador.'}
+                              : "Arraste e solte ou selecione no seu computador."}
                           </p>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          Máximo de {Math.round(MAX_ASSET_FILE_SIZE_BYTES / 1024 / 1024)}MB por arquivo.
+                          Máximo de{" "}
+                          {Math.round(MAX_ASSET_FILE_SIZE_BYTES / 1024 / 1024)}
+                          MB por arquivo.
                         </p>
                       </label>
                     </div>
                     {financialDocs.length > 0 && (
                       <ul className="space-y-2 rounded-md border border-muted p-3 text-sm">
                         {financialDocs.map((doc, index) => (
-                          <li key={`${doc.file.name}-${doc.file.lastModified}`} className="flex flex-wrap items-center gap-3">
+                          <li
+                            key={`${doc.file.name}-${doc.file.lastModified}`}
+                            className="flex flex-wrap items-center gap-3"
+                          >
                             <div className="min-w-[200px] flex-1">
                               <p className="font-medium">{doc.file.name}</p>
-                              <p className="text-xs text-muted-foreground">{formatFileSize(doc.file.size)}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatFileSize(doc.file.size)}
+                              </p>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Badge variant="secondary">{financialTypeLabels[doc.type]}</Badge>
+                              <Badge variant="secondary">
+                                {financialTypeLabels[doc.type]}
+                              </Badge>
                               <Select
                                 value={doc.type}
-                                onValueChange={(value) => updateFinancialDocType(index, value as FinancialDocType)}
-                                disabled={uploadingAssets || Boolean(pendingOrder)}
+                                onValueChange={value =>
+                                  updateFinancialDocType(
+                                    index,
+                                    value as FinancialDocType
+                                  )
+                                }
+                                disabled={
+                                  uploadingAssets || Boolean(pendingOrder)
+                                }
                               >
                                 <SelectTrigger className="h-8 w-[180px] text-xs">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="PAYMENT_PROOF">Comprovante</SelectItem>
-                                  <SelectItem value="PURCHASE_ORDER">Ordem de compra</SelectItem>
+                                  <SelectItem value="PAYMENT_PROOF">
+                                    Comprovante
+                                  </SelectItem>
+                                  <SelectItem value="PURCHASE_ORDER">
+                                    Ordem de compra
+                                  </SelectItem>
                                 </SelectContent>
                               </Select>
                               <Button
@@ -632,7 +767,9 @@ Orientações para a criação de arte:`}
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => removeFinancialDoc(index)}
-                                disabled={uploadingAssets || Boolean(pendingOrder)}
+                                disabled={
+                                  uploadingAssets || Boolean(pendingOrder)
+                                }
                               >
                                 Remover
                               </Button>
@@ -646,14 +783,34 @@ Orientações para a criação de arte:`}
               </AccordionItem>
             </Accordion>
           </div>
-
         </div>
         <div className="sticky bottom-0 border-t bg-background pt-4">
           <Button onClick={handleSubmit} disabled={saving || uploadingAssets}>
-            {pendingOrder ? 'Enviar arquivos' : 'Gerar Ordem de Serviço'}
+            {pendingOrder ? "Enviar arquivos" : "Gerar Ordem de Serviço"}
           </Button>
         </div>
       </DialogContent>
+
+      <AlertDialog
+        open={confirmDraftDialogOpen}
+        onOpenChange={setConfirmDraftDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tem certeza que deseja fechar?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Para evitar perda acidental de informações, confirme se deseja
+              fechar a tela de Nova Ordem de Serviço.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuar editando</AlertDialogCancel>
+            <AlertDialogAction onClick={closeDialogAfterConfirmation}>
+              Fechar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
