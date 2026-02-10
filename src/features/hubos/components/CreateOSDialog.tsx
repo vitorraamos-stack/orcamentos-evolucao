@@ -19,6 +19,8 @@ import { uploadAssetsForOrder, uploadFinancialDocsForOrder, validateFiles } from
 import { ACCEPTED_ASSET_CONTENT_TYPES, MAX_ASSET_FILE_SIZE_BYTES } from '@/features/hubos/assetUtils';
 import type { FinancialDoc, FinancialDocType } from '@/features/hubos/assets';
 
+const DEFAULT_FINANCIAL_DOC_TYPE: FinancialDocType = 'PAYMENT_PROOF';
+
 interface CreateOSDialogProps {
   onCreated: (order: OsOrder) => void;
 }
@@ -36,7 +38,6 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   const [saving, setSaving] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [financialDocs, setFinancialDocs] = useState<FinancialDoc[]>([]);
-  const [selectedFinancialDocType, setSelectedFinancialDocType] = useState<FinancialDocType>('PAYMENT_PROOF');
   const [uploadingAssets, setUploadingAssets] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<OsOrder | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -55,7 +56,6 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     setSelectedArtDirectionTag(null);
     setSelectedFiles([]);
     setFinancialDocs([]);
-    setSelectedFinancialDocType('PAYMENT_PROOF');
     setPendingOrder(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -103,7 +103,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
       ...current,
       ...Array.from(files).map((file) => ({
         file,
-        type: selectedFinancialDocType,
+        type: DEFAULT_FINANCIAL_DOC_TYPE,
       })),
     ]);
     if (financialDocInputRef.current) {
@@ -574,24 +574,6 @@ Orientações para a criação de arte:`}
                     <p className="text-xs text-muted-foreground">
                       Selecione comprovantes e ordens de compra para acompanhar a OS.
                     </p>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div className="space-y-1">
-                        <Label>Tipo do documento</Label>
-                        <Select
-                          value={selectedFinancialDocType}
-                          onValueChange={(value) => setSelectedFinancialDocType(value as FinancialDocType)}
-                          disabled={uploadingAssets || Boolean(pendingOrder)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="PAYMENT_PROOF">Comprovante de pagamento</SelectItem>
-                            <SelectItem value="PURCHASE_ORDER">Ordem de compra</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
                     <div className="space-y-1">
                       <Label htmlFor="financial-docs">Anexar documento(s)</Label>
                       <Input
