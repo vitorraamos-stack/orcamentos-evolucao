@@ -268,17 +268,6 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     }
   };
 
-  const hasDraftableData =
-    Boolean(saleNumber.trim()) ||
-    Boolean(clientName.trim()) ||
-    Boolean(description.trim()) ||
-    Boolean(deliveryDate) ||
-    logisticType !== "retirada" ||
-    Boolean(address.trim()) ||
-    Boolean(selectedArtDirectionTag) ||
-    selectedFiles.length > 0 ||
-    financialDocs.length > 0;
-
   const formatFileSize = (size: number) => {
     if (size < 1024) return `${size} B`;
     const kb = size / 1024;
