@@ -61,9 +61,10 @@ import {
   ACCEPTED_ASSET_CONTENT_TYPES,
   MAX_ASSET_FILE_SIZE_BYTES,
 } from "@/features/hubos/assetUtils";
-import type { FinancialDoc, FinancialDocType } from "@/features/hubos/assets";
+import type { FinancialDoc, FinancialDocType, FinancialInstallmentLabel } from "@/features/hubos/assets";
 
 const DEFAULT_FINANCIAL_DOC_TYPE: FinancialDocType = "PAYMENT_PROOF";
+const DEFAULT_INSTALLMENT_LABEL: FinancialInstallmentLabel = '1/1';
 
 interface CreateOSDialogProps {
   onCreated: (order: OsOrder) => void;
@@ -269,6 +270,8 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
       ...Array.from(files).map(file => ({
         file,
         type: DEFAULT_FINANCIAL_DOC_TYPE,
+        installmentLabel: DEFAULT_INSTALLMENT_LABEL,
+        secondDueDate: null,
       })),
     ]);
     if (financialDocInputRef.current) {
@@ -285,8 +288,36 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   const updateFinancialDocType = (index: number, newType: FinancialDocType) => {
     setFinancialDocs(current =>
       current.map((doc, itemIndex) =>
-        itemIndex === index ? { ...doc, type: newType } : doc
+        itemIndex === index
+          ? {
+              ...doc,
+              type: newType,
+              installmentLabel:
+                newType === 'PAYMENT_PROOF' ? doc.installmentLabel ?? DEFAULT_INSTALLMENT_LABEL : undefined,
+              secondDueDate: newType === 'PAYMENT_PROOF' ? doc.secondDueDate ?? null : undefined,
+            }
+          : doc
       )
+    );
+  };
+
+  const updateInstallmentLabel = (index: number, installmentLabel: FinancialInstallmentLabel) => {
+    setFinancialDocs((current) =>
+      current.map((doc, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...doc,
+              installmentLabel,
+              secondDueDate: installmentLabel === '1/2' ? doc.secondDueDate ?? '' : null,
+            }
+          : doc
+      )
+    );
+  };
+
+  const updateSecondDueDate = (index: number, secondDueDate: string) => {
+    setFinancialDocs((current) =>
+      current.map((doc, itemIndex) => (itemIndex === index ? { ...doc, secondDueDate } : doc))
     );
   };
 
@@ -348,6 +379,14 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
       toast.error(
         financialValidation.error ?? "Documentos financeiros inválidos."
       );
+      return;
+    }
+
+    const invalidProofDoc = financialDocs.find(
+      (doc) => doc.type === 'PAYMENT_PROOF' && doc.installmentLabel === '1/2' && !doc.secondDueDate
+    );
+    if (invalidProofDoc) {
+      toast.error('Para comprovante 1/2, a Data 2ª Parcela é obrigatória.');
       return;
     }
 
@@ -872,6 +911,34 @@ Orientações para a criação de arte:`}
                                   </SelectItem>
                                 </SelectContent>
                               </Select>
+                              {doc.type === 'PAYMENT_PROOF' && (
+                                <>
+                                  <Select
+                                    value={doc.installmentLabel ?? DEFAULT_INSTALLMENT_LABEL}
+                                    onValueChange={(value) =>
+                                      updateInstallmentLabel(index, value as FinancialInstallmentLabel)
+                                    }
+                                    disabled={uploadingAssets || Boolean(pendingOrder)}
+                                  >
+                                    <SelectTrigger className="h-8 w-[90px] text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="1/1">1/1</SelectItem>
+                                      <SelectItem value="1/2">1/2</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  {(doc.installmentLabel ?? DEFAULT_INSTALLMENT_LABEL) === '1/2' && (
+                                    <Input
+                                      type="date"
+                                      className="h-8 w-[170px] text-xs"
+                                      value={doc.secondDueDate ?? ''}
+                                      onChange={(event) => updateSecondDueDate(index, event.target.value)}
+                                      disabled={uploadingAssets || Boolean(pendingOrder)}
+                                    />
+                                  )}
+                                </>
+                              )}
                               <Button
                                 type="button"
                                 variant="ghost"
