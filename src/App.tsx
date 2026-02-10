@@ -13,6 +13,8 @@ import OsProducaoBoardPage from "@/modules/hub-os/pages/OsProducaoBoardPage";
 import OsDetailPage from "@/modules/hub-os/pages/OsDetailPage";
 import OsCreatePage from "@/modules/hub-os/pages/OsCreatePage";
 import OsAuditPage from "@/modules/hub-os/pages/OsAuditPage";
+import OsPendentesPage from "@/modules/hub-os/pages/OsPendentesPage";
+import FinanceiroPortalPage from "@/modules/hub-os/pages/FinanceiroPortalPage";
 import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -49,6 +51,31 @@ function Router() {
         <Layout>
           <RequireModule moduleKey="hub_os">
             <HubOsAccessGuard scope="audit"><OsAuditPage /></HubOsAccessGuard>
+          </RequireModule>
+        </Layout>
+      </Route>
+
+
+      <Route path="/hub-os/pendentes">
+        <Layout>
+          <RequireModule moduleKey="hub_os">
+            <OsPendentesPage />
+          </RequireModule>
+        </Layout>
+      </Route>
+
+      <Route path="/financeiro">
+        <Layout>
+          <RequireModule moduleKey="hub_os_financeiro">
+            <FinanceiroPortalPage />
+          </RequireModule>
+        </Layout>
+      </Route>
+
+      <Route path="/hub-os/financeiro">
+        <Layout>
+          <RequireModule moduleKey="hub_os_financeiro">
+            <FinanceiroPortalPage />
           </RequireModule>
         </Layout>
       </Route>
