@@ -171,6 +171,60 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     selectedFiles.length > 0 ||
     financialDocs.length > 0;
 
+  const handleSaveAsDraft = async () => {
+    if (!hasDraftableData) {
+      setConfirmDraftDialogOpen(false);
+      setOpen(false);
+      reset();
+      toast.message("Nenhum dado para salvar como rascunho.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const order = await createOrder({
+        sale_number: saleNumber.trim() || "Rascunho",
+        client_name: clientName.trim() || "Rascunho",
+        title: "Rascunho",
+        description: description.trim() || "Rascunho",
+        delivery_date: deliveryDate || null,
+        logistic_type: logisticType,
+        address: logisticType === "retirada" ? null : address || null,
+        art_status: ART_COLUMNS[0],
+        prod_status: null,
+        art_direction_tag: selectedArtDirectionTag,
+        reproducao,
+        letra_caixa: letraCaixa,
+        created_by: user?.id ?? null,
+        updated_by: user?.id ?? null,
+      });
+
+      onCreated(order);
+      saveDraft();
+      setConfirmDraftDialogOpen(false);
+      setOpen(false);
+      reset();
+      toast.success("Rascunho salvo na Caixa de Entrada.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Não foi possível salvar o rascunho.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const hasDraftableData =
+    Boolean(saleNumber.trim()) ||
+    Boolean(clientName.trim()) ||
+    Boolean(description.trim()) ||
+    Boolean(deliveryDate) ||
+    logisticType !== "retirada" ||
+    Boolean(address.trim()) ||
+    Boolean(selectedArtDirectionTag) ||
+    selectedFiles.length > 0 ||
+    financialDocs.length > 0;
+
   const formatFileSize = (size: number) => {
     if (size < 1024) return `${size} B`;
     const kb = size / 1024;
@@ -867,21 +921,7 @@ Orientações para a criação de arte:`}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Não</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (hasDraftableData) {
-                  saveDraft();
-                }
-                setConfirmDraftDialogOpen(false);
-                setOpen(false);
-                reset();
-                toast.message(
-                  hasDraftableData
-                    ? "Rascunho salvo."
-                    : "Nenhum dado para salvar como rascunho."
-                );
-              }}
-            >
+            <AlertDialogAction onClick={handleSaveAsDraft}>
               Sim
             </AlertDialogAction>
           </AlertDialogFooter>
