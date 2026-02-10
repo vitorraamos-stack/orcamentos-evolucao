@@ -148,7 +148,8 @@ supabase secrets set \
   R2_ACCOUNT_ID=... \
   R2_ACCESS_KEY_ID=... \
   R2_SECRET_ACCESS_KEY=... \
-  R2_BUCKET=os-artes
+  R2_BUCKET=os-artes \
+  MAPBOX_ACCESS_TOKEN=...
 ```
 
 5. Publique as funções:
@@ -158,7 +159,13 @@ supabase functions deploy r2-presign-upload
 supabase functions deploy r2-presign-download
 supabase functions deploy r2-delete-objects
 supabase functions deploy r2-health
+supabase functions deploy optimize-installation-route
 ```
+
+6. Otimização de rota de instalações:
+   - Endpoint: `POST /functions/v1/optimize-installation-route`
+   - Requer usuário autenticado (JWT) e secret `MAPBOX_ACCESS_TOKEN`.
+   - Limite: **máx. 12 paradas** (incluindo ponto inicial/final).
 
 > As funções exigem usuário autenticado (JWT) e geram URLs pré-assinadas com expiração curta (10 min).
 

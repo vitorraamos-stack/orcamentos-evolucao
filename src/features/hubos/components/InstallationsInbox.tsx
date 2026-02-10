@@ -3,7 +3,12 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { optimizeInstallationRoute, type OptimizeInstallationRouteResponse } from '@/features/hubos/api';
 import { PROD_COLUMNS } from '@/features/hubos/constants';
 import { cn } from '@/lib/utils';
 import type { OsOrder } from '@/features/hubos/types';
@@ -21,6 +26,12 @@ type InstallationsInboxProps = {
 
 type QuickFilter = 'today' | 'week' | 'overdue' | 'all';
 
+const todayAsInput = () => {
+  const now = new Date();
+  const timezoneOffset = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 10);
+};
+
 const formatDate = (value: string | null) => {
   if (!value) return 'Sem data';
   const [year, month, day] = value.split('-').map(Number);
@@ -37,9 +48,17 @@ const formatDateWithWeekday = (value: string | null) => {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
-  }).format(
-    new Date(year, month - 1, day)
-  );
+  }).format(new Date(year, month - 1, day));
+};
+
+const formatDistance = (meters: number) => `${(meters / 1000).toFixed(1)} km`;
+const formatDuration = (seconds: number) => {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.round((seconds % 3600) / 60);
+  if (hours > 0) {
+    return `${hours}h ${minutes}min`;
+  }
+  return `${minutes}min`;
 };
 
 const getStatusLabel = (order: OsOrder) =>
@@ -60,6 +79,11 @@ const parseDeliveryDate = (value: string | null) => {
 
 const isFinalized = (order: OsOrder) => order.prod_status === FINAL_PROD_STATUS;
 
+const skippedReasonLabel: Record<string, string> = {
+  'missing-address': 'Sem endereço cadastrado',
+  'geocode-failed': 'Falha ao geocodificar endereço',
+};
+
 export default function InstallationsInbox({
   orders,
   selectedId,
@@ -71,6 +95,13 @@ export default function InstallationsInbox({
   onOpenKanban,
 }: InstallationsInboxProps) {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
+  const [optimizeOpen, setOptimizeOpen] = useState(false);
+  const [routeDate, setRouteDate] = useState(todayAsInput());
+  const [startAddress, setStartAddress] = useState('');
+  const [endAddress, setEndAddress] = useState('');
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [optimizing, setOptimizing] = useState(false);
+  const [result, setResult] = useState<OptimizeInstallationRouteResponse | null>(null);
 
   const selectedOrder = useMemo(
     () => orders.find((order) => order.id === selectedId) ?? null,
@@ -101,6 +132,15 @@ export default function InstallationsInbox({
       );
     });
   }, [orders, searchValue]);
+
+  const routeOrders = useMemo(
+    () => orders.filter((order) => order.delivery_date === routeDate),
+    [orders, routeDate]
+  );
+
+  useEffect(() => {
+    setSelectedOrderIds(routeOrders.map((order) => order.id));
+  }, [routeDate, optimizeOpen, routeOrders]);
 
   const getIsToday = useCallback(
     (order: OsOrder) => {
@@ -226,6 +266,42 @@ export default function InstallationsInbox({
     onOpenKanban(selectedOrder);
   };
 
+  const toggleOrderSelection = (orderId: string, checked: boolean) => {
+    setSelectedOrderIds((prev) => {
+      if (checked) {
+        return prev.includes(orderId) ? prev : [...prev, orderId];
+      }
+      return prev.filter((id) => id !== orderId);
+    });
+  };
+
+  const handleOptimizeRoute = async () => {
+    if (selectedOrderIds.length === 0) {
+      toast.error('Selecione pelo menos uma OS para otimizar a rota.');
+      return;
+    }
+
+    setOptimizing(true);
+    setResult(null);
+
+    try {
+      const payload = await optimizeInstallationRoute({
+        date: routeDate,
+        orderIds: selectedOrderIds,
+        startAddress: startAddress.trim() || undefined,
+        endAddress: endAddress.trim() || undefined,
+      });
+      setResult(payload);
+      toast.success('Rota otimizada com sucesso.');
+    } catch (error) {
+      console.error(error);
+      const message = error instanceof Error ? error.message : 'Erro ao otimizar rota.';
+      toast.error(message.includes('Max 12') ? `${message} Desmarque algumas OS e tente novamente.` : message);
+    } finally {
+      setOptimizing(false);
+    }
+  };
+
   const filteredCountLabel = `${filteredOrders.length}/${orders.length}`;
   const hasOrders = orders.length > 0;
   const hasFiltered = filteredOrders.length > 0;
@@ -239,10 +315,178 @@ export default function InstallationsInbox({
             {orders.length} {orders.length === 1 ? 'OS' : 'OS'}
           </p>
         </div>
-        <Button variant="ghost" onClick={onBack}>
-          Voltar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setRouteDate(todayAsInput());
+              setStartAddress('');
+              setEndAddress('');
+              setResult(null);
+              setOptimizeOpen(true);
+            }}
+          >
+            Otimizar rota
+          </Button>
+          <Button variant="ghost" onClick={onBack}>
+            Voltar
+          </Button>
+        </div>
       </div>
+
+      <Dialog open={optimizeOpen} onOpenChange={setOptimizeOpen}>
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Otimizar rota de instalações</DialogTitle>
+            <DialogDescription>
+              Selecione a data, escolha as OS e opcionalmente informe ponto de partida/chegada.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="route-date">Data</Label>
+              <Input id="route-date" type="date" value={routeDate} onChange={(event) => setRouteDate(event.target.value)} />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="route-start">Ponto de partida (opcional)</Label>
+              <Input
+                id="route-start"
+                placeholder="Rua, número, bairro, cidade"
+                value={startAddress}
+                onChange={(event) => setStartAddress(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2 md:col-span-3">
+              <Label htmlFor="route-end">Ponto de chegada (opcional)</Label>
+              <Input
+                id="route-end"
+                placeholder="Rua, número, bairro, cidade"
+                value={endAddress}
+                onChange={(event) => setEndAddress(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>OS da data ({routeOrders.length})</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedOrderIds(routeOrders.map((order) => order.id))}
+              >
+                Marcar todas
+              </Button>
+            </div>
+            <ScrollArea className="h-44 rounded-md border p-2">
+              <div className="space-y-2">
+                {routeOrders.length === 0 && (
+                  <p className="text-sm text-muted-foreground">Nenhuma OS de instalação para a data selecionada.</p>
+                )}
+                {routeOrders.map((order) => {
+                  const checked = selectedOrderIds.includes(order.id);
+                  return (
+                    <label
+                      key={order.id}
+                      className="flex cursor-pointer items-start gap-2 rounded-md p-2 hover:bg-muted"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(value) => toggleOrderSelection(order.id, Boolean(value))}
+                      />
+                      <div className="text-sm">
+                        <p className="font-medium">
+                          {order.sale_number} - {order.client_name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{order.address || 'Sem endereço'}</p>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          </div>
+
+          {result && (
+            <div className="space-y-3 rounded-md border p-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <Badge variant="secondary">Distância: {formatDistance(result.route.distance_m)}</Badge>
+                <Badge variant="secondary">Tempo: {formatDuration(result.route.duration_s)}</Badge>
+                <Badge variant="outline">Limite: {result.limit.maxStops} paradas</Badge>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Sequência recomendada</p>
+                <ol className="space-y-1 text-sm">
+                  {result.stops.map((stop, index) => (
+                    <li key={`${stop.type}-${index}`} className="rounded-md border p-2">
+                      {stop.type === 'order' ? (
+                        <>
+                          <p className="font-medium">
+                            #{stop.sequence} • {stop.clientName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{stop.address}</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-medium">{stop.type === 'start' ? 'Partida' : 'Chegada'}</p>
+                          <p className="text-xs text-muted-foreground">{stop.address}</p>
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              {result.skipped.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Ignoradas</p>
+                  <ul className="space-y-1 text-sm text-muted-foreground">
+                    {result.skipped.map((item) => {
+                      const order = orders.find((entry) => entry.id === item.orderId);
+                      return (
+                        <li key={`${item.orderId}-${item.reason}`}>
+                          {order?.sale_number ?? item.orderId}: {skippedReasonLabel[item.reason] ?? item.reason}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!result.links.googleMaps}
+                  onClick={() => result.links.googleMaps && window.open(result.links.googleMaps, '_blank', 'noopener,noreferrer')}
+                >
+                  Abrir no Google Maps
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!result.links.waze}
+                  onClick={() => result.links.waze && window.open(result.links.waze, '_blank', 'noopener,noreferrer')}
+                >
+                  Abrir no Waze
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOptimizeOpen(false)}>
+              Fechar
+            </Button>
+            <Button onClick={handleOptimizeRoute} disabled={optimizing || routeOrders.length === 0}>
+              {optimizing ? 'Otimizando...' : 'Gerar rota'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex flex-col gap-4 lg:flex-row">
         <div className="flex w-full flex-col gap-3 lg:w-[380px] lg:min-w-[360px] lg:max-w-[420px]">
