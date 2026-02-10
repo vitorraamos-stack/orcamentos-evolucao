@@ -1,17 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { optimizeInstallationRoute, type OptimizeInstallationRouteResponse } from '@/features/hubos/api';
-import { PROD_COLUMNS } from '@/features/hubos/constants';
-import { cn } from '@/lib/utils';
-import type { OsOrder } from '@/features/hubos/types';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  optimizeInstallationRoute,
+  type OptimizeInstallationRouteResponse,
+} from "@/features/hubos/api";
+import { PROD_COLUMNS } from "@/features/hubos/constants";
+import { cn } from "@/lib/utils";
+import type { OsOrder } from "@/features/hubos/types";
 
 type InstallationsInboxProps = {
   orders: OsOrder[];
@@ -24,7 +32,13 @@ type InstallationsInboxProps = {
   onOpenKanban: (order: OsOrder) => void;
 };
 
-type QuickFilter = 'today' | 'week' | 'overdue' | 'all';
+type QuickFilter = "today" | "week" | "overdue" | "all";
+
+const todayAsInput = () => {
+  const now = new Date();
+  const timezoneOffset = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 10);
+};
 
 const todayAsInput = () => {
   const now = new Date();
@@ -33,21 +47,23 @@ const todayAsInput = () => {
 };
 
 const formatDate = (value: string | null) => {
-  if (!value) return 'Sem data';
-  const [year, month, day] = value.split('-').map(Number);
+  if (!value) return "Sem data";
+  const [year, month, day] = value.split("-").map(Number);
   if (!year || !month || !day) return value;
-  return new Intl.DateTimeFormat('pt-BR').format(new Date(year, month - 1, day));
+  return new Intl.DateTimeFormat("pt-BR").format(
+    new Date(year, month - 1, day)
+  );
 };
 
 const formatDateWithWeekday = (value: string | null) => {
-  if (!value) return 'Sem data';
-  const [year, month, day] = value.split('-').map(Number);
+  if (!value) return "Sem data";
+  const [year, month, day] = value.split("-").map(Number);
   if (!year || !month || !day) return value;
-  return new Intl.DateTimeFormat('pt-BR', {
-    weekday: 'short',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
+  return new Intl.DateTimeFormat("pt-BR", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   }).format(new Date(year, month - 1, day));
 };
 
@@ -62,7 +78,9 @@ const formatDuration = (seconds: number) => {
 };
 
 const getStatusLabel = (order: OsOrder) =>
-  order.prod_status ? `Produção • ${order.prod_status}` : `Arte • ${order.art_status}`;
+  order.prod_status
+    ? `Produção • ${order.prod_status}`
+    : `Arte • ${order.art_status}`;
 
 const FINAL_PROD_STATUS = PROD_COLUMNS[PROD_COLUMNS.length - 1];
 
@@ -70,7 +88,7 @@ const normalize = (value: string) => value.toLowerCase();
 
 const parseDeliveryDate = (value: string | null) => {
   if (!value) return null;
-  const [year, month, day] = value.split('-').map(Number);
+  const [year, month, day] = value.split("-").map(Number);
   if (!year || !month || !day) return null;
   const date = new Date(year, month - 1, day);
   date.setHours(0, 0, 0, 0);
@@ -80,8 +98,8 @@ const parseDeliveryDate = (value: string | null) => {
 const isFinalized = (order: OsOrder) => order.prod_status === FINAL_PROD_STATUS;
 
 const skippedReasonLabel: Record<string, string> = {
-  'missing-address': 'Sem endereço cadastrado',
-  'geocode-failed': 'Falha ao geocodificar endereço',
+  missing_address: "Sem endereço cadastrado",
+  geocode_failed: "Falha ao geocodificar endereço",
 };
 
 export default function InstallationsInbox({
@@ -94,17 +112,20 @@ export default function InstallationsInbox({
   onEdit,
   onOpenKanban,
 }: InstallationsInboxProps) {
-  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [optimizeOpen, setOptimizeOpen] = useState(false);
-  const [routeDate, setRouteDate] = useState(todayAsInput());
-  const [startAddress, setStartAddress] = useState('');
-  const [endAddress, setEndAddress] = useState('');
-  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [dateFrom, setDateFrom] = useState(todayAsInput());
+  const [dateTo, setDateTo] = useState(todayAsInput());
+  const [dateWindowDays, setDateWindowDays] = useState("1");
+  const [geoClusterRadiusKm, setGeoClusterRadiusKm] = useState("5");
+  const [maxStopsPerRoute, setMaxStopsPerRoute] = useState("20");
+  const [startAddress, setStartAddress] = useState("");
   const [optimizing, setOptimizing] = useState(false);
-  const [result, setResult] = useState<OptimizeInstallationRouteResponse | null>(null);
+  const [result, setResult] =
+    useState<OptimizeInstallationRouteResponse | null>(null);
 
   const selectedOrder = useMemo(
-    () => orders.find((order) => order.id === selectedId) ?? null,
+    () => orders.find(order => order.id === selectedId) ?? null,
     [orders, selectedId]
   );
 
@@ -122,9 +143,9 @@ export default function InstallationsInbox({
 
   const searchFilteredOrders = useMemo(() => {
     const search = normalize(searchValue.trim());
-    return orders.filter((order) => {
+    return orders.filter(order => {
       if (!search) return true;
-      const description = order.description ?? '';
+      const description = order.description ?? "";
       return (
         normalize(order.sale_number).includes(search) ||
         normalize(order.client_name).includes(search) ||
@@ -180,10 +201,10 @@ export default function InstallationsInbox({
   );
 
   const filteredOrders = useMemo(() => {
-    const filtered = searchFilteredOrders.filter((order) => {
-      if (quickFilter === 'today') return getIsToday(order);
-      if (quickFilter === 'week') return getIsWeek(order);
-      if (quickFilter === 'overdue') return getIsOverdue(order);
+    const filtered = searchFilteredOrders.filter(order => {
+      if (quickFilter === "today") return getIsToday(order);
+      if (quickFilter === "week") return getIsWeek(order);
+      if (quickFilter === "overdue") return getIsOverdue(order);
       return true;
     });
     return filtered.sort((a, b) => {
@@ -212,7 +233,7 @@ export default function InstallationsInbox({
       }
       return;
     }
-    const stillExists = filteredOrders.some((order) => order.id === selectedId);
+    const stillExists = filteredOrders.some(order => order.id === selectedId);
     if (!selectedId || !stillExists) {
       onSelect(filteredOrders[0].id);
     }
@@ -223,31 +244,31 @@ export default function InstallationsInbox({
     const summary = [
       `OS ${selectedOrder.sale_number} - ${selectedOrder.client_name}`,
       `Entrega: ${formatDate(selectedOrder.delivery_date)}`,
-      `Endereço: ${selectedOrder.address || '(não informado)'}`,
+      `Endereço: ${selectedOrder.address || "(não informado)"}`,
       `Status: ${getStatusLabel(selectedOrder)}`,
-      `Pedido: ${selectedOrder.description || '(sem descrição)'}`,
-    ].join('\n');
+      `Pedido: ${selectedOrder.description || "(sem descrição)"}`,
+    ].join("\n");
     try {
       await navigator.clipboard.writeText(summary);
-      toast.success('Resumo copiado para a área de transferência.');
+      toast.success("Resumo copiado para a área de transferência.");
     } catch (error) {
       console.error(error);
-      toast.error('Não foi possível copiar o resumo.');
+      toast.error("Não foi possível copiar o resumo.");
     }
   };
 
   const handleCopyAddress = async () => {
     if (!selectedOrder) return;
     if (!selectedOrder.address) {
-      toast.error('Sem endereço para copiar.');
+      toast.error("Sem endereço para copiar.");
       return;
     }
     try {
       await navigator.clipboard.writeText(selectedOrder.address);
-      toast.success('Endereço copiado para a área de transferência.');
+      toast.success("Endereço copiado para a área de transferência.");
     } catch (error) {
       console.error(error);
-      toast.error('Não foi possível copiar o endereço.');
+      toast.error("Não foi possível copiar o endereço.");
     }
   };
 
@@ -255,10 +276,10 @@ export default function InstallationsInbox({
     if (!selectedOrder) return;
     const summary = `Instalação OS ${selectedOrder.sale_number} - ${selectedOrder.client_name} | Entrega: ${formatDate(
       selectedOrder.delivery_date
-    )} | Endereço: ${selectedOrder.address || '(não informado)'}`;
+    )} | Endereço: ${selectedOrder.address || "(não informado)"}`;
     const url = `https://wa.me/?text=${encodeURIComponent(summary)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
-    toast.success('Abrindo WhatsApp...');
+    window.open(url, "_blank", "noopener,noreferrer");
+    toast.success("Abrindo WhatsApp...");
   };
 
   const handleOpenKanban = () => {
@@ -266,37 +287,27 @@ export default function InstallationsInbox({
     onOpenKanban(selectedOrder);
   };
 
-  const toggleOrderSelection = (orderId: string, checked: boolean) => {
-    setSelectedOrderIds((prev) => {
-      if (checked) {
-        return prev.includes(orderId) ? prev : [...prev, orderId];
-      }
-      return prev.filter((id) => id !== orderId);
-    });
-  };
-
   const handleOptimizeRoute = async () => {
-    if (selectedOrderIds.length === 0) {
-      toast.error('Selecione pelo menos uma OS para otimizar a rota.');
-      return;
-    }
-
     setOptimizing(true);
     setResult(null);
 
     try {
       const payload = await optimizeInstallationRoute({
-        date: routeDate,
-        orderIds: selectedOrderIds,
-        startAddress: startAddress.trim() || undefined,
-        endAddress: endAddress.trim() || undefined,
+        dateFrom: dateFrom || null,
+        dateTo: dateTo || null,
+        dateWindowDays: Number(dateWindowDays || 1),
+        geoClusterRadiusKm: Number(geoClusterRadiusKm || 5),
+        maxStopsPerRoute: Number(maxStopsPerRoute || 20),
+        startAddress: startAddress.trim() || null,
+        profile: "driving-car",
       });
       setResult(payload);
-      toast.success('Rota otimizada com sucesso.');
+      toast.success("Rota otimizada com sucesso.");
     } catch (error) {
       console.error(error);
-      const message = error instanceof Error ? error.message : 'Erro ao otimizar rota.';
-      toast.error(message.includes('Max 12') ? `${message} Desmarque algumas OS e tente novamente.` : message);
+      const message =
+        error instanceof Error ? error.message : "Erro ao otimizar rota.";
+      toast.error(message);
     } finally {
       setOptimizing(false);
     }
@@ -310,18 +321,23 @@ export default function InstallationsInbox({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">Instalações ({filteredCountLabel})</h2>
+          <h2 className="text-xl font-semibold">
+            Instalações ({filteredCountLabel})
+          </h2>
           <p className="text-sm text-muted-foreground">
-            {orders.length} {orders.length === 1 ? 'OS' : 'OS'}
+            {orders.length} {orders.length === 1 ? "OS" : "OS"}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
             onClick={() => {
-              setRouteDate(todayAsInput());
-              setStartAddress('');
-              setEndAddress('');
+              setDateFrom(todayAsInput());
+              setDateTo(todayAsInput());
+              setDateWindowDays("1");
+              setGeoClusterRadiusKm("5");
+              setMaxStopsPerRoute("20");
+              setStartAddress("");
               setResult(null);
               setOptimizeOpen(true);
             }}
@@ -339,116 +355,96 @@ export default function InstallationsInbox({
           <DialogHeader>
             <DialogTitle>Otimizar rota de instalações</DialogTitle>
             <DialogDescription>
-              Selecione a data, escolha as OS e opcionalmente informe ponto de partida/chegada.
+              Selecione a data, escolha as OS e opcionalmente informe ponto de
+              partida/chegada.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="route-date">Data</Label>
-              <Input id="route-date" type="date" value={routeDate} onChange={(event) => setRouteDate(event.target.value)} />
+              <Label htmlFor="route-date-from">Data inicial</Label>
+              <Input
+                id="route-date-from"
+                type="date"
+                value={dateFrom}
+                onChange={event => setDateFrom(event.target.value)}
+              />
             </div>
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2">
+              <Label htmlFor="route-date-to">Data final</Label>
+              <Input
+                id="route-date-to"
+                type="date"
+                value={dateTo}
+                onChange={event => setDateTo(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="route-window">Janela de datas (dias)</Label>
+              <Input
+                id="route-window"
+                type="number"
+                min={0}
+                value={dateWindowDays}
+                onChange={event => setDateWindowDays(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="route-radius">Raio geográfico (km)</Label>
+              <Input
+                id="route-radius"
+                type="number"
+                min={1}
+                value={geoClusterRadiusKm}
+                onChange={event => setGeoClusterRadiusKm(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="route-max">Máx. paradas por rota</Label>
+              <Input
+                id="route-max"
+                type="number"
+                min={1}
+                value={maxStopsPerRoute}
+                onChange={event => setMaxStopsPerRoute(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="route-start">Ponto de partida (opcional)</Label>
               <Input
                 id="route-start"
                 placeholder="Rua, número, bairro, cidade"
                 value={startAddress}
-                onChange={(event) => setStartAddress(event.target.value)}
+                onChange={event => setStartAddress(event.target.value)}
               />
             </div>
-            <div className="space-y-2 md:col-span-3">
-              <Label htmlFor="route-end">Ponto de chegada (opcional)</Label>
-              <Input
-                id="route-end"
-                placeholder="Rua, número, bairro, cidade"
-                value={endAddress}
-                onChange={(event) => setEndAddress(event.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>OS da data ({routeOrders.length})</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedOrderIds(routeOrders.map((order) => order.id))}
-              >
-                Marcar todas
-              </Button>
-            </div>
-            <ScrollArea className="h-44 rounded-md border p-2">
-              <div className="space-y-2">
-                {routeOrders.length === 0 && (
-                  <p className="text-sm text-muted-foreground">Nenhuma OS de instalação para a data selecionada.</p>
-                )}
-                {routeOrders.map((order) => {
-                  const checked = selectedOrderIds.includes(order.id);
-                  return (
-                    <label
-                      key={order.id}
-                      className="flex cursor-pointer items-start gap-2 rounded-md p-2 hover:bg-muted"
-                    >
-                      <Checkbox
-                        checked={checked}
-                        onCheckedChange={(value) => toggleOrderSelection(order.id, Boolean(value))}
-                      />
-                      <div className="text-sm">
-                        <p className="font-medium">
-                          {order.sale_number} - {order.client_name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{order.address || 'Sem endereço'}</p>
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            </ScrollArea>
           </div>
 
           {result && (
             <div className="space-y-3 rounded-md border p-3">
               <div className="flex flex-wrap items-center gap-2 text-sm">
-                <Badge variant="secondary">Distância: {formatDistance(result.route.distance_m)}</Badge>
-                <Badge variant="secondary">Tempo: {formatDuration(result.route.duration_s)}</Badge>
-                <Badge variant="outline">Limite: {result.limit.maxStops} paradas</Badge>
+                <Badge variant="secondary">
+                  Candidatas: {result.stats.totalCandidates}
+                </Badge>
+                <Badge variant="secondary">
+                  Geocodadas: {result.stats.geocoded}
+                </Badge>
+                <Badge variant="outline">Grupos: {result.stats.groups}</Badge>
+                <Badge variant="outline">Rotas: {result.stats.routes}</Badge>
               </div>
 
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Sequência recomendada</p>
-                <ol className="space-y-1 text-sm">
-                  {result.stops.map((stop, index) => (
-                    <li key={`${stop.type}-${index}`} className="rounded-md border p-2">
-                      {stop.type === 'order' ? (
-                        <>
-                          <p className="font-medium">
-                            #{stop.sequence} • {stop.clientName}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{stop.address}</p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="font-medium">{stop.type === 'start' ? 'Partida' : 'Chegada'}</p>
-                          <p className="text-xs text-muted-foreground">{stop.address}</p>
-                        </>
-                      )}
-                    </li>
-                  ))}
-                </ol>
-              </div>
-
-              {result.skipped.length > 0 && (
+              {result.unassigned.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">Ignoradas</p>
+                  <p className="text-sm font-medium">Não atribuídas</p>
                   <ul className="space-y-1 text-sm text-muted-foreground">
-                    {result.skipped.map((item) => {
-                      const order = orders.find((entry) => entry.id === item.orderId);
+                    {result.unassigned.map(item => {
+                      const order = orders.find(
+                        entry => entry.id === item.os_id
+                      );
                       return (
-                        <li key={`${item.orderId}-${item.reason}`}>
-                          {order?.sale_number ?? item.orderId}: {skippedReasonLabel[item.reason] ?? item.reason}
+                        <li key={`${item.os_id}-${item.reason}`}>
+                          {order?.sale_number ?? item.os_id}:{" "}
+                          {skippedReasonLabel[item.reason] ?? item.reason}
                         </li>
                       );
                     })}
@@ -456,23 +452,75 @@ export default function InstallationsInbox({
                 </div>
               )}
 
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!result.links.googleMaps}
-                  onClick={() => result.links.googleMaps && window.open(result.links.googleMaps, '_blank', 'noopener,noreferrer')}
-                >
-                  Abrir no Google Maps
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!result.links.waze}
-                  onClick={() => result.links.waze && window.open(result.links.waze, '_blank', 'noopener,noreferrer')}
-                >
-                  Abrir no Waze
-                </Button>
+              <div className="space-y-3">
+                {result.groups.map(group => (
+                  <Card key={group.groupId} className="p-3">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <Badge>{group.groupId}</Badge>
+                      <Badge variant="outline">
+                        {group.dateRange.from || "sem data"} até{" "}
+                        {group.dateRange.to || "sem data"}
+                      </Badge>
+                    </div>
+                    <div className="space-y-2">
+                      {group.routes.map(route => (
+                        <div
+                          key={route.routeId}
+                          className="rounded-md border p-2"
+                        >
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary">{route.routeId}</Badge>
+                            <Badge variant="outline">
+                              Distância:{" "}
+                              {route.summary.distance_m
+                                ? formatDistance(route.summary.distance_m)
+                                : "n/d"}
+                            </Badge>
+                            <Badge variant="outline">
+                              Tempo:{" "}
+                              {route.summary.duration_s
+                                ? formatDuration(route.summary.duration_s)
+                                : "n/d"}
+                            </Badge>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={!route.googleMapsUrl}
+                              onClick={() =>
+                                route.googleMapsUrl &&
+                                window.open(
+                                  route.googleMapsUrl,
+                                  "_blank",
+                                  "noopener,noreferrer"
+                                )
+                              }
+                            >
+                              Abrir no Google Maps
+                            </Button>
+                          </div>
+                          <ol className="space-y-1 text-sm">
+                            {route.stops.map(stop => (
+                              <li
+                                key={stop.os_id}
+                                className="rounded-md border p-2"
+                              >
+                                <p className="font-medium">
+                                  #{stop.sequence} • {stop.client_name} (
+                                  {stop.sale_number})
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {stop.address || "Sem endereço"} •{" "}
+                                  {stop.delivery_date || "Sem data"}
+                                </p>
+                              </li>
+                            ))}
+                          </ol>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                ))}
               </div>
             </div>
           )}
@@ -481,8 +529,8 @@ export default function InstallationsInbox({
             <Button variant="outline" onClick={() => setOptimizeOpen(false)}>
               Fechar
             </Button>
-            <Button onClick={handleOptimizeRoute} disabled={optimizing || routeOrders.length === 0}>
-              {optimizing ? 'Otimizando...' : 'Gerar rota'}
+            <Button onClick={handleOptimizeRoute} disabled={optimizing}>
+              {optimizing ? "Otimizando..." : "Gerar rota"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -493,38 +541,38 @@ export default function InstallationsInbox({
           <Input
             placeholder="Pesquisar..."
             value={searchValue}
-            onChange={(event) => onSearchChange(event.target.value)}
+            onChange={event => onSearchChange(event.target.value)}
           />
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
-              variant={quickFilter === 'today' ? 'default' : 'outline'}
+              variant={quickFilter === "today" ? "default" : "outline"}
               size="sm"
-              onClick={() => setQuickFilter('today')}
+              onClick={() => setQuickFilter("today")}
             >
               Hoje ({quickFilterCounts.today})
             </Button>
             <Button
               type="button"
-              variant={quickFilter === 'week' ? 'default' : 'outline'}
+              variant={quickFilter === "week" ? "default" : "outline"}
               size="sm"
-              onClick={() => setQuickFilter('week')}
+              onClick={() => setQuickFilter("week")}
             >
               Esta semana ({quickFilterCounts.week})
             </Button>
             <Button
               type="button"
-              variant={quickFilter === 'overdue' ? 'default' : 'outline'}
+              variant={quickFilter === "overdue" ? "default" : "outline"}
               size="sm"
-              onClick={() => setQuickFilter('overdue')}
+              onClick={() => setQuickFilter("overdue")}
             >
               Atrasadas ({quickFilterCounts.overdue})
             </Button>
             <Button
               type="button"
-              variant={quickFilter === 'all' ? 'default' : 'outline'}
+              variant={quickFilter === "all" ? "default" : "outline"}
               size="sm"
-              onClick={() => setQuickFilter('all')}
+              onClick={() => setQuickFilter("all")}
             >
               Todas ({quickFilterCounts.all})
             </Button>
@@ -539,7 +587,7 @@ export default function InstallationsInbox({
                 Nenhum resultado para sua busca.
               </Card>
             ) : (
-              filteredOrders.map((order) => {
+              filteredOrders.map(order => {
                 const isSelected = order.id === selectedId;
                 const isOverdue = getIsOverdue(order);
                 const isToday = getIsToday(order);
@@ -549,11 +597,11 @@ export default function InstallationsInbox({
                     type="button"
                     onClick={() => onSelect(order.id)}
                     className={cn(
-                      'flex w-full flex-col gap-2 rounded-lg border p-3 text-left transition',
+                      "flex w-full flex-col gap-2 rounded-lg border p-3 text-left transition",
                       isSelected
-                        ? 'border-primary bg-primary/5 shadow-sm'
-                        : 'hover:border-muted-foreground/40 hover:bg-muted/40',
-                      isOverdue && 'border-l-4 border-l-destructive'
+                        ? "border-primary bg-primary/5 shadow-sm"
+                        : "hover:border-muted-foreground/40 hover:bg-muted/40",
+                      isOverdue && "border-l-4 border-l-destructive"
                     )}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -568,12 +616,16 @@ export default function InstallationsInbox({
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <Badge variant="secondary">{getStatusLabel(order)}</Badge>
-                      {isOverdue && <Badge variant="destructive">ATRASADA</Badge>}
+                      {isOverdue && (
+                        <Badge variant="destructive">ATRASADA</Badge>
+                      )}
                       {isToday && <Badge>HOJE</Badge>}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       {order.delivery_date && (
-                        <Badge variant="outline">Entrega: {formatDate(order.delivery_date)}</Badge>
+                        <Badge variant="outline">
+                          Entrega: {formatDate(order.delivery_date)}
+                        </Badge>
                       )}
                       <Badge>Instalação</Badge>
                     </div>
@@ -603,33 +655,50 @@ export default function InstallationsInbox({
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                  <Badge variant="secondary">{getStatusLabel(selectedOrder)}</Badge>
-                  {getIsOverdue(selectedOrder) && <Badge variant="destructive">ATRASADA</Badge>}
+                  <Badge variant="secondary">
+                    {getStatusLabel(selectedOrder)}
+                  </Badge>
+                  {getIsOverdue(selectedOrder) && (
+                    <Badge variant="destructive">ATRASADA</Badge>
+                  )}
                   {getIsToday(selectedOrder) && <Badge>HOJE</Badge>}
                 </div>
               </div>
 
               <div className="grid gap-3 text-sm">
                 <div>
-                  <p className="text-xs uppercase text-muted-foreground">Descrição detalhada</p>
-                  <p>{selectedOrder.description || '(sem descrição)'}</p>
+                  <p className="text-xs uppercase text-muted-foreground">
+                    Descrição detalhada
+                  </p>
+                  <p>{selectedOrder.description || "(sem descrição)"}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-muted-foreground">Data de entrega</p>
+                  <p className="text-xs uppercase text-muted-foreground">
+                    Data de entrega
+                  </p>
                   <p>{formatDate(selectedOrder.delivery_date)}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-muted-foreground">Endereço</p>
-                  <p>{selectedOrder.address || '(não informado)'}</p>
+                  <p className="text-xs uppercase text-muted-foreground">
+                    Endereço
+                  </p>
+                  <p>{selectedOrder.address || "(não informado)"}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-muted-foreground">Flags</p>
+                  <p className="text-xs uppercase text-muted-foreground">
+                    Flags
+                  </p>
                   <div className="flex flex-wrap gap-2">
-                    {selectedOrder.reproducao && <Badge variant="secondary">Reprodução</Badge>}
-                    {selectedOrder.letra_caixa && <Badge variant="secondary">Letra caixa</Badge>}
-                    {!selectedOrder.reproducao && !selectedOrder.letra_caixa && (
-                      <span className="text-muted-foreground">(nenhuma)</span>
+                    {selectedOrder.reproducao && (
+                      <Badge variant="secondary">Reprodução</Badge>
                     )}
+                    {selectedOrder.letra_caixa && (
+                      <Badge variant="secondary">Letra caixa</Badge>
+                    )}
+                    {!selectedOrder.reproducao &&
+                      !selectedOrder.letra_caixa && (
+                        <span className="text-muted-foreground">(nenhuma)</span>
+                      )}
                   </div>
                 </div>
               </div>
