@@ -22,6 +22,7 @@ const EVENT_OPTIONS = [
   { value: 'status_change', label: 'Mudança de Status' },
   { value: 'archive', label: 'Arquivamento' },
   { value: 'delete', label: 'Exclusão' },
+  { value: 'FINANCE_INSTALLMENT_STATUS_CHANGED', label: 'Financeiro (status parcela)' },
 ];
 
 const formatDateTime = (value: string) =>
@@ -62,6 +63,16 @@ const formatDetails = (event: OsOrderEvent) => {
   if (event.type === 'delete') {
     return 'Exclusão manual.';
   }
+
+  if (event.type === 'FINANCE_INSTALLMENT_STATUS_CHANGED') {
+    const installmentNo = payload?.installment_no ?? '—';
+    const totalInstallments = payload?.total_installments ?? '—';
+    const oldStatus = payload?.old_status ?? '—';
+    const newStatus = payload?.new_status ?? '—';
+    const notes = payload?.notes ? ` | Obs.: ${payload.notes}` : '';
+    return `Parcela ${installmentNo}/${totalInstallments}: ${oldStatus} → ${newStatus}${notes}`;
+  }
+
   return JSON.stringify(payload ?? {});
 };
 
