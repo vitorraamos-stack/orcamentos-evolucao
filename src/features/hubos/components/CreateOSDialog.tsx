@@ -270,6 +270,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
             "Documentos financeiros enviados e aguardando sincronização."
           );
         }
+        clearDraft();
         reset();
         setOpen(false);
       } catch (uploadError) {
@@ -362,6 +363,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
           setUploadingAssets(false);
         }
       }
+      clearDraft();
       reset();
       setOpen(false);
     } catch (error) {
