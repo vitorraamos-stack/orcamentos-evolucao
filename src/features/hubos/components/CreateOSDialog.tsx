@@ -171,7 +171,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     selectedFiles.length > 0 ||
     financialDocs.length > 0;
 
-  const handleSaveAsDraft = async () => {
+  const confirmSaveDraftAndCreateCard = async () => {
     if (!getHasDraftableData()) {
       setConfirmDraftDialogOpen(false);
       setOpen(false);
@@ -975,7 +975,7 @@ Orientações para a criação de arte:`}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Não</AlertDialogCancel>
-            <AlertDialogAction onClick={handleSaveAsDraft}>
+            <AlertDialogAction onClick={confirmSaveDraftAndCreateCard}>
               Sim
             </AlertDialogAction>
           </AlertDialogFooter>
