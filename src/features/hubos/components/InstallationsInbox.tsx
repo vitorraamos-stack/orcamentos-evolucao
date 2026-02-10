@@ -40,6 +40,12 @@ const todayAsInput = () => {
   return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 10);
 };
 
+const todayAsInput = () => {
+  const now = new Date();
+  const timezoneOffset = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 10);
+};
+
 const formatDate = (value: string | null) => {
   if (!value) return "Sem data";
   const [year, month, day] = value.split("-").map(Number);
@@ -147,6 +153,15 @@ export default function InstallationsInbox({
       );
     });
   }, [orders, searchValue]);
+
+  const routeOrders = useMemo(
+    () => orders.filter((order) => order.delivery_date === routeDate),
+    [orders, routeDate]
+  );
+
+  useEffect(() => {
+    setSelectedOrderIds(routeOrders.map((order) => order.id));
+  }, [routeDate, optimizeOpen, routeOrders]);
 
   const getIsToday = useCallback(
     (order: OsOrder) => {

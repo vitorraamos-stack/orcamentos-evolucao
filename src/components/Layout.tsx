@@ -9,7 +9,8 @@ import {
   Package, 
   LogOut, 
   Menu,
-  Settings
+  Settings,
+  BadgeDollarSign
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
@@ -45,6 +46,7 @@ export default function Layout({ children }: LayoutProps) {
   const canViewCalculadora = hasModuleAccess('calculadora');
   const canViewMateriais = isAdmin && hasModuleAccess('materiais');
   const canViewConfiguracoes = hubPermissions.canManageUsers && hasModuleAccess('configuracoes');
+  const canViewFinanceiro = hasModuleAccess('hub_os_financeiro');
 
   const NavItems = () => (
     <div className="space-y-1">
@@ -59,6 +61,19 @@ export default function Layout({ children }: LayoutProps) {
           >
             <ClipboardList className="mr-2 h-4 w-4" />
             Hub OS
+          </Button>
+        </Link>
+      )}
+
+
+      {canViewFinanceiro && (
+        <Link href="/hub-os/financeiro">
+          <Button
+            variant={location.startsWith('/hub-os/financeiro') ? 'secondary' : 'ghost'}
+            className={cn("w-full justify-start", location.startsWith('/hub-os/financeiro') && "bg-sidebar-accent text-sidebar-accent-foreground")}
+          >
+            <BadgeDollarSign className="mr-2 h-4 w-4" />
+            Financeiro
           </Button>
         </Link>
       )}

@@ -72,6 +72,55 @@ export const optimizeInstallationRoute = async (
   return json as OptimizeInstallationRouteResponse;
 };
 
+
+export type OptimizeInstallationRoutePayload = {
+  date: string;
+  orderIds?: string[];
+  startAddress?: string;
+  endAddress?: string;
+  roundtrip?: boolean;
+};
+
+export type OptimizeInstallationRouteResponse = {
+  date: string;
+  provider: 'mapbox';
+  limit: {
+    maxStops: number;
+  };
+  route: {
+    distance_m: number;
+    duration_s: number;
+  };
+  stops: Array<
+    | {
+        type: 'start' | 'end';
+        address: string;
+        lat: number;
+        lng: number;
+      }
+    | {
+        type: 'order';
+        orderId: string;
+        clientName: string;
+        address: string;
+        lat: number;
+        lng: number;
+        sequence: number;
+      }
+  >;
+  links: {
+    googleMaps: string | null;
+    waze: string | null;
+  };
+  skipped: Array<{
+    orderId: string;
+    reason: string;
+  }>;
+};
+
+export const optimizeInstallationRoute = async (payload: OptimizeInstallationRoutePayload) =>
+  invokeEdgeFunction<OptimizeInstallationRouteResponse>(supabase, 'optimize-installation-route', payload);
+
 export const fetchOrders = async () => {
   const { data, error } = await supabase
     .from("os_orders")
