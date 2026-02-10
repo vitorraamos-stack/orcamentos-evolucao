@@ -161,18 +161,17 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   };
 
   const confirmSaveDraftAndCreateCard = async () => {
-    const draftHasAnyData =
-      Boolean(saleNumber.trim()) ||
-      Boolean(clientName.trim()) ||
-      Boolean(description.trim()) ||
-      Boolean(deliveryDate) ||
-      logisticType !== "retirada" ||
-      Boolean(address.trim()) ||
-      Boolean(selectedArtDirectionTag) ||
-      selectedFiles.length > 0 ||
-      financialDocs.length > 0;
-
-    if (!draftHasAnyData) {
+    if (
+      !Boolean(saleNumber.trim()) &&
+      !Boolean(clientName.trim()) &&
+      !Boolean(description.trim()) &&
+      !Boolean(deliveryDate) &&
+      logisticType === "retirada" &&
+      !Boolean(address.trim()) &&
+      !Boolean(selectedArtDirectionTag) &&
+      selectedFiles.length === 0 &&
+      financialDocs.length === 0
+    ) {
       setConfirmDraftDialogOpen(false);
       setOpen(false);
       reset();
