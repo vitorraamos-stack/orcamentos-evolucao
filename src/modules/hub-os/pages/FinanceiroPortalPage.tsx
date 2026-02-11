@@ -52,9 +52,18 @@ export default function FinanceiroPortalPage() {
     useState<FinanceInstallmentStatus | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewRenderUrl, setPreviewRenderUrl] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (previewRenderUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(previewRenderUrl);
+      }
+    };
+  }, [previewRenderUrl]);
 
   const load = async () => {
     try {
@@ -129,6 +138,10 @@ export default function FinanceiroPortalPage() {
     setPreviewLoading(true);
     setPreviewError(null);
     setPreviewUrl(null);
+    if (previewRenderUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(previewRenderUrl);
+    }
+    setPreviewRenderUrl(null);
     setPreviewName(asset?.original_name ?? "Comprovante");
 
     try {
@@ -151,6 +164,21 @@ export default function FinanceiroPortalPage() {
       }
 
       setPreviewUrl(data.downloadUrl);
+
+      try {
+        const response = await fetch(data.downloadUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        setPreviewRenderUrl(URL.createObjectURL(blob));
+      } catch (blobError) {
+        console.warn(
+          "Falha ao criar blob para preview, usando URL direta.",
+          blobError
+        );
+      }
     } catch (error) {
       console.error(error);
       setPreviewError(
@@ -320,11 +348,16 @@ export default function FinanceiroPortalPage() {
         onOpenChange={open => {
           setPreviewOpen(open);
           if (!open) {
+            if (previewRenderUrl?.startsWith("blob:")) {
+              URL.revokeObjectURL(previewRenderUrl);
+            }
+            setPreviewRenderUrl(null);
             setPreviewUrl(null);
             setPreviewError(null);
           }
         }}
         url={previewUrl}
+        previewUrl={previewRenderUrl}
         filename={previewName}
         loading={previewLoading}
         error={previewError}

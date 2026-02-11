@@ -11,6 +11,7 @@ type ComprovantePreviewDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   url: string | null;
+  previewUrl?: string | null;
   filename: string | null;
   loading: boolean;
   error: string | null;
@@ -27,6 +28,7 @@ export function ComprovantePreviewDialog({
   open,
   onOpenChange,
   url,
+  previewUrl,
   filename,
   loading,
   error,
@@ -48,6 +50,7 @@ export function ComprovantePreviewDialog({
   }, [open]);
 
   const canOpen = Boolean(url);
+  const displayUrl = previewUrl ?? url;
 
   const openInNewTab = () => {
     if (!url) return;
@@ -88,7 +91,7 @@ export function ComprovantePreviewDialog({
             </div>
           )}
 
-          {!loading && !error && canOpen && fileType === "image" && (
+          {!loading && !error && displayUrl && fileType === "image" && (
             <div className="flex h-full w-full flex-col">
               <div className="flex items-center justify-end gap-2 border-b px-4 py-2">
                 <Button
@@ -129,7 +132,7 @@ export function ComprovantePreviewDialog({
               </div>
               <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
                 <img
-                  src={url ?? undefined}
+                  src={displayUrl}
                   alt={filename ?? "Comprovante"}
                   className="max-h-full w-auto object-contain"
                   style={{
@@ -141,15 +144,15 @@ export function ComprovantePreviewDialog({
             </div>
           )}
 
-          {!loading && !error && canOpen && fileType === "pdf" && (
+          {!loading && !error && displayUrl && fileType === "pdf" && (
             <iframe
-              src={url ?? undefined}
+              src={displayUrl}
               title={filename ?? "Comprovante PDF"}
               className="h-full w-full"
             />
           )}
 
-          {!loading && !error && canOpen && fileType === "other" && (
+          {!loading && !error && displayUrl && fileType === "other" && (
             <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
               <p className="text-sm">
                 Pré-visualização indisponível para este formato.
