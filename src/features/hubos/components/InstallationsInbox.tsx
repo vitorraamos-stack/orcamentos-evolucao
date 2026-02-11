@@ -96,7 +96,7 @@ const skippedReasonLabel: Record<string, string> = {
   geocode_failed: "Falha ao geocodificar endereço",
 };
 
-const DEFAULT_BASE_ADDRESS = "João Grumiche, 196 - Kobrasol - São José";
+const DEFAULT_BASE_ADDRESS = "Rua João Grumiche, 196 - Kobrasol São José - SC, 88102-600";
 
 const formatGroupLabel = (groupId: string) => {
   const match = groupId.match(/date-(\d+)__?geo-(\d+)/i);
@@ -113,6 +113,20 @@ const formatRouteLabel = (routeId: string) => {
 const buildWazeUrl = (coords: [number, number]) => {
   const [lon, lat] = coords;
   return `https://waze.com/ul?ll=${lat},${lon}&navigate=yes`;
+};
+
+const addressHasCityUfCep = (address: string) => {
+  const normalized = address.trim();
+  if (!normalized) return false;
+
+  const hasUf = /\b(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)\b/i.test(
+    normalized
+  );
+  const hasCep = /\b\d{5}-?\d{3}\b/.test(normalized);
+  const parts = normalized.split("-").map(part => part.trim()).filter(Boolean);
+  const hasCityByParts = parts.length >= 3;
+
+  return hasUf || hasCep || hasCityByParts;
 };
 
 export default function InstallationsInbox({
@@ -137,6 +151,8 @@ export default function InstallationsInbox({
   const [optimizing, setOptimizing] = useState(false);
   const [result, setResult] =
     useState<OptimizeInstallationRouteResponse | null>(null);
+  const [allowOptimizeWithIncompleteAddresses, setAllowOptimizeWithIncompleteAddresses] =
+    useState(false);
 
   const selectedOrder = useMemo(
     () => orders.find(order => order.id === selectedId) ?? null,
@@ -169,11 +185,16 @@ export default function InstallationsInbox({
   }, [orders, searchValue]);
 
   useEffect(() => {
-    const selectedByDate = orders
-      .filter(order => order.delivery_date === dateFrom)
+    const selectedByRange = orders
+      .filter(order => {
+        if (!order.delivery_date) return false;
+        if (dateFrom && order.delivery_date < dateFrom) return false;
+        if (dateTo && order.delivery_date > dateTo) return false;
+        return true;
+      })
       .map(order => order.id);
-    setSelectedOrderIds(selectedByDate);
-  }, [dateFrom, orders]);
+    setSelectedOrderIds(selectedByRange);
+  }, [dateFrom, dateTo, orders]);
 
   const getIsToday = useCallback(
     (order: OsOrder) => {
@@ -238,6 +259,40 @@ export default function InstallationsInbox({
     });
   }, [getIsOverdue, getIsToday, getIsWeek, quickFilter, searchFilteredOrders]);
 
+  const selectedOrdersForDateRange = useMemo(
+    () =>
+      orders.filter(order => {
+        if (!order.delivery_date) return false;
+        if (dateFrom && order.delivery_date < dateFrom) return false;
+        if (dateTo && order.delivery_date > dateTo) return false;
+        return true;
+      }),
+    [dateFrom, dateTo, orders]
+  );
+
+  const addressWarnings = useMemo(() => {
+    const warnings: string[] = [];
+
+    if (startAddress.trim() && !addressHasCityUfCep(startAddress)) {
+      warnings.push(
+        "O ponto de partida parece incompleto (inclua cidade/UF ou CEP)."
+      );
+    }
+
+    const ordersWithIncompleteAddress = selectedOrdersForDateRange.filter(order => {
+      if (!order.address?.trim()) return false;
+      return !addressHasCityUfCep(order.address);
+    });
+
+    if (ordersWithIncompleteAddress.length > 0) {
+      warnings.push(
+        `${ordersWithIncompleteAddress.length} OS com endereço possivelmente incompleto (sem cidade/UF/CEP).`
+      );
+    }
+
+    return warnings;
+  }, [selectedOrdersForDateRange, startAddress]);
+
   useEffect(() => {
     if (!filteredOrders.length) {
       if (selectedId !== null) {
@@ -300,6 +355,13 @@ export default function InstallationsInbox({
   };
 
   const handleOptimizeRoute = async () => {
+    if (addressWarnings.length > 0 && !allowOptimizeWithIncompleteAddresses) {
+      toast.error(
+        "Revise os endereços (cidade/UF/CEP) ou habilite a opção para continuar mesmo assim."
+      );
+      return;
+    }
+
     setOptimizing(true);
     setResult(null);
 
@@ -312,6 +374,7 @@ export default function InstallationsInbox({
         maxStopsPerRoute: Number(maxStopsPerRoute || 20),
         startAddress: startAddress.trim() || null,
         profile: "driving-car",
+        orderIds: selectedOrderIds.length > 0 ? selectedOrderIds : null,
       });
       setResult(payload);
       toast.success("Rota otimizada com sucesso.");
@@ -350,6 +413,7 @@ export default function InstallationsInbox({
               setGeoClusterRadiusKm("5");
               setMaxStopsPerRoute("20");
               setStartAddress(DEFAULT_BASE_ADDRESS);
+              setAllowOptimizeWithIncompleteAddresses(false);
               setResult(null);
               setOptimizeOpen(true);
             }}
@@ -432,6 +496,61 @@ export default function InstallationsInbox({
             </div>
           </div>
 
+          {addressWarnings.length > 0 && (
+            <Card className="border-amber-300 bg-amber-50 p-3">
+              <p className="text-sm font-medium text-amber-900">
+                Atenção com os endereços antes de otimizar
+              </p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-900">
+                {addressWarnings.map(warning => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+              <label className="mt-3 flex items-center gap-2 text-xs text-amber-900">
+                <input
+                  type="checkbox"
+                  checked={allowOptimizeWithIncompleteAddresses}
+                  onChange={event =>
+                    setAllowOptimizeWithIncompleteAddresses(event.target.checked)
+                  }
+                />
+                Continuar mesmo com endereços incompletos
+              </label>
+            </Card>
+          )}
+
+
+          <div className="space-y-2 rounded-md border p-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">OS incluídas na otimização</p>
+              <p className="text-xs text-muted-foreground">{selectedOrderIds.length}/{selectedOrdersForDateRange.length} selecionadas</p>
+            </div>
+            <div className="max-h-40 space-y-1 overflow-y-auto pr-1">
+              {selectedOrdersForDateRange.map(order => {
+                const checked = selectedOrderIds.includes(order.id);
+                return (
+                  <label key={order.id} className="flex items-center gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={event => {
+                        setSelectedOrderIds(current =>
+                          event.target.checked
+                            ? [...current, order.id]
+                            : current.filter(id => id !== order.id)
+                        );
+                      }}
+                    />
+                    <span className="truncate">{order.sale_number} - {order.client_name}</span>
+                  </label>
+                );
+              })}
+              {selectedOrdersForDateRange.length === 0 && (
+                <p className="text-xs text-muted-foreground">Nenhuma OS no intervalo selecionado.</p>
+              )}
+            </div>
+          </div>
+
           {result && (
             <div className="space-y-3 rounded-md border p-3">
               <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -484,13 +603,13 @@ export default function InstallationsInbox({
                             <Badge variant="secondary">{formatRouteLabel(route.routeId)}</Badge>
                             <Badge variant="outline">
                               Distância:{" "}
-                              {route.summary.distance_m
+                              {route.summary.distance_m != null
                                 ? formatDistance(route.summary.distance_m)
                                 : "n/d"}
                             </Badge>
                             <Badge variant="outline">
                               Tempo:{" "}
-                              {route.summary.duration_s
+                              {route.summary.duration_s != null
                                 ? formatDuration(route.summary.duration_s)
                                 : "n/d"}
                             </Badge>
