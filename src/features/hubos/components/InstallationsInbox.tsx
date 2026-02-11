@@ -364,7 +364,7 @@ export default function InstallationsInbox({
       </div>
 
       <Dialog open={optimizeOpen} onOpenChange={setOptimizeOpen}>
-        <DialogContent className="max-h-[90vh] max-w-3xl overflow-hidden">
+        <DialogContent className="max-h-[calc(100vh-2rem)] w-[96vw] overflow-y-auto sm:max-w-5xl lg:max-w-6xl">
           <DialogHeader>
             <DialogTitle>Otimizar rota de instalações</DialogTitle>
             <DialogDescription>
@@ -465,7 +465,7 @@ export default function InstallationsInbox({
                 </div>
               )}
 
-              <div className="space-y-3">
+              <div className="grid gap-3 lg:grid-cols-2">
                 {result.groups.map(group => (
                   <Card key={formatGroupLabel(group.groupId)} className="p-3">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
