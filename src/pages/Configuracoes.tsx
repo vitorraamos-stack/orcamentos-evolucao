@@ -76,6 +76,28 @@ export default function Configuracoes() {
     return headers;
   };
 
+  const parseApiResponse = async (response: Response) => {
+    const raw = await response.text();
+
+    if (!raw) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(raw) as any;
+    } catch {
+      const fallbackMessage = raw
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 240);
+
+      throw new Error(
+        fallbackMessage ||
+          'A API retornou uma resposta inválida. Verifique o endpoint /api/admin-users.'
+      );
+    }
+  };
+
   const requestAdminUsers = async (options: RequestInit) => {
     const accessToken = session?.access_token;
     if (!accessToken) {
@@ -110,7 +132,7 @@ export default function Configuracoes() {
     setLoadingUsers(true);
     try {
       const response = await requestAdminUsers({ method: 'GET' });
-      const result = await response.json();
+      const result = await parseApiResponse(response);
       if (!response.ok) throw new Error(result.error?.message || 'Erro ao carregar usuários.');
       setUsers(result.data?.users || []);
     } catch (error: any) {
@@ -162,7 +184,7 @@ export default function Configuracoes() {
           modules: newModules,
         }),
       });
-      const result = await response.json();
+      const result = await parseApiResponse(response);
       if (!response.ok) throw new Error(result.error?.message || 'Erro ao criar usuário.');
 
       toast.success('Usuário criado com sucesso.');
@@ -196,7 +218,7 @@ export default function Configuracoes() {
           modules: editModules,
         }),
       });
-      const result = await response.json();
+      const result = await parseApiResponse(response);
       if (!response.ok) throw new Error(result.error?.message || 'Erro ao editar usuário.');
       toast.success('Usuário atualizado com sucesso.');
       setEditingUser(null);
@@ -220,7 +242,7 @@ export default function Configuracoes() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: passwordUser.id, newPassword: password }),
       });
-      const result = await response.json();
+      const result = await parseApiResponse(response);
       if (!response.ok) throw new Error(result.error?.message || 'Erro ao redefinir senha.');
       toast.success('Senha redefinida com sucesso.');
       setPasswordUser(null);
@@ -244,7 +266,7 @@ export default function Configuracoes() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, setActive: nextActive }),
       });
-      const result = await response.json();
+      const result = await parseApiResponse(response);
       if (!response.ok) throw new Error(result.error?.message || 'Erro ao alterar status.');
       toast.success(`Usuário ${nextActive ? 'reativado' : 'desativado'} com sucesso.`);
       fetchUsers();

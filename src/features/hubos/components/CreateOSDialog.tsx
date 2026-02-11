@@ -61,20 +61,11 @@ import {
   ACCEPTED_ASSET_CONTENT_TYPES,
   MAX_ASSET_FILE_SIZE_BYTES,
 } from "@/features/hubos/assetUtils";
-import type { FinancialDoc, FinancialDocType } from "@/features/hubos/assets";
+import type { FinancialDoc, FinancialDocType, FinancialInstallmentLabel } from "@/features/hubos/assets";
 
 const DEFAULT_FINANCIAL_DOC_TYPE: FinancialDocType = "PAYMENT_PROOF";
-const DRAFT_STORAGE_KEY = "hubos:create-os-draft";
-
-interface CreateOsDraft {
-  saleNumber: string;
-  clientName: string;
-  description: string;
-  deliveryDate: string;
-  logisticType: LogisticType;
-  address: string;
-  selectedArtDirectionTag: ArtDirectionTag | null;
-}
+const DEFAULT_INSTALLMENT_LABEL: FinancialInstallmentLabel = '1/1';
+const OS_DRAFT_STORAGE_KEY = 'hubos:create-os-draft';
 
 interface CreateOSDialogProps {
   onCreated: (order: OsOrder) => void;
@@ -103,6 +94,31 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   const reproducao = false;
   const letraCaixa = false;
 
+  const saveDraft = () => {
+    try {
+      const payload = {
+        saleNumber,
+        clientName,
+        description,
+        deliveryDate,
+        logisticType,
+        address,
+        selectedArtDirectionTag,
+      };
+      localStorage.setItem(OS_DRAFT_STORAGE_KEY, JSON.stringify(payload));
+    } catch (error) {
+      console.error('Erro ao salvar rascunho local da OS.', error);
+    }
+  };
+
+  const clearDraft = () => {
+    try {
+      localStorage.removeItem(OS_DRAFT_STORAGE_KEY);
+    } catch (error) {
+      console.error('Erro ao limpar rascunho local da OS.', error);
+    }
+  };
+
   const reset = () => {
     setSaleNumber("");
     setClientName("");
@@ -122,42 +138,10 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     }
   };
 
-  const saveDraft = () => {
-    const draft: CreateOsDraft = {
-      saleNumber,
-      clientName,
-      description,
-      deliveryDate,
-      logisticType,
-      address,
-      selectedArtDirectionTag,
-    };
-    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-  };
-
-  const clearDraft = () => {
-    localStorage.removeItem(DRAFT_STORAGE_KEY);
-  };
-
-  const loadDraft = () => {
-    const draftRaw = localStorage.getItem(DRAFT_STORAGE_KEY);
-    if (!draftRaw) return;
-
-    try {
-      const draft = JSON.parse(draftRaw) as Partial<CreateOsDraft>;
-      setSaleNumber(draft.saleNumber ?? "");
-      setClientName(draft.clientName ?? "");
-      setDescription(draft.description ?? "");
-      setDeliveryDate(draft.deliveryDate ?? "");
-      setLogisticType((draft.logisticType as LogisticType) ?? "retirada");
-      setAddress(draft.address ?? "");
-      setSelectedArtDirectionTag(
-        (draft.selectedArtDirectionTag as ArtDirectionTag | null) ?? null
-      );
-      toast.message("Rascunho da OS carregado.");
-    } catch {
-      clearDraft();
-    }
+  const closeDialogAfterConfirmation = () => {
+    setConfirmDraftDialogOpen(false);
+    setOpen(false);
+    reset();
   };
 
   const confirmSaveDraftAndCreateCard = async () => {
@@ -312,6 +296,8 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
       ...Array.from(files).map(file => ({
         file,
         type: DEFAULT_FINANCIAL_DOC_TYPE,
+        installmentLabel: DEFAULT_INSTALLMENT_LABEL,
+        secondDueDate: null,
       })),
     ]);
     if (financialDocInputRef.current) {
@@ -328,8 +314,36 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   const updateFinancialDocType = (index: number, newType: FinancialDocType) => {
     setFinancialDocs(current =>
       current.map((doc, itemIndex) =>
-        itemIndex === index ? { ...doc, type: newType } : doc
+        itemIndex === index
+          ? {
+              ...doc,
+              type: newType,
+              installmentLabel:
+                newType === 'PAYMENT_PROOF' ? doc.installmentLabel ?? DEFAULT_INSTALLMENT_LABEL : undefined,
+              secondDueDate: newType === 'PAYMENT_PROOF' ? doc.secondDueDate ?? null : undefined,
+            }
+          : doc
       )
+    );
+  };
+
+  const updateInstallmentLabel = (index: number, installmentLabel: FinancialInstallmentLabel) => {
+    setFinancialDocs((current) =>
+      current.map((doc, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...doc,
+              installmentLabel,
+              secondDueDate: installmentLabel === '1/2' ? doc.secondDueDate ?? '' : null,
+            }
+          : doc
+      )
+    );
+  };
+
+  const updateSecondDueDate = (index: number, secondDueDate: string) => {
+    setFinancialDocs((current) =>
+      current.map((doc, itemIndex) => (itemIndex === index ? { ...doc, secondDueDate } : doc))
     );
   };
 
@@ -391,6 +405,14 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
       toast.error(
         financialValidation.error ?? "Documentos financeiros inválidos."
       );
+      return;
+    }
+
+    const invalidProofDoc = financialDocs.find(
+      (doc) => doc.type === 'PAYMENT_PROOF' && doc.installmentLabel === '1/2' && !doc.secondDueDate
+    );
+    if (invalidProofDoc) {
+      toast.error('Para comprovante 1/2, a Data 2ª Parcela é obrigatória.');
       return;
     }
 
@@ -529,12 +551,6 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     <Dialog
       open={open}
       onOpenChange={nextOpen => {
-        if (nextOpen) {
-          loadDraft();
-          setOpen(true);
-          return;
-        }
-
         if (!nextOpen && confirmDraftDialogOpen) {
           return;
         }
@@ -921,6 +937,37 @@ Orientações para a criação de arte:`}
                                   </SelectItem>
                                 </SelectContent>
                               </Select>
+                              {doc.type === 'PAYMENT_PROOF' && (
+                                <>
+                                  <Select
+                                    value={doc.installmentLabel ?? DEFAULT_INSTALLMENT_LABEL}
+                                    onValueChange={(value) =>
+                                      updateInstallmentLabel(index, value as FinancialInstallmentLabel)
+                                    }
+                                    disabled={uploadingAssets || Boolean(pendingOrder)}
+                                  >
+                                    <SelectTrigger className="h-8 w-[90px] text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="1/1">1/1</SelectItem>
+                                      <SelectItem value="1/2">1/2</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  {(doc.installmentLabel ?? DEFAULT_INSTALLMENT_LABEL) === '1/2' && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-medium text-foreground">Data 2ª Parcela:</span>
+                                      <Input
+                                        type="date"
+                                        className="h-8 w-[170px] text-xs"
+                                        value={doc.secondDueDate ?? ''}
+                                        onChange={(event) => updateSecondDueDate(index, event.target.value)}
+                                        disabled={uploadingAssets || Boolean(pendingOrder)}
+                                      />
+                                    </div>
+                                  )}
+                                </>
+                              )}
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -956,16 +1003,16 @@ Orientações para a criação de arte:`}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Salvar como rascunho?</AlertDialogTitle>
+            <AlertDialogTitle>Tem certeza que deseja fechar?</AlertDialogTitle>
             <AlertDialogDescription>
-              Clique em "Sim" para salvar os dados preenchidos e fechar a tela.
-              Clique em "Não" para continuar editando.
+              Para evitar perda acidental de informações, confirme se deseja
+              fechar a tela de Nova Ordem de Serviço.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Não</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSaveDraftAndCreateCard}>
-              Sim
+            <AlertDialogCancel>Continuar editando</AlertDialogCancel>
+            <AlertDialogAction onClick={closeDialogAfterConfirmation}>
+              Fechar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
