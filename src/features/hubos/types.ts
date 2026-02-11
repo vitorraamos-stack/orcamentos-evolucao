@@ -92,3 +92,32 @@ export type AssetJob = {
   updated_at: string;
   last_error: string | null;
 };
+
+
+export type FinanceInstallmentStatus =
+  | 'AWAITING_PROOF'
+  | 'PENDING_REVIEW'
+  | 'CONCILIADO'
+  | 'LANCADO'
+  | 'REJEITADO'
+  | 'CADASTRO_PENDENTE';
+
+export type FinanceInstallment = {
+  id: string;
+  os_id: string;
+  installment_no: 1 | 2;
+  total_installments: 1 | 2;
+  due_date: string | null;
+  asset_id: string | null;
+  status: FinanceInstallmentStatus;
+  notes: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  os_orders?: Pick<OsOrder, 'id' | 'sale_number' | 'client_name' | 'created_at'> | null;
+  os_order_assets?: {
+    id: string;
+    object_path: string;
+    original_name: string | null;
+  } | null;
+};
