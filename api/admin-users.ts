@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
-import { APP_MODULE_KEYS, CONFIG_MODULE_KEY, type AppModuleKey } from '../src/constants/modules';
 
 const APP_MODULES = [
   { key: 'hub_os', label: 'Hub OS', routePrefixes: ['/hub-os', '/os'] },
+  { key: 'hub_os_financeiro', label: 'Financeiro', routePrefixes: ['/hub-os/financeiro', '/financeiro'] },
   { key: 'galeria', label: 'Galeria', routePrefixes: ['/galeria'] },
   { key: 'calculadora', label: 'Calculadora', routePrefixes: ['/'] },
   { key: 'materiais', label: 'Materiais', routePrefixes: ['/materiais'] },

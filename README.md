@@ -159,6 +159,7 @@ supabase functions deploy r2-presign-upload
 supabase functions deploy r2-presign-download
 supabase functions deploy r2-delete-objects
 supabase functions deploy r2-health
+supabase functions deploy optimize-installation-route
 ```
 
 6. Otimização de rota de instalações (ORS):

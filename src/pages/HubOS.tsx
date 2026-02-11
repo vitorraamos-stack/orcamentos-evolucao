@@ -16,8 +16,9 @@ import ArtDirectionTagPopup from '@/features/hubos/components/ArtDirectionTagPop
 import FiltersBar from '@/features/hubos/components/FiltersBar';
 import InstallationsInbox from '@/features/hubos/components/InstallationsInbox';
 import MetricsBar from '@/features/hubos/components/MetricsBar';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
+import { fetchPendingSecondInstallments } from '@/features/hubos/finance';
 
 const defaultFilters: HubOsFilters = {
   search: '',
@@ -44,6 +45,7 @@ const isOverdue = (order: OsOrder) => {
 
 export default function HubOS() {
   const { user, isAdmin, hubPermissions } = useAuth();
+  const [, setLocation] = useLocation();
   const [orders, setOrders] = useState<OsOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState(defaultFilters);
@@ -57,6 +59,7 @@ export default function HubOS() {
   const [selectedInstallationId, setSelectedInstallationId] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [assetJobByOsId, setAssetJobByOsId] = useState<Record<string, AssetJob | null>>({});
+  const [pendingInstallmentsCount, setPendingInstallmentsCount] = useState(0);
 
   useEffect(() => {
     if (hubPermissions.canViewArteBoard && !hubPermissions.canViewProducaoBoard) {
@@ -67,6 +70,17 @@ export default function HubOS() {
     }
   }, [hubPermissions.canViewArteBoard, hubPermissions.canViewProducaoBoard]);
 
+
+
+
+  const loadPendingInstallments = async () => {
+    try {
+      const pending = await fetchPendingSecondInstallments();
+      setPendingInstallmentsCount(pending.length);
+    } catch (error) {
+      console.error('Erro ao carregar pendências financeiras', error);
+    }
+  };
 
   const loadOrders = async () => {
     try {
@@ -89,6 +103,8 @@ export default function HubOS() {
         loadOrders();
       })
       .subscribe();
+
+    loadPendingInstallments();
 
     return () => {
       supabase.removeChannel(channel);
@@ -131,8 +147,9 @@ export default function HubOS() {
       instalacoes: orders.filter(
         (order) => order.logistic_type === 'instalacao' && order.prod_status !== 'Finalizados'
       ).length,
+      pendentes: pendingInstallmentsCount,
     };
-  }, [arteOrders, producaoOrders, filteredOrders, orders]);
+  }, [arteOrders, producaoOrders, filteredOrders, orders, pendingInstallmentsCount]);
 
   const installationOrders = useMemo(
     () => orders.filter((order) => order.logistic_type === 'instalacao'),
@@ -515,6 +532,7 @@ export default function HubOS() {
         onInstalacoesClick={() => {
           setViewMode('instalacoes');
         }}
+        onPendentesClick={() => setLocation('/hub-os/pendentes')}
       />
 
       {viewMode === 'kanban' ? (
