@@ -158,15 +158,26 @@ export default function FinanceiroPortalPage() {
         }
       );
 
-      if (!data?.downloadUrl) {
+      const previewData = await invokeEdgeFunction<{ downloadUrl: string }>(
+        supabase,
+        "r2-presign-download",
+        {
+          key: asset.object_path,
+          filename: asset.original_name ?? undefined,
+          forPreview: true,
+        }
+      );
+
+      if (!data?.downloadUrl || !previewData?.downloadUrl) {
         setPreviewError("Não foi possível gerar a URL do comprovante.");
         return;
       }
 
       setPreviewUrl(data.downloadUrl);
+      setPreviewRenderUrl(previewData.downloadUrl);
 
       try {
-        const response = await fetch(data.downloadUrl);
+        const response = await fetch(previewData.downloadUrl);
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
