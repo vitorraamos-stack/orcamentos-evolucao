@@ -39,60 +39,6 @@ const FILTER_STATUSES: Record<
   cadastro: ["CADASTRO_PENDENTE"],
 };
 
-const getFileExtension = (filename?: string | null) => {
-  if (!filename || !filename.includes(".")) return null;
-  return filename.split(".").pop()?.toLowerCase() ?? null;
-};
-
-const isPreviewBlobLikelyInvalid = (blob: Blob, filename?: string | null) => {
-  const extension = getFileExtension(filename);
-
-  if (!extension) {
-    return blob.size === 0;
-  }
-
-  if (["png", "jpg", "jpeg", "webp", "gif", "bmp"].includes(extension)) {
-    return (
-      blob.size === 0 ||
-      (!blob.type.startsWith("image/") &&
-        blob.type !== "application/octet-stream")
-    );
-  }
-
-  if (extension === "pdf") {
-    return (
-      blob.size === 0 ||
-      (!blob.type.includes("pdf") && blob.type !== "application/octet-stream")
-    );
-  }
-
-  return blob.size === 0;
-};
-
-const isMissingObjectError = (status: number, body: string) => {
-  const normalizedBody = body.toLowerCase();
-  return (
-    status === 404 ||
-    normalizedBody.includes("nosuchkey") ||
-    normalizedBody.includes("the specified key does not exist") ||
-    normalizedBody.includes("not found")
-  );
-};
-
-const buildPreviewFetchErrorMessage = (
-  status: number,
-  body: string,
-  filename?: string | null
-) => {
-  const looksLikeMissingObject = isMissingObjectError(status, body);
-
-  if (looksLikeMissingObject) {
-    return `Comprovante não encontrado no R2 (${filename ?? "arquivo"}). Provável remoção após sincronização SMB.`;
-  }
-
-  return "Não foi possível carregar a pré-visualização deste comprovante. Você ainda pode baixar ou abrir em nova aba.";
-};
-
 export default function FinanceiroPortalPage() {
   const { user } = useAuth();
   const [items, setItems] = useState<FinanceInstallment[]>([]);
@@ -228,40 +174,7 @@ export default function FinanceiroPortalPage() {
       }
 
       setPreviewUrl(data.downloadUrl);
-
-      try {
-        const response = await fetch(previewData.downloadUrl);
-        if (!response.ok) {
-          const responseBody = await response.text();
-          if (isMissingObjectError(response.status, responseBody)) {
-            setPreviewUrl(null);
-          }
-          setPreviewError(
-            buildPreviewFetchErrorMessage(
-              response.status,
-              responseBody,
-              asset.original_name
-            )
-          );
-          return;
-        }
-
-        const blob = await response.blob();
-
-        if (isPreviewBlobLikelyInvalid(blob, asset.original_name)) {
-          setPreviewError(
-            "O arquivo retornado não pôde ser renderizado como comprovante. Verifique se o objeto no R2 está íntegro."
-          );
-          return;
-        }
-
-        setPreviewRenderUrl(URL.createObjectURL(blob));
-      } catch (blobError) {
-        console.warn("Falha ao criar preview por blob.", blobError);
-        setPreviewError(
-          "Não foi possível carregar a pré-visualização deste comprovante. Você ainda pode baixar ou abrir em nova aba."
-        );
-      }
+      setPreviewRenderUrl(previewData.downloadUrl);
     } catch (error) {
       console.error(error);
       setPreviewError(
