@@ -52,7 +52,8 @@ export function ComprovantePreviewDialog({
   }, [open]);
 
   const canOpen = Boolean(url);
-  const displayUrl = previewUrl ?? url;
+  const displayUrl = previewUrl ?? null;
+  const hasPreviewMedia = Boolean(displayUrl);
 
   useEffect(() => {
     setMediaError(false);
@@ -99,7 +100,7 @@ export function ComprovantePreviewDialog({
 
           {!loading &&
             !error &&
-            displayUrl &&
+            hasPreviewMedia &&
             fileType === "image" &&
             !mediaError && (
               <div className="flex h-full w-full flex-col">
@@ -157,7 +158,7 @@ export function ComprovantePreviewDialog({
 
           {!loading &&
             !error &&
-            displayUrl &&
+            hasPreviewMedia &&
             fileType === "image" &&
             mediaError && (
               <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
@@ -171,21 +172,32 @@ export function ComprovantePreviewDialog({
               </div>
             )}
 
-          {!loading && !error && displayUrl && fileType === "pdf" && (
+          {!loading && !error && hasPreviewMedia && fileType === "pdf" && (
             <iframe
-              src={displayUrl}
+              src={displayUrl ?? undefined}
               title={filename ?? "Comprovante PDF"}
               className="h-full w-full"
             />
           )}
 
-          {!loading && !error && displayUrl && fileType === "other" && (
+          {!loading && !error && fileType === "other" && (
             <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
               <p className="text-sm">
                 Pré-visualização indisponível para este formato.
               </p>
               <p className="text-xs text-muted-foreground">
                 Use os botões abaixo para abrir ou baixar o comprovante.
+              </p>
+            </div>
+          )}
+
+          {!loading && !error && !hasPreviewMedia && fileType !== "other" && (
+            <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+              <p className="text-sm text-destructive">
+                Pré-visualização indisponível para este comprovante.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Você ainda pode baixar ou abrir em nova aba.
               </p>
             </div>
           )}
