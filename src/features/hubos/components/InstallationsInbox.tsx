@@ -134,7 +134,6 @@ export default function InstallationsInbox({
   const [geoClusterRadiusKm, setGeoClusterRadiusKm] = useState("5");
   const [maxStopsPerRoute, setMaxStopsPerRoute] = useState("20");
   const [startAddress, setStartAddress] = useState(DEFAULT_BASE_ADDRESS);
-  const [detailsIframeOrderId, setDetailsIframeOrderId] = useState<string | null>(null);
   const [optimizing, setOptimizing] = useState(false);
   const [result, setResult] =
     useState<OptimizeInstallationRouteResponse | null>(null);
@@ -543,7 +542,14 @@ export default function InstallationsInbox({
                                     type="button"
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => setDetailsIframeOrderId(stop.os_id)}
+                                    onClick={() => {
+                                      const matchedOrder = orders.find(order => order.id === stop.os_id);
+                                      if (!matchedOrder) {
+                                        toast.error("Não foi possível localizar esta OS na lista atual.");
+                                        return;
+                                      }
+                                      onEdit(matchedOrder);
+                                    }}
                                   >
                                     Abrir detalhes da OS
                                   </Button>
@@ -569,27 +575,6 @@ export default function InstallationsInbox({
             </div>
           )}
 
-
-          <Dialog
-            open={Boolean(detailsIframeOrderId)}
-            onOpenChange={(open) => !open && setDetailsIframeOrderId(null)}
-          >
-            <DialogContent className="max-h-[90vh] max-w-5xl overflow-hidden">
-              <DialogHeader>
-                <DialogTitle>Detalhes da OS</DialogTitle>
-                <DialogDescription>
-                  Visualização rápida da OS selecionada.
-                </DialogDescription>
-              </DialogHeader>
-              {detailsIframeOrderId && (
-                <iframe
-                  title={`Detalhes OS ${detailsIframeOrderId}`}
-                  src={`/os/${detailsIframeOrderId}`}
-                  className="h-[65vh] w-full rounded-md border"
-                />
-              )}
-            </DialogContent>
-          </Dialog>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setOptimizeOpen(false)}>
