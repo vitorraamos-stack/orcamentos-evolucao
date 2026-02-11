@@ -1,14 +1,17 @@
-import { supabase } from '@/lib/supabase';
-import { EdgeFunctionInvokeError, invokeEdgeFunction } from '@/lib/supabase/invokeEdgeFunction';
+import { supabase } from "@/lib/supabase";
+import {
+  EdgeFunctionInvokeError,
+  invokeEdgeFunction,
+} from "@/lib/supabase/invokeEdgeFunction";
 import {
   ASSET_BUCKET,
   buildAssetObjectPath,
   resolveAssetContentType,
   sanitizeFilename,
   validateFiles,
-} from './assetUtils';
+} from "./assetUtils";
 
-export { ASSET_BUCKET, sanitizeFilename, validateFiles } from './assetUtils';
+export { ASSET_BUCKET, sanitizeFilename, validateFiles } from "./assetUtils";
 
 type UploadAssetsParams = {
   osId: string;
@@ -16,11 +19,14 @@ type UploadAssetsParams = {
   userId: string | null;
 };
 
-export type FinancialDocType = 'PAYMENT_PROOF' | 'PURCHASE_ORDER';
+export type FinancialDocType = "PAYMENT_PROOF" | "PURCHASE_ORDER";
+export type FinancialInstallmentLabel = "1/1" | "1/2" | "2/2";
 
 export type FinancialDoc = {
   file: File;
   type: FinancialDocType;
+  installmentLabel?: FinancialInstallmentLabel;
+  secondDueDate?: string | null;
 };
 
 type UploadFinancialDocsParams = {
@@ -35,25 +41,30 @@ class PresignInvokeError extends Error {
 }
 
 const mapPresignError = (status?: number, details?: string) => {
-  if (status === 401 || /invalid jwt/i.test(details ?? '')) {
-    return 'Sessão expirada ou projeto Supabase incorreto. Faça login novamente.';
+  if (status === 401 || /invalid jwt/i.test(details ?? "")) {
+    return "Sessão expirada ou projeto Supabase incorreto. Faça login novamente.";
   }
 
   if (status === 404) {
-    return 'Edge Function r2-presign-upload não publicada neste projeto Supabase.';
+    return "Edge Function r2-presign-upload não publicada neste projeto Supabase.";
   }
 
-  if (status === 500 && /r2 env not configured/i.test(details ?? '')) {
-    return 'Secrets do R2 não configurados no Supabase.';
+  if (status === 500 && /r2 env not configured/i.test(details ?? "")) {
+    return "Secrets do R2 não configurados no Supabase.";
   }
 
   return null;
 };
 
-const buildPresignInvokeError = async (presignError: unknown) => {
-  const invokeError = new PresignInvokeError('R2 não configurado ou falha ao gerar URL de upload.');
+const isProtectedPaymentProofKey = (key: string) =>
+  key.includes("/Financeiro/Comprovante/");
 
-  if (!presignError || typeof presignError !== 'object') {
+const buildPresignInvokeError = async (presignError: unknown) => {
+  const invokeError = new PresignInvokeError(
+    "R2 não configurado ou falha ao gerar URL de upload."
+  );
+
+  if (!presignError || typeof presignError !== "object") {
     return invokeError;
   }
 
@@ -79,7 +90,7 @@ const buildPresignInvokeError = async (presignError: unknown) => {
   if (!details && errorLike.context) {
     try {
       const body = await errorLike.context.clone().json();
-      if (body && typeof body.error === 'string') {
+      if (body && typeof body.error === "string") {
         details = body.error;
       }
     } catch {
@@ -106,8 +117,8 @@ const buildFinancialDocObjectPath = (
   now = new Date()
 ) => {
   const sanitizedName = sanitizeFilename(filename);
-  const timestamp = now.toISOString().replace(/[:.]/g, '-');
-  if (docType === 'PAYMENT_PROOF') {
+  const timestamp = now.toISOString().replace(/[:.]/g, "-");
+  if (docType === "PAYMENT_PROOF") {
     return `os_orders/${osId}/Financeiro/Comprovante/${timestamp}_${sanitizedName}`;
   }
   return `os_orders/${osId}/financeiro/purchase_order/${jobId}/${timestamp}_${sanitizedName}`;
@@ -117,20 +128,32 @@ type UploadReceiptParams = {
   osId: string;
   file: File;
   userId: string | null;
+  installmentLabel?: FinancialInstallmentLabel;
+  secondDueDate?: string | null;
 };
 
-export const uploadReceiptForOrder = async ({ osId, file, userId }: UploadReceiptParams) => {
+export const uploadReceiptForOrder = async ({
+  osId,
+  file,
+  userId,
+  installmentLabel,
+  secondDueDate,
+}: UploadReceiptParams) => {
   return uploadFinancialDocsForOrder({
     orderId: osId,
-    docs: [{ file, type: 'PAYMENT_PROOF' }],
+    docs: [{ file, type: "PAYMENT_PROOF", installmentLabel, secondDueDate }],
     userId,
   });
 };
 
-export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssetsParams) => {
+export const uploadAssetsForOrder = async ({
+  osId,
+  files,
+  userId,
+}: UploadAssetsParams) => {
   const validation = validateFiles(files);
   if (!validation.ok) {
-    throw new Error(validation.error ?? 'Arquivos inválidos.');
+    throw new Error(validation.error ?? "Arquivos inválidos.");
   }
 
   let jobId: string | null = null;
@@ -138,18 +161,18 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
 
   try {
     const { data: job, error: jobError } = await supabase
-      .from('os_order_asset_jobs')
+      .from("os_order_asset_jobs")
       .insert({
         os_id: osId,
-        status: 'UPLOADING',
+        status: "UPLOADING",
         created_by: userId,
         attempt_count: 0,
       })
-      .select('id')
+      .select("id")
       .single();
 
     if (jobError || !job) {
-      throw new Error(jobError?.message ?? 'Erro ao criar o job de upload.');
+      throw new Error(jobError?.message ?? "Erro ao criar o job de upload.");
     }
 
     jobId = job.id;
@@ -165,7 +188,10 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
       let presignData: { uploadUrl: string; bucket?: string } | null = null;
 
       try {
-        presignData = await invokeEdgeFunction<{ uploadUrl: string; bucket?: string }>(supabase, 'r2-presign-upload', {
+        presignData = await invokeEdgeFunction<{
+          uploadUrl: string;
+          bucket?: string;
+        }>(supabase, "r2-presign-upload", {
           key: objectPath,
           contentType,
           sizeBytes: file.size,
@@ -179,9 +205,9 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
       }
 
       const uploadResponse = await fetch(presignData.uploadUrl, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': contentType,
+          "Content-Type": contentType,
         },
         body: file,
       });
@@ -190,23 +216,26 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
         throw new Error(`Falha ao enviar o arquivo "${sanitizedName}".`);
       }
 
-      const etag = uploadResponse.headers.get('etag')?.replace(/"/g, '') ?? null;
+      const etag =
+        uploadResponse.headers.get("etag")?.replace(/"/g, "") ?? null;
       uploadedPaths.push(objectPath);
 
-      const { error: assetError } = await supabase.from('os_order_assets').insert({
-        os_id: osId,
-        job_id: currentJobId,
-        bucket: presignData.bucket ?? ASSET_BUCKET,
-        storage_bucket: presignData.bucket ?? ASSET_BUCKET,
-        storage_provider: 'r2',
-        r2_etag: etag,
-        object_path: objectPath,
-        original_name: file.name,
-        mime_type: contentType || null,
-        size_bytes: file.size,
-        uploaded_by: userId,
-        asset_type: 'CLIENT_FILE',
-      });
+      const { error: assetError } = await supabase
+        .from("os_order_assets")
+        .insert({
+          os_id: osId,
+          job_id: currentJobId,
+          bucket: presignData.bucket ?? ASSET_BUCKET,
+          storage_bucket: presignData.bucket ?? ASSET_BUCKET,
+          storage_provider: "r2",
+          r2_etag: etag,
+          object_path: objectPath,
+          original_name: file.name,
+          mime_type: contentType || null,
+          size_bytes: file.size,
+          uploaded_by: userId,
+          asset_type: "CLIENT_FILE",
+        });
 
       if (assetError) {
         throw new Error(assetError.message);
@@ -214,9 +243,9 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
     }
 
     const { error: updateError } = await supabase
-      .from('os_order_asset_jobs')
-      .update({ status: 'PENDING', updated_at: new Date().toISOString() })
-      .eq('id', jobId);
+      .from("os_order_asset_jobs")
+      .update({ status: "PENDING", updated_at: new Date().toISOString() })
+      .eq("id", jobId);
 
     if (updateError) {
       throw new Error(updateError.message);
@@ -225,46 +254,64 @@ export const uploadAssetsForOrder = async ({ osId, files, userId }: UploadAssets
     return { jobId };
   } catch (error) {
     if (jobId) {
-      const message = error instanceof Error ? error.message : 'Erro ao enviar arquivos.';
+      const message =
+        error instanceof Error ? error.message : "Erro ao enviar arquivos.";
 
       try {
         const { data: assets } = await supabase
-          .from('os_order_assets')
-          .select('object_path, storage_provider')
-          .eq('job_id', jobId);
+          .from("os_order_assets")
+          .select("object_path, storage_provider")
+          .eq("job_id", jobId);
         const storedPaths = (assets ?? [])
-          .filter((asset) => asset.storage_provider === 'r2')
-          .map((asset) => asset.object_path);
-        const pathsToDelete = Array.from(new Set([...uploadedPaths, ...storedPaths]));
-        if (pathsToDelete.length > 0) {
-          await invokeEdgeFunction<void>(supabase, 'r2-delete-objects', {
-            keys: pathsToDelete,
+          .filter(asset => asset.storage_provider === "r2")
+          .map(asset => asset.object_path);
+        const pathsToDelete = Array.from(
+          new Set([...uploadedPaths, ...storedPaths])
+        );
+        const deletablePaths = pathsToDelete.filter(
+          path => !isProtectedPaymentProofKey(path)
+        );
+        if (deletablePaths.length > 0) {
+          await invokeEdgeFunction<void>(supabase, "r2-delete-objects", {
+            keys: deletablePaths,
             bucket: ASSET_BUCKET,
           });
           await supabase
-            .from('os_order_assets')
+            .from("os_order_assets")
             .update({ deleted_from_storage_at: new Date().toISOString() })
-            .in('object_path', pathsToDelete);
+            .in("object_path", deletablePaths);
         }
       } catch (cleanupError) {
-        console.error('Falha ao limpar uploads no R2:', cleanupError);
+        console.error("Falha ao limpar uploads no R2:", cleanupError);
       }
 
       await supabase
-        .from('os_order_asset_jobs')
-        .update({ status: 'ERROR', last_error: message, attempt_count: 1, updated_at: new Date().toISOString() })
-        .eq('id', jobId);
-      await supabase.from('os_order_assets').update({ error: message }).eq('job_id', jobId);
+        .from("os_order_asset_jobs")
+        .update({
+          status: "ERROR",
+          last_error: message,
+          attempt_count: 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", jobId);
+      await supabase
+        .from("os_order_assets")
+        .update({ error: message })
+        .eq("job_id", jobId);
     }
 
     throw error;
   }
 };
 
-export const uploadFinancialDocsForOrder = async ({ orderId, docs, userId }: UploadFinancialDocsParams) => {
-  const validation = validateFiles(docs.map((doc) => doc.file));
+export const uploadFinancialDocsForOrder = async ({
+  orderId,
+  docs,
+  userId,
+}: UploadFinancialDocsParams) => {
+  const validation = validateFiles(docs.map(doc => doc.file));
   if (!validation.ok) {
-    throw new Error(validation.error ?? 'Arquivos inválidos.');
+    throw new Error(validation.error ?? "Arquivos inválidos.");
   }
 
   let jobId: string | null = null;
@@ -272,18 +319,18 @@ export const uploadFinancialDocsForOrder = async ({ orderId, docs, userId }: Upl
 
   try {
     const { data: job, error: jobError } = await supabase
-      .from('os_order_asset_jobs')
+      .from("os_order_asset_jobs")
       .insert({
         os_id: orderId,
-        status: 'UPLOADING',
+        status: "UPLOADING",
         created_by: userId,
         attempt_count: 0,
       })
-      .select('id')
+      .select("id")
       .single();
 
     if (jobError || !job) {
-      throw new Error(jobError?.message ?? 'Erro ao criar o job de upload.');
+      throw new Error(jobError?.message ?? "Erro ao criar o job de upload.");
     }
 
     jobId = job.id;
@@ -294,11 +341,16 @@ export const uploadFinancialDocsForOrder = async ({ orderId, docs, userId }: Upl
     for (const doc of docs) {
       const { file, type } = doc;
       const sanitizedName = sanitizeFilename(file.name);
-      const objectPath = buildFinancialDocObjectPath(orderId, currentJobId, type, file.name);
+      const objectPath = buildFinancialDocObjectPath(
+        orderId,
+        currentJobId,
+        type,
+        file.name
+      );
       const contentType = resolveAssetContentType(file);
 
       const { data: asset, error: assetError } = await supabase
-        .from('os_order_assets')
+        .from("os_order_assets")
         .insert({
           os_id: orderId,
           job_id: currentJobId,
@@ -310,17 +362,22 @@ export const uploadFinancialDocsForOrder = async ({ orderId, docs, userId }: Upl
           uploaded_by: userId,
           asset_type: type,
         })
-        .select('id')
+        .select("id")
         .single();
 
       if (assetError || !asset) {
-        throw new Error(assetError?.message ?? 'Erro ao registrar o documento financeiro.');
+        throw new Error(
+          assetError?.message ?? "Erro ao registrar o documento financeiro."
+        );
       }
 
       let presignData: { uploadUrl: string; bucket?: string } | null = null;
 
       try {
-        presignData = await invokeEdgeFunction<{ uploadUrl: string; bucket?: string }>(supabase, 'r2-presign-upload', {
+        presignData = await invokeEdgeFunction<{
+          uploadUrl: string;
+          bucket?: string;
+        }>(supabase, "r2-presign-upload", {
           key: objectPath,
           contentType,
           sizeBytes: file.size,
@@ -334,9 +391,9 @@ export const uploadFinancialDocsForOrder = async ({ orderId, docs, userId }: Upl
       }
 
       const uploadResponse = await fetch(presignData.uploadUrl, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': contentType,
+          "Content-Type": contentType,
         },
         body: file,
       });
@@ -345,27 +402,46 @@ export const uploadFinancialDocsForOrder = async ({ orderId, docs, userId }: Upl
         throw new Error(`Falha ao enviar o documento "${sanitizedName}".`);
       }
 
-      const etag = uploadResponse.headers.get('etag')?.replace(/"/g, '') ?? null;
+      const etag =
+        uploadResponse.headers.get("etag")?.replace(/"/g, "") ?? null;
       uploadedPaths.push(objectPath);
 
       const { error: updateError } = await supabase
-        .from('os_order_assets')
+        .from("os_order_assets")
         .update({
-          storage_provider: 'r2',
+          storage_provider: "r2",
           storage_bucket: presignData.bucket ?? ASSET_BUCKET,
           r2_etag: etag,
         })
-        .eq('id', asset.id);
+        .eq("id", asset.id);
 
       if (updateError) {
         throw new Error(updateError.message);
       }
+
+      if (type === "PAYMENT_PROOF") {
+        const installmentLabel = doc.installmentLabel ?? "1/1";
+        const { error: rpcError } = await supabase.rpc(
+          "finance_upsert_from_asset",
+          {
+            p_os_id: orderId,
+            p_asset_id: asset.id,
+            p_installment_label: installmentLabel,
+            p_second_due_date:
+              installmentLabel === "1/2" ? (doc.secondDueDate ?? null) : null,
+          }
+        );
+
+        if (rpcError) {
+          throw new Error(rpcError.message);
+        }
+      }
     }
 
     const { error: updateJobError } = await supabase
-      .from('os_order_asset_jobs')
-      .update({ status: 'PENDING', updated_at: new Date().toISOString() })
-      .eq('id', jobId);
+      .from("os_order_asset_jobs")
+      .update({ status: "PENDING", updated_at: new Date().toISOString() })
+      .eq("id", jobId);
 
     if (updateJobError) {
       throw new Error(updateJobError.message);
@@ -373,43 +449,62 @@ export const uploadFinancialDocsForOrder = async ({ orderId, docs, userId }: Upl
 
     return { jobId };
   } catch (error) {
-    console.error('Falha ao enviar documentos financeiros.', {
+    console.error("Falha ao enviar documentos financeiros.", {
       orderId,
       jobId,
       error,
     });
 
     if (jobId) {
-      const message = error instanceof Error ? error.message : 'Erro ao enviar documentos financeiros.';
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Erro ao enviar documentos financeiros.";
 
       try {
         const { data: assets } = await supabase
-          .from('os_order_assets')
-          .select('object_path, storage_provider')
-          .eq('job_id', jobId);
+          .from("os_order_assets")
+          .select("object_path, storage_provider")
+          .eq("job_id", jobId);
         const storedPaths = (assets ?? [])
-          .filter((asset) => asset.storage_provider === 'r2')
-          .map((asset) => asset.object_path);
-        const pathsToDelete = Array.from(new Set([...uploadedPaths, ...storedPaths]));
-        if (pathsToDelete.length > 0) {
-          await invokeEdgeFunction<void>(supabase, 'r2-delete-objects', {
-            keys: pathsToDelete,
+          .filter(asset => asset.storage_provider === "r2")
+          .map(asset => asset.object_path);
+        const pathsToDelete = Array.from(
+          new Set([...uploadedPaths, ...storedPaths])
+        );
+        const deletablePaths = pathsToDelete.filter(
+          path => !isProtectedPaymentProofKey(path)
+        );
+        if (deletablePaths.length > 0) {
+          await invokeEdgeFunction<void>(supabase, "r2-delete-objects", {
+            keys: deletablePaths,
             bucket: ASSET_BUCKET,
           });
           await supabase
-            .from('os_order_assets')
+            .from("os_order_assets")
             .update({ deleted_from_storage_at: new Date().toISOString() })
-            .in('object_path', pathsToDelete);
+            .in("object_path", deletablePaths);
         }
       } catch (cleanupError) {
-        console.error('Falha ao limpar uploads de documentos financeiros no R2:', cleanupError);
+        console.error(
+          "Falha ao limpar uploads de documentos financeiros no R2:",
+          cleanupError
+        );
       }
 
       await supabase
-        .from('os_order_asset_jobs')
-        .update({ status: 'ERROR', last_error: message, attempt_count: 1, updated_at: new Date().toISOString() })
-        .eq('id', jobId);
-      await supabase.from('os_order_assets').update({ error: message }).eq('job_id', jobId);
+        .from("os_order_asset_jobs")
+        .update({
+          status: "ERROR",
+          last_error: message,
+          attempt_count: 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", jobId);
+      await supabase
+        .from("os_order_assets")
+        .update({ error: message })
+        .eq("job_id", jobId);
     }
 
     throw error;
