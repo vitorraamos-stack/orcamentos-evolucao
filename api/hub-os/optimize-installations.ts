@@ -90,6 +90,32 @@ function chunkArray<T>(items: T[], chunkSize: number): T[][] {
   return chunks;
 }
 
+function estimateSummaryFromStops(
+  stops: Array<{ coords: [number, number] }>,
+  startCoords?: [number, number] | null
+) {
+  if (stops.length === 0) {
+    return { distance_m: 0, duration_s: 0 };
+  }
+
+  let totalKm = 0;
+  let cursor = startCoords ?? stops[0].coords;
+  const fromIndex = startCoords ? 0 : 1;
+
+  for (let index = fromIndex; index < stops.length; index += 1) {
+    const target = stops[index].coords;
+    totalKm += haversineDistanceKm(cursor, target);
+    cursor = target;
+  }
+
+  const avgSpeedKmh = 35;
+  const durationHours = totalKm / avgSpeedKmh;
+  return {
+    distance_m: Math.round(totalKm * 1000),
+    duration_s: Math.round(durationHours * 3600),
+  };
+}
+
 function buildGoogleMapsUrl(
   stops: Array<{ coords: [number, number] }>,
   startCoords?: [number, number] | null
@@ -98,9 +124,14 @@ function buildGoogleMapsUrl(
 
   const origin = startCoords ?? stops[0].coords;
   const destination = stops[stops.length - 1].coords;
-  const waypoints = stops
-    .slice(0, -1)
-    .map(stop => `${stop.coords[1]},${stop.coords[0]}`);
+
+  const waypointStops = startCoords
+    ? stops.slice(0, -1)
+    : stops.slice(1, -1);
+
+  const waypoints = waypointStops.map(
+    stop => `${stop.coords[1]},${stop.coords[0]}`
+  );
 
   const url = new URL("https://www.google.com/maps/dir/");
   url.searchParams.set("api", "1");
@@ -364,13 +395,13 @@ async function optimizeWithORS(
 
   const route = data.routes?.[0];
   const jobOrder = (route?.steps ?? [])
-    .filter(step => step.type === "job" && typeof step.job === "number")
+    .filter(step => typeof step.job === "number")
     .map(step => step.job as number);
 
   if (jobOrder.length === 0) {
     return {
       orderedStops: nearestNeighborFallback(stops, startCoords),
-      summary: { distance_m: null, duration_s: null },
+      summary: estimateSummaryFromStops(stops, startCoords),
       source: "fallback",
     };
   }
@@ -419,6 +450,17 @@ export default async function handler(req: any, res: any) {
     return json(res, 400, {
       error: error instanceof Error ? error.message : "Payload inválido.",
     });
+  }
+
+  let resolvedStartCoords = parsed.startCoords;
+  if (!resolvedStartCoords && parsed.startAddress) {
+    try {
+      resolvedStartCoords = await geocodeORS(parsed.startAddress, orsApiKey);
+    } catch {
+      return json(res, 400, {
+        error: "Não foi possível geocodificar o ponto de partida informado.",
+      });
+    }
   }
 
   try {
@@ -553,15 +595,15 @@ export default async function handler(req: any, res: any) {
             optimized = await optimizeWithORS(
               routeStops,
               orsApiKey,
-              parsed.startCoords
+              resolvedStartCoords
             );
           } catch {
             optimized = {
               orderedStops: nearestNeighborFallback(
                 routeStops,
-                parsed.startCoords
+                resolvedStartCoords
               ),
-              summary: { distance_m: null, duration_s: null },
+              summary: estimateSummaryFromStops(routeStops, resolvedStartCoords),
               source: "fallback",
             };
           }
@@ -576,11 +618,19 @@ export default async function handler(req: any, res: any) {
             sale_number: item.os.sale_number,
           }));
 
+          const estimatedSummary = estimateSummaryFromStops(
+            stops,
+            resolvedStartCoords
+          );
+
           groupRoutes.push({
             routeId: `${groupId}#${routeIndex + 1}`,
-            summary: optimized.summary,
+            summary: {
+              distance_m: optimized.summary.distance_m ?? estimatedSummary.distance_m,
+              duration_s: optimized.summary.duration_s ?? estimatedSummary.duration_s,
+            },
             stops,
-            googleMapsUrl: buildGoogleMapsUrl(stops, parsed.startCoords),
+            googleMapsUrl: buildGoogleMapsUrl(stops, resolvedStartCoords),
           });
           totalRoutes += 1;
         }
@@ -599,7 +649,7 @@ export default async function handler(req: any, res: any) {
       type: "route_optimized",
       created_by: currentUser.id,
       payload: {
-        paramsUsed: parsed,
+        paramsUsed: { ...parsed, startCoords: resolvedStartCoords ?? null },
         totalCandidates: orders.length,
         geocoded: geocoded.length,
         unassigned: unassigned.length,
@@ -619,7 +669,7 @@ export default async function handler(req: any, res: any) {
     });
 
     return json(res, 200, {
-      paramsUsed: parsed,
+      paramsUsed: { ...parsed, startCoords: resolvedStartCoords ?? null },
       stats: {
         totalCandidates: orders.length,
         geocoded: geocoded.length,
@@ -642,4 +692,5 @@ export {
   clusterByGeoRadius,
   buildGoogleMapsUrl,
   buildOptimizationPayload,
+  estimateSummaryFromStops,
 };
