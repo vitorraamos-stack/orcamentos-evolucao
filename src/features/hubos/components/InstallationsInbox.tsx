@@ -96,6 +96,25 @@ const skippedReasonLabel: Record<string, string> = {
   geocode_failed: "Falha ao geocodificar endereço",
 };
 
+const DEFAULT_BASE_ADDRESS = "João Grumiche, 196 - Kobrasol - São José";
+
+const formatGroupLabel = (groupId: string) => {
+  const match = groupId.match(/date-(\d+)__?geo-(\d+)/i);
+  if (!match) return groupId;
+  return `Grupo ${match[1]}.${match[2]}`;
+};
+
+const formatRouteLabel = (routeId: string) => {
+  const match = routeId.match(/#(\d+)$/);
+  if (!match) return routeId;
+  return `Rota ${match[1]}`;
+};
+
+const buildWazeUrl = (coords: [number, number]) => {
+  const [lon, lat] = coords;
+  return `https://waze.com/ul?ll=${lat},${lon}&navigate=yes`;
+};
+
 export default function InstallationsInbox({
   orders,
   selectedId,
@@ -114,7 +133,8 @@ export default function InstallationsInbox({
   const [dateWindowDays, setDateWindowDays] = useState("1");
   const [geoClusterRadiusKm, setGeoClusterRadiusKm] = useState("5");
   const [maxStopsPerRoute, setMaxStopsPerRoute] = useState("20");
-  const [startAddress, setStartAddress] = useState("");
+  const [startAddress, setStartAddress] = useState(DEFAULT_BASE_ADDRESS);
+  const [detailsIframeOrderId, setDetailsIframeOrderId] = useState<string | null>(null);
   const [optimizing, setOptimizing] = useState(false);
   const [result, setResult] =
     useState<OptimizeInstallationRouteResponse | null>(null);
@@ -330,7 +350,7 @@ export default function InstallationsInbox({
               setDateWindowDays("1");
               setGeoClusterRadiusKm("5");
               setMaxStopsPerRoute("20");
-              setStartAddress("");
+              setStartAddress(DEFAULT_BASE_ADDRESS);
               setResult(null);
               setOptimizeOpen(true);
             }}
@@ -447,9 +467,9 @@ export default function InstallationsInbox({
 
               <div className="space-y-3">
                 {result.groups.map(group => (
-                  <Card key={group.groupId} className="p-3">
+                  <Card key={formatGroupLabel(group.groupId)} className="p-3">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <Badge>{group.groupId}</Badge>
+                      <Badge>{formatGroupLabel(group.groupId)}</Badge>
                       <Badge variant="outline">
                         {group.dateRange.from || "sem data"} até{" "}
                         {group.dateRange.to || "sem data"}
@@ -458,11 +478,11 @@ export default function InstallationsInbox({
                     <div className="space-y-2">
                       {group.routes.map(route => (
                         <div
-                          key={route.routeId}
+                          key={formatRouteLabel(route.routeId)}
                           className="rounded-md border p-2"
                         >
                           <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <Badge variant="secondary">{route.routeId}</Badge>
+                            <Badge variant="secondary">{formatRouteLabel(route.routeId)}</Badge>
                             <Badge variant="outline">
                               Distância:{" "}
                               {route.summary.distance_m
@@ -480,16 +500,28 @@ export default function InstallationsInbox({
                               size="sm"
                               variant="outline"
                               disabled={!route.googleMapsUrl}
-                              onClick={() =>
-                                route.googleMapsUrl &&
-                                window.open(
-                                  route.googleMapsUrl,
-                                  "_blank",
-                                  "noopener,noreferrer"
-                                )
-                              }
+                              asChild
                             >
-                              Abrir no Google Maps
+                              <a
+                                href={route.googleMapsUrl ?? "#"}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                Abrir no Google Maps
+                              </a>
+                            </Button>
+                            <Button type="button" size="sm" variant="outline" asChild>
+                              <a
+                                href={
+                                  route.stops[0]
+                                    ? buildWazeUrl(route.stops[0].coords)
+                                    : "#"
+                                }
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                Abrir no Waze
+                              </a>
                             </Button>
                           </div>
                           <ol className="space-y-1 text-sm">
@@ -506,6 +538,25 @@ export default function InstallationsInbox({
                                   {stop.address || "Sem endereço"} •{" "}
                                   {stop.delivery_date || "Sem data"}
                                 </p>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setDetailsIframeOrderId(stop.os_id)}
+                                  >
+                                    Abrir detalhes da OS
+                                  </Button>
+                                  <Button type="button" size="sm" variant="outline" asChild>
+                                    <a
+                                      href={buildWazeUrl(stop.coords)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      Waze (endereço)
+                                    </a>
+                                  </Button>
+                                </div>
                               </li>
                             ))}
                           </ol>
@@ -517,6 +568,28 @@ export default function InstallationsInbox({
               </div>
             </div>
           )}
+
+
+          <Dialog
+            open={Boolean(detailsIframeOrderId)}
+            onOpenChange={(open) => !open && setDetailsIframeOrderId(null)}
+          >
+            <DialogContent className="max-h-[90vh] max-w-5xl overflow-hidden">
+              <DialogHeader>
+                <DialogTitle>Detalhes da OS</DialogTitle>
+                <DialogDescription>
+                  Visualização rápida da OS selecionada.
+                </DialogDescription>
+              </DialogHeader>
+              {detailsIframeOrderId && (
+                <iframe
+                  title={`Detalhes OS ${detailsIframeOrderId}`}
+                  src={`/os/${detailsIframeOrderId}`}
+                  className="h-[65vh] w-full rounded-md border"
+                />
+              )}
+            </DialogContent>
+          </Dialog>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setOptimizeOpen(false)}>
