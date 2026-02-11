@@ -69,17 +69,22 @@ const isPreviewBlobLikelyInvalid = (blob: Blob, filename?: string | null) => {
   return blob.size === 0;
 };
 
+const isMissingObjectError = (status: number, body: string) => {
+  const normalizedBody = body.toLowerCase();
+  return (
+    status === 404 ||
+    normalizedBody.includes("nosuchkey") ||
+    normalizedBody.includes("the specified key does not exist") ||
+    normalizedBody.includes("not found")
+  );
+};
+
 const buildPreviewFetchErrorMessage = (
   status: number,
   body: string,
   filename?: string | null
 ) => {
-  const normalizedBody = body.toLowerCase();
-  const looksLikeMissingObject =
-    status === 404 ||
-    normalizedBody.includes("nosuchkey") ||
-    normalizedBody.includes("the specified key does not exist") ||
-    normalizedBody.includes("not found");
+  const looksLikeMissingObject = isMissingObjectError(status, body);
 
   if (looksLikeMissingObject) {
     return `Comprovante não encontrado no R2 (${filename ?? "arquivo"}). Provável remoção após sincronização SMB.`;
@@ -228,6 +233,9 @@ export default function FinanceiroPortalPage() {
         const response = await fetch(previewData.downloadUrl);
         if (!response.ok) {
           const responseBody = await response.text();
+          if (isMissingObjectError(response.status, responseBody)) {
+            setPreviewUrl(null);
+          }
           setPreviewError(
             buildPreviewFetchErrorMessage(
               response.status,
