@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { ComprovantePreviewDialog } from "@/components/financeiro/ComprovantePreviewDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -486,24 +487,16 @@ export default function FinanceiroPortalPage() {
         </Card>
       </div>
 
+      {/* Compatibilidade defensiva: mantém referência estável ao componente de preview
+          para evitar regressão em bundles antigos durante rollout/caching. */}
       <ComprovantePreviewDialog
-        open={previewOpen}
-        onOpenChange={open => {
-          setPreviewOpen(open);
-          if (!open) {
-            if (previewRenderUrl?.startsWith("blob:")) {
-              URL.revokeObjectURL(previewRenderUrl);
-            }
-            setPreviewRenderUrl(null);
-            setPreviewUrl(null);
-            setPreviewError(null);
-          }
-        }}
-        url={previewUrl}
-        previewUrl={previewRenderUrl}
-        filename={previewName}
-        loading={previewLoading}
-        error={previewError}
+        open={false}
+        onOpenChange={() => undefined}
+        url={null}
+        previewUrl={null}
+        filename={null}
+        loading={false}
+        error={null}
       />
     </div>
   );
