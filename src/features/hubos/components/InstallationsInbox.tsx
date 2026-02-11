@@ -108,7 +108,8 @@ export default function InstallationsInbox({
 }: InstallationsInboxProps) {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [optimizeOpen, setOptimizeOpen] = useState(false);
-  const [routeDate, setRouteDate] = useState(todayAsInput());
+  const [dateFrom, setDateFrom] = useState(todayAsInput());
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [dateTo, setDateTo] = useState(todayAsInput());
   const [dateWindowDays, setDateWindowDays] = useState("1");
   const [geoClusterRadiusKm, setGeoClusterRadiusKm] = useState("5");
@@ -148,14 +149,12 @@ export default function InstallationsInbox({
     });
   }, [orders, searchValue]);
 
-  const routeOrders = useMemo(
-    () => orders.filter((order) => order.delivery_date === routeDate),
-    [orders, routeDate]
-  );
-
   useEffect(() => {
-    setSelectedOrderIds(routeOrders.map((order) => order.id));
-  }, [routeDate, optimizeOpen, routeOrders]);
+    const selectedByDate = orders
+      .filter(order => order.delivery_date === dateFrom)
+      .map(order => order.id);
+    setSelectedOrderIds(selectedByDate);
+  }, [dateFrom, orders]);
 
   const getIsToday = useCallback(
     (order: OsOrder) => {
@@ -287,7 +286,7 @@ export default function InstallationsInbox({
 
     try {
       const payload = await optimizeInstallationRoute({
-        dateFrom: routeDate || null,
+        dateFrom: dateFrom || null,
         dateTo: dateTo || null,
         dateWindowDays: Number(dateWindowDays || 1),
         geoClusterRadiusKm: Number(geoClusterRadiusKm || 5),
@@ -326,7 +325,7 @@ export default function InstallationsInbox({
           <Button
             variant="outline"
             onClick={() => {
-              setRouteDate(todayAsInput());
+              setDateFrom(todayAsInput());
               setDateTo(todayAsInput());
               setDateWindowDays("1");
               setGeoClusterRadiusKm("5");
@@ -360,8 +359,8 @@ export default function InstallationsInbox({
               <Input
                 id="route-date-from"
                 type="date"
-                value={routeDate}
-                onChange={event => setRouteDate(event.target.value)}
+                value={dateFrom}
+                onChange={event => setDateFrom(event.target.value)}
               />
             </div>
             <div className="space-y-2">
