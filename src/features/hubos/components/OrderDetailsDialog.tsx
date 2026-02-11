@@ -1,6 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,17 +17,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ArrowLeft } from 'lucide-react';
-import { createOrderEvent, updateOrder } from '../api';
-import { ART_COLUMNS, PROD_COLUMNS } from '../constants';
-import type { LogisticType, OsOrder, ProductionTag } from '../types';
-import { useAuth } from '@/contexts/AuthContext';
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { ArrowLeft } from "lucide-react";
+import {
+  createOrderEvent,
+  fetchUserDisplayNameById,
+  updateOrder,
+} from "../api";
+import { ART_COLUMNS, PROD_COLUMNS } from "../constants";
+import type { LogisticType, OsOrder, ProductionTag } from "../types";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface OrderDetailsDialogProps {
   order: OsOrder | null;
@@ -32,8 +42,8 @@ interface OrderDetailsDialogProps {
 }
 
 const formatStatus = (order: OsOrder | null) => {
-  if (!order) return '';
-  const boardLabel = order.prod_status ? 'Produção' : 'Arte';
+  if (!order) return "";
+  const boardLabel = order.prod_status ? "Produção" : "Arte";
   const columnLabel = order.prod_status ?? order.art_status;
   return `${boardLabel} • ${columnLabel}`;
 };
@@ -46,40 +56,70 @@ export default function OrderDetailsDialog({
   onDelete,
 }: OrderDetailsDialogProps) {
   const { user, isAdmin } = useAuth();
-  const [saleNumber, setSaleNumber] = useState('');
-  const [clientName, setClientName] = useState('');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [deliveryDate, setDeliveryDate] = useState('');
-  const [logisticType, setLogisticType] = useState<LogisticType>('retirada');
-  const [address, setAddress] = useState('');
-  const [productionTag, setProductionTag] = useState<ProductionTag | ''>('');
+  const [saleNumber, setSaleNumber] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [logisticType, setLogisticType] = useState<LogisticType>("retirada");
+  const [address, setAddress] = useState("");
+  const [productionTag, setProductionTag] = useState<ProductionTag | "">("");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [moving, setMoving] = useState(false);
+  const [createdByName, setCreatedByName] = useState<string | null>(null);
 
   useEffect(() => {
     if (!order) return;
-    setSaleNumber(order.sale_number ?? '');
-    setClientName(order.client_name ?? '');
-    setTitle(order.title ?? '');
-    setDescription(order.description ?? '');
+    setSaleNumber(order.sale_number ?? "");
+    setClientName(order.client_name ?? "");
+    setTitle(order.title ?? "");
+    setDescription(order.description ?? "");
     setDeliveryDate(formatDateDisplay(order.delivery_date));
-    setLogisticType(order.logistic_type ?? 'retirada');
-    setAddress(order.address ?? '');
-    setProductionTag(order.production_tag ?? '');
+    setLogisticType(order.logistic_type ?? "retirada");
+    setAddress(order.address ?? "");
+    setProductionTag(order.production_tag ?? "");
     setEditing(false);
   }, [order, open]);
 
+  useEffect(() => {
+    let active = true;
+
+    const loadCreatedByName = async () => {
+      if (!order?.created_by) {
+        setCreatedByName(null);
+        return;
+      }
+
+      try {
+        const displayName = await fetchUserDisplayNameById(order.created_by);
+        if (active) {
+          setCreatedByName(displayName);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar usuário criador da OS.", error);
+        if (active) {
+          setCreatedByName(order.created_by);
+        }
+      }
+    };
+
+    loadCreatedByName();
+
+    return () => {
+      active = false;
+    };
+  }, [order?.created_by]);
+
   const defaultTitle = useMemo(() => {
-    const base = [saleNumber, clientName].filter(Boolean).join(' - ');
+    const base = [saleNumber, clientName].filter(Boolean).join(" - ");
     return base.trim();
   }, [saleNumber, clientName]);
 
   const formatDateDisplay = (value?: string | null) => {
-    if (!value) return '';
+    if (!value) return "";
     if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      const [year, month, day] = value.split('-');
+      const [year, month, day] = value.split("-");
       if (year && month && day) {
         return `${day}/${month}/${year}`;
       }
@@ -90,11 +130,11 @@ export default function OrderDetailsDialog({
   const normalizeDate = (value: string) => {
     if (!value) return null;
     if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-    const parts = value.split('/');
+    const parts = value.split("/");
     if (parts.length === 3) {
       const [day, month, year] = parts;
       if (day && month && year) {
-        return `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        return `${year.padStart(4, "0")}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
       }
     }
     return null;
@@ -103,11 +143,11 @@ export default function OrderDetailsDialog({
   const handleSave = async () => {
     if (!order) return;
     if (!logisticType) {
-      toast.error('Selecione o tipo de entrega.');
+      toast.error("Selecione o tipo de entrega.");
       return;
     }
-    if (logisticType === 'instalacao' && !address.trim()) {
-      toast.error('Informe o endereço de instalação.');
+    if (logisticType === "instalacao" && !address.trim()) {
+      toast.error("Informe o endereço de instalação.");
       return;
     }
 
@@ -121,13 +161,13 @@ export default function OrderDetailsDialog({
         description: description || null,
         delivery_date: normalizedDeliveryDate,
         logistic_type: logisticType,
-        address: logisticType === 'retirada' ? null : address.trim() || null,
+        address: logisticType === "retirada" ? null : address.trim() || null,
         production_tag: productionTag || null,
         updated_at: new Date().toISOString(),
         updated_by: user?.id ?? null,
       };
 
-      if (order.prod_status === 'Produção') {
+      if (order.prod_status === "Produção") {
         payload.production_tag = productionTag || null;
       }
 
@@ -135,16 +175,16 @@ export default function OrderDetailsDialog({
         ...payload,
       });
       onUpdated(updated);
-      toast.success('Card atualizado com sucesso.');
+      toast.success("Card atualizado com sucesso.");
       onOpenChange(false);
     } catch (error) {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : typeof error === 'object' && error && 'message' in error
+          : typeof error === "object" && error && "message" in error
             ? String(error.message)
-            : 'Erro ao salvar as alterações.';
-      console.error('Erro ao salvar alterações do card.', error);
+            : "Erro ao salvar as alterações.";
+      console.error("Erro ao salvar alterações do card.", error);
       toast.error(errorMessage);
     } finally {
       setSaving(false);
@@ -156,7 +196,7 @@ export default function OrderDetailsDialog({
     try {
       setMoving(true);
       const updated = await updateOrder(order.id, {
-        art_status: 'Produzir',
+        art_status: "Produzir",
         prod_status: PROD_COLUMNS[0],
         updated_at: new Date().toISOString(),
         updated_by: user?.id ?? null,
@@ -164,35 +204,37 @@ export default function OrderDetailsDialog({
       try {
         await createOrderEvent({
           os_id: order.id,
-          type: 'status_change',
+          type: "status_change",
           payload: {
-            board: 'arte',
+            board: "arte",
             from: order.art_status,
-            to: 'Produzir',
-            actor_name: user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
+            to: "Produzir",
+            actor_name:
+              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
           },
           created_by: user?.id ?? null,
         });
         await createOrderEvent({
           os_id: order.id,
-          type: 'status_change',
+          type: "status_change",
           payload: {
-            board: 'producao',
+            board: "producao",
             from: order.prod_status,
             to: PROD_COLUMNS[0],
-            actor_name: user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
+            actor_name:
+              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
           },
           created_by: user?.id ?? null,
         });
       } catch (eventError) {
-        console.error('Erro ao registrar auditoria de status.', eventError);
+        console.error("Erro ao registrar auditoria de status.", eventError);
       }
       onUpdated(updated);
-      toast.success('Card enviado para Produção.');
+      toast.success("Card enviado para Produção.");
       onOpenChange(false);
     } catch (error) {
       console.error(error);
-      toast.error('Erro ao enviar para Produção.');
+      toast.error("Erro ao enviar para Produção.");
     } finally {
       setMoving(false);
     }
@@ -211,24 +253,25 @@ export default function OrderDetailsDialog({
       try {
         await createOrderEvent({
           os_id: order.id,
-          type: 'status_change',
+          type: "status_change",
           payload: {
-            board: 'arte',
+            board: "arte",
             from: order.art_status,
             to: ART_COLUMNS[0],
-            actor_name: user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
+            actor_name:
+              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
           },
           created_by: user?.id ?? null,
         });
       } catch (eventError) {
-        console.error('Erro ao registrar auditoria de status.', eventError);
+        console.error("Erro ao registrar auditoria de status.", eventError);
       }
       onUpdated(updated);
-      toast.success('Card movido para Arte.');
+      toast.success("Card movido para Arte.");
       onOpenChange(false);
     } catch (error) {
       console.error(error);
-      toast.error('Erro ao voltar para Arte.');
+      toast.error("Erro ao voltar para Arte.");
     } finally {
       setMoving(false);
     }
@@ -240,7 +283,7 @@ export default function OrderDetailsDialog({
       await onDelete(order.id);
       onOpenChange(false);
     } catch (error) {
-      console.error('Erro ao excluir o card.', error);
+      console.error("Erro ao excluir o card.", error);
     }
   };
 
@@ -248,9 +291,11 @@ export default function OrderDetailsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{title || defaultTitle || 'Detalhes da OS'}</DialogTitle>
+          <DialogTitle>{title || defaultTitle || "Detalhes da OS"}</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
             Status atual: {formatStatus(order)}
+            <br />
+            Criado por: {createdByName || "Não identificado"}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
@@ -259,7 +304,7 @@ export default function OrderDetailsDialog({
               <Label>Número da venda</Label>
               <Input
                 value={saleNumber}
-                onChange={(event) => setSaleNumber(event.target.value)}
+                onChange={event => setSaleNumber(event.target.value)}
                 disabled={!editing}
               />
             </div>
@@ -267,7 +312,7 @@ export default function OrderDetailsDialog({
               <Label>Cliente</Label>
               <Input
                 value={clientName}
-                onChange={(event) => setClientName(event.target.value)}
+                onChange={event => setClientName(event.target.value)}
                 disabled={!editing}
               />
             </div>
@@ -277,7 +322,7 @@ export default function OrderDetailsDialog({
             <Label>Título</Label>
             <Input
               value={title}
-              onChange={(event) => setTitle(event.target.value)}
+              onChange={event => setTitle(event.target.value)}
               placeholder={defaultTitle}
               disabled={!editing}
             />
@@ -287,7 +332,7 @@ export default function OrderDetailsDialog({
             <Label>Descrição detalhada do pedido</Label>
             <Textarea
               value={description}
-              onChange={(event) => setDescription(event.target.value)}
+              onChange={event => setDescription(event.target.value)}
               rows={4}
               disabled={!editing}
             />
@@ -298,7 +343,7 @@ export default function OrderDetailsDialog({
               <Label>Data de entrega</Label>
               <Input
                 value={deliveryDate}
-                onChange={(event) => setDeliveryDate(event.target.value)}
+                onChange={event => setDeliveryDate(event.target.value)}
                 placeholder="dd/mm/aaaa"
                 inputMode="numeric"
                 disabled={!editing}
@@ -308,7 +353,7 @@ export default function OrderDetailsDialog({
               <Label>Tipo de entrega</Label>
               <RadioGroup
                 value={logisticType}
-                onValueChange={(value) => {
+                onValueChange={value => {
                   if (editing) {
                     setLogisticType(value as LogisticType);
                   }
@@ -333,23 +378,23 @@ export default function OrderDetailsDialog({
             </div>
           </div>
 
-          {logisticType !== 'retirada' && (
+          {logisticType !== "retirada" && (
             <div className="space-y-1">
               <Label>Endereço de entrega/instalação</Label>
               <Input
                 value={address}
-                onChange={(event) => setAddress(event.target.value)}
+                onChange={event => setAddress(event.target.value)}
                 disabled={!editing}
               />
             </div>
           )}
 
-          {order?.prod_status === 'Produção' && (
+          {order?.prod_status === "Produção" && (
             <div className="space-y-2">
               <Label>Tag de produção</Label>
               <RadioGroup
                 value={productionTag}
-                onValueChange={(value) => {
+                onValueChange={value => {
                   if (editing) {
                     setProductionTag(value as ProductionTag);
                   }
@@ -372,12 +417,21 @@ export default function OrderDetailsDialog({
 
           <div className="flex flex-wrap gap-2">
             {!order?.prod_status && (
-              <Button variant="secondary" onClick={handleSendToProduction} disabled={moving}>
+              <Button
+                variant="secondary"
+                onClick={handleSendToProduction}
+                disabled={moving}
+              >
                 Enviar para Produção
               </Button>
             )}
             {order?.prod_status && isAdmin && (
-              <Button variant="outline" onClick={handleBackToArte} disabled={moving} className="gap-2">
+              <Button
+                variant="outline"
+                onClick={handleBackToArte}
+                disabled={moving}
+                className="gap-2"
+              >
                 <ArrowLeft className="h-4 w-4" />
                 Voltar para Arte
               </Button>
@@ -394,12 +448,15 @@ export default function OrderDetailsDialog({
                   <AlertDialogHeader>
                     <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Essa ação não pode ser desfeita. O card será excluído permanentemente.
+                      Essa ação não pode ser desfeita. O card será excluído
+                      permanentemente.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete}>Confirmar</AlertDialogAction>
+                    <AlertDialogAction onClick={handleDelete}>
+                      Confirmar
+                    </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
@@ -407,7 +464,11 @@ export default function OrderDetailsDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button variant="secondary" onClick={() => setEditing(true)} disabled={editing}>
+            <Button
+              variant="secondary"
+              onClick={() => setEditing(true)}
+              disabled={editing}
+            >
               Editar
             </Button>
             <Button onClick={handleSave} disabled={saving || !editing}>

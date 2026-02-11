@@ -212,6 +212,13 @@ const fetchUserDisplayMap = async (userIds: string[]) => {
   );
 };
 
+export const fetchUserDisplayNameById = async (userId: string | null) => {
+  if (!userId) return null;
+  const usersById = await fetchUserDisplayMap([userId]);
+  const user = usersById.get(userId);
+  return user?.full_name || user?.email || user?.id || null;
+};
+
 type AuditFilters = {
   search?: string;
   type?: string;
