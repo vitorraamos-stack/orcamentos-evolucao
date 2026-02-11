@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import {
   fetchFinanceQueue,
   fetchPendingSecondInstallments,
+  updateFinanceInstallment,
 } from "@/features/hubos/finance";
 import type { FinanceInstallment } from "@/features/hubos/types";
 import { uploadReceiptForOrder } from "@/features/hubos/assets";
@@ -28,6 +29,8 @@ export default function OsPendentesPage() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
+  const [consultantNote, setConsultantNote] = useState("");
+  const [returningToFinance, setReturningToFinance] = useState(false);
 
   const load = async () => {
     try {
@@ -108,6 +111,45 @@ export default function OsPendentesPage() {
       );
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleReturnToFinanceQueue = async () => {
+    if (!selected) {
+      toast.error("Selecione uma solicitação.");
+      return;
+    }
+
+    try {
+      setReturningToFinance(true);
+      const notePrefix =
+        selectedGroup === "cadastro"
+          ? "Consultor confirmou atualização de cadastro."
+          : "Consultor confirmou ajuste solicitado (rejeitado).";
+
+      const nextNote = [notePrefix, consultantNote.trim(), selected.notes ?? ""]
+        .filter(Boolean)
+        .join("\n\n");
+
+      await updateFinanceInstallment({
+        id: selected.id,
+        status: "PENDING_REVIEW",
+        notes: nextNote || null,
+        reviewedBy: user?.id ?? null,
+      });
+
+      toast.success("Solicitação enviada de volta para a fila do financeiro.");
+      setConsultantNote("");
+      await load();
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível enviar para a fila do financeiro."
+      );
+    } finally {
+      setReturningToFinance(false);
     }
   };
 
@@ -289,6 +331,28 @@ export default function OsPendentesPage() {
                     disabled={!file || sending}
                   >
                     {sending ? "Enviando..." : "Anexar comprovante 2/2"}
+                  </Button>
+                </>
+              )}
+
+              {(selectedGroup === "cadastro" ||
+                selectedGroup === "rejected") && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Atualização do consultor (opcional)</Label>
+                    <Input
+                      placeholder="Descreva o que foi ajustado para o financeiro revisar"
+                      value={consultantNote}
+                      onChange={event => setConsultantNote(event.target.value)}
+                    />
+                  </div>
+                  <Button
+                    onClick={handleReturnToFinanceQueue}
+                    disabled={returningToFinance}
+                  >
+                    {returningToFinance
+                      ? "Enviando para o financeiro..."
+                      : "Confirmar atualização e enviar ao financeiro"}
                   </Button>
                 </>
               )}
