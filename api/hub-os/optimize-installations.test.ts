@@ -59,14 +59,58 @@ describe("optimize-installations helpers", () => {
     expect(payload.vehicles[0].start).toEqual([-46.6333, -23.5505]);
   });
 
-  it("buildGoogleMapsUrl creates directions URL", () => {
+  it("buildGoogleMapsUrl without startCoords and 2 stops has no waypoints", () => {
     const url = buildGoogleMapsUrl([
       { coords: [-46.6333, -23.5505] },
       { coords: [-46.64, -23.56] },
     ]);
 
-    expect(url).toContain("google.com/maps/dir");
-    expect(url).toContain("origin=");
-    expect(url).toContain("destination=");
+    expect(url).toBeTruthy();
+    const parsed = new URL(url!);
+    expect(parsed.pathname).toBe("/maps/dir/");
+    expect(parsed.searchParams.get("origin")).toBe("-23.5505,-46.6333");
+    expect(parsed.searchParams.get("destination")).toBe("-23.56,-46.64");
+    expect(parsed.searchParams.get("waypoints")).toBeNull();
+  });
+
+  it("buildGoogleMapsUrl without startCoords and 3 stops keeps only middle as waypoint", () => {
+    const url = buildGoogleMapsUrl([
+      { coords: [-46.6333, -23.5505] },
+      { coords: [-46.625, -23.552] },
+      { coords: [-46.64, -23.56] },
+    ]);
+
+    expect(url).toBeTruthy();
+    const parsed = new URL(url!);
+    expect(parsed.searchParams.get("origin")).toBe("-23.5505,-46.6333");
+    expect(parsed.searchParams.get("destination")).toBe("-23.56,-46.64");
+    expect(parsed.searchParams.get("waypoints")).toBe("-23.552,-46.625");
+  });
+
+  it("buildGoogleMapsUrl with startCoords keeps first stop as waypoint", () => {
+    const url = buildGoogleMapsUrl(
+      [
+        { coords: [-46.6333, -23.5505] },
+        { coords: [-46.64, -23.56] },
+      ],
+      [-46.62, -23.54]
+    );
+
+    expect(url).toBeTruthy();
+    const parsed = new URL(url!);
+    expect(parsed.searchParams.get("origin")).toBe("-23.54,-46.62");
+    expect(parsed.searchParams.get("destination")).toBe("-23.56,-46.64");
+    expect(parsed.searchParams.get("waypoints")).toBe("-23.5505,-46.6333");
+  });
+
+  it("buildGoogleMapsUrl without startCoords and single stop returns search URL", () => {
+    const url = buildGoogleMapsUrl([{ coords: [-46.6333, -23.5505] }]);
+
+    expect(url).toBeTruthy();
+    const parsed = new URL(url!);
+    expect(parsed.pathname).toBe("/maps/search/");
+    expect(parsed.searchParams.get("api")).toBe("1");
+    expect(parsed.searchParams.get("query")).toBe("-23.5505,-46.6333");
+    expect(parsed.searchParams.get("waypoints")).toBeNull();
   });
 });

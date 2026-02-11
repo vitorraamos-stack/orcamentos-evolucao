@@ -485,6 +485,26 @@ export default function FinanceiroPortalPage() {
           </div>
         </Card>
       </div>
+
+      <ComprovantePreviewDialog
+        open={previewOpen}
+        onOpenChange={open => {
+          setPreviewOpen(open);
+          if (!open) {
+            if (previewRenderUrl?.startsWith("blob:")) {
+              URL.revokeObjectURL(previewRenderUrl);
+            }
+            setPreviewRenderUrl(null);
+            setPreviewUrl(null);
+            setPreviewError(null);
+          }
+        }}
+        url={previewUrl}
+        previewUrl={previewRenderUrl}
+        filename={previewName}
+        loading={previewLoading}
+        error={previewError}
+      />
     </div>
   );
 }
