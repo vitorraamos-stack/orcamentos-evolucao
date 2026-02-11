@@ -96,7 +96,7 @@ const skippedReasonLabel: Record<string, string> = {
   geocode_failed: "Falha ao geocodificar endereço",
 };
 
-const DEFAULT_BASE_ADDRESS = "João Grumiche, 196 - Kobrasol - São José";
+const DEFAULT_BASE_ADDRESS = "Rua João Grumiche, 196 - Kobrasol São José - SC, 88102-600";
 
 const formatGroupLabel = (groupId: string) => {
   const match = groupId.match(/date-(\d+)__?geo-(\d+)/i);
