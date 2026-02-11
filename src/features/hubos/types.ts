@@ -28,6 +28,10 @@ export type OsOrder = {
   delivery_date: string | null;
   logistic_type: LogisticType;
   address: string | null;
+  address_lat?: number | null;
+  address_lng?: number | null;
+  address_geocoded_at?: string | null;
+  address_geocode_provider?: string | null;
   production_tag: ProductionTag | null;
   art_direction_tag: ArtDirectionTag | null;
   art_status: ArtStatus;
