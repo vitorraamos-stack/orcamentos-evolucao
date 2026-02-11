@@ -115,6 +115,20 @@ const buildWazeUrl = (coords: [number, number]) => {
   return `https://waze.com/ul?ll=${lat},${lon}&navigate=yes`;
 };
 
+const addressHasCityUfCep = (address: string) => {
+  const normalized = address.trim();
+  if (!normalized) return false;
+
+  const hasUf = /\b(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)\b/i.test(
+    normalized
+  );
+  const hasCep = /\b\d{5}-?\d{3}\b/.test(normalized);
+  const parts = normalized.split("-").map(part => part.trim()).filter(Boolean);
+  const hasCityByParts = parts.length >= 3;
+
+  return hasUf || hasCep || hasCityByParts;
+};
+
 export default function InstallationsInbox({
   orders,
   selectedId,
@@ -137,6 +151,8 @@ export default function InstallationsInbox({
   const [optimizing, setOptimizing] = useState(false);
   const [result, setResult] =
     useState<OptimizeInstallationRouteResponse | null>(null);
+  const [allowOptimizeWithIncompleteAddresses, setAllowOptimizeWithIncompleteAddresses] =
+    useState(false);
 
   const selectedOrder = useMemo(
     () => orders.find(order => order.id === selectedId) ?? null,
@@ -238,6 +254,40 @@ export default function InstallationsInbox({
     });
   }, [getIsOverdue, getIsToday, getIsWeek, quickFilter, searchFilteredOrders]);
 
+  const selectedOrdersForDateRange = useMemo(
+    () =>
+      orders.filter(order => {
+        if (!order.delivery_date) return false;
+        if (dateFrom && order.delivery_date < dateFrom) return false;
+        if (dateTo && order.delivery_date > dateTo) return false;
+        return true;
+      }),
+    [dateFrom, dateTo, orders]
+  );
+
+  const addressWarnings = useMemo(() => {
+    const warnings: string[] = [];
+
+    if (startAddress.trim() && !addressHasCityUfCep(startAddress)) {
+      warnings.push(
+        "O ponto de partida parece incompleto (inclua cidade/UF ou CEP)."
+      );
+    }
+
+    const ordersWithIncompleteAddress = selectedOrdersForDateRange.filter(order => {
+      if (!order.address?.trim()) return false;
+      return !addressHasCityUfCep(order.address);
+    });
+
+    if (ordersWithIncompleteAddress.length > 0) {
+      warnings.push(
+        `${ordersWithIncompleteAddress.length} OS com endereço possivelmente incompleto (sem cidade/UF/CEP).`
+      );
+    }
+
+    return warnings;
+  }, [selectedOrdersForDateRange, startAddress]);
+
   useEffect(() => {
     if (!filteredOrders.length) {
       if (selectedId !== null) {
@@ -300,6 +350,13 @@ export default function InstallationsInbox({
   };
 
   const handleOptimizeRoute = async () => {
+    if (addressWarnings.length > 0 && !allowOptimizeWithIncompleteAddresses) {
+      toast.error(
+        "Revise os endereços (cidade/UF/CEP) ou habilite a opção para continuar mesmo assim."
+      );
+      return;
+    }
+
     setOptimizing(true);
     setResult(null);
 
@@ -350,6 +407,7 @@ export default function InstallationsInbox({
               setGeoClusterRadiusKm("5");
               setMaxStopsPerRoute("20");
               setStartAddress(DEFAULT_BASE_ADDRESS);
+              setAllowOptimizeWithIncompleteAddresses(false);
               setResult(null);
               setOptimizeOpen(true);
             }}
@@ -431,6 +489,29 @@ export default function InstallationsInbox({
               />
             </div>
           </div>
+
+          {addressWarnings.length > 0 && (
+            <Card className="border-amber-300 bg-amber-50 p-3">
+              <p className="text-sm font-medium text-amber-900">
+                Atenção com os endereços antes de otimizar
+              </p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-900">
+                {addressWarnings.map(warning => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+              <label className="mt-3 flex items-center gap-2 text-xs text-amber-900">
+                <input
+                  type="checkbox"
+                  checked={allowOptimizeWithIncompleteAddresses}
+                  onChange={event =>
+                    setAllowOptimizeWithIncompleteAddresses(event.target.checked)
+                  }
+                />
+                Continuar mesmo com endereços incompletos
+              </label>
+            </Card>
+          )}
 
           {result && (
             <div className="space-y-3 rounded-md border p-3">
