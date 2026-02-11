@@ -15,6 +15,24 @@ import { uploadReceiptForOrder } from "@/features/hubos/assets";
 import { useAuth } from "@/contexts/AuthContext";
 import { labelFinanceStatus } from "@/lib/financeStatusLabels";
 
+const buildFinanceNoteHistory = ({
+  existing,
+  actor,
+  statusLabel,
+  note,
+}: {
+  existing?: string | null;
+  actor: "CONSULTOR" | "BPO";
+  statusLabel: string;
+  note?: string | null;
+}) => {
+  const cleanNote = note?.trim();
+  const timestamp = new Date().toLocaleString("pt-BR");
+  const header = `[${timestamp}] ${actor} • ${statusLabel}`;
+  const entry = cleanNote ? `${header}\n${cleanNote}` : header;
+  return [existing?.trim(), entry].filter(Boolean).join("\n\n");
+};
+
 export default function OsPendentesPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
@@ -127,9 +145,12 @@ export default function OsPendentesPage() {
           ? "Consultor confirmou atualização de cadastro."
           : "Consultor confirmou ajuste solicitado (rejeitado).";
 
-      const nextNote = [notePrefix, consultantNote.trim(), selected.notes ?? ""]
-        .filter(Boolean)
-        .join("\n\n");
+      const nextNote = buildFinanceNoteHistory({
+        existing: selected.notes,
+        actor: "CONSULTOR",
+        statusLabel: notePrefix,
+        note: consultantNote,
+      });
 
       await updateFinanceInstallment({
         id: selected.id,
@@ -307,7 +328,7 @@ export default function OsPendentesPage() {
                   {selected.due_date ?? "—"}
                 </p>
                 {selected.notes && (
-                  <p>
+                  <p className="whitespace-pre-wrap">
                     <span className="font-medium">Observação:</span>{" "}
                     {selected.notes}
                   </p>

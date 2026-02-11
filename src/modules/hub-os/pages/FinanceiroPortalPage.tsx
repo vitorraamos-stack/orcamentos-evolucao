@@ -57,6 +57,26 @@ const getFileType = (filename?: string | null) => {
   return "other" as const;
 };
 
+const buildFinanceNoteHistory = ({
+  existing,
+  actor,
+  status,
+  note,
+}: {
+  existing?: string | null;
+  actor: "BPO" | "CONSULTOR";
+  status: FinanceInstallmentStatus;
+  note?: string | null;
+}) => {
+  const cleanNote = note?.trim();
+  const timestamp = new Date().toLocaleString("pt-BR");
+  const statusLabel = labelFinanceStatus(status);
+  const header = `[${timestamp}] ${actor} • ${statusLabel}`;
+  const entry = cleanNote ? `${header}\n${cleanNote}` : header;
+
+  return [existing?.trim(), entry].filter(Boolean).join("\n\n");
+};
+
 export default function FinanceiroPortalPage() {
   const { user } = useAuth();
   const cacheRef = useRef<Map<string, PreviewCacheEntry>>(new Map());
@@ -127,10 +147,17 @@ export default function FinanceiroPortalPage() {
 
     try {
       setSavingStatus(status);
+      const mergedNotes = buildFinanceNoteHistory({
+        existing: selected.notes,
+        actor: "BPO",
+        status,
+        note: notes,
+      });
+
       await updateFinanceInstallment({
         id: selected.id,
         status,
-        notes: notes.trim() || null,
+        notes: mergedNotes || null,
         reviewedBy: user?.id ?? null,
       });
       toast.success("Status atualizado.");
@@ -355,6 +382,14 @@ export default function FinanceiroPortalPage() {
                     Criado em
                   </p>
                   <p>{new Date(selected.created_at).toLocaleString("pt-BR")}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-muted-foreground">
+                    Histórico financeiro
+                  </p>
+                  <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                    {selected.notes?.trim() || "(sem histórico)"}
+                  </p>
                 </div>
               </div>
 
