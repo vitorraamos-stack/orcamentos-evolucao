@@ -126,9 +126,19 @@ function buildGoogleMapsUrl(
 ) {
   if (stops.length === 0) return null;
 
+  if (!startCoords && stops.length === 1) {
+    const [lng, lat] = stops[0].coords;
+    const url = new URL("https://www.google.com/maps/search/");
+    url.searchParams.set("api", "1");
+    url.searchParams.set("query", `${lat},${lng}`);
+    return url.toString();
+  }
+
   const origin = startCoords ?? stops[0].coords;
   const destination = stops[stops.length - 1].coords;
 
+  // With explicit start we can keep all stops except destination as waypoints.
+  // Without explicit start, first stop is the origin and must not be duplicated in waypoints.
   const waypointStops = startCoords
     ? stops.slice(0, -1)
     : stops.slice(1, -1);
