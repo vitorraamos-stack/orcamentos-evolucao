@@ -185,11 +185,16 @@ export default function InstallationsInbox({
   }, [orders, searchValue]);
 
   useEffect(() => {
-    const selectedByDate = orders
-      .filter(order => order.delivery_date === dateFrom)
+    const selectedByRange = orders
+      .filter(order => {
+        if (!order.delivery_date) return false;
+        if (dateFrom && order.delivery_date < dateFrom) return false;
+        if (dateTo && order.delivery_date > dateTo) return false;
+        return true;
+      })
       .map(order => order.id);
-    setSelectedOrderIds(selectedByDate);
-  }, [dateFrom, orders]);
+    setSelectedOrderIds(selectedByRange);
+  }, [dateFrom, dateTo, orders]);
 
   const getIsToday = useCallback(
     (order: OsOrder) => {
@@ -369,6 +374,7 @@ export default function InstallationsInbox({
         maxStopsPerRoute: Number(maxStopsPerRoute || 20),
         startAddress: startAddress.trim() || null,
         profile: "driving-car",
+        orderIds: selectedOrderIds.length > 0 ? selectedOrderIds : null,
       });
       setResult(payload);
       toast.success("Rota otimizada com sucesso.");
@@ -513,6 +519,38 @@ export default function InstallationsInbox({
             </Card>
           )}
 
+
+          <div className="space-y-2 rounded-md border p-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">OS incluídas na otimização</p>
+              <p className="text-xs text-muted-foreground">{selectedOrderIds.length}/{selectedOrdersForDateRange.length} selecionadas</p>
+            </div>
+            <div className="max-h-40 space-y-1 overflow-y-auto pr-1">
+              {selectedOrdersForDateRange.map(order => {
+                const checked = selectedOrderIds.includes(order.id);
+                return (
+                  <label key={order.id} className="flex items-center gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={event => {
+                        setSelectedOrderIds(current =>
+                          event.target.checked
+                            ? [...current, order.id]
+                            : current.filter(id => id !== order.id)
+                        );
+                      }}
+                    />
+                    <span className="truncate">{order.sale_number} - {order.client_name}</span>
+                  </label>
+                );
+              })}
+              {selectedOrdersForDateRange.length === 0 && (
+                <p className="text-xs text-muted-foreground">Nenhuma OS no intervalo selecionado.</p>
+              )}
+            </div>
+          </div>
+
           {result && (
             <div className="space-y-3 rounded-md border p-3">
               <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -565,13 +603,13 @@ export default function InstallationsInbox({
                             <Badge variant="secondary">{formatRouteLabel(route.routeId)}</Badge>
                             <Badge variant="outline">
                               Distância:{" "}
-                              {route.summary.distance_m
+                              {route.summary.distance_m != null
                                 ? formatDistance(route.summary.distance_m)
                                 : "n/d"}
                             </Badge>
                             <Badge variant="outline">
                               Tempo:{" "}
-                              {route.summary.duration_s
+                              {route.summary.duration_s != null
                                 ? formatDuration(route.summary.duration_s)
                                 : "n/d"}
                             </Badge>

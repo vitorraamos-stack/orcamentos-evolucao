@@ -9,6 +9,7 @@ type OptimizePayload = {
   startAddress?: string | null;
   startCoords?: [number, number] | null;
   profile?: "driving-car";
+  orderIds?: string[] | null;
 };
 
 type OsCandidate = {
@@ -19,6 +20,9 @@ type OsCandidate = {
   address: string | null;
   address_lat: number | null;
   address_lng: number | null;
+  updated_at: string;
+  address_geocoded_at: string | null;
+  address_geocode_provider: string | null;
 };
 
 type GeocodedStop = {
@@ -175,6 +179,7 @@ function parseRequestBody(
     startAddress: payload.startAddress ?? null,
     startCoords: payload.startCoords ?? null,
     profile: "driving-car",
+    orderIds: Array.isArray(payload.orderIds) ? payload.orderIds.filter((value): value is string => typeof value === "string" && value.trim().length > 0) : null,
   };
 }
 
@@ -218,28 +223,62 @@ async function requireAdminAuth(req: any, res: any, supabaseAdmin: any) {
   return user;
 }
 
-async function geocodeORS(text: string, orsApiKey: string) {
-  const url = new URL(`${ORS_BASE_URL}/geocode/search`);
-  url.searchParams.set("api_key", orsApiKey);
-  url.searchParams.set("text", text);
-  url.searchParams.set("boundary.country", "BR");
-  url.searchParams.set("size", "1");
+async function geocodeORS(
+  text: string,
+  orsApiKey: string,
+  focusCoords?: [number, number] | null
+) {
+  const normalized = normalizeAddress(text);
+  const queries = [normalized, `${normalized}, Brasil`];
 
-  const response = await fetch(url.toString());
-  if (!response.ok) {
-    throw new Error(`ORS geocode failed (${response.status})`);
+  let bestCoords: [number, number] | null = null;
+  let bestScore = Number.NEGATIVE_INFINITY;
+
+  for (const queryText of queries) {
+    const url = new URL(`${ORS_BASE_URL}/geocode/search`);
+    url.searchParams.set("api_key", orsApiKey);
+    url.searchParams.set("text", queryText);
+    url.searchParams.set("boundary.country", "BR");
+    url.searchParams.set("size", "5");
+    url.searchParams.set("layers", "address,venue,street");
+    if (focusCoords) {
+      url.searchParams.set("focus.point.lon", String(focusCoords[0]));
+      url.searchParams.set("focus.point.lat", String(focusCoords[1]));
+    }
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      throw new Error(`ORS geocode failed (${response.status})`);
+    }
+
+    const data = (await response.json()) as {
+      features?: Array<{
+        geometry?: { coordinates?: [number, number] };
+        properties?: { confidence?: number };
+      }>;
+    };
+
+    for (const feature of data.features ?? []) {
+      const coords = feature.geometry?.coordinates;
+      if (!coords || coords.length < 2) continue;
+
+      const confidence = feature.properties?.confidence ?? 0;
+      const distancePenalty =
+        focusCoords ? haversineDistanceKm(focusCoords, coords) * 0.5 : 0;
+      const score = confidence * 100 - distancePenalty;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestCoords = coords;
+      }
+    }
   }
 
-  const data = (await response.json()) as {
-    features?: Array<{ geometry?: { coordinates?: [number, number] } }>;
-  };
-
-  const coords = data.features?.[0]?.geometry?.coordinates;
-  if (!coords || coords.length < 2) {
+  if (!bestCoords) {
     throw new Error("ORS geocode did not return coordinates");
   }
 
-  return coords;
+  return bestCoords;
 }
 
 function groupByDateWindow(stops: GeocodedStop[], dateWindowDays: number) {
@@ -421,6 +460,41 @@ async function optimizeWithORS(
   };
 }
 
+
+async function fetchDirectionsSummary(
+  coordinates: Array<[number, number]>,
+  profile: string,
+  orsApiKey: string
+) {
+  if (coordinates.length < 2) return null;
+
+  const url = new URL(`${ORS_BASE_URL}/v2/directions/${profile}`);
+  url.searchParams.set('api_key', orsApiKey);
+
+  const response = await fetch(url.toString(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      coordinates,
+      instructions: false,
+    }),
+  });
+
+  if (!response.ok) return null;
+
+  const payload = (await response.json()) as {
+    routes?: Array<{ summary?: { distance?: number; duration?: number } }>;
+  };
+
+  const summary = payload.routes?.[0]?.summary;
+  if (!summary) return null;
+
+  return {
+    distance_m: typeof summary.distance === 'number' ? summary.distance : null,
+    duration_s: typeof summary.duration === 'number' ? summary.duration : null,
+  };
+}
+
 export default async function handler(req: any, res: any) {
   const startedAt = Date.now();
 
@@ -455,7 +529,7 @@ export default async function handler(req: any, res: any) {
   let resolvedStartCoords = parsed.startCoords;
   if (!resolvedStartCoords && parsed.startAddress) {
     try {
-      resolvedStartCoords = await geocodeORS(parsed.startAddress, orsApiKey);
+      resolvedStartCoords = await geocodeORS(parsed.startAddress, orsApiKey, null);
     } catch {
       return json(res, 400, {
         error: "Não foi possível geocodificar o ponto de partida informado.",
@@ -467,7 +541,7 @@ export default async function handler(req: any, res: any) {
     let query = supabaseAdmin
       .from("os_orders")
       .select(
-        "id, sale_number, client_name, delivery_date, address, address_lat, address_lng"
+        "id, sale_number, client_name, delivery_date, address, address_lat, address_lng, updated_at, address_geocoded_at, address_geocode_provider"
       )
       .eq("logistic_type", "instalacao")
       .eq("archived", false)
@@ -475,6 +549,9 @@ export default async function handler(req: any, res: any) {
 
     if (parsed.dateFrom) query = query.gte("delivery_date", parsed.dateFrom);
     if (parsed.dateTo) query = query.lte("delivery_date", parsed.dateTo);
+    if (parsed.orderIds && parsed.orderIds.length > 0) {
+      query = query.in("id", parsed.orderIds);
+    }
 
     const { data: rows, error: queryError } = await query;
     if (queryError) {
@@ -489,10 +566,6 @@ export default async function handler(req: any, res: any) {
     const resolveGeocode = async (
       order: OsCandidate
     ): Promise<[number, number] | null> => {
-      if (order.address_lng !== null && order.address_lat !== null) {
-        return [order.address_lng, order.address_lat];
-      }
-
       const address = order.address ? normalizeAddress(order.address) : "";
       if (!address) {
         unassigned.push({ os_id: order.id, reason: "missing_address" });
@@ -502,8 +575,25 @@ export default async function handler(req: any, res: any) {
       const cached = geocodeCache.get(address);
       if (cached) return cached;
 
+      const geocodeIsCurrent =
+        order.address_geocode_provider === "openrouteservice" &&
+        order.address_geocoded_at &&
+        (!order.updated_at ||
+          new Date(order.address_geocoded_at).getTime() >=
+            new Date(order.updated_at).getTime());
+
+      if (
+        geocodeIsCurrent &&
+        order.address_lng !== null &&
+        order.address_lat !== null
+      ) {
+        const cachedCoords: [number, number] = [order.address_lng, order.address_lat];
+        geocodeCache.set(address, cachedCoords);
+        return cachedCoords;
+      }
+
       try {
-        const coords = await geocodeORS(address, orsApiKey);
+        const coords = await geocodeORS(address, orsApiKey, resolvedStartCoords);
         geocodeCache.set(address, coords);
 
         await supabaseAdmin
@@ -518,6 +608,9 @@ export default async function handler(req: any, res: any) {
 
         return coords;
       } catch {
+        if (order.address_lng !== null && order.address_lat !== null) {
+          return [order.address_lng, order.address_lat];
+        }
         unassigned.push({ os_id: order.id, reason: "geocode_failed" });
         return null;
       }
@@ -623,11 +716,31 @@ export default async function handler(req: any, res: any) {
             resolvedStartCoords
           );
 
+          const directionsCoordinates = [
+            ...(resolvedStartCoords ? [resolvedStartCoords] : []),
+            ...stops.map(stop => stop.coords),
+          ];
+
+          const directionsSummary =
+            optimized.summary.distance_m !== null && optimized.summary.duration_s !== null
+              ? optimized.summary
+              : await fetchDirectionsSummary(
+                  directionsCoordinates,
+                  parsed.profile,
+                  orsApiKey
+                );
+
           groupRoutes.push({
             routeId: `${groupId}#${routeIndex + 1}`,
             summary: {
-              distance_m: optimized.summary.distance_m ?? estimatedSummary.distance_m,
-              duration_s: optimized.summary.duration_s ?? estimatedSummary.duration_s,
+              distance_m:
+                optimized.summary.distance_m ??
+                directionsSummary?.distance_m ??
+                estimatedSummary.distance_m,
+              duration_s:
+                optimized.summary.duration_s ??
+                directionsSummary?.duration_s ??
+                estimatedSummary.duration_s,
             },
             stops,
             googleMapsUrl: buildGoogleMapsUrl(stops, resolvedStartCoords),
