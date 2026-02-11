@@ -1,41 +1,61 @@
-import { useEffect, useMemo, useState } from 'react';
-import { DndContext, DragEndEvent } from '@dnd-kit/core';
-import { toast } from 'sonner';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabase';
-import { ART_COLUMNS, PROD_COLUMNS } from '@/features/hubos/constants';
-import type { ArtDirectionTag, ArtStatus, AssetJob, HubOsFilters, OsOrder, ProdStatus } from '@/features/hubos/types';
-import { archiveOrder, createOrderEvent, deleteOrder, fetchOrders, updateOrder } from '@/features/hubos/api';
-import { getLatestAssetJobsByOsId } from '@/features/hubos/assetJobs';
-import KanbanColumn from '@/features/hubos/components/KanbanColumn';
-import KanbanCard from '@/features/hubos/components/KanbanCard';
-import OrderDetailsDialog from '@/features/hubos/components/OrderDetailsDialog';
-import CreateOSDialog from '@/features/hubos/components/CreateOSDialog';
-import ArtDirectionTagPopup from '@/features/hubos/components/ArtDirectionTagPopup';
-import FiltersBar from '@/features/hubos/components/FiltersBar';
-import InstallationsInbox from '@/features/hubos/components/InstallationsInbox';
-import MetricsBar from '@/features/hubos/components/MetricsBar';
-import { Link, useLocation } from 'wouter';
-import { useAuth } from '@/contexts/AuthContext';
-import { fetchPendingSecondInstallments } from '@/features/hubos/finance';
+import { useEffect, useMemo, useState } from "react";
+import { DndContext, DragEndEvent } from "@dnd-kit/core";
+import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase";
+import { ART_COLUMNS, PROD_COLUMNS } from "@/features/hubos/constants";
+import type {
+  ArtDirectionTag,
+  ArtStatus,
+  AssetJob,
+  HubOsFilters,
+  OsOrder,
+  ProdStatus,
+} from "@/features/hubos/types";
+import {
+  archiveOrder,
+  createOrderEvent,
+  deleteOrder,
+  fetchOrders,
+  updateOrder,
+} from "@/features/hubos/api";
+import { getLatestAssetJobsByOsId } from "@/features/hubos/assetJobs";
+import KanbanColumn from "@/features/hubos/components/KanbanColumn";
+import KanbanCard from "@/features/hubos/components/KanbanCard";
+import OrderDetailsDialog from "@/features/hubos/components/OrderDetailsDialog";
+import CreateOSDialog from "@/features/hubos/components/CreateOSDialog";
+import ArtDirectionTagPopup from "@/features/hubos/components/ArtDirectionTagPopup";
+import FiltersBar from "@/features/hubos/components/FiltersBar";
+import InstallationsInbox from "@/features/hubos/components/InstallationsInbox";
+import MetricsBar from "@/features/hubos/components/MetricsBar";
+import { Link, useLocation } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
+import { fetchPendingSecondInstallments } from "@/features/hubos/finance";
 
 const defaultFilters: HubOsFilters = {
-  search: '',
+  search: "",
   reproducao: false,
   letraCaixa: false,
-  logisticType: 'all',
+  logisticType: "all",
   overdueOnly: false,
 };
 
 const normalize = (value: string) => value.toLowerCase();
 
 const FINAL_PROD_STATUS = PROD_COLUMNS[PROD_COLUMNS.length - 1];
-const DONE_ASSET_STATUSES = new Set(['CLEANED', 'DONE', 'DONE_CLEANUP_FAILED']);
+const DONE_ASSET_STATUSES = new Set(["CLEANED", "DONE", "DONE_CLEANUP_FAILED"]);
+type InboxKey =
+  | "global"
+  | "arte"
+  | "producao"
+  | "atrasados"
+  | "prontoAvisar"
+  | "instalacoes";
 
 const isOverdue = (order: OsOrder) => {
   if (!order.delivery_date) return false;
-  const [year, month, day] = order.delivery_date.split('-').map(Number);
+  const [year, month, day] = order.delivery_date.split("-").map(Number);
   const delivery = new Date(year, (month ?? 1) - 1, day ?? 1);
   const today = new Date();
   delivery.setHours(0, 0, 0, 0);
@@ -49,36 +69,43 @@ export default function HubOS() {
   const [orders, setOrders] = useState<OsOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState(defaultFilters);
-  const [viewMode, setViewMode] = useState<'kanban' | 'instalacoes'>('kanban');
-  const [activeTab, setActiveTab] = useState<'arte' | 'producao'>('arte');
+  const [viewMode, setViewMode] = useState<"kanban" | "inbox">("kanban");
+  const [inboxKey, setInboxKey] = useState<InboxKey>("instalacoes");
+  const [activeTab, setActiveTab] = useState<"arte" | "producao">("arte");
   const [selectedOrder, setSelectedOrder] = useState<OsOrder | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [artDirectionPopupOpen, setArtDirectionPopupOpen] = useState(false);
-  const [artDirectionPopupTag, setArtDirectionPopupTag] = useState<ArtDirectionTag | null>(null);
-  const [installationSearch, setInstallationSearch] = useState('');
-  const [selectedInstallationId, setSelectedInstallationId] = useState<string | null>(null);
+  const [artDirectionPopupTag, setArtDirectionPopupTag] =
+    useState<ArtDirectionTag | null>(null);
+  const [inboxSearch, setInboxSearch] = useState("");
+  const [selectedInboxId, setSelectedInboxId] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
-  const [assetJobByOsId, setAssetJobByOsId] = useState<Record<string, AssetJob | null>>({});
+  const [assetJobByOsId, setAssetJobByOsId] = useState<
+    Record<string, AssetJob | null>
+  >({});
   const [pendingInstallmentsCount, setPendingInstallmentsCount] = useState(0);
 
   useEffect(() => {
-    if (hubPermissions.canViewArteBoard && !hubPermissions.canViewProducaoBoard) {
-      setActiveTab('arte');
+    if (
+      hubPermissions.canViewArteBoard &&
+      !hubPermissions.canViewProducaoBoard
+    ) {
+      setActiveTab("arte");
     }
-    if (!hubPermissions.canViewArteBoard && hubPermissions.canViewProducaoBoard) {
-      setActiveTab('producao');
+    if (
+      !hubPermissions.canViewArteBoard &&
+      hubPermissions.canViewProducaoBoard
+    ) {
+      setActiveTab("producao");
     }
   }, [hubPermissions.canViewArteBoard, hubPermissions.canViewProducaoBoard]);
-
-
-
 
   const loadPendingInstallments = async () => {
     try {
       const pending = await fetchPendingSecondInstallments();
       setPendingInstallmentsCount(pending.length);
     } catch (error) {
-      console.error('Erro ao carregar pendências financeiras', error);
+      console.error("Erro ao carregar pendências financeiras", error);
     }
   };
 
@@ -89,7 +116,7 @@ export default function HubOS() {
       setOrders(data);
     } catch (error) {
       console.error(error);
-      toast.error('Não foi possível carregar o Hub OS.');
+      toast.error("Não foi possível carregar o Hub OS.");
     } finally {
       setLoading(false);
     }
@@ -98,10 +125,14 @@ export default function HubOS() {
   useEffect(() => {
     loadOrders();
     const channel = supabase
-      .channel('hub-os-orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'os_orders' }, () => {
-        loadOrders();
-      })
+      .channel("hub-os-orders")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "os_orders" },
+        () => {
+          loadOrders();
+        }
+      )
       .subscribe();
 
     loadPendingInstallments();
@@ -113,7 +144,7 @@ export default function HubOS() {
 
   const filteredOrders = useMemo(() => {
     const search = normalize(filters.search);
-    return orders.filter((order) => {
+    return orders.filter(order => {
       const matchesSearch =
         !search ||
         normalize(order.sale_number).includes(search) ||
@@ -121,59 +152,119 @@ export default function HubOS() {
       const matchesRepro = !filters.reproducao || order.reproducao;
       const matchesLetra = !filters.letraCaixa || order.letra_caixa;
       const matchesLogistic =
-        filters.logisticType === 'all' || order.logistic_type === filters.logisticType;
+        filters.logisticType === "all" ||
+        order.logistic_type === filters.logisticType;
       const matchesOverdue = !filters.overdueOnly || isOverdue(order);
-      return matchesSearch && matchesRepro && matchesLetra && matchesLogistic && matchesOverdue;
+      return (
+        matchesSearch &&
+        matchesRepro &&
+        matchesLetra &&
+        matchesLogistic &&
+        matchesOverdue
+      );
     });
   }, [orders, filters]);
 
   const arteOrders = useMemo(
-    () => filteredOrders.filter((order) => !order.prod_status && ART_COLUMNS.includes(order.art_status)),
+    () =>
+      filteredOrders.filter(
+        order => !order.prod_status && ART_COLUMNS.includes(order.art_status)
+      ),
     [filteredOrders]
   );
 
   const producaoOrders = useMemo(
-    () => filteredOrders.filter((order) => order.prod_status !== null),
+    () => filteredOrders.filter(order => order.prod_status !== null),
     [filteredOrders]
+  );
+
+  const openOrders = useMemo(
+    () => orders.filter(order => order.prod_status !== "Finalizados"),
+    [orders]
+  );
+
+  const overdueOrders = useMemo(
+    () => filteredOrders.filter(isOverdue),
+    [filteredOrders]
+  );
+
+  const prontoAvisarOrders = useMemo(
+    () =>
+      producaoOrders.filter(
+        order => order.prod_status === "Pronto / Avisar Cliente"
+      ),
+    [producaoOrders]
+  );
+
+  const instalacaoOrders = useMemo(
+    () =>
+      orders.filter(
+        order =>
+          order.logistic_type === "instalacao" &&
+          order.prod_status !== "Finalizados"
+      ),
+    [orders]
   );
 
   const metrics = useMemo(() => {
     return {
+      global: openOrders.length,
       totalArte: arteOrders.length,
       totalProducao: producaoOrders.length,
-      overdue: filteredOrders.filter(isOverdue).length,
-      paraAprovacao: arteOrders.filter((order) => order.art_status === 'Para Aprovação').length,
-      prontoAvisar: producaoOrders.filter((order) => order.prod_status === 'Pronto / Avisar Cliente').length,
-      instalacoes: orders.filter(
-        (order) => order.logistic_type === 'instalacao' && order.prod_status !== 'Finalizados'
-      ).length,
+      overdue: overdueOrders.length,
+      prontoAvisar: prontoAvisarOrders.length,
+      instalacoes: instalacaoOrders.length,
       pendentes: pendingInstallmentsCount,
     };
-  }, [arteOrders, producaoOrders, filteredOrders, orders, pendingInstallmentsCount]);
+  }, [
+    arteOrders,
+    instalacaoOrders.length,
+    openOrders.length,
+    overdueOrders.length,
+    pendingInstallmentsCount,
+    producaoOrders.length,
+    prontoAvisarOrders.length,
+  ]);
 
-  const installationOrders = useMemo(
-    () => orders.filter((order) => order.logistic_type === 'instalacao'),
-    [orders]
-  );
-  const installationInboxOrders = installationOrders;
+  const inboxOrders = useMemo(() => {
+    if (inboxKey === "global") return openOrders;
+    if (inboxKey === "arte") return arteOrders;
+    if (inboxKey === "producao") return producaoOrders;
+    if (inboxKey === "atrasados") return overdueOrders;
+    if (inboxKey === "prontoAvisar") return prontoAvisarOrders;
+    return instalacaoOrders;
+  }, [
+    arteOrders,
+    inboxKey,
+    instalacaoOrders,
+    openOrders,
+    overdueOrders,
+    producaoOrders,
+    prontoAvisarOrders,
+  ]);
 
   const visibleOrders = useMemo(() => {
-    if (viewMode === 'instalacoes') return installationInboxOrders;
-    return activeTab === 'arte' ? arteOrders : producaoOrders;
-  }, [activeTab, arteOrders, installationInboxOrders, producaoOrders, viewMode]);
+    if (viewMode === "inbox") return inboxOrders;
+    return activeTab === "arte" ? arteOrders : producaoOrders;
+  }, [activeTab, arteOrders, inboxOrders, producaoOrders, viewMode]);
 
-  const visibleOrderIds = useMemo(() => visibleOrders.map((order) => order.id), [visibleOrders]);
+  const visibleOrderIds = useMemo(
+    () => visibleOrders.map(order => order.id),
+    [visibleOrders]
+  );
 
   const assetIndicatorByOsId = useMemo(() => {
-    const indicators: Record<string, 'processing' | 'done' | null> = {};
-    visibleOrderIds.forEach((osId) => {
+    const indicators: Record<string, "processing" | "done" | null> = {};
+    visibleOrderIds.forEach(osId => {
       const job = assetJobByOsId[osId];
       if (!job) {
         indicators[osId] = null;
         return;
       }
       // "Concluído" when the latest job is finalized; otherwise keep "Processando".
-      indicators[osId] = DONE_ASSET_STATUSES.has(job.status) ? 'done' : 'processing';
+      indicators[osId] = DONE_ASSET_STATUSES.has(job.status)
+        ? "done"
+        : "processing";
     });
     return indicators;
   }, [assetJobByOsId, visibleOrderIds]);
@@ -193,7 +284,7 @@ export default function HubOS() {
           setAssetJobByOsId(latestJobs);
         }
       } catch (error) {
-        console.error('Erro ao carregar jobs de arte.', error);
+        console.error("Erro ao carregar jobs de arte.", error);
       }
     };
 
@@ -204,8 +295,12 @@ export default function HubOS() {
       if (incomingCreated > currentCreated) return true;
       if (incomingCreated < currentCreated) return false;
       if (incoming.id === current.id) {
-        const incomingUpdated = new Date(incoming.updated_at ?? incoming.created_at).getTime();
-        const currentUpdated = new Date(current.updated_at ?? current.created_at).getTime();
+        const incomingUpdated = new Date(
+          incoming.updated_at ?? incoming.created_at
+        ).getTime();
+        const currentUpdated = new Date(
+          current.updated_at ?? current.created_at
+        ).getTime();
         return incomingUpdated > currentUpdated;
       }
       return false;
@@ -214,20 +309,20 @@ export default function HubOS() {
     loadLatestAssetJobs();
 
     const channel = supabase
-      .channel('hub-os-asset-jobs')
+      .channel("hub-os-asset-jobs")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'os_order_asset_jobs',
-          filter: `os_id=in.(${visibleOrderIds.join(',')})`,
+          event: "*",
+          schema: "public",
+          table: "os_order_asset_jobs",
+          filter: `os_id=in.(${visibleOrderIds.join(",")})`,
         },
-        (payload) => {
+        payload => {
           const incoming = payload.new as AssetJob;
           if (!incoming?.os_id) return;
           if (!visibleOrderIds.includes(incoming.os_id)) return;
-          setAssetJobByOsId((prev) => {
+          setAssetJobByOsId(prev => {
             const current = prev[incoming.os_id] ?? null;
             if (!shouldReplaceJob(current, incoming)) return prev;
             return { ...prev, [incoming.os_id]: incoming };
@@ -248,18 +343,18 @@ export default function HubOS() {
   }, [visibleOrderIds]);
 
   useEffect(() => {
-    if (viewMode !== 'instalacoes') return;
-    if (installationInboxOrders.length === 0 && selectedInstallationId !== null) {
-      setSelectedInstallationId(null);
+    if (viewMode !== "inbox") return;
+    if (inboxOrders.length === 0 && selectedInboxId !== null) {
+      setSelectedInboxId(null);
     }
-  }, [installationInboxOrders, selectedInstallationId, viewMode]);
+  }, [inboxOrders, selectedInboxId, viewMode]);
 
   useEffect(() => {
-    if (viewMode !== 'kanban' || !highlightId) return;
+    if (viewMode !== "kanban" || !highlightId) return;
     const targetId = highlightId;
     const scrollTimer = window.setTimeout(() => {
       const element = document.querySelector(`[data-os-id="${targetId}"]`);
-      element?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      element?.scrollIntoView({ block: "center", behavior: "smooth" });
     }, 200);
     const clearTimer = window.setTimeout(() => {
       setHighlightId(null);
@@ -271,52 +366,58 @@ export default function HubOS() {
   }, [activeTab, highlightId, viewMode]);
 
   const updateLocalOrder = (updated: OsOrder) => {
-    setOrders((prev) => prev.map((order) => (order.id === updated.id ? updated : order)));
+    setOrders(prev =>
+      prev.map(order => (order.id === updated.id ? updated : order))
+    );
   };
 
   const handleArchive = async (order: OsOrder) => {
     const previous = orders;
-    setOrders((prev) => prev.filter((item) => item.id !== order.id));
+    setOrders(prev => prev.filter(item => item.id !== order.id));
 
     try {
       await archiveOrder(order.id, user?.id ?? null);
       try {
         await createOrderEvent({
           os_id: order.id,
-          type: 'archive',
+          type: "archive",
           payload: {
             archived: true,
-            actor_name: user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
+            actor_name:
+              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
           },
           created_by: user?.id ?? null,
         });
       } catch (eventError) {
-        console.error('Erro ao registrar auditoria de arquivamento.', eventError);
+        console.error(
+          "Erro ao registrar auditoria de arquivamento.",
+          eventError
+        );
       }
-      toast.success('Card arquivado.');
+      toast.success("Card arquivado.");
     } catch (error) {
       console.error(error);
       setOrders(previous);
-      toast.error('Não foi possível arquivar o card.');
+      toast.error("Não foi possível arquivar o card.");
     }
   };
 
   const handleDelete = async (orderId: string) => {
     if (!isAdmin) {
-      toast.error('Você não tem permissão para excluir.');
+      toast.error("Você não tem permissão para excluir.");
       return;
     }
-    const order = orders.find((item) => item.id === orderId);
+    const order = orders.find(item => item.id === orderId);
     if (!order) return;
     const previous = orders;
-    setOrders((prev) => prev.filter((item) => item.id !== order.id));
+    setOrders(prev => prev.filter(item => item.id !== order.id));
 
     try {
       await deleteOrder(order.id);
       try {
         await createOrderEvent({
           os_id: order.id,
-          type: 'delete',
+          type: "delete",
           payload: {
             previous: {
               id: order.id,
@@ -326,29 +427,30 @@ export default function HubOS() {
               art_status: order.art_status,
               prod_status: order.prod_status,
             },
-            reason: 'manual_delete',
-            actor_name: user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
+            reason: "manual_delete",
+            actor_name:
+              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
           },
           created_by: user?.id ?? null,
         });
       } catch (eventError) {
-        console.error('Erro ao registrar auditoria de exclusão.', eventError);
+        console.error("Erro ao registrar auditoria de exclusão.", eventError);
       }
-      toast.success('Card excluído.');
+      toast.success("Card excluído.");
     } catch (error) {
       console.error(error);
       setOrders(previous);
-      toast.error('Não foi possível excluir o card.');
+      toast.error("Não foi possível excluir o card.");
     }
   };
 
   const handleDragEndArte = async ({ active, over }: DragEndEvent) => {
     if (!over) return;
     if (!hubPermissions.canMoveArteBoard) {
-      toast.error('Você não tem permissão para mover cards de Arte.');
+      toast.error("Você não tem permissão para mover cards de Arte.");
       return;
     }
-    const order = orders.find((item) => item.id === active.id);
+    const order = orders.find(item => item.id === active.id);
     if (!order) return;
     const nextStatus = over.id as ArtStatus;
     if (order.art_status === nextStatus) return;
@@ -356,11 +458,11 @@ export default function HubOS() {
     const inboxStatus = ART_COLUMNS[0];
     const inCreationStatus = ART_COLUMNS[1];
     const previous = order;
-    const shouldInitProd = nextStatus === 'Produzir' && !order.prod_status;
+    const shouldInitProd = nextStatus === "Produzir" && !order.prod_status;
     const optimistic = {
       ...order,
       art_status: nextStatus,
-      prod_status: shouldInitProd ? 'Produção' : order.prod_status,
+      prod_status: shouldInitProd ? "Produção" : order.prod_status,
     } satisfies OsOrder;
 
     updateLocalOrder(optimistic);
@@ -368,7 +470,7 @@ export default function HubOS() {
     try {
       const updated = await updateOrder(order.id, {
         art_status: nextStatus,
-        prod_status: shouldInitProd ? 'Produção' : order.prod_status,
+        prod_status: shouldInitProd ? "Produção" : order.prod_status,
         updated_at: new Date().toISOString(),
         updated_by: user?.id ?? null,
       });
@@ -384,21 +486,22 @@ export default function HubOS() {
       try {
         await createOrderEvent({
           os_id: order.id,
-          type: 'status_change',
+          type: "status_change",
           payload: {
-            board: 'arte',
+            board: "arte",
             from: order.art_status,
             to: nextStatus,
-            actor_name: user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
+            actor_name:
+              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
           },
           created_by: user?.id ?? null,
         });
       } catch (eventError) {
-        console.error('Erro ao registrar auditoria de status.', eventError);
+        console.error("Erro ao registrar auditoria de status.", eventError);
       }
     } catch (error) {
       console.error(error);
-      toast.error('Erro ao mover card.');
+      toast.error("Erro ao mover card.");
       updateLocalOrder(previous);
     }
   };
@@ -406,10 +509,10 @@ export default function HubOS() {
   const handleDragEndProducao = async ({ active, over }: DragEndEvent) => {
     if (!over) return;
     if (!hubPermissions.canMoveProducaoBoard) {
-      toast.error('Você não tem permissão para mover cards de Produção.');
+      toast.error("Você não tem permissão para mover cards de Produção.");
       return;
     }
-    const order = orders.find((item) => item.id === active.id);
+    const order = orders.find(item => item.id === active.id);
     if (!order) return;
     const nextStatus = over.id as ProdStatus;
     if (order.prod_status === nextStatus) return;
@@ -428,41 +531,107 @@ export default function HubOS() {
       try {
         await createOrderEvent({
           os_id: order.id,
-          type: 'status_change',
+          type: "status_change",
           payload: {
-            board: 'producao',
+            board: "producao",
             from: order.prod_status,
             to: nextStatus,
-            actor_name: user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
+            actor_name:
+              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
           },
           created_by: user?.id ?? null,
         });
       } catch (eventError) {
-        console.error('Erro ao registrar auditoria de status.', eventError);
+        console.error("Erro ao registrar auditoria de status.", eventError);
       }
     } catch (error) {
       console.error(error);
-      toast.error('Erro ao mover card.');
+      toast.error("Erro ao mover card.");
       updateLocalOrder(previous);
     }
   };
 
-  const renderBoard = (ordersList: OsOrder[], columns: string[], onDragEnd: (event: DragEndEvent) => void) => {
+  const openInbox = (key: InboxKey) => {
+    setInboxKey(key);
+    setViewMode("inbox");
+    setSelectedInboxId(null);
+    setInboxSearch("");
+    setHighlightId(null);
+  };
+
+  const inboxMeta = useMemo(() => {
+    if (inboxKey === "global") {
+      return {
+        title: "GLOBAL",
+        emptyMessage: "Nenhuma OS em aberto no momento.",
+        showOptimizeRoute: false,
+      };
+    }
+    if (inboxKey === "arte") {
+      return {
+        title: "Total em Arte",
+        emptyMessage: "Nenhuma OS encontrada em Arte.",
+        showOptimizeRoute: false,
+      };
+    }
+    if (inboxKey === "producao") {
+      return {
+        title: "Total em Produção",
+        emptyMessage: "Nenhuma OS encontrada em Produção.",
+        showOptimizeRoute: false,
+      };
+    }
+    if (inboxKey === "atrasados") {
+      return {
+        title: "Atrasados",
+        emptyMessage: "Nenhuma OS atrasada no momento.",
+        showOptimizeRoute: false,
+      };
+    }
+    if (inboxKey === "prontoAvisar") {
+      return {
+        title: "Pronto / Avisar",
+        emptyMessage: "Nenhuma OS pronta para avisar.",
+        showOptimizeRoute: false,
+      };
+    }
+    return {
+      title: "Instalações",
+      emptyMessage: "Nenhuma OS marcada como Instalação.",
+      showOptimizeRoute: true,
+    };
+  }, [inboxKey]);
+
+  const renderBoard = (
+    ordersList: OsOrder[],
+    columns: string[],
+    onDragEnd: (event: DragEndEvent) => void
+  ) => {
     return (
       <DndContext onDragEnd={onDragEnd}>
         <div className="w-full overflow-x-auto">
           <div className="flex w-max gap-4 pb-4 pr-4">
-            {columns.map((status) => {
-              const items = ordersList.filter((order) =>
-                columns === ART_COLUMNS ? order.art_status === status : order.prod_status === status
+            {columns.map(status => {
+              const items = ordersList.filter(order =>
+                columns === ART_COLUMNS
+                  ? order.art_status === status
+                  : order.prod_status === status
               );
               return (
-                <KanbanColumn key={status} id={status} title={status} count={items.length}>
-                  {items.map((order) => (
+                <KanbanColumn
+                  key={status}
+                  id={status}
+                  title={status}
+                  count={items.length}
+                >
+                  {items.map(order => (
                     <KanbanCard
                       key={order.id}
                       id={order.id}
-                      title={order.title || `${order.sale_number} - ${order.client_name}`}
+                      title={
+                        order.title ||
+                        `${order.sale_number} - ${order.client_name}`
+                      }
                       clientName={order.client_name}
                       deliveryDate={order.delivery_date}
                       logisticType={order.logistic_type}
@@ -494,7 +663,9 @@ export default function HubOS() {
     return (
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold">Hub OS</h1>
-        <p className="text-sm text-muted-foreground">Sem permissão para acessar o módulo Hub OS.</p>
+        <p className="text-sm text-muted-foreground">
+          Sem permissão para acessar o módulo Hub OS.
+        </p>
       </div>
     );
   }
@@ -503,7 +674,9 @@ export default function HubOS() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Hub OS Evolução - Ordens de Serviço</h1>
+          <h1 className="text-2xl font-semibold">
+            Hub OS Evolução - Ordens de Serviço
+          </h1>
           <p className="text-sm text-muted-foreground">
             Kanban integrado com tempo real e filtros avançados.
           </p>
@@ -516,8 +689,8 @@ export default function HubOS() {
           )}
           {hubPermissions.canCreateOs && (
             <CreateOSDialog
-              onCreated={(order) => {
-                setOrders((prev) => [order, ...prev]);
+              onCreated={order => {
+                setOrders(prev => [order, ...prev]);
               }}
             />
           )}
@@ -529,23 +702,37 @@ export default function HubOS() {
 
       <MetricsBar
         {...metrics}
-        onInstalacoesClick={() => {
-          setViewMode('instalacoes');
-        }}
-        onPendentesClick={() => setLocation('/hub-os/pendentes')}
+        onGlobalClick={() => openInbox("global")}
+        onArteClick={() => openInbox("arte")}
+        onProducaoClick={() => openInbox("producao")}
+        onAtrasadosClick={() => openInbox("atrasados")}
+        onProntoAvisarClick={() => openInbox("prontoAvisar")}
+        onInstalacoesClick={() => openInbox("instalacoes")}
+        onPendentesClick={() => setLocation("/hub-os/pendentes")}
       />
 
-      {viewMode === 'kanban' ? (
+      {viewMode === "kanban" ? (
         <>
           <FiltersBar value={filters} onChange={setFilters} />
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'arte' | 'producao')} className="space-y-4">
+          <Tabs
+            value={activeTab}
+            onValueChange={value => setActiveTab(value as "arte" | "producao")}
+            className="space-y-4"
+          >
             <TabsList>
-              {hubPermissions.canViewArteBoard && <TabsTrigger value="arte">Arte</TabsTrigger>}
-              {hubPermissions.canViewProducaoBoard && <TabsTrigger value="producao">Produção</TabsTrigger>}
+              {hubPermissions.canViewArteBoard && (
+                <TabsTrigger value="arte">Arte</TabsTrigger>
+              )}
+              {hubPermissions.canViewProducaoBoard && (
+                <TabsTrigger value="producao">Produção</TabsTrigger>
+              )}
             </TabsList>
-            {!hubPermissions.canViewArteBoard && !hubPermissions.canViewProducaoBoard && (
-              <p className="text-sm text-muted-foreground">Sem acesso aos boards do Hub OS.</p>
-            )}
+            {!hubPermissions.canViewArteBoard &&
+              !hubPermissions.canViewProducaoBoard && (
+                <p className="text-sm text-muted-foreground">
+                  Sem acesso aos boards do Hub OS.
+                </p>
+              )}
             {hubPermissions.canViewArteBoard && (
               <TabsContent value="arte" className="space-y-4">
                 {renderBoard(arteOrders, ART_COLUMNS, handleDragEndArte)}
@@ -553,26 +740,33 @@ export default function HubOS() {
             )}
             {hubPermissions.canViewProducaoBoard && (
               <TabsContent value="producao" className="space-y-4">
-                {renderBoard(producaoOrders, PROD_COLUMNS, handleDragEndProducao)}
+                {renderBoard(
+                  producaoOrders,
+                  PROD_COLUMNS,
+                  handleDragEndProducao
+                )}
               </TabsContent>
             )}
           </Tabs>
         </>
       ) : (
         <InstallationsInbox
-          orders={installationInboxOrders}
-          selectedId={selectedInstallationId}
-          searchValue={installationSearch}
-          onSearchChange={setInstallationSearch}
-          onSelect={setSelectedInstallationId}
-          onBack={() => setViewMode('kanban')}
-          onEdit={(order) => {
+          orders={inboxOrders}
+          title={inboxMeta.title}
+          emptyMessage={inboxMeta.emptyMessage}
+          showOptimizeRoute={inboxMeta.showOptimizeRoute}
+          selectedId={selectedInboxId}
+          searchValue={inboxSearch}
+          onSearchChange={setInboxSearch}
+          onSelect={setSelectedInboxId}
+          onBack={() => setViewMode("kanban")}
+          onEdit={order => {
             setSelectedOrder(order);
             setDialogOpen(true);
           }}
-          onOpenKanban={(order) => {
-            setViewMode('kanban');
-            setActiveTab(order.prod_status ? 'producao' : 'arte');
+          onOpenKanban={order => {
+            setViewMode("kanban");
+            setActiveTab(order.prod_status ? "producao" : "arte");
             setHighlightId(order.id);
           }}
         />
@@ -581,19 +775,19 @@ export default function HubOS() {
       <OrderDetailsDialog
         order={selectedOrder}
         open={dialogOpen}
-        onOpenChange={(open) => {
+        onOpenChange={open => {
           setDialogOpen(open);
           if (!open) {
             setSelectedOrder(null);
           }
         }}
         onUpdated={updateLocalOrder}
-        onDelete={(id) => handleDelete(id)}
+        onDelete={id => handleDelete(id)}
       />
       {artDirectionPopupTag && (
         <ArtDirectionTagPopup
           open={artDirectionPopupOpen}
-          onOpenChange={(open) => {
+          onOpenChange={open => {
             setArtDirectionPopupOpen(open);
             if (!open) {
               setArtDirectionPopupTag(null);

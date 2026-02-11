@@ -23,6 +23,9 @@ import type { OsOrder } from "@/features/hubos/types";
 
 type InstallationsInboxProps = {
   orders: OsOrder[];
+  title?: string;
+  emptyMessage?: string;
+  showOptimizeRoute?: boolean;
   selectedId: string | null;
   searchValue: string;
   onSearchChange: (value: string) => void;
@@ -76,6 +79,12 @@ const getStatusLabel = (order: OsOrder) =>
     ? `Produção • ${order.prod_status}`
     : `Arte • ${order.art_status}`;
 
+const formatLogisticType = (value: OsOrder["logistic_type"]) => {
+  if (value === "instalacao") return "Instalação";
+  if (value === "entrega") return "Entrega";
+  return "Retirada";
+};
+
 const FINAL_PROD_STATUS = PROD_COLUMNS[PROD_COLUMNS.length - 1];
 
 const normalize = (value: string) => value.toLowerCase();
@@ -96,7 +105,8 @@ const skippedReasonLabel: Record<string, string> = {
   geocode_failed: "Falha ao geocodificar endereço",
 };
 
-const DEFAULT_BASE_ADDRESS = "Rua João Grumiche, 196 - Kobrasol São José - SC, 88102-600";
+const DEFAULT_BASE_ADDRESS =
+  "Rua João Grumiche, 196 - Kobrasol São José - SC, 88102-600";
 
 const formatGroupLabel = (groupId: string) => {
   const match = groupId.match(/date-(\d+)__?geo-(\d+)/i);
@@ -119,11 +129,15 @@ const addressHasCityUfCep = (address: string) => {
   const normalized = address.trim();
   if (!normalized) return false;
 
-  const hasUf = /\b(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)\b/i.test(
-    normalized
-  );
+  const hasUf =
+    /\b(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)\b/i.test(
+      normalized
+    );
   const hasCep = /\b\d{5}-?\d{3}\b/.test(normalized);
-  const parts = normalized.split("-").map(part => part.trim()).filter(Boolean);
+  const parts = normalized
+    .split("-")
+    .map(part => part.trim())
+    .filter(Boolean);
   const hasCityByParts = parts.length >= 3;
 
   return hasUf || hasCep || hasCityByParts;
@@ -131,6 +145,9 @@ const addressHasCityUfCep = (address: string) => {
 
 export default function InstallationsInbox({
   orders,
+  title = "Instalações",
+  emptyMessage = "Nenhuma OS encontrada para este indicador.",
+  showOptimizeRoute = true,
   selectedId,
   searchValue,
   onSearchChange,
@@ -151,8 +168,10 @@ export default function InstallationsInbox({
   const [optimizing, setOptimizing] = useState(false);
   const [result, setResult] =
     useState<OptimizeInstallationRouteResponse | null>(null);
-  const [allowOptimizeWithIncompleteAddresses, setAllowOptimizeWithIncompleteAddresses] =
-    useState(false);
+  const [
+    allowOptimizeWithIncompleteAddresses,
+    setAllowOptimizeWithIncompleteAddresses,
+  ] = useState(false);
 
   const selectedOrder = useMemo(
     () => orders.find(order => order.id === selectedId) ?? null,
@@ -279,10 +298,12 @@ export default function InstallationsInbox({
       );
     }
 
-    const ordersWithIncompleteAddress = selectedOrdersForDateRange.filter(order => {
-      if (!order.address?.trim()) return false;
-      return !addressHasCityUfCep(order.address);
-    });
+    const ordersWithIncompleteAddress = selectedOrdersForDateRange.filter(
+      order => {
+        if (!order.address?.trim()) return false;
+        return !addressHasCityUfCep(order.address);
+      }
+    );
 
     if (ordersWithIncompleteAddress.length > 0) {
       warnings.push(
@@ -397,36 +418,41 @@ export default function InstallationsInbox({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold">
-            Instalações ({filteredCountLabel})
+            {title} ({filteredCountLabel})
           </h2>
           <p className="text-sm text-muted-foreground">
             {orders.length} {orders.length === 1 ? "OS" : "OS"}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => {
-              setDateFrom(todayAsInput());
-              setDateTo(todayAsInput());
-              setDateWindowDays("1");
-              setGeoClusterRadiusKm("5");
-              setMaxStopsPerRoute("20");
-              setStartAddress(DEFAULT_BASE_ADDRESS);
-              setAllowOptimizeWithIncompleteAddresses(false);
-              setResult(null);
-              setOptimizeOpen(true);
-            }}
-          >
-            Otimizar rota
-          </Button>
+          {showOptimizeRoute && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDateFrom(todayAsInput());
+                setDateTo(todayAsInput());
+                setDateWindowDays("1");
+                setGeoClusterRadiusKm("5");
+                setMaxStopsPerRoute("20");
+                setStartAddress(DEFAULT_BASE_ADDRESS);
+                setAllowOptimizeWithIncompleteAddresses(false);
+                setResult(null);
+                setOptimizeOpen(true);
+              }}
+            >
+              Otimizar rota
+            </Button>
+          )}
           <Button variant="ghost" onClick={onBack}>
             Voltar
           </Button>
         </div>
       </div>
 
-      <Dialog open={optimizeOpen} onOpenChange={setOptimizeOpen}>
+      <Dialog
+        open={showOptimizeRoute && optimizeOpen}
+        onOpenChange={setOptimizeOpen}
+      >
         <DialogContent className="max-h-[calc(100vh-2rem)] w-[96vw] overflow-y-auto sm:max-w-5xl lg:max-w-6xl">
           <DialogHeader>
             <DialogTitle>Otimizar rota de instalações</DialogTitle>
@@ -511,7 +537,9 @@ export default function InstallationsInbox({
                   type="checkbox"
                   checked={allowOptimizeWithIncompleteAddresses}
                   onChange={event =>
-                    setAllowOptimizeWithIncompleteAddresses(event.target.checked)
+                    setAllowOptimizeWithIncompleteAddresses(
+                      event.target.checked
+                    )
                   }
                 />
                 Continuar mesmo com endereços incompletos
@@ -519,17 +547,22 @@ export default function InstallationsInbox({
             </Card>
           )}
 
-
           <div className="space-y-2 rounded-md border p-3">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium">OS incluídas na otimização</p>
-              <p className="text-xs text-muted-foreground">{selectedOrderIds.length}/{selectedOrdersForDateRange.length} selecionadas</p>
+              <p className="text-xs text-muted-foreground">
+                {selectedOrderIds.length}/{selectedOrdersForDateRange.length}{" "}
+                selecionadas
+              </p>
             </div>
             <div className="max-h-40 space-y-1 overflow-y-auto pr-1">
               {selectedOrdersForDateRange.map(order => {
                 const checked = selectedOrderIds.includes(order.id);
                 return (
-                  <label key={order.id} className="flex items-center gap-2 text-xs">
+                  <label
+                    key={order.id}
+                    className="flex items-center gap-2 text-xs"
+                  >
                     <input
                       type="checkbox"
                       checked={checked}
@@ -541,12 +574,16 @@ export default function InstallationsInbox({
                         );
                       }}
                     />
-                    <span className="truncate">{order.sale_number} - {order.client_name}</span>
+                    <span className="truncate">
+                      {order.sale_number} - {order.client_name}
+                    </span>
                   </label>
                 );
               })}
               {selectedOrdersForDateRange.length === 0 && (
-                <p className="text-xs text-muted-foreground">Nenhuma OS no intervalo selecionado.</p>
+                <p className="text-xs text-muted-foreground">
+                  Nenhuma OS no intervalo selecionado.
+                </p>
               )}
             </div>
           </div>
@@ -600,7 +637,9 @@ export default function InstallationsInbox({
                           className="rounded-md border p-2"
                         >
                           <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <Badge variant="secondary">{formatRouteLabel(route.routeId)}</Badge>
+                            <Badge variant="secondary">
+                              {formatRouteLabel(route.routeId)}
+                            </Badge>
                             <Badge variant="outline">
                               Distância:{" "}
                               {route.summary.distance_m != null
@@ -628,7 +667,12 @@ export default function InstallationsInbox({
                                 Abrir no Google Maps
                               </a>
                             </Button>
-                            <Button type="button" size="sm" variant="outline" asChild>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              asChild
+                            >
                               <a
                                 href={
                                   route.stops[0]
@@ -662,9 +706,13 @@ export default function InstallationsInbox({
                                     size="sm"
                                     variant="outline"
                                     onClick={() => {
-                                      const matchedOrder = orders.find(order => order.id === stop.os_id);
+                                      const matchedOrder = orders.find(
+                                        order => order.id === stop.os_id
+                                      );
                                       if (!matchedOrder) {
-                                        toast.error("Não foi possível localizar esta OS na lista atual.");
+                                        toast.error(
+                                          "Não foi possível localizar esta OS na lista atual."
+                                        );
                                         return;
                                       }
                                       onEdit(matchedOrder);
@@ -672,7 +720,12 @@ export default function InstallationsInbox({
                                   >
                                     Abrir detalhes da OS
                                   </Button>
-                                  <Button type="button" size="sm" variant="outline" asChild>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    asChild
+                                  >
                                     <a
                                       href={buildWazeUrl(stop.coords)}
                                       target="_blank"
@@ -693,7 +746,6 @@ export default function InstallationsInbox({
               </div>
             </div>
           )}
-
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setOptimizeOpen(false)}>
@@ -750,7 +802,7 @@ export default function InstallationsInbox({
           <div className="flex flex-col gap-2">
             {!hasOrders ? (
               <Card className="p-4 text-sm text-muted-foreground">
-                Nenhuma OS marcada como Instalação.
+                {emptyMessage}
               </Card>
             ) : !hasFiltered ? (
               <Card className="p-4 text-sm text-muted-foreground">
@@ -797,7 +849,7 @@ export default function InstallationsInbox({
                           Entrega: {formatDate(order.delivery_date)}
                         </Badge>
                       )}
-                      <Badge>Instalação</Badge>
+                      <Badge>{formatLogisticType(order.logistic_type)}</Badge>
                     </div>
                   </button>
                 );
