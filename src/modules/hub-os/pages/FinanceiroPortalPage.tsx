@@ -248,7 +248,7 @@ export default function FinanceiroPortalPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[360px,1fr,420px]">
+      <div className="grid gap-4 lg:grid-cols-[360px_minmax(0,_1fr)_420px]">
         <div className="flex flex-col gap-2">
           <Input
             placeholder="Pesquisar..."
@@ -315,7 +315,7 @@ export default function FinanceiroPortalPage() {
           </div>
         </div>
 
-        <Card className="p-5">
+        <Card className="min-w-0 p-5">
           {!selected ? (
             <div className="flex h-full min-h-[320px] items-center justify-center text-sm text-muted-foreground">
               Selecione um item para revisar.
@@ -399,7 +399,7 @@ export default function FinanceiroPortalPage() {
           )}
         </Card>
 
-        <Card className="flex min-h-[560px] flex-col overflow-hidden p-0">
+        <Card className="flex min-h-[560px] min-w-0 flex-col overflow-hidden p-0">
           <div className="border-b px-4 py-3">
             <p className="font-medium">Preview do comprovante</p>
           </div>
