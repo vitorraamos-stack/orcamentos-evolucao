@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useRoute } from 'wouter';
+import { useLocation, useRoute } from 'wouter';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -47,9 +47,16 @@ const formatCurrency = (value?: number | null) => {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 };
 
+const formatDeliveryType = (deliveryType: DeliveryType | null) => {
+  if (!deliveryType) return '—';
+  return deliveryType === 'RETIRADA' ? 'Retirada' : deliveryType === 'ENTREGA' ? 'Entrega' : 'Instalação';
+};
+
 export default function OsDetailPage() {
+  const [, setLocation] = useLocation();
   const [, params] = useRoute('/os/:id');
   const osId = params?.id;
+  const isKioskMode = new URLSearchParams(window.location.search).get('kiosk') === '1';
   const { user } = useAuth();
   const [order, setOrder] = useState<Os | null>(null);
   const [events, setEvents] = useState<OsEvent[]>([]);
@@ -119,11 +126,7 @@ export default function OsDetailPage() {
     if (!osId) return;
     try {
       setLoading(true);
-      const [osData, eventData, paymentData] = await Promise.all([
-        fetchOsById(osId),
-        fetchOsEvents(osId),
-        fetchOsPayments(osId),
-      ]);
+      const osData = await fetchOsById(osId);
       setOrder(osData);
       setSaleNumber(osData.sale_number ?? '');
       setClientName(osData.client_name ?? osData.customer_name);
@@ -144,6 +147,14 @@ export default function OsDetailPage() {
       setIsReproducao(Boolean(osData.is_reproducao));
       setReproMotivo(osData.repro_motivo ?? '');
       setHasLetraCaixa(Boolean(osData.has_letra_caixa));
+
+      if (isKioskMode) {
+        setEvents([]);
+        setPayments([]);
+        return;
+      }
+
+      const [eventData, paymentData] = await Promise.all([fetchOsEvents(osId), fetchOsPayments(osId)]);
       setEvents(eventData);
       setPayments(paymentData);
     } catch (error) {
@@ -156,7 +167,19 @@ export default function OsDetailPage() {
 
   useEffect(() => {
     loadData();
-  }, [osId]);
+  }, [isKioskMode, osId]);
+
+  useEffect(() => {
+    if (!isKioskMode) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setLocation('/os/kiosk');
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isKioskMode, setLocation]);
 
   const handleSaveDetails = async () => {
     if (!order) return;
@@ -454,6 +477,124 @@ export default function OsDetailPage() {
 
   if (!order) {
     return <div className="text-muted-foreground">OS não encontrada.</div>;
+  }
+
+  if (isKioskMode) {
+    return (
+      <div className="mx-auto w-full max-w-5xl space-y-6 pb-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-semibold">OS #{order.os_number ?? '—'}</h1>
+            <p className="text-sm text-muted-foreground">Modo quiosque · somente leitura</p>
+          </div>
+          <Button size="lg" onClick={() => setLocation('/os/kiosk')}>
+            Nova busca
+          </Button>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Resumo para acabamento</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <p className="text-xs text-muted-foreground">Título</p>
+                <p className="font-medium">{order.title || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Cliente</p>
+                <p className="font-medium">{order.client_name || order.customer_name || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Nº da venda</p>
+                <p className="font-medium">{order.sale_number || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Criada em</p>
+                <p className="font-medium">{formatDateTime(order.created_at)}</p>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Descrição técnica</p>
+              <p className="whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-sm">{order.description || '—'}</p>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Observações</p>
+              <p className="whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-sm">{order.notes || '—'}</p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Status Arte</p>
+                <p className="font-medium">{order.status_arte || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Status Produção</p>
+                <p className="font-medium">{order.status_producao || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Tipo de saída</p>
+                <p className="font-medium">{formatDeliveryType(order.delivery_type)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Data de entrega</p>
+                <p className="font-medium">{order.delivery_date || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Letra caixa</p>
+                <p className="font-medium">{order.has_letra_caixa ? 'Sim' : 'Não'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Reprodução</p>
+                <p className="font-medium">{order.is_reproducao ? 'Sim' : 'Não'}</p>
+              </div>
+            </div>
+
+            {order.is_reproducao ? (
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Motivo da reprodução</p>
+                <p className="whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-sm">{order.repro_motivo || '—'}</p>
+              </div>
+            ) : null}
+
+            {order.delivery_type === 'INSTALACAO' ? (
+              <div className="rounded-md border p-4">
+                <p className="mb-2 text-sm font-semibold">Dados de instalação</p>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Data</p>
+                    <p className="font-medium">{order.installation_date || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Janela de horário</p>
+                    <p className="font-medium">{order.installation_time_window || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Contato no local</p>
+                    <p className="font-medium">{order.on_site_contact || '—'}</p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {order.folder_path ? (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Caminho da pasta</p>
+                <div className="rounded-md border p-3 text-xs break-all">{order.folder_path}</div>
+                <Button variant="outline" size="sm" onClick={handleCopyFolderPath}>
+                  <Copy className="mr-2 h-4 w-4" /> Copiar caminho
+                </Button>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
