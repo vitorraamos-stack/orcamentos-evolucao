@@ -34,6 +34,7 @@ export function ComprovantePreviewDialog({
   error,
 }: ComprovantePreviewDialogProps) {
   const [zoom, setZoom] = useState(1);
+  const [mediaError, setMediaError] = useState(false);
 
   const fileType = useMemo(() => {
     const extension = getExtension(filename);
@@ -46,11 +47,16 @@ export function ComprovantePreviewDialog({
   useEffect(() => {
     if (!open) {
       setZoom(1);
+      setMediaError(false);
     }
   }, [open]);
 
   const canOpen = Boolean(url);
   const displayUrl = previewUrl ?? url;
+
+  useEffect(() => {
+    setMediaError(false);
+  }, [displayUrl, filename]);
 
   const openInNewTab = () => {
     if (!url) return;
@@ -91,58 +97,79 @@ export function ComprovantePreviewDialog({
             </div>
           )}
 
-          {!loading && !error && displayUrl && fileType === "image" && (
-            <div className="flex h-full w-full flex-col">
-              <div className="flex items-center justify-end gap-2 border-b px-4 py-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setZoom(current =>
-                      Math.max(0.5, Number((current - 0.25).toFixed(2)))
-                    )
-                  }
-                >
-                  -
-                </Button>
-                <span className="min-w-16 text-center text-xs text-muted-foreground">
-                  {Math.round(zoom * 100)}%
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setZoom(current =>
-                      Math.min(4, Number((current + 0.25).toFixed(2)))
-                    )
-                  }
-                >
-                  +
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setZoom(1)}
-                >
-                  Reset
-                </Button>
+          {!loading &&
+            !error &&
+            displayUrl &&
+            fileType === "image" &&
+            !mediaError && (
+              <div className="flex h-full w-full flex-col">
+                <div className="flex items-center justify-end gap-2 border-b px-4 py-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setZoom(current =>
+                        Math.max(0.5, Number((current - 0.25).toFixed(2)))
+                      )
+                    }
+                  >
+                    -
+                  </Button>
+                  <span className="min-w-16 text-center text-xs text-muted-foreground">
+                    {Math.round(zoom * 100)}%
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setZoom(current =>
+                        Math.min(4, Number((current + 0.25).toFixed(2)))
+                      )
+                    }
+                  >
+                    +
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setZoom(1)}
+                  >
+                    Reset
+                  </Button>
+                </div>
+                <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+                  <img
+                    src={displayUrl}
+                    alt={filename ?? "Comprovante"}
+                    className="max-h-full w-auto object-contain"
+                    onError={() => setMediaError(true)}
+                    style={{
+                      transform: `scale(${zoom})`,
+                      transformOrigin: "center center",
+                    }}
+                  />
+                </div>
               </div>
-              <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
-                <img
-                  src={displayUrl}
-                  alt={filename ?? "Comprovante"}
-                  className="max-h-full w-auto object-contain"
-                  style={{
-                    transform: `scale(${zoom})`,
-                    transformOrigin: "center center",
-                  }}
-                />
+            )}
+
+          {!loading &&
+            !error &&
+            displayUrl &&
+            fileType === "image" &&
+            mediaError && (
+              <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+                <p className="text-sm text-destructive">
+                  Não foi possível renderizar a imagem deste comprovante.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  O arquivo pode estar ausente/corrompido no storage. Use
+                  “Baixar” ou “Abrir em nova aba”.
+                </p>
               </div>
-            </div>
-          )}
+            )}
 
           {!loading && !error && displayUrl && fileType === "pdf" && (
             <iframe

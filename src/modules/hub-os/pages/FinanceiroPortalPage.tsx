@@ -39,6 +39,36 @@ const FILTER_STATUSES: Record<
   cadastro: ["CADASTRO_PENDENTE"],
 };
 
+const getFileExtension = (filename?: string | null) => {
+  if (!filename || !filename.includes(".")) return null;
+  return filename.split(".").pop()?.toLowerCase() ?? null;
+};
+
+const isPreviewBlobLikelyInvalid = (blob: Blob, filename?: string | null) => {
+  const extension = getFileExtension(filename);
+
+  if (!extension) {
+    return blob.size === 0;
+  }
+
+  if (["png", "jpg", "jpeg", "webp", "gif", "bmp"].includes(extension)) {
+    return (
+      blob.size === 0 ||
+      (!blob.type.startsWith("image/") &&
+        blob.type !== "application/octet-stream")
+    );
+  }
+
+  if (extension === "pdf") {
+    return (
+      blob.size === 0 ||
+      (!blob.type.includes("pdf") && blob.type !== "application/octet-stream")
+    );
+  }
+
+  return blob.size === 0;
+};
+
 export default function FinanceiroPortalPage() {
   const { user } = useAuth();
   const [items, setItems] = useState<FinanceInstallment[]>([]);
@@ -174,7 +204,6 @@ export default function FinanceiroPortalPage() {
       }
 
       setPreviewUrl(data.downloadUrl);
-      setPreviewRenderUrl(previewData.downloadUrl);
 
       try {
         const response = await fetch(previewData.downloadUrl);
@@ -183,11 +212,19 @@ export default function FinanceiroPortalPage() {
         }
 
         const blob = await response.blob();
+
+        if (isPreviewBlobLikelyInvalid(blob, asset.original_name)) {
+          setPreviewError(
+            "O arquivo retornado não pôde ser renderizado como comprovante. Verifique se o objeto no R2 está íntegro."
+          );
+          return;
+        }
+
         setPreviewRenderUrl(URL.createObjectURL(blob));
       } catch (blobError) {
-        console.warn(
-          "Falha ao criar blob para preview, usando URL direta.",
-          blobError
+        console.warn("Falha ao criar preview por blob.", blobError);
+        setPreviewError(
+          "Não foi possível carregar a pré-visualização deste comprovante. Você ainda pode baixar ou abrir em nova aba."
         );
       }
     } catch (error) {
