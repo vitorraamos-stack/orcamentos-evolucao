@@ -10,6 +10,7 @@ export type OptimizeInstallationRoutePayload = {
   startAddress?: string | null;
   startCoords?: [number, number] | null;
   profile?: "driving-car";
+  orderIds?: string[] | null;
 };
 
 export type OptimizedRouteStop = {
