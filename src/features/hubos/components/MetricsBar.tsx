@@ -8,7 +8,9 @@ interface MetricsBarProps {
   paraAprovacao: number;
   prontoAvisar: number;
   instalacoes: number;
+  pendentes: number;
   onInstalacoesClick?: () => void;
+  onPendentesClick?: () => void;
 }
 
 const MetricCard = ({
@@ -52,7 +54,9 @@ export default function MetricsBar({
   paraAprovacao,
   prontoAvisar,
   instalacoes,
+  pendentes,
   onInstalacoesClick,
+  onPendentesClick,
 }: MetricsBarProps) {
   return (
     <div className="flex flex-wrap gap-3">
@@ -62,6 +66,7 @@ export default function MetricsBar({
       <MetricCard label="Para Aprovação" value={paraAprovacao} />
       <MetricCard label="Pronto/Avisar" value={prontoAvisar} />
       <MetricCard label="Instalações" value={instalacoes} onClick={onInstalacoesClick} />
+      <MetricCard label="Pendentes" value={pendentes} onClick={onPendentesClick} />
     </div>
   );
 }
