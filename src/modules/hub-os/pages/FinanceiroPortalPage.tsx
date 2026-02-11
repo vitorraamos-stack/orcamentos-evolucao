@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ComprovantePreviewDialog } from "@/components/financeiro/ComprovantePreviewDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,8 +40,27 @@ const FILTER_STATUSES: Record<
   cadastro: ["CADASTRO_PENDENTE"],
 };
 
+type PreviewCacheEntry = {
+  downloadUrl: string;
+  previewUrl: string;
+  expiresAt: number;
+};
+
+const getFileType = (filename?: string | null) => {
+  const ext = filename?.split(".").pop()?.toLowerCase();
+  if (!ext) return "other" as const;
+  if (["png", "jpg", "jpeg", "webp", "gif", "bmp"].includes(ext)) {
+    return "image" as const;
+  }
+  if (ext === "pdf") return "pdf" as const;
+  return "other" as const;
+};
+
 export default function FinanceiroPortalPage() {
   const { user } = useAuth();
+  const cacheRef = useRef<Map<string, PreviewCacheEntry>>(new Map());
+  const requestRef = useRef(0);
+
   const [items, setItems] = useState<FinanceInstallment[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -52,20 +70,12 @@ export default function FinanceiroPortalPage() {
   const [search, setSearch] = useState("");
   const [savingStatus, setSavingStatus] =
     useState<FinanceInstallmentStatus | null>(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
+
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewRenderUrl, setPreviewRenderUrl] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (previewRenderUrl?.startsWith("blob:")) {
-        URL.revokeObjectURL(previewRenderUrl);
-      }
-    };
-  }, [previewRenderUrl]);
 
   const load = async () => {
     try {
@@ -137,59 +147,92 @@ export default function FinanceiroPortalPage() {
     }
   };
 
-  const openComprovantePreview = async (
+  const loadComprovantePreview = async (
     asset: FinanceInstallment["os_order_assets"]
   ) => {
-    setPreviewOpen(true);
-    setPreviewLoading(true);
+    requestRef.current += 1;
+    const reqId = requestRef.current;
+
     setPreviewError(null);
     setPreviewUrl(null);
-    if (previewRenderUrl?.startsWith("blob:")) {
-      URL.revokeObjectURL(previewRenderUrl);
-    }
     setPreviewRenderUrl(null);
     setPreviewName(asset?.original_name ?? "Comprovante");
 
+    if (!asset?.object_path) {
+      setPreviewError("Comprovante indisponível.");
+      return;
+    }
+
+    const cached = cacheRef.current.get(asset.object_path);
+    if (cached && cached.expiresAt > Date.now()) {
+      setPreviewUrl(cached.downloadUrl);
+      setPreviewRenderUrl(cached.previewUrl);
+      setPreviewLoading(false);
+      return;
+    }
+
+    setPreviewLoading(true);
     try {
-      if (!asset?.object_path) {
-        setPreviewError("Comprovante indisponível.");
-        return;
-      }
+      const [downloadData, previewData] = await Promise.all([
+        invokeEdgeFunction<{ downloadUrl: string }>(
+          supabase,
+          "r2-presign-download",
+          { key: asset.object_path }
+        ),
+        invokeEdgeFunction<{ downloadUrl: string }>(
+          supabase,
+          "r2-presign-download",
+          {
+            key: asset.object_path,
+            filename: asset.original_name ?? undefined,
+            forPreview: true,
+          }
+        ),
+      ]);
 
-      const data = await invokeEdgeFunction<{ downloadUrl: string }>(
-        supabase,
-        "r2-presign-download",
-        {
-          key: asset.object_path,
-        }
-      );
+      if (reqId !== requestRef.current) return;
 
-      const previewData = await invokeEdgeFunction<{ downloadUrl: string }>(
-        supabase,
-        "r2-presign-download",
-        {
-          key: asset.object_path,
-          filename: asset.original_name ?? undefined,
-          forPreview: true,
-        }
-      );
-
-      if (!data?.downloadUrl || !previewData?.downloadUrl) {
+      if (!downloadData?.downloadUrl || !previewData?.downloadUrl) {
         setPreviewError("Não foi possível gerar a URL do comprovante.");
         return;
       }
 
-      setPreviewUrl(data.downloadUrl);
-      setPreviewRenderUrl(previewData.downloadUrl);
+      const entry: PreviewCacheEntry = {
+        downloadUrl: downloadData.downloadUrl,
+        previewUrl: previewData.downloadUrl,
+        expiresAt: Date.now() + 8 * 60 * 1000,
+      };
+      cacheRef.current.set(asset.object_path, entry);
+
+      setPreviewUrl(entry.downloadUrl);
+      setPreviewRenderUrl(entry.previewUrl);
     } catch (error) {
+      if (reqId !== requestRef.current) return;
       console.error(error);
       setPreviewError(
-        "Falha ao carregar comprovante. Tente novamente em instantes."
+        "Falha ao carregar comprovante. Você ainda pode tentar abrir em nova aba."
       );
     } finally {
-      setPreviewLoading(false);
+      if (reqId === requestRef.current) {
+        setPreviewLoading(false);
+      }
     }
   };
+
+  useEffect(() => {
+    setNotes("");
+    if (!selected) {
+      setPreviewName(null);
+      setPreviewUrl(null);
+      setPreviewRenderUrl(null);
+      setPreviewError(null);
+      setPreviewLoading(false);
+      return;
+    }
+    void loadComprovantePreview(selected.os_order_assets);
+  }, [selected?.id]);
+
+  const fileType = getFileType(previewName);
 
   return (
     <div className="space-y-4">
@@ -204,8 +247,8 @@ export default function FinanceiroPortalPage() {
         </div>
       </div>
 
-      <div className="flex gap-4">
-        <div className="flex w-full max-w-[360px] flex-col gap-2">
+      <div className="grid gap-4 lg:grid-cols-[360px,1fr,420px]">
+        <div className="flex flex-col gap-2">
           <Input
             placeholder="Pesquisar..."
             value={search}
@@ -252,11 +295,9 @@ export default function FinanceiroPortalPage() {
                         : "hover:border-muted-foreground/40 hover:bg-muted/40"
                     )}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-sm font-semibold">
-                        OS #{item.os_orders?.sale_number ?? "—"} -{" "}
-                        {item.os_orders?.client_name ?? "Sem cliente"}
-                      </div>
+                    <div className="text-sm font-semibold">
+                      OS #{item.os_orders?.sale_number ?? "—"} -{" "}
+                      {item.os_orders?.client_name ?? "Sem cliente"}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <Badge variant="secondary">
@@ -273,9 +314,9 @@ export default function FinanceiroPortalPage() {
           </div>
         </div>
 
-        <Card className="flex-1 p-5">
+        <Card className="p-5">
           {!selected ? (
-            <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+            <div className="flex h-full min-h-[320px] items-center justify-center text-sm text-muted-foreground">
               Selecione um item para revisar.
             </div>
           ) : (
@@ -306,20 +347,7 @@ export default function FinanceiroPortalPage() {
                   <p className="text-xs uppercase text-muted-foreground">
                     Comprovante
                   </p>
-                  {selected.os_order_assets ? (
-                    <button
-                      type="button"
-                      className="text-sm text-primary underline"
-                      onClick={() =>
-                        openComprovantePreview(selected.os_order_assets)
-                      }
-                    >
-                      {selected.os_order_assets.original_name ??
-                        selected.os_order_assets.object_path}
-                    </button>
-                  ) : (
-                    <p className="text-muted-foreground">(não anexado)</p>
-                  )}
+                  <p className="text-sm">{previewName ?? "—"}</p>
                 </div>
                 <div>
                   <p className="text-xs uppercase text-muted-foreground">
@@ -368,6 +396,93 @@ export default function FinanceiroPortalPage() {
               </div>
             </div>
           )}
+        </Card>
+
+        <Card className="flex min-h-[560px] flex-col overflow-hidden p-0">
+          <div className="border-b px-4 py-3">
+            <p className="font-medium">Preview do comprovante</p>
+          </div>
+
+          <div className="min-h-0 flex-1 bg-muted/20">
+            {previewLoading && (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                Carregando comprovante...
+              </div>
+            )}
+
+            {!previewLoading && previewError && (
+              <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
+                <p className="text-sm text-destructive">{previewError}</p>
+              </div>
+            )}
+
+            {!previewLoading &&
+              !previewError &&
+              previewRenderUrl &&
+              fileType === "image" && (
+                <div className="flex h-full items-center justify-center overflow-auto p-3">
+                  <img
+                    src={previewRenderUrl}
+                    alt={previewName ?? "Comprovante"}
+                    className="max-h-full w-auto object-contain"
+                  />
+                </div>
+              )}
+
+            {!previewLoading &&
+              !previewError &&
+              previewRenderUrl &&
+              fileType === "pdf" && (
+                <iframe
+                  src={previewRenderUrl}
+                  title={previewName ?? "Comprovante PDF"}
+                  className="h-full w-full"
+                />
+              )}
+
+            {!previewLoading && !previewError && !previewRenderUrl && (
+              <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
+                Sem preview disponível para o item selecionado.
+              </div>
+            )}
+
+            {!previewLoading &&
+              !previewError &&
+              previewRenderUrl &&
+              fileType === "other" && (
+                <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
+                  Pré-visualização indisponível para este formato.
+                </div>
+              )}
+          </div>
+
+          <div className="flex flex-wrap justify-end gap-2 border-t px-4 py-3">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!previewUrl}
+              onClick={() => {
+                if (!previewUrl) return;
+                const a = document.createElement("a");
+                a.href = previewUrl;
+                if (previewName) a.download = previewName;
+                a.rel = "noreferrer";
+                a.click();
+              }}
+            >
+              Baixar
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!previewUrl}
+              onClick={() =>
+                previewUrl && window.open(previewUrl, "_blank", "noreferrer")
+              }
+            >
+              Abrir em nova aba
+            </Button>
+          </div>
         </Card>
       </div>
 
