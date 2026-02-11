@@ -5,6 +5,11 @@ export const APP_MODULES = [
     routePrefixes: ['/hub-os', '/os'],
   },
   {
+    key: 'hub_os_financeiro',
+    label: 'Financeiro',
+    routePrefixes: ['/hub-os/financeiro', '/financeiro'],
+  },
+  {
     key: 'galeria',
     label: 'Galeria',
     routePrefixes: ['/galeria'],

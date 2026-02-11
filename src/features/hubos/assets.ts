@@ -17,10 +17,13 @@ type UploadAssetsParams = {
 };
 
 export type FinancialDocType = 'PAYMENT_PROOF' | 'PURCHASE_ORDER';
+export type FinancialInstallmentLabel = '1/1' | '1/2' | '2/2';
 
 export type FinancialDoc = {
   file: File;
   type: FinancialDocType;
+  installmentLabel?: FinancialInstallmentLabel;
+  secondDueDate?: string | null;
 };
 
 type UploadFinancialDocsParams = {
@@ -117,12 +120,20 @@ type UploadReceiptParams = {
   osId: string;
   file: File;
   userId: string | null;
+  installmentLabel?: FinancialInstallmentLabel;
+  secondDueDate?: string | null;
 };
 
-export const uploadReceiptForOrder = async ({ osId, file, userId }: UploadReceiptParams) => {
+export const uploadReceiptForOrder = async ({
+  osId,
+  file,
+  userId,
+  installmentLabel,
+  secondDueDate,
+}: UploadReceiptParams) => {
   return uploadFinancialDocsForOrder({
     orderId: osId,
-    docs: [{ file, type: 'PAYMENT_PROOF' }],
+    docs: [{ file, type: 'PAYMENT_PROOF', installmentLabel, secondDueDate }],
     userId,
   });
 };
@@ -359,6 +370,20 @@ export const uploadFinancialDocsForOrder = async ({ orderId, docs, userId }: Upl
 
       if (updateError) {
         throw new Error(updateError.message);
+      }
+
+      if (type === 'PAYMENT_PROOF') {
+        const installmentLabel = doc.installmentLabel ?? '1/1';
+        const { error: rpcError } = await supabase.rpc('finance_upsert_from_asset', {
+          p_os_id: orderId,
+          p_asset_id: asset.id,
+          p_installment_label: installmentLabel,
+          p_second_due_date: installmentLabel === '1/2' ? doc.secondDueDate ?? null : null,
+        });
+
+        if (rpcError) {
+          throw new Error(rpcError.message);
+        }
       }
     }
 
