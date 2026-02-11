@@ -148,7 +148,8 @@ supabase secrets set \
   R2_ACCOUNT_ID=... \
   R2_ACCESS_KEY_ID=... \
   R2_SECRET_ACCESS_KEY=... \
-  R2_BUCKET=os-artes
+  R2_BUCKET=os-artes \
+  ORS_API_KEY=...
 ```
 
 5. Publique as funções:
@@ -159,6 +160,11 @@ supabase functions deploy r2-presign-download
 supabase functions deploy r2-delete-objects
 supabase functions deploy r2-health
 ```
+
+6. Otimização de rota de instalações (ORS):
+   - Endpoint server-side: `POST /api/hub-os/optimize-installations`
+   - Requer usuário autenticado (Bearer JWT) com role gerente/admin.
+   - Chave `ORS_API_KEY` fica apenas no servidor (sem prefixo `VITE_`).
 
 > As funções exigem usuário autenticado (JWT) e geram URLs pré-assinadas com expiração curta (10 min).
 
