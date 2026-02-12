@@ -11,6 +11,7 @@ import Configuracoes from "@/pages/Configuracoes";
 import OsArteBoardPage from "@/modules/hub-os/pages/OsArteBoardPage";
 import OsProducaoBoardPage from "@/modules/hub-os/pages/OsProducaoBoardPage";
 import OsDetailPage from "@/modules/hub-os/pages/OsDetailPage";
+import OsKioskPage from "@/modules/hub-os/pages/OsKioskPage";
 import OsCreatePage from "@/modules/hub-os/pages/OsCreatePage";
 import OsAuditPage from "@/modules/hub-os/pages/OsAuditPage";
 import OsPendentesPage from "@/modules/hub-os/pages/OsPendentesPage";
@@ -127,6 +128,12 @@ function Router() {
         </Layout>
       </Route>
 
+      <Route path="/os/kiosk">
+        <RequireModule moduleKey="hub_os">
+          <HubOsAccessGuard scope="producao"><OsKioskPage /></HubOsAccessGuard>
+        </RequireModule>
+      </Route>
+
       <Route path="/os/novo">
         <Layout>
           <RequireModule moduleKey="hub_os">
@@ -136,11 +143,17 @@ function Router() {
       </Route>
 
       <Route path="/os/:id">
-        <Layout>
+        {new URLSearchParams(window.location.search).get('kiosk') === '1' ? (
           <RequireModule moduleKey="hub_os">
-            <OsDetailPage />
+            <HubOsAccessGuard scope="producao"><OsDetailPage /></HubOsAccessGuard>
           </RequireModule>
-        </Layout>
+        ) : (
+          <Layout>
+            <RequireModule moduleKey="hub_os">
+              <OsDetailPage />
+            </RequireModule>
+          </Layout>
+        )}
       </Route>
 
       <Route path="/404" component={NotFound} />

@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase';
 import type { Os, OsEvent, OsPaymentProof, OsStatus, PaymentStatus } from './types';
 
+const NOT_FOUND_CODE = 'PGRST116';
+
 export const fetchOsStatuses = async () => {
   const { data, error } = await supabase
     .from('os_status')
@@ -30,6 +32,31 @@ export const fetchOsById = async (id: string) => {
 
   if (error) throw error;
   return data as Os;
+};
+
+export const fetchOsByCode = async (code: string): Promise<Os | null> => {
+  const numericCode = Number(code);
+  const hasNumericCode = Number.isInteger(numericCode) && numericCode > 0;
+
+  if (hasNumericCode) {
+    const { data, error } = await supabase
+      .from('os')
+      .select('*')
+      .eq('os_number', numericCode)
+      .maybeSingle();
+
+    if (error && error.code !== NOT_FOUND_CODE) throw error;
+    if (data) return data as Os;
+  }
+
+  const { data, error } = await supabase
+    .from('os')
+    .select('*')
+    .eq('sale_number', code)
+    .maybeSingle();
+
+  if (error && error.code !== NOT_FOUND_CODE) throw error;
+  return (data as Os | null) ?? null;
 };
 
 export const fetchOsEvents = async (osId: string) => {

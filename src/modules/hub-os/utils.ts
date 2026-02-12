@@ -25,6 +25,16 @@ export const generateFolderPath = (customerName: string, osNumber: number | null
   return `${basePath}\\${letter}\\${cleanName}\\${numberText}`;
 };
 
+export const sanitizeOsCode = (rawCode: string) => {
+  const normalized = rawCode
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/^OS#?/i, '')
+    .replace(/-/g, '');
+
+  return normalized.trim();
+};
+
 const isSameDate = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() &&
   a.getMonth() === b.getMonth() &&
