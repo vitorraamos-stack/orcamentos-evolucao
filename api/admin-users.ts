@@ -1,16 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-const APP_MODULES = [
-  { key: 'hub_os', label: 'Hub OS', routePrefixes: ['/hub-os', '/os'] },
-  { key: 'hub_os_financeiro', label: 'Financeiro', routePrefixes: ['/hub-os/financeiro', '/financeiro'] },
-  { key: 'galeria', label: 'Galeria', routePrefixes: ['/galeria'] },
-  { key: 'calculadora', label: 'Calculadora', routePrefixes: ['/'] },
-  { key: 'materiais', label: 'Materiais', routePrefixes: ['/materiais'] },
-  { key: 'configuracoes', label: 'Configurações', routePrefixes: ['/configuracoes'] },
-] as const;
-
-type AppModuleKey = (typeof APP_MODULES)[number]['key'];
-const APP_MODULE_KEYS = APP_MODULES.map((module) => module.key);
+type AppModuleKey = string;
 const CONFIG_MODULE_KEY: AppModuleKey = 'configuracoes';
 
 const ALLOWED_ROLES = [
@@ -45,15 +35,15 @@ function jsonError(res: any, status: number, code: string, message: string) {
   return json(res, status, { ok: false, error: { code, message } });
 }
 
-const parseModules = (modules: unknown) => {
+const parseModules = (modules: unknown, allowedModuleKeys: readonly string[]) => {
   if (modules === undefined) return undefined;
   if (!Array.isArray(modules)) return { error: 'Modules deve ser um array.' } as const;
-  const normalized = modules.map((module) => String(module));
-  const invalid = normalized.filter((module) => !(APP_MODULE_KEYS as readonly string[]).includes(module));
+  const normalized = modules.map((module) => String(module).trim());
+  const invalid = normalized.filter((module) => !allowedModuleKeys.includes(module));
   if (invalid.length > 0) {
     return { error: `Módulos inválidos: ${invalid.join(', ')}.` } as const;
   }
-  return { value: normalized as AppModuleKey[] } as const;
+  return { value: Array.from(new Set(normalized)) as AppModuleKey[] } as const;
 };
 
 async function requireAdminAuth(req: any, res: any, supabaseAdmin: ReturnType<typeof createClient>) {
@@ -108,6 +98,16 @@ export default async function handler(req: any, res: any) {
   const currentUser = await requireAdminAuth(req, res, supabaseAdmin);
   if (!currentUser) return;
 
+  const { data: appModules, error: appModulesError } = await supabaseAdmin
+    .from('app_modules')
+    .select('module_key');
+
+  if (appModulesError) {
+    return jsonError(res, 500, 'module_list_error', 'Não foi possível carregar módulos permitidos.');
+  }
+
+  const allowedModuleKeys = (appModules || []).map((module) => module.module_key);
+
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
 
   try {
@@ -130,7 +130,7 @@ export default async function handler(req: any, res: any) {
       const modulesByUser = new Map<string, AppModuleKey[]>();
       (moduleAccessRows || []).forEach((row) => {
         const current = modulesByUser.get(row.user_id) || [];
-        if ((APP_MODULE_KEYS as readonly string[]).includes(row.module_key)) {
+        if (allowedModuleKeys.includes(row.module_key)) {
           current.push(row.module_key as AppModuleKey);
           modulesByUser.set(row.user_id, current);
         }
@@ -156,7 +156,7 @@ export default async function handler(req: any, res: any) {
     if (req.method === 'POST') {
       const { email, password, role, name, modules } = body || {};
       const normalizedRole = normalizeRole(role);
-      const parsedModules = parseModules(modules);
+      const parsedModules = parseModules(modules, allowedModuleKeys);
 
       if (!email || !password || !name) {
         return jsonError(res, 400, 'validation_error', 'Informe email, password, name e role.');
@@ -212,7 +212,7 @@ export default async function handler(req: any, res: any) {
 
       const normalizedRole = role === undefined ? undefined : normalizeRole(role);
       if (role !== undefined && !normalizedRole) return jsonError(res, 400, 'validation_error', 'Role inválido.');
-      const parsedModules = parseModules(modules);
+      const parsedModules = parseModules(modules, allowedModuleKeys);
       if (parsedModules && 'error' in parsedModules) {
         return jsonError(res, 400, 'validation_error', parsedModules.error);
       }
@@ -298,9 +298,7 @@ export default async function handler(req: any, res: any) {
 
         const currentModules = (existingModules || [])
           .map((module) => module.module_key)
-          .filter((moduleKey): moduleKey is AppModuleKey =>
-            (APP_MODULE_KEYS as readonly string[]).includes(moduleKey)
-          );
+          .filter((moduleKey): moduleKey is AppModuleKey => allowedModuleKeys.includes(moduleKey));
 
         if (!currentModules.includes(CONFIG_MODULE_KEY)) {
           ensureManagerConfigModules = [...currentModules, CONFIG_MODULE_KEY];

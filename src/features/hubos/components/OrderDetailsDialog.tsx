@@ -407,6 +407,14 @@ export default function OrderDetailsDialog({
                     Em Produção
                   </label>
                   <label className="flex items-center gap-2 text-sm">
+                    <RadioGroupItem value="AGUARDANDO_INSUMOS" />
+                    Aguardando Insumos
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <RadioGroupItem value="PRODUCAO_EXTERNA" />
+                    Produção Externa
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
                     <RadioGroupItem value="PRONTO" />
                     Pronto
                   </label>
