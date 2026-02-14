@@ -136,3 +136,12 @@
     font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
   }
 }
+
+@keyframes inboxArrow {
+  0%, 100% {
+    transform: translateX(-2px);
+  }
+  50% {
+    transform: translateX(6px);
+  }
+}
