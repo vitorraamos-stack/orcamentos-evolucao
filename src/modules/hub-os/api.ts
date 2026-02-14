@@ -42,14 +42,23 @@ export const fetchOsByCode = async (code: string): Promise<Os | null> => {
     return null;
   }
 
-  const { data, error } = await supabase
+  const { data: byOsNumber, error: byOsNumberError } = await supabase
     .from('os')
     .select('*')
     .eq('os_number', numericCode)
     .maybeSingle();
 
-  if (error && error.code !== NOT_FOUND_CODE) throw error;
-  return (data as Os | null) ?? null;
+  if (byOsNumberError && byOsNumberError.code !== NOT_FOUND_CODE) throw byOsNumberError;
+  if (byOsNumber) return byOsNumber as Os;
+
+  const { data: bySaleNumber, error: bySaleNumberError } = await supabase
+    .from('os')
+    .select('*')
+    .eq('os_number', numericCode)
+    .maybeSingle();
+
+  if (bySaleNumberError && bySaleNumberError.code !== NOT_FOUND_CODE) throw bySaleNumberError;
+  return (bySaleNumber as Os | null) ?? null;
 };
 
 export const fetchOsEvents = async (osId: string) => {
