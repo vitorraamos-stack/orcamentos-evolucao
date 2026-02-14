@@ -24,7 +24,8 @@ const invalidFiles = [];
 
 for (const filePath of files) {
   const source = readFileSync(filePath, 'utf8');
-  if (!source.includes('<Dialog')) continue;
+  const usesDialogTag = /<Dialog(?:\s|>|\/)/.test(source);
+  if (!usesDialogTag) continue;
 
   const dialogImports = [...source.matchAll(/import\s+\{([\s\S]*?)\}\s+from\s+['"]@\/components\/ui\/dialog['"]/g)]
     .map((match) => match[1] ?? '')
