@@ -38,25 +38,27 @@ export const fetchOsByCode = async (code: string): Promise<Os | null> => {
   const numericCode = Number(code);
   const hasNumericCode = Number.isInteger(numericCode) && numericCode > 0;
 
-  if (hasNumericCode) {
-    const { data, error } = await supabase
-      .from('os')
-      .select('*')
-      .eq('os_number', numericCode)
-      .maybeSingle();
-
-    if (error && error.code !== NOT_FOUND_CODE) throw error;
-    if (data) return data as Os;
+  if (!hasNumericCode) {
+    return null;
   }
 
-  const { data, error } = await supabase
+  const { data: byOsNumber, error: byOsNumberError } = await supabase
     .from('os')
     .select('*')
-    .eq('sale_number', code)
+    .eq('os_number', numericCode)
     .maybeSingle();
 
-  if (error && error.code !== NOT_FOUND_CODE) throw error;
-  return (data as Os | null) ?? null;
+  if (byOsNumberError && byOsNumberError.code !== NOT_FOUND_CODE) throw byOsNumberError;
+  if (byOsNumber) return byOsNumber as Os;
+
+  const { data: bySaleNumber, error: bySaleNumberError } = await supabase
+    .from('os')
+    .select('*')
+    .eq('os_number', numericCode)
+    .maybeSingle();
+
+  if (bySaleNumberError && bySaleNumberError.code !== NOT_FOUND_CODE) throw bySaleNumberError;
+  return (bySaleNumber as Os | null) ?? null;
 };
 
 export const fetchOsEvents = async (osId: string) => {

@@ -33,8 +33,8 @@ export default function OsKioskPage() {
   const [errorType, setErrorType] = useState<KioskErrorType | null>(null);
 
   const errorMessage = useMemo(() => {
-    if (errorType === 'invalid_code') return 'Código inválido.';
-    if (errorType === 'not_found') return 'OS não encontrada. Verifique o código da etiqueta.';
+    if (errorType === 'invalid_code') return 'Informe apenas o número da OS.';
+    if (errorType === 'not_found') return 'OS não encontrada. Verifique o número da etiqueta.';
     if (errorType === 'session') return 'Sessão expirada. Faça login novamente.';
     if (errorType === 'network') return 'Falha de rede. Tente novamente.';
     if (errorType === 'unknown') return 'Erro ao consultar OS. Tente novamente.';
@@ -59,7 +59,7 @@ export default function OsKioskPage() {
     if (!sanitizedCode) {
       setCode('');
       setErrorType('invalid_code');
-      toast.error('Código inválido.');
+      toast.error('Informe apenas o número da OS.');
       focusInput();
       return;
     }
@@ -67,12 +67,20 @@ export default function OsKioskPage() {
     try {
       setLoading(true);
       setErrorType(null);
+      if (!/^\d+$/.test(sanitizedCode)) {
+        setCode('');
+        setErrorType('invalid_code');
+        toast.error('Informe apenas o número da OS.');
+        focusInput();
+        return;
+      }
+
       const foundOrder = await fetchOsByCode(sanitizedCode);
 
       if (!foundOrder) {
         setCode('');
         setErrorType('not_found');
-        toast.error('OS não encontrada. Verifique o código da etiqueta.');
+        toast.error('OS não encontrada. Verifique o número da etiqueta.');
         focusInput();
         return;
       }
@@ -104,7 +112,7 @@ export default function OsKioskPage() {
       <Card className="w-full max-w-3xl">
         <CardHeader className="space-y-2 text-center">
           <CardTitle className="text-3xl">Modo quiosque · Acabamento</CardTitle>
-          <p className="text-sm text-muted-foreground">Digite ou escaneie o código da OS e pressione Enter.</p>
+          <p className="text-sm text-muted-foreground">Digite ou escaneie o número da OS e pressione Enter.</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSearch} className="space-y-3">
@@ -112,7 +120,7 @@ export default function OsKioskPage() {
               ref={inputRef}
               value={code}
               onChange={(event) => setCode(event.target.value)}
-              placeholder="Ex.: OS#123 ou VENDA123"
+              placeholder="Ex.: OS#85468"
               autoComplete="off"
               autoCapitalize="none"
               spellCheck={false}
