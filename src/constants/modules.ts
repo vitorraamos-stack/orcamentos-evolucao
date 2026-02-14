@@ -15,6 +15,11 @@ export const APP_MODULES = [
     routePrefixes: [],
   },
   {
+    key: 'hub_os_producao_externa',
+    label: 'Hub OS - Produção Externa',
+    routePrefixes: [],
+  },
+  {
     key: 'hub_os_kiosk',
     label: 'Quiosque (Acabamento)',
     routePrefixes: ['/os/kiosk'],

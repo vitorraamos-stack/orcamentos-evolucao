@@ -2,44 +2,45 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const SRC_DIR = 'src';
-const files = [];
 
-const walk = (dir) => {
+const collectTsxFiles = (dir) => {
+  const output = [];
   for (const entry of readdirSync(dir)) {
     const fullPath = join(dir, entry);
     const stats = statSync(fullPath);
     if (stats.isDirectory()) {
-      walk(fullPath);
+      output.push(...collectTsxFiles(fullPath));
       continue;
     }
     if (fullPath.endsWith('.tsx')) {
-      files.push(fullPath);
+      output.push(fullPath);
     }
   }
+  return output;
 };
 
-walk(SRC_DIR);
-
+const files = collectTsxFiles(SRC_DIR);
 const invalidFiles = [];
 
 for (const filePath of files) {
   const source = readFileSync(filePath, 'utf8');
   if (!source.includes('<Dialog')) continue;
 
-  const hasUiDialogImport =
-    /from\s+['"]@\/components\/ui\/dialog['"]/.test(source) &&
-    /\bDialog\b/.test(source.split(/from\s+['"]@\/components\/ui\/dialog['"]/)[0] || source);
+  const dialogImports = [...source.matchAll(/import\s+\{([\s\S]*?)\}\s+from\s+['"]@\/components\/ui\/dialog['"]/g)]
+    .map((match) => match[1] ?? '')
+    .join(',');
 
-  const hasDialogPrimitiveUsage = /DialogPrimitive/.test(source);
+  const hasDialogNamedImport = /(^|\W)Dialog(\W|$)/.test(dialogImports);
+  const hasDialogPrimitiveUsage = source.includes('DialogPrimitive');
 
-  if (!hasUiDialogImport && !hasDialogPrimitiveUsage) {
+  if (!hasDialogNamedImport && !hasDialogPrimitiveUsage) {
     invalidFiles.push(filePath);
   }
 }
 
 if (invalidFiles.length > 0) {
-  console.error('Found <Dialog usage without proper import in:');
-  invalidFiles.forEach((file) => console.error(`- ${file}`));
+  console.error('Found <Dialog usage without proper Dialog import in:');
+  invalidFiles.forEach((filePath) => console.error(`- ${filePath}`));
   process.exit(1);
 }
 

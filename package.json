@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run check:dialog-imports && vite build",
     "preview": "vite preview",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
