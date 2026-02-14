@@ -130,7 +130,9 @@ function Router() {
 
       <Route path="/os/kiosk">
         <RequireModule moduleKey="hub_os">
-          <HubOsAccessGuard scope="producao"><OsKioskPage /></HubOsAccessGuard>
+          <RequireModule moduleKey="hub_os_kiosk">
+            <HubOsAccessGuard scope="producao"><OsKioskPage /></HubOsAccessGuard>
+          </RequireModule>
         </RequireModule>
       </Route>
 
@@ -145,7 +147,9 @@ function Router() {
       <Route path="/os/:id">
         {new URLSearchParams(window.location.search).get('kiosk') === '1' ? (
           <RequireModule moduleKey="hub_os">
-            <HubOsAccessGuard scope="producao"><OsDetailPage /></HubOsAccessGuard>
+            <RequireModule moduleKey="hub_os_kiosk">
+              <HubOsAccessGuard scope="producao"><OsDetailPage /></HubOsAccessGuard>
+            </RequireModule>
           </RequireModule>
         ) : (
           <Layout>

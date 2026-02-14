@@ -3,6 +3,17 @@ import type { Os, OsEvent, OsPaymentProof, OsStatus, PaymentStatus } from './typ
 
 const NOT_FOUND_CODE = 'PGRST116';
 
+const normalizeDigits = (value: string | null | undefined) =>
+  String(value ?? '').replace(/\D+/g, '');
+
+
+const hasStandaloneNumber = (value: string | null | undefined, code: string) => {
+  const source = String(value ?? '');
+  const escapedCode = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(^|\\D)${escapedCode}(\\D|$)`);
+  return pattern.test(source);
+};
+
 export const fetchOsStatuses = async () => {
   const { data, error } = await supabase
     .from('os_status')
@@ -38,25 +49,55 @@ export const fetchOsByCode = async (code: string): Promise<Os | null> => {
   const numericCode = Number(code);
   const hasNumericCode = Number.isInteger(numericCode) && numericCode > 0;
 
-  if (hasNumericCode) {
-    const { data, error } = await supabase
-      .from('os')
-      .select('*')
-      .eq('os_number', numericCode)
-      .maybeSingle();
-
-    if (error && error.code !== NOT_FOUND_CODE) throw error;
-    if (data) return data as Os;
+  if (!hasNumericCode) {
+    return null;
   }
 
-  const { data, error } = await supabase
+  const { data: byOsNumber, error: byOsNumberError } = await supabase
+    .from('os')
+    .select('*')
+    .eq('os_number', numericCode)
+    .maybeSingle();
+
+  if (byOsNumberError && byOsNumberError.code !== NOT_FOUND_CODE) throw byOsNumberError;
+  if (byOsNumber) return byOsNumber as Os;
+
+  const { data: bySaleNumber, error: bySaleNumberError } = await supabase
     .from('os')
     .select('*')
     .eq('sale_number', code)
     .maybeSingle();
 
-  if (error && error.code !== NOT_FOUND_CODE) throw error;
-  return (data as Os | null) ?? null;
+  if (bySaleNumberError && bySaleNumberError.code !== NOT_FOUND_CODE) throw bySaleNumberError;
+  if (bySaleNumber) return bySaleNumber as Os;
+
+  const { data: fuzzySaleRows, error: fuzzySaleError } = await supabase
+    .from('os')
+    .select('*')
+    .ilike('sale_number', `%${code}%`)
+    .limit(50);
+
+  if (fuzzySaleError) throw fuzzySaleError;
+
+  const matchByNormalizedSaleNumber = (fuzzySaleRows || []).find(
+    (row) => normalizeDigits(row.sale_number) === code
+  );
+
+  if (matchByNormalizedSaleNumber) {
+    return matchByNormalizedSaleNumber as Os;
+  }
+
+  const { data: fuzzyTitleRows, error: fuzzyTitleError } = await supabase
+    .from('os')
+    .select('*')
+    .ilike('title', `%${code}%`)
+    .limit(50);
+
+  if (fuzzyTitleError) throw fuzzyTitleError;
+
+  const matchByTitleNumber = (fuzzyTitleRows || []).find((row) => hasStandaloneNumber(row.title, code));
+
+  return (matchByTitleNumber as Os | undefined) ?? null;
 };
 
 export const fetchOsEvents = async (osId: string) => {
