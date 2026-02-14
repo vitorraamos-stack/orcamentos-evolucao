@@ -290,23 +290,33 @@ export default function HubOS() {
 
     const shouldReplaceJob = (current: AssetJob | null, incoming: AssetJob) => {
       if (!current) return true;
+
       const incomingCreated = new Date(incoming.created_at).getTime();
       const currentCreated = new Date(current.created_at).getTime();
       if (incomingCreated > currentCreated) return true;
       if (incomingCreated < currentCreated) return false;
+
+      const incomingUpdated = new Date(
+        incoming.updated_at ?? incoming.created_at
+      ).getTime();
+      const currentUpdated = new Date(
+        current.updated_at ?? current.created_at
+      ).getTime();
+
       if (incoming.id === current.id) {
-        const incomingUpdated = new Date(
-          incoming.updated_at ?? incoming.created_at
-        ).getTime();
-        const currentUpdated = new Date(
-          current.updated_at ?? current.created_at
-        ).getTime();
         return incomingUpdated > currentUpdated;
       }
-      return false;
+
+      return incomingUpdated >= currentUpdated;
     };
 
     loadLatestAssetJobs();
+
+    const handleWindowFocus = () => {
+      loadLatestAssetJobs();
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
 
     const channel = supabase
       .channel("hub-os-asset-jobs")
@@ -316,7 +326,6 @@ export default function HubOS() {
           event: "*",
           schema: "public",
           table: "os_order_asset_jobs",
-          filter: `os_id=in.(${visibleOrderIds.join(",")})`,
         },
         payload => {
           const incoming = payload.new as AssetJob;
@@ -333,10 +342,11 @@ export default function HubOS() {
 
     const pollingInterval = window.setInterval(() => {
       loadLatestAssetJobs();
-    }, 20000);
+    }, 5000);
 
     return () => {
       active = false;
+      window.removeEventListener("focus", handleWindowFocus);
       window.clearInterval(pollingInterval);
       supabase.removeChannel(channel);
     };
