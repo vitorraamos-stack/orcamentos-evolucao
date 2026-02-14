@@ -85,6 +85,11 @@ export default function OsKioskPage() {
         return;
       }
 
+      if (foundOrder.source === 'os_orders') {
+        setLocation(`/hub-os?search=${encodeURIComponent(sanitizedCode)}&openOrderId=${encodeURIComponent(foundOrder.id)}&kiosk=1`);
+        return;
+      }
+
       setLocation(`/os/${foundOrder.id}?kiosk=1`);
     } catch (error) {
       console.error(error);

@@ -121,12 +121,11 @@ export default function HubOS() {
     Record<string, AssetJob | null>
   >({});
   const [pendingInstallmentsCount, setPendingInstallmentsCount] = useState(0);
-  const [insumosReturnNotesDraft, setInsumosReturnNotesDraft] = useState("");
-  const [insumosRequestDetailsDraft, setInsumosRequestDetailsDraft] = useState("");
-  const [updatingInsumosTransition, setUpdatingInsumosTransition] = useState(false);
-  const [insumosRequesterName, setInsumosRequesterName] = useState<string | null>(null);
-  const previousInsumosIdsRef = useRef<Set<string>>(new Set());
-  const hasLoadedInsumosRef = useRef(false);
+  const kioskParams = new URLSearchParams(window.location.search);
+  const kioskSearch = kioskParams.get("search");
+  const kioskOpenOrderId = kioskParams.get("openOrderId");
+  const hasAppliedKioskSearch = useRef(false);
+  const hasOpenedKioskOrder = useRef(false);
 
   useEffect(() => {
     if (
@@ -142,6 +141,14 @@ export default function HubOS() {
       setActiveTab("producao");
     }
   }, [hubPermissions.canViewArteBoard, hubPermissions.canViewProducaoBoard]);
+
+  useEffect(() => {
+    if (!kioskSearch || hasAppliedKioskSearch.current) return;
+    setFilters((prev) => ({ ...prev, search: kioskSearch }));
+    setActiveTab("producao");
+    hasAppliedKioskSearch.current = true;
+  }, [kioskSearch]);
+
 
   const loadPendingInstallments = async () => {
     try {
@@ -932,6 +939,16 @@ export default function HubOS() {
       </DndContext>
     );
   };
+
+  useEffect(() => {
+    if (!kioskOpenOrderId || hasOpenedKioskOrder.current || orders.length === 0) return;
+    const targetOrder = orders.find((order) => order.id === kioskOpenOrderId);
+    if (!targetOrder) return;
+    setSelectedOrder(targetOrder);
+    setDialogOpen(true);
+    setActiveTab("producao");
+    hasOpenedKioskOrder.current = true;
+  }, [kioskOpenOrderId, orders]);
 
   if (!hubPermissions.canViewHubOS) {
     return (
