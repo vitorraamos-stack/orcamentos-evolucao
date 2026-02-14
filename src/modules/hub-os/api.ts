@@ -3,6 +3,17 @@ import type { Os, OsEvent, OsPaymentProof, OsStatus, PaymentStatus } from './typ
 
 const NOT_FOUND_CODE = 'PGRST116';
 
+const normalizeDigits = (value: string | null | undefined) =>
+  String(value ?? '').replace(/\D+/g, '');
+
+
+const hasStandaloneNumber = (value: string | null | undefined, code: string) => {
+  const source = String(value ?? '');
+  const escapedCode = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(^|\\D)${escapedCode}(\\D|$)`);
+  return pattern.test(source);
+};
+
 export const fetchOsStatuses = async () => {
   const { data, error } = await supabase
     .from('os_status')
@@ -58,7 +69,35 @@ export const fetchOsByCode = async (code: string): Promise<Os | null> => {
     .maybeSingle();
 
   if (bySaleNumberError && bySaleNumberError.code !== NOT_FOUND_CODE) throw bySaleNumberError;
-  return (bySaleNumber as Os | null) ?? null;
+  if (bySaleNumber) return bySaleNumber as Os;
+
+  const { data: fuzzySaleRows, error: fuzzySaleError } = await supabase
+    .from('os')
+    .select('*')
+    .ilike('sale_number', `%${code}%`)
+    .limit(50);
+
+  if (fuzzySaleError) throw fuzzySaleError;
+
+  const matchByNormalizedSaleNumber = (fuzzySaleRows || []).find(
+    (row) => normalizeDigits(row.sale_number) === code
+  );
+
+  if (matchByNormalizedSaleNumber) {
+    return matchByNormalizedSaleNumber as Os;
+  }
+
+  const { data: fuzzyTitleRows, error: fuzzyTitleError } = await supabase
+    .from('os')
+    .select('*')
+    .ilike('title', `%${code}%`)
+    .limit(50);
+
+  if (fuzzyTitleError) throw fuzzyTitleError;
+
+  const matchByTitleNumber = (fuzzyTitleRows || []).find((row) => hasStandaloneNumber(row.title, code));
+
+  return (matchByTitleNumber as Os | undefined) ?? null;
 };
 
 export const fetchOsEvents = async (osId: string) => {
