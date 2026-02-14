@@ -64,6 +64,7 @@ export default function OrderDetailsDialog({
   const [logisticType, setLogisticType] = useState<LogisticType>("retirada");
   const [address, setAddress] = useState("");
   const [productionTag, setProductionTag] = useState<ProductionTag | "">("");
+  const [insumosDetails, setInsumosDetails] = useState("");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [moving, setMoving] = useState(false);
@@ -79,6 +80,7 @@ export default function OrderDetailsDialog({
     setLogisticType(order.logistic_type ?? "retirada");
     setAddress(order.address ?? "");
     setProductionTag(order.production_tag ?? "");
+    setInsumosDetails(order.insumos_details ?? "");
     setEditing(false);
   }, [order, open]);
 
@@ -151,6 +153,11 @@ export default function OrderDetailsDialog({
       return;
     }
 
+    if (order.prod_status === "Produção" && productionTag === "AGUARDANDO_INSUMOS" && !insumosDetails.trim()) {
+      toast.error("Informe os detalhes do material necessário.");
+      return;
+    }
+
     try {
       setSaving(true);
       const normalizedDeliveryDate = normalizeDate(deliveryDate);
@@ -169,6 +176,11 @@ export default function OrderDetailsDialog({
 
       if (order.prod_status === "Produção") {
         payload.production_tag = productionTag || null;
+        payload.insumos_details = productionTag === "AGUARDANDO_INSUMOS" ? insumosDetails.trim() : order.insumos_details;
+
+        if (productionTag === "AGUARDANDO_INSUMOS" && !order.insumos_requested_at) {
+          payload.insumos_requested_at = new Date().toISOString();
+        }
       }
 
       const updated = await updateOrder(order.id, {
@@ -420,6 +432,19 @@ export default function OrderDetailsDialog({
                   </label>
                 </div>
               </RadioGroup>
+            </div>
+          )}
+
+          {order?.prod_status === "Produção" && productionTag === "AGUARDANDO_INSUMOS" && (
+            <div className="space-y-1">
+              <Label>Detalhes do material necessário</Label>
+              <Textarea
+                value={insumosDetails}
+                onChange={event => setInsumosDetails(event.target.value)}
+                placeholder="Ex: chapa ACM 3mm, fita dupla face VHB, tinta..."
+                rows={4}
+                disabled={!editing}
+              />
             </div>
           )}
 

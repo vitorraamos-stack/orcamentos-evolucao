@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,9 @@ type InstallationsInboxProps = {
   onBack: () => void;
   onEdit: (order: OsOrder) => void;
   onOpenKanban: (order: OsOrder) => void;
+  renderOrderExtra?: (order: OsOrder) => ReactNode;
+  selectedOrderExtra?: (order: OsOrder) => ReactNode;
+  selectedOrderActions?: (order: OsOrder) => ReactNode;
 };
 
 type QuickFilter = "today" | "week" | "overdue" | "all";
@@ -155,6 +158,9 @@ export default function InstallationsInbox({
   onBack,
   onEdit,
   onOpenKanban,
+  renderOrderExtra,
+  selectedOrderExtra,
+  selectedOrderActions,
 }: InstallationsInboxProps) {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [optimizeOpen, setOptimizeOpen] = useState(false);
@@ -343,31 +349,6 @@ export default function InstallationsInbox({
       console.error(error);
       toast.error("Não foi possível copiar o resumo.");
     }
-  };
-
-  const handleCopyAddress = async () => {
-    if (!selectedOrder) return;
-    if (!selectedOrder.address) {
-      toast.error("Sem endereço para copiar.");
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(selectedOrder.address);
-      toast.success("Endereço copiado para a área de transferência.");
-    } catch (error) {
-      console.error(error);
-      toast.error("Não foi possível copiar o endereço.");
-    }
-  };
-
-  const handleOpenWhatsapp = () => {
-    if (!selectedOrder) return;
-    const summary = `Instalação OS ${selectedOrder.sale_number} - ${selectedOrder.client_name} | Entrega: ${formatDate(
-      selectedOrder.delivery_date
-    )} | Endereço: ${selectedOrder.address || "(não informado)"}`;
-    const url = `https://wa.me/?text=${encodeURIComponent(summary)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
-    toast.success("Abrindo WhatsApp...");
   };
 
   const handleOpenKanban = () => {
@@ -851,6 +832,7 @@ export default function InstallationsInbox({
                       )}
                       <Badge>{formatLogisticType(order.logistic_type)}</Badge>
                     </div>
+                    {renderOrderExtra?.(order)}
                   </button>
                 );
               })
@@ -925,19 +907,16 @@ export default function InstallationsInbox({
                 </div>
               </div>
 
+              {selectedOrderExtra?.(selectedOrder)}
+
               <div className="flex flex-wrap gap-2">
+                {selectedOrderActions?.(selectedOrder)}
                 <Button onClick={() => onEdit(selectedOrder)}>Editar</Button>
                 <Button variant="outline" onClick={handleOpenKanban}>
                   Abrir no Kanban
                 </Button>
                 <Button variant="outline" onClick={handleCopySummary}>
                   Copiar resumo
-                </Button>
-                <Button variant="outline" onClick={handleCopyAddress}>
-                  Copiar endereço
-                </Button>
-                <Button variant="outline" onClick={handleOpenWhatsapp}>
-                  Abrir WhatsApp
                 </Button>
               </div>
             </div>
