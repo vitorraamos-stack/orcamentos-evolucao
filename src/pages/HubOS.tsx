@@ -3,7 +3,6 @@ import { DndContext, DragEndEvent } from "@dnd-kit/core";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
@@ -122,9 +121,9 @@ export default function HubOS() {
     Record<string, AssetJob | null>
   >({});
   const [pendingInstallmentsCount, setPendingInstallmentsCount] = useState(0);
-  const [resolveInsumosOrder, setResolveInsumosOrder] = useState<OsOrder | null>(null);
-  const [resolveInsumosNotes, setResolveInsumosNotes] = useState("");
-  const [resolvingInsumos, setResolvingInsumos] = useState(false);
+  const [insumosReturnNotesDraft, setInsumosReturnNotesDraft] = useState("");
+  const [insumosRequestDetailsDraft, setInsumosRequestDetailsDraft] = useState("");
+  const [updatingInsumosTransition, setUpdatingInsumosTransition] = useState(false);
   const [insumosRequesterName, setInsumosRequesterName] = useState<string | null>(null);
   const previousInsumosIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedInsumosRef = useRef(false);
@@ -302,6 +301,25 @@ export default function HubOS() {
     return () => {
       active = false;
     };
+  }, [inboxKey, orders, selectedInboxId]);
+
+  useEffect(() => {
+    const selectedOrder = orders.find(order => order.id === selectedInboxId);
+    if (!selectedOrder) {
+      setInsumosReturnNotesDraft("");
+      setInsumosRequestDetailsDraft("");
+      return;
+    }
+
+    if (inboxKey === "aguardandoInsumos") {
+      setInsumosReturnNotesDraft(selectedOrder.insumos_return_notes ?? "");
+      return;
+    }
+
+    if (inboxKey === "producao" && selectedOrder.prod_status === "Produção") {
+      setInsumosRequestDetailsDraft(selectedOrder.insumos_details ?? "");
+      return;
+    }
   }, [inboxKey, orders, selectedInboxId]);
 
   useEffect(() => {
@@ -697,44 +715,86 @@ export default function HubOS() {
     }
   };
 
-  const handleResolveInsumos = async () => {
-    if (!resolveInsumosOrder) return;
-    if (resolveInsumosNotes.trim().length < 3) {
+  const handleReturnToProduction = async (order: OsOrder) => {
+    if (insumosReturnNotesDraft.trim().length < 3) {
       toast.error("Informe observações com ao menos 3 caracteres.");
       return;
     }
 
-    const previous = resolveInsumosOrder;
+    const resolvedAt = new Date().toISOString();
+    const previous = order;
     const optimistic = {
-      ...resolveInsumosOrder,
+      ...order,
       production_tag: "EM_PRODUCAO",
-      insumos_return_notes: resolveInsumosNotes.trim(),
-      insumos_resolved_at: new Date().toISOString(),
+      insumos_return_notes: insumosReturnNotesDraft.trim(),
+      insumos_resolved_at: resolvedAt,
       insumos_resolved_by: user?.id ?? null,
     } satisfies OsOrder;
 
     updateLocalOrder(optimistic);
 
     try {
-      setResolvingInsumos(true);
-      const updated = await updateOrder(resolveInsumosOrder.id, {
+      setUpdatingInsumosTransition(true);
+      const updated = await updateOrder(order.id, {
         production_tag: "EM_PRODUCAO",
-        insumos_return_notes: resolveInsumosNotes.trim(),
-        insumos_resolved_at: new Date().toISOString(),
+        insumos_return_notes: insumosReturnNotesDraft.trim(),
+        insumos_resolved_at: resolvedAt,
         insumos_resolved_by: user?.id ?? null,
+        updated_at: resolvedAt,
+        updated_by: user?.id ?? null,
+      });
+      updateLocalOrder(updated);
+      setInsumosReturnNotesDraft("");
+      toast.success("OS retornada para Produção com observações.");
+    } catch (error) {
+      console.error("Erro ao retornar OS para produção.", error);
+      updateLocalOrder(previous);
+      toast.error("Não foi possível retornar a OS para produção.");
+    } finally {
+      setUpdatingInsumosTransition(false);
+    }
+  };
+
+  const handleSendToInsumos = async (order: OsOrder) => {
+    if (insumosRequestDetailsDraft.trim().length < 3) {
+      toast.error("Informe os detalhes/observações do material necessário.");
+      return;
+    }
+
+    const requestedAt = order.insumos_requested_at ?? new Date().toISOString();
+    const previous = order;
+    const optimistic = {
+      ...order,
+      production_tag: "AGUARDANDO_INSUMOS",
+      insumos_details: insumosRequestDetailsDraft.trim(),
+      insumos_requested_at: requestedAt,
+      insumos_return_notes: null,
+      insumos_resolved_at: null,
+      insumos_resolved_by: null,
+    } satisfies OsOrder;
+
+    updateLocalOrder(optimistic);
+
+    try {
+      setUpdatingInsumosTransition(true);
+      const updated = await updateOrder(order.id, {
+        production_tag: "AGUARDANDO_INSUMOS",
+        insumos_details: insumosRequestDetailsDraft.trim(),
+        insumos_requested_at: requestedAt,
+        insumos_return_notes: null,
+        insumos_resolved_at: null,
+        insumos_resolved_by: null,
         updated_at: new Date().toISOString(),
         updated_by: user?.id ?? null,
       });
       updateLocalOrder(updated);
-      toast.success("Material marcado como disponível e OS devolvida para produção.");
-      setResolveInsumosOrder(null);
-      setResolveInsumosNotes("");
+      toast.success("OS enviada para Aguardando Insumos.");
     } catch (error) {
-      console.error("Erro ao concluir pedido de insumos.", error);
+      console.error("Erro ao enviar OS para aguardando insumos.", error);
       updateLocalOrder(previous);
-      toast.error("Não foi possível concluir o pedido de insumos.");
+      toast.error("Não foi possível enviar a OS para aguardando insumos.");
     } finally {
-      setResolvingInsumos(false);
+      setUpdatingInsumosTransition(false);
     }
   };
 
@@ -1012,24 +1072,65 @@ export default function HubOS() {
                         <p className="text-red-900">{new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(order.insumos_requested_at))} {insumosRequesterName ? `• ${insumosRequesterName}` : ""}</p>
                       </div>
                     )}
+                    <div className="space-y-1">
+                      <Label htmlFor="insumos-return-inline">Observações para retorno à Produção</Label>
+                      <Textarea
+                        id="insumos-return-inline"
+                        value={insumosReturnNotesDraft}
+                        onChange={event => setInsumosReturnNotesDraft(event.target.value)}
+                        placeholder="Descreva o que foi liberado e orientações para a produção..."
+                        rows={3}
+                      />
+                    </div>
                   </div>
                 )
-              : undefined
+              : inboxKey === "producao"
+                ? order =>
+                    order.prod_status === "Produção" ? (
+                      <div className="grid gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
+                        <div className="space-y-1">
+                          <p className="text-xs uppercase text-amber-800">Observações / Material necessário</p>
+                          <Textarea
+                            value={insumosRequestDetailsDraft}
+                            onChange={event => setInsumosRequestDetailsDraft(event.target.value)}
+                            placeholder="Ex: chapa ACM 3mm, fita VHB, tinta..."
+                            rows={3}
+                          />
+                        </div>
+                        {order.insumos_return_notes && (
+                          <div>
+                            <p className="text-xs uppercase text-amber-800">Última observação de retorno</p>
+                            <p className="whitespace-pre-line text-amber-950">{order.insumos_return_notes}</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : null
+                : undefined
           }
           selectedOrderActions={
             inboxKey === "aguardandoInsumos"
               ? order => (
                   <Button
                     className="bg-emerald-600 text-white hover:bg-emerald-700"
-                    onClick={() => {
-                      setResolveInsumosOrder(order);
-                      setResolveInsumosNotes("");
-                    }}
+                    onClick={() => handleReturnToProduction(order)}
+                    disabled={updatingInsumosTransition}
                   >
-                    Concluir / Material disponível
+                    Retornar para Produção
                   </Button>
                 )
-              : undefined
+              : inboxKey === "producao"
+                ? order =>
+                    order.prod_status === "Produção" ? (
+                      <Button
+                        variant="outline"
+                        className="border-amber-500 text-amber-700 hover:bg-amber-100"
+                        onClick={() => handleSendToInsumos(order)}
+                        disabled={updatingInsumosTransition}
+                      >
+                        Enviar para Aguardando Insumos
+                      </Button>
+                    ) : null
+                : undefined
           }
         />
       )}
