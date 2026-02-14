@@ -49,6 +49,8 @@ type InboxKey =
   | "global"
   | "arte"
   | "producao"
+  | "aguardandoInsumos"
+  | "producaoExterna"
   | "atrasados"
   | "prontoAvisar"
   | "instalacoes";
@@ -64,7 +66,7 @@ const isOverdue = (order: OsOrder) => {
 };
 
 export default function HubOS() {
-  const { user, isAdmin, hubPermissions } = useAuth();
+  const { user, isAdmin, hubPermissions, hasModuleAccess } = useAuth();
   const [, setLocation] = useLocation();
   const [orders, setOrders] = useState<OsOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -206,6 +208,24 @@ export default function HubOS() {
     [orders]
   );
 
+  const aguardandoInsumosOrders = useMemo(
+    () =>
+      producaoOrders.filter(
+        order => order.production_tag === "AGUARDANDO_INSUMOS"
+      ),
+    [producaoOrders]
+  );
+
+  const producaoExternaOrders = useMemo(
+    () =>
+      producaoOrders.filter(
+        order => order.production_tag === "PRODUCAO_EXTERNA"
+      ),
+    [producaoOrders]
+  );
+
+  const showProductionExtras = hasModuleAccess("hub_os_producao_extras");
+
   const metrics = useMemo(() => {
     return {
       global: openOrders.length,
@@ -230,15 +250,19 @@ export default function HubOS() {
     if (inboxKey === "global") return openOrders;
     if (inboxKey === "arte") return arteOrders;
     if (inboxKey === "producao") return producaoOrders;
+    if (inboxKey === "aguardandoInsumos") return aguardandoInsumosOrders;
+    if (inboxKey === "producaoExterna") return producaoExternaOrders;
     if (inboxKey === "atrasados") return overdueOrders;
     if (inboxKey === "prontoAvisar") return prontoAvisarOrders;
     return instalacaoOrders;
   }, [
     arteOrders,
+    aguardandoInsumosOrders,
     inboxKey,
     instalacaoOrders,
     openOrders,
     overdueOrders,
+    producaoExternaOrders,
     producaoOrders,
     prontoAvisarOrders,
   ]);
@@ -591,6 +615,20 @@ export default function HubOS() {
         showOptimizeRoute: false,
       };
     }
+    if (inboxKey === "aguardandoInsumos") {
+      return {
+        title: "Aguardando Insumos",
+        emptyMessage: "Nenhuma OS aguardando insumos.",
+        showOptimizeRoute: false,
+      };
+    }
+    if (inboxKey === "producaoExterna") {
+      return {
+        title: "Produção Externa",
+        emptyMessage: "Nenhuma OS em produção externa.",
+        showOptimizeRoute: false,
+      };
+    }
     if (inboxKey === "atrasados") {
       return {
         title: "Atrasados",
@@ -712,9 +750,23 @@ export default function HubOS() {
 
       <MetricsBar
         {...metrics}
+        aguardandoInsumos={
+          showProductionExtras ? aguardandoInsumosOrders.length : undefined
+        }
+        producaoExterna={
+          showProductionExtras ? producaoExternaOrders.length : undefined
+        }
         onGlobalClick={() => openInbox("global")}
         onArteClick={() => openInbox("arte")}
         onProducaoClick={() => openInbox("producao")}
+        onAguardandoInsumosClick={
+          showProductionExtras
+            ? () => openInbox("aguardandoInsumos")
+            : undefined
+        }
+        onProducaoExternaClick={
+          showProductionExtras ? () => openInbox("producaoExterna") : undefined
+        }
         onAtrasadosClick={() => openInbox("atrasados")}
         onProntoAvisarClick={() => openInbox("prontoAvisar")}
         onInstalacoesClick={() => openInbox("instalacoes")}

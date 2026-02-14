@@ -1,6 +1,10 @@
 export type LogisticType = 'retirada' | 'entrega' | 'instalacao';
 
-export type ProductionTag = 'EM_PRODUCAO' | 'PRONTO';
+export type ProductionTag =
+  | 'EM_PRODUCAO'
+  | 'PRONTO'
+  | 'AGUARDANDO_INSUMOS'
+  | 'PRODUCAO_EXTERNA';
 
 export type ArtDirectionTag = 'ARTE_PRONTA_EDICAO' | 'CRIACAO_ARTE' | 'URGENTE';
 

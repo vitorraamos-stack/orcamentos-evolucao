@@ -44,6 +44,14 @@ const logisticLabel: Record<LogisticType, string> = {
 
 const productionTagConfig: Record<ProductionTag, { label: string; className: string }> = {
   EM_PRODUCAO: { label: 'Em Produção', className: 'bg-orange-500 text-white' },
+  AGUARDANDO_INSUMOS: {
+    label: 'Aguardando Insumos',
+    className: 'bg-amber-500 text-white',
+  },
+  PRODUCAO_EXTERNA: {
+    label: 'Produção Externa',
+    className: 'bg-violet-500 text-white',
+  },
   PRONTO: { label: 'Pronto', className: 'bg-emerald-500 text-white' },
 };
 
