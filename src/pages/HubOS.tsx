@@ -824,6 +824,19 @@ export default function HubOS() {
                   id={status}
                   title={status}
                   count={items.length}
+                  headerAction={
+                    columns === PROD_COLUMNS &&
+                    status === 'Em Acabamento' &&
+                    hasModuleAccess('hub_os_kiosk') ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setLocation('/os/kiosk')}
+                      >
+                        Quiosque
+                      </Button>
+                    ) : null
+                  }
                 >
                   {items.map(order => (
                     <KanbanCard
