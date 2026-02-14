@@ -121,11 +121,12 @@ export default function HubOS() {
     Record<string, AssetJob | null>
   >({});
   const [pendingInstallmentsCount, setPendingInstallmentsCount] = useState(0);
-  const kioskParams = new URLSearchParams(window.location.search);
-  const kioskSearch = kioskParams.get("search");
-  const kioskOpenOrderId = kioskParams.get("openOrderId");
-  const hasAppliedKioskSearch = useRef(false);
-  const hasOpenedKioskOrder = useRef(false);
+  const [insumosReturnNotesDraft, setInsumosReturnNotesDraft] = useState("");
+  const [insumosRequestDetailsDraft, setInsumosRequestDetailsDraft] = useState("");
+  const [updatingInsumosTransition, setUpdatingInsumosTransition] = useState(false);
+  const [insumosRequesterName, setInsumosRequesterName] = useState<string | null>(null);
+  const previousInsumosIdsRef = useRef<Set<string>>(new Set());
+  const hasLoadedInsumosRef = useRef(false);
 
   useEffect(() => {
     if (
