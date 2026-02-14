@@ -22,10 +22,12 @@ const MetricCard = ({
   label,
   value,
   onClick,
+  className,
 }: {
   label: string;
   value: number;
   onClick?: () => void;
+  className?: string;
 }) => {
   const isInteractive = Boolean(onClick);
   return (
@@ -33,7 +35,8 @@ const MetricCard = ({
       className={cn(
         "flex min-w-[160px] flex-col gap-1 p-3",
         isInteractive &&
-          "cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          "cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+        className
       )}
       role={isInteractive ? "button" : undefined}
       tabIndex={isInteractive ? 0 : undefined}
@@ -97,9 +100,14 @@ export default function MetricsBar({
         onClick={onInstalacoesClick}
       />
       <MetricCard
-        label="Pendentes"
+        label="Pendentes/Financeiro"
         value={pendentes}
         onClick={onPendentesClick}
+        className={
+          pendentes > 0
+            ? "border-orange-300 bg-orange-50 text-orange-950 animate-pulse [animation-duration:2.8s] [animation-timing-function:ease-in-out] motion-reduce:animate-none"
+            : undefined
+        }
       />
     </div>
   );
