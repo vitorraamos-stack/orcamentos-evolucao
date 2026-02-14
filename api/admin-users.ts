@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 const APP_MODULES = [
   { key: 'hub_os', label: 'Hub OS', routePrefixes: ['/hub-os', '/os'] },
   { key: 'hub_os_financeiro', label: 'Financeiro', routePrefixes: ['/hub-os/financeiro', '/financeiro'] },
+  { key: 'hub_os_kiosk', label: 'Quiosque (Acabamento)', routePrefixes: ['/os/kiosk'] },
   { key: 'galeria', label: 'Galeria', routePrefixes: ['/galeria'] },
   { key: 'calculadora', label: 'Calculadora', routePrefixes: ['/'] },
   { key: 'materiais', label: 'Materiais', routePrefixes: ['/materiais'] },
@@ -12,6 +13,7 @@ const APP_MODULES = [
 type AppModuleKey = (typeof APP_MODULES)[number]['key'];
 const APP_MODULE_KEYS = APP_MODULES.map((module) => module.key);
 const CONFIG_MODULE_KEY: AppModuleKey = 'configuracoes';
+const KIOSK_MODULE_KEY: AppModuleKey = 'hub_os_kiosk';
 
 const ALLOWED_ROLES = [
   'consultor_vendas',
@@ -185,10 +187,13 @@ export default async function handler(req: any, res: any) {
       if (upsertError) throw upsertError;
 
       const moduleList = parsedModules && 'value' in parsedModules ? parsedModules.value : [];
-      const nextModules =
-        normalizedRole === 'gerente' && !moduleList.includes(CONFIG_MODULE_KEY)
-          ? [...moduleList, CONFIG_MODULE_KEY]
-          : moduleList;
+      const requiredManagerModules: AppModuleKey[] = [CONFIG_MODULE_KEY, KIOSK_MODULE_KEY];
+      const nextModules = normalizedRole === 'gerente'
+        ? requiredManagerModules.reduce(
+            (acc, moduleKey) => (acc.includes(moduleKey) ? acc : [...acc, moduleKey]),
+            moduleList
+          )
+        : moduleList;
 
       if (nextModules.length > 0) {
         const { error: moduleInsertError } = await supabaseAdmin.from('user_module_access').insert(
@@ -287,7 +292,7 @@ export default async function handler(req: any, res: any) {
         }
       }
 
-      let ensureManagerConfigModules: AppModuleKey[] | null = null;
+      let ensureManagerModules: AppModuleKey[] | null = null;
 
       if (normalizedRole === 'gerente' && !(parsedModules && 'value' in parsedModules)) {
         const { data: existingModules, error: existingModulesError } = await supabaseAdmin
@@ -302,9 +307,11 @@ export default async function handler(req: any, res: any) {
             (APP_MODULE_KEYS as readonly string[]).includes(moduleKey)
           );
 
-        if (!currentModules.includes(CONFIG_MODULE_KEY)) {
-          ensureManagerConfigModules = [...currentModules, CONFIG_MODULE_KEY];
-        }
+        const requiredManagerModules: AppModuleKey[] = [CONFIG_MODULE_KEY, KIOSK_MODULE_KEY];
+        ensureManagerModules = requiredManagerModules.reduce(
+          (acc, moduleKey) => (acc.includes(moduleKey) ? acc : [...acc, moduleKey]),
+          currentModules
+        );
       }
 
       if (normalizedRole) {
@@ -316,11 +323,14 @@ export default async function handler(req: any, res: any) {
       }
 
       if (parsedModules && 'value' in parsedModules) {
-        const nextModules =
-          (normalizedRole === 'gerente' || (normalizedRole === undefined && isTargetManager)) &&
-          !parsedModules.value.includes(CONFIG_MODULE_KEY)
-            ? [...parsedModules.value, CONFIG_MODULE_KEY]
-            : parsedModules.value;
+        const requiredManagerModules: AppModuleKey[] = [CONFIG_MODULE_KEY, KIOSK_MODULE_KEY];
+        const shouldForceManagerModules = normalizedRole === 'gerente' || (normalizedRole === undefined && isTargetManager);
+        const nextModules = shouldForceManagerModules
+          ? requiredManagerModules.reduce(
+              (acc, moduleKey) => (acc.includes(moduleKey) ? acc : [...acc, moduleKey]),
+              parsedModules.value
+            )
+          : parsedModules.value;
 
         const { error: moduleUpdateError } = await supabaseAdmin.rpc('set_user_modules', {
           target_user_id: userId,
@@ -329,10 +339,10 @@ export default async function handler(req: any, res: any) {
         if (moduleUpdateError) throw moduleUpdateError;
       }
 
-      if (ensureManagerConfigModules) {
+      if (ensureManagerModules) {
         const { error: moduleUpdateError } = await supabaseAdmin.rpc('set_user_modules', {
           target_user_id: userId,
-          module_keys: ensureManagerConfigModules,
+          module_keys: ensureManagerModules,
         });
         if (moduleUpdateError) throw moduleUpdateError;
       }
