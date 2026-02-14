@@ -65,7 +65,7 @@ export const fetchOsByCode = async (code: string): Promise<Os | null> => {
   const { data: bySaleNumber, error: bySaleNumberError } = await supabase
     .from('os')
     .select('*')
-    .eq('sale_number', code)
+    .eq('os_number', numericCode)
     .maybeSingle();
 
   if (bySaleNumberError && bySaleNumberError.code !== NOT_FOUND_CODE) throw bySaleNumberError;

@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DndContext, DragEndEvent } from "@dnd-kit/core";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
 import { ART_COLUMNS, PROD_COLUMNS } from "@/features/hubos/constants";
 import type {
@@ -18,6 +20,7 @@ import {
   createOrderEvent,
   deleteOrder,
   fetchOrders,
+  fetchUserDisplayNameById,
   updateOrder,
 } from "@/features/hubos/api";
 import { getLatestAssetJobsByOsId } from "@/features/hubos/assetJobs";
@@ -65,6 +68,38 @@ const isOverdue = (order: OsOrder) => {
   return delivery < today && order.prod_status !== FINAL_PROD_STATUS;
 };
 
+const playInsumosAlertSound = () => {
+  if (typeof window === "undefined") return;
+  const AudioContextCtor = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextCtor) return;
+
+  const context = new AudioContextCtor();
+  const now = context.currentTime;
+  const notes = [880, 660, 990];
+
+  notes.forEach((frequency, index) => {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    const startAt = now + index * 0.14;
+    const endAt = startAt + 0.12;
+
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(frequency, startAt);
+    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.exponentialRampToValueAtTime(0.2, startAt + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, endAt);
+
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start(startAt);
+    oscillator.stop(endAt);
+  });
+
+  window.setTimeout(() => {
+    void context.close();
+  }, 700);
+};
+
 export default function HubOS() {
   const { user, isAdmin, hubPermissions, hasModuleAccess } = useAuth();
   const [, setLocation] = useLocation();
@@ -86,6 +121,12 @@ export default function HubOS() {
     Record<string, AssetJob | null>
   >({});
   const [pendingInstallmentsCount, setPendingInstallmentsCount] = useState(0);
+  const [insumosReturnNotesDraft, setInsumosReturnNotesDraft] = useState("");
+  const [insumosRequestDetailsDraft, setInsumosRequestDetailsDraft] = useState("");
+  const [updatingInsumosTransition, setUpdatingInsumosTransition] = useState(false);
+  const [insumosRequesterName, setInsumosRequesterName] = useState<string | null>(null);
+  const previousInsumosIdsRef = useRef<Set<string>>(new Set());
+  const hasLoadedInsumosRef = useRef(false);
 
   useEffect(() => {
     if (
@@ -224,7 +265,96 @@ export default function HubOS() {
     [producaoOrders]
   );
 
-  const showProductionExtras = hasModuleAccess("hub_os_producao_extras");
+  const canViewAguardandoInsumos = hasModuleAccess("hub_os_insumos");
+  const canViewProducaoExterna = hasModuleAccess("hub_os_producao_externa");
+
+  useEffect(() => {
+    if (inboxKey !== "aguardandoInsumos") {
+      setInsumosRequesterName(null);
+      return;
+    }
+
+    const selectedOrder = orders.find(
+      order => order.id === selectedInboxId && order.production_tag === "AGUARDANDO_INSUMOS"
+    );
+    const requesterId = selectedOrder?.updated_by ?? selectedOrder?.created_by ?? null;
+
+    if (!selectedOrder?.insumos_requested_at || !requesterId) {
+      setInsumosRequesterName(null);
+      return;
+    }
+
+    let active = true;
+    fetchUserDisplayNameById(requesterId)
+      .then(name => {
+        if (active) {
+          setInsumosRequesterName(name ?? requesterId);
+        }
+      })
+      .catch(error => {
+        console.error("Erro ao carregar responsável pela solicitação de insumos.", error);
+        if (active) {
+          setInsumosRequesterName(requesterId);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [inboxKey, orders, selectedInboxId]);
+
+  useEffect(() => {
+    const selectedOrder = orders.find(order => order.id === selectedInboxId);
+    if (!selectedOrder) {
+      setInsumosReturnNotesDraft("");
+      setInsumosRequestDetailsDraft("");
+      return;
+    }
+
+    if (inboxKey === "aguardandoInsumos") {
+      setInsumosReturnNotesDraft(selectedOrder.insumos_return_notes ?? "");
+      return;
+    }
+
+    if (inboxKey === "producao" && selectedOrder.prod_status === "Produção") {
+      setInsumosRequestDetailsDraft(selectedOrder.insumos_details ?? "");
+      return;
+    }
+  }, [inboxKey, orders, selectedInboxId]);
+
+  useEffect(() => {
+    if (!canViewAguardandoInsumos) return;
+
+    const currentIds = new Set(aguardandoInsumosOrders.map(order => order.id));
+    const previousIds = previousInsumosIdsRef.current;
+    let hasNewOrder = false;
+    currentIds.forEach(id => {
+      if (!previousIds.has(id)) hasNewOrder = true;
+    });
+
+    if (hasLoadedInsumosRef.current && hasNewOrder) {
+      if (typeof window !== "undefined" && "Notification" in window) {
+        if (Notification.permission === "granted") {
+          new Notification("ATENÇÃO - Novo pedido de material!");
+        } else if (Notification.permission === "default") {
+          Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+              new Notification("ATENÇÃO - Novo pedido de material!");
+            }
+          });
+        }
+      }
+
+      try {
+        playInsumosAlertSound();
+      } catch (error) {
+        console.warn("Não foi possível reproduzir o alerta sonoro de insumos.", error);
+      }
+    }
+
+    previousInsumosIdsRef.current = currentIds;
+    hasLoadedInsumosRef.current = true;
+  }, [aguardandoInsumosOrders, canViewAguardandoInsumos]);
 
   const metrics = useMemo(() => {
     return {
@@ -585,6 +715,89 @@ export default function HubOS() {
     }
   };
 
+  const handleReturnToProduction = async (order: OsOrder) => {
+    if (insumosReturnNotesDraft.trim().length < 3) {
+      toast.error("Informe observações com ao menos 3 caracteres.");
+      return;
+    }
+
+    const resolvedAt = new Date().toISOString();
+    const previous = order;
+    const optimistic = {
+      ...order,
+      production_tag: "EM_PRODUCAO",
+      insumos_return_notes: insumosReturnNotesDraft.trim(),
+      insumos_resolved_at: resolvedAt,
+      insumos_resolved_by: user?.id ?? null,
+    } satisfies OsOrder;
+
+    updateLocalOrder(optimistic);
+
+    try {
+      setUpdatingInsumosTransition(true);
+      const updated = await updateOrder(order.id, {
+        production_tag: "EM_PRODUCAO",
+        insumos_return_notes: insumosReturnNotesDraft.trim(),
+        insumos_resolved_at: resolvedAt,
+        insumos_resolved_by: user?.id ?? null,
+        updated_at: resolvedAt,
+        updated_by: user?.id ?? null,
+      });
+      updateLocalOrder(updated);
+      setInsumosReturnNotesDraft("");
+      toast.success("OS retornada para Produção com observações.");
+    } catch (error) {
+      console.error("Erro ao retornar OS para produção.", error);
+      updateLocalOrder(previous);
+      toast.error("Não foi possível retornar a OS para produção.");
+    } finally {
+      setUpdatingInsumosTransition(false);
+    }
+  };
+
+  const handleSendToInsumos = async (order: OsOrder) => {
+    if (insumosRequestDetailsDraft.trim().length < 3) {
+      toast.error("Informe os detalhes/observações do material necessário.");
+      return;
+    }
+
+    const requestedAt = order.insumos_requested_at ?? new Date().toISOString();
+    const previous = order;
+    const optimistic = {
+      ...order,
+      production_tag: "AGUARDANDO_INSUMOS",
+      insumos_details: insumosRequestDetailsDraft.trim(),
+      insumos_requested_at: requestedAt,
+      insumos_return_notes: null,
+      insumos_resolved_at: null,
+      insumos_resolved_by: null,
+    } satisfies OsOrder;
+
+    updateLocalOrder(optimistic);
+
+    try {
+      setUpdatingInsumosTransition(true);
+      const updated = await updateOrder(order.id, {
+        production_tag: "AGUARDANDO_INSUMOS",
+        insumos_details: insumosRequestDetailsDraft.trim(),
+        insumos_requested_at: requestedAt,
+        insumos_return_notes: null,
+        insumos_resolved_at: null,
+        insumos_resolved_by: null,
+        updated_at: new Date().toISOString(),
+        updated_by: user?.id ?? null,
+      });
+      updateLocalOrder(updated);
+      toast.success("OS enviada para Aguardando Insumos.");
+    } catch (error) {
+      console.error("Erro ao enviar OS para aguardando insumos.", error);
+      updateLocalOrder(previous);
+      toast.error("Não foi possível enviar a OS para aguardando insumos.");
+    } finally {
+      setUpdatingInsumosTransition(false);
+    }
+  };
+
   const openInbox = (key: InboxKey) => {
     setInboxKey(key);
     setViewMode("inbox");
@@ -763,23 +976,14 @@ export default function HubOS() {
 
       <MetricsBar
         {...metrics}
-        aguardandoInsumos={
-          showProductionExtras ? aguardandoInsumosOrders.length : undefined
-        }
-        producaoExterna={
-          showProductionExtras ? producaoExternaOrders.length : undefined
-        }
+        aguardandoInsumos={canViewAguardandoInsumos ? aguardandoInsumosOrders.length : undefined}
+        producaoExterna={canViewProducaoExterna ? producaoExternaOrders.length : undefined}
+        insumosAlertActive={canViewAguardandoInsumos && aguardandoInsumosOrders.length > 0}
         onGlobalClick={() => openInbox("global")}
         onArteClick={() => openInbox("arte")}
         onProducaoClick={() => openInbox("producao")}
-        onAguardandoInsumosClick={
-          showProductionExtras
-            ? () => openInbox("aguardandoInsumos")
-            : undefined
-        }
-        onProducaoExternaClick={
-          showProductionExtras ? () => openInbox("producaoExterna") : undefined
-        }
+        onAguardandoInsumosClick={canViewAguardandoInsumos ? () => openInbox("aguardandoInsumos") : undefined}
+        onProducaoExternaClick={canViewProducaoExterna ? () => openInbox("producaoExterna") : undefined}
         onAtrasadosClick={() => openInbox("atrasados")}
         onProntoAvisarClick={() => openInbox("prontoAvisar")}
         onInstalacoesClick={() => openInbox("instalacoes")}
@@ -844,8 +1048,135 @@ export default function HubOS() {
             setActiveTab(order.prod_status ? "producao" : "arte");
             setHighlightId(order.id);
           }}
+          renderOrderExtra={
+            inboxKey === "aguardandoInsumos"
+              ? order => (
+                  <div className="space-y-1 rounded-md border border-red-200 bg-red-50 p-2 text-xs">
+                    <p className="font-medium text-red-900">Material necessário</p>
+                    <p className="whitespace-pre-line text-red-800">{order.insumos_details || "(não informado)"}</p>
+                  </div>
+                )
+              : undefined
+          }
+          selectedOrderExtra={
+            inboxKey === "aguardandoInsumos"
+              ? order => (
+                  <div className="grid gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm">
+                    <div>
+                      <p className="text-xs uppercase text-red-800">Detalhes do material necessário</p>
+                      <p className="whitespace-pre-line text-red-950">{order.insumos_details || "(não informado)"}</p>
+                    </div>
+                    {order.insumos_requested_at && (
+                      <div>
+                        <p className="text-xs uppercase text-red-800">Solicitado em</p>
+                        <p className="text-red-900">{new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(order.insumos_requested_at))} {insumosRequesterName ? `• ${insumosRequesterName}` : ""}</p>
+                      </div>
+                    )}
+                    <div className="space-y-1">
+                      <Label htmlFor="insumos-return-inline">Observações para retorno à Produção</Label>
+                      <Textarea
+                        id="insumos-return-inline"
+                        value={insumosReturnNotesDraft}
+                        onChange={event => setInsumosReturnNotesDraft(event.target.value)}
+                        placeholder="Descreva o que foi liberado e orientações para a produção..."
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                )
+              : inboxKey === "producao"
+                ? order =>
+                    order.prod_status === "Produção" ? (
+                      <div className="grid gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
+                        <div className="space-y-1">
+                          <p className="text-xs uppercase text-amber-800">Observações / Material necessário</p>
+                          <Textarea
+                            value={insumosRequestDetailsDraft}
+                            onChange={event => setInsumosRequestDetailsDraft(event.target.value)}
+                            placeholder="Ex: chapa ACM 3mm, fita VHB, tinta..."
+                            rows={3}
+                          />
+                        </div>
+                        {order.insumos_return_notes && (
+                          <div>
+                            <p className="text-xs uppercase text-amber-800">Última observação de retorno</p>
+                            <p className="whitespace-pre-line text-amber-950">{order.insumos_return_notes}</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : null
+                : undefined
+          }
+          selectedOrderActions={
+            inboxKey === "aguardandoInsumos"
+              ? order => (
+                  <Button
+                    className="bg-emerald-600 text-white hover:bg-emerald-700"
+                    onClick={() => handleReturnToProduction(order)}
+                    disabled={updatingInsumosTransition}
+                  >
+                    Retornar para Produção
+                  </Button>
+                )
+              : inboxKey === "producao"
+                ? order =>
+                    order.prod_status === "Produção" ? (
+                      <Button
+                        variant="outline"
+                        className="border-amber-500 text-amber-700 hover:bg-amber-100"
+                        onClick={() => handleSendToInsumos(order)}
+                        disabled={updatingInsumosTransition}
+                      >
+                        Enviar para Aguardando Insumos
+                      </Button>
+                    ) : null
+                : undefined
+          }
         />
       )}
+
+      <Dialog
+        open={Boolean(resolveInsumosOrder)}
+        onOpenChange={open => {
+          if (!open) {
+            setResolveInsumosOrder(null);
+            setResolveInsumosNotes("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Concluir pedido de material</DialogTitle>
+            <DialogDescription>
+              Informe as observações ao devolver o card para produção.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="insumos-return-notes">Observações ao devolver o card</Label>
+            <Textarea
+              id="insumos-return-notes"
+              value={resolveInsumosNotes}
+              onChange={event => setResolveInsumosNotes(event.target.value)}
+              placeholder="Descreva o material liberado e orientações para produção..."
+              rows={4}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setResolveInsumosOrder(null);
+                setResolveInsumosNotes("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleResolveInsumos} disabled={resolvingInsumos}>
+              Concluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <OrderDetailsDialog
         order={selectedOrder}

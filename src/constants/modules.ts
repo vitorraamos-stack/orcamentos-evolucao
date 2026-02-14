@@ -10,8 +10,8 @@ export const APP_MODULES = [
     routePrefixes: ['/hub-os/financeiro', '/financeiro'],
   },
   {
-    key: 'hub_os_producao_extras',
-    label: 'Hub OS - Produção (Extras)',
+    key: 'hub_os_insumos',
+    label: 'Hub OS - Aguardando Insumos',
     routePrefixes: [],
   },
   {
