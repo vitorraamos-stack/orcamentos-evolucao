@@ -115,6 +115,9 @@ export default function HubOS() {
   const [artDirectionPopupTag, setArtDirectionPopupTag] =
     useState<ArtDirectionTag | null>(null);
   const [inboxSearch, setInboxSearch] = useState("");
+  // Backward-compatible alias to prevent runtime crashes if stale/legacy code references kioskSearch.
+  const kioskSearch = inboxSearch;
+  const setKioskSearch = setInboxSearch;
   const [selectedInboxId, setSelectedInboxId] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [assetJobByOsId, setAssetJobByOsId] = useState<
@@ -1053,8 +1056,8 @@ export default function HubOS() {
           emptyMessage={inboxMeta.emptyMessage}
           showOptimizeRoute={inboxMeta.showOptimizeRoute}
           selectedId={selectedInboxId}
-          searchValue={inboxSearch}
-          onSearchChange={setInboxSearch}
+          searchValue={kioskSearch}
+          onSearchChange={setKioskSearch}
           onSelect={setSelectedInboxId}
           onBack={() => setViewMode("kanban")}
           onEdit={order => {
