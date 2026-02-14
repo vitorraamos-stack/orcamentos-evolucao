@@ -38,21 +38,14 @@ export const fetchOsByCode = async (code: string): Promise<Os | null> => {
   const numericCode = Number(code);
   const hasNumericCode = Number.isInteger(numericCode) && numericCode > 0;
 
-  if (hasNumericCode) {
-    const { data, error } = await supabase
-      .from('os')
-      .select('*')
-      .eq('os_number', numericCode)
-      .maybeSingle();
-
-    if (error && error.code !== NOT_FOUND_CODE) throw error;
-    if (data) return data as Os;
+  if (!hasNumericCode) {
+    return null;
   }
 
   const { data, error } = await supabase
     .from('os')
     .select('*')
-    .eq('sale_number', code)
+    .eq('os_number', numericCode)
     .maybeSingle();
 
   if (error && error.code !== NOT_FOUND_CODE) throw error;
