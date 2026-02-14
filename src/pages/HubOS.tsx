@@ -21,6 +21,7 @@ import {
   createOrderEvent,
   deleteOrder,
   fetchOrders,
+  fetchUserDisplayNameById,
   updateOrder,
 } from "@/features/hubos/api";
 import { getLatestAssetJobsByOsId } from "@/features/hubos/assetJobs";
@@ -124,6 +125,7 @@ export default function HubOS() {
   const [resolveInsumosOrder, setResolveInsumosOrder] = useState<OsOrder | null>(null);
   const [resolveInsumosNotes, setResolveInsumosNotes] = useState("");
   const [resolvingInsumos, setResolvingInsumos] = useState(false);
+  const [insumosRequesterName, setInsumosRequesterName] = useState<string | null>(null);
   const previousInsumosIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedInsumosRef = useRef(false);
 
@@ -266,6 +268,41 @@ export default function HubOS() {
 
   const canViewAguardandoInsumos = hasModuleAccess("hub_os_insumos");
   const canViewProducaoExterna = hasModuleAccess("hub_os_producao_externa");
+
+  useEffect(() => {
+    if (inboxKey !== "aguardandoInsumos") {
+      setInsumosRequesterName(null);
+      return;
+    }
+
+    const selectedOrder = orders.find(
+      order => order.id === selectedInboxId && order.production_tag === "AGUARDANDO_INSUMOS"
+    );
+    const requesterId = selectedOrder?.updated_by ?? selectedOrder?.created_by ?? null;
+
+    if (!selectedOrder?.insumos_requested_at || !requesterId) {
+      setInsumosRequesterName(null);
+      return;
+    }
+
+    let active = true;
+    fetchUserDisplayNameById(requesterId)
+      .then(name => {
+        if (active) {
+          setInsumosRequesterName(name ?? requesterId);
+        }
+      })
+      .catch(error => {
+        console.error("Erro ao carregar responsável pela solicitação de insumos.", error);
+        if (active) {
+          setInsumosRequesterName(requesterId);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [inboxKey, orders, selectedInboxId]);
 
   useEffect(() => {
     if (!canViewAguardandoInsumos) return;
@@ -972,7 +1009,7 @@ export default function HubOS() {
                     {order.insumos_requested_at && (
                       <div>
                         <p className="text-xs uppercase text-red-800">Solicitado em</p>
-                        <p className="text-red-900">{new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(order.insumos_requested_at))}</p>
+                        <p className="text-red-900">{new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(order.insumos_requested_at))} {insumosRequesterName ? `• ${insumosRequesterName}` : ""}</p>
                       </div>
                     )}
                   </div>
@@ -983,7 +1020,7 @@ export default function HubOS() {
             inboxKey === "aguardandoInsumos"
               ? order => (
                   <Button
-                    variant="destructive"
+                    className="bg-emerald-600 text-white hover:bg-emerald-700"
                     onClick={() => {
                       setResolveInsumosOrder(order);
                       setResolveInsumosNotes("");

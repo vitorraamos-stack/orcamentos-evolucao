@@ -351,31 +351,6 @@ export default function InstallationsInbox({
     }
   };
 
-  const handleCopyAddress = async () => {
-    if (!selectedOrder) return;
-    if (!selectedOrder.address) {
-      toast.error("Sem endereço para copiar.");
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(selectedOrder.address);
-      toast.success("Endereço copiado para a área de transferência.");
-    } catch (error) {
-      console.error(error);
-      toast.error("Não foi possível copiar o endereço.");
-    }
-  };
-
-  const handleOpenWhatsapp = () => {
-    if (!selectedOrder) return;
-    const summary = `Instalação OS ${selectedOrder.sale_number} - ${selectedOrder.client_name} | Entrega: ${formatDate(
-      selectedOrder.delivery_date
-    )} | Endereço: ${selectedOrder.address || "(não informado)"}`;
-    const url = `https://wa.me/?text=${encodeURIComponent(summary)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
-    toast.success("Abrindo WhatsApp...");
-  };
-
   const handleOpenKanban = () => {
     if (!selectedOrder) return;
     onOpenKanban(selectedOrder);
@@ -942,12 +917,6 @@ export default function InstallationsInbox({
                 </Button>
                 <Button variant="outline" onClick={handleCopySummary}>
                   Copiar resumo
-                </Button>
-                <Button variant="outline" onClick={handleCopyAddress}>
-                  Copiar endereço
-                </Button>
-                <Button variant="outline" onClick={handleOpenWhatsapp}>
-                  Abrir WhatsApp
                 </Button>
               </div>
             </div>
