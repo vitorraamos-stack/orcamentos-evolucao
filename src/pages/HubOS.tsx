@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DndContext, DragEndEvent } from "@dnd-kit/core";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -86,6 +86,11 @@ export default function HubOS() {
     Record<string, AssetJob | null>
   >({});
   const [pendingInstallmentsCount, setPendingInstallmentsCount] = useState(0);
+  const kioskParams = new URLSearchParams(window.location.search);
+  const kioskSearch = kioskParams.get("search");
+  const kioskOpenOrderId = kioskParams.get("openOrderId");
+  const hasAppliedKioskSearch = useRef(false);
+  const hasOpenedKioskOrder = useRef(false);
 
   useEffect(() => {
     if (
@@ -101,6 +106,14 @@ export default function HubOS() {
       setActiveTab("producao");
     }
   }, [hubPermissions.canViewArteBoard, hubPermissions.canViewProducaoBoard]);
+
+  useEffect(() => {
+    if (!kioskSearch || hasAppliedKioskSearch.current) return;
+    setFilters((prev) => ({ ...prev, search: kioskSearch }));
+    setActiveTab("producao");
+    hasAppliedKioskSearch.current = true;
+  }, [kioskSearch]);
+
 
   const loadPendingInstallments = async () => {
     try {
@@ -671,6 +684,19 @@ export default function HubOS() {
                   id={status}
                   title={status}
                   count={items.length}
+                  headerAction={
+                    columns === PROD_COLUMNS &&
+                    status === 'Em Acabamento' &&
+                    hasModuleAccess('hub_os_kiosk') ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setLocation('/os/kiosk')}
+                      >
+                        Quiosque
+                      </Button>
+                    ) : null
+                  }
                 >
                   {items.map(order => (
                     <KanbanCard
@@ -706,6 +732,16 @@ export default function HubOS() {
       </DndContext>
     );
   };
+
+  useEffect(() => {
+    if (!kioskOpenOrderId || hasOpenedKioskOrder.current || orders.length === 0) return;
+    const targetOrder = orders.find((order) => order.id === kioskOpenOrderId);
+    if (!targetOrder) return;
+    setSelectedOrder(targetOrder);
+    setDialogOpen(true);
+    setActiveTab("producao");
+    hasOpenedKioskOrder.current = true;
+  }, [kioskOpenOrderId, orders]);
 
   if (!hubPermissions.canViewHubOS) {
     return (
