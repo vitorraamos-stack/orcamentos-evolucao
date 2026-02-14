@@ -5,6 +5,8 @@ interface MetricsBarProps {
   global: number;
   totalArte: number;
   totalProducao: number;
+  aguardandoInsumos?: number;
+  producaoExterna?: number;
   overdue: number;
   prontoAvisar: number;
   instalacoes: number;
@@ -12,6 +14,8 @@ interface MetricsBarProps {
   onGlobalClick?: () => void;
   onArteClick?: () => void;
   onProducaoClick?: () => void;
+  onAguardandoInsumosClick?: () => void;
+  onProducaoExternaClick?: () => void;
   onAtrasadosClick?: () => void;
   onProntoAvisarClick?: () => void;
   onInstalacoesClick?: () => void;
@@ -59,6 +63,8 @@ export default function MetricsBar({
   global,
   totalArte,
   totalProducao,
+  aguardandoInsumos,
+  producaoExterna,
   overdue,
   prontoAvisar,
   instalacoes,
@@ -66,6 +72,8 @@ export default function MetricsBar({
   onGlobalClick,
   onArteClick,
   onProducaoClick,
+  onAguardandoInsumosClick,
+  onProducaoExternaClick,
   onAtrasadosClick,
   onProntoAvisarClick,
   onInstalacoesClick,
@@ -84,6 +92,20 @@ export default function MetricsBar({
         value={totalProducao}
         onClick={onProducaoClick}
       />
+      {typeof aguardandoInsumos === "number" && onAguardandoInsumosClick && (
+        <MetricCard
+          label="Aguardando Insumos"
+          value={aguardandoInsumos}
+          onClick={onAguardandoInsumosClick}
+        />
+      )}
+      {typeof producaoExterna === "number" && onProducaoExternaClick && (
+        <MetricCard
+          label="Produção Externa"
+          value={producaoExterna}
+          onClick={onProducaoExternaClick}
+        />
+      )}
       <MetricCard
         label="Atrasados"
         value={overdue}
