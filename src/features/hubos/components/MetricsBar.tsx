@@ -1,3 +1,4 @@
+import { ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +12,7 @@ interface MetricsBarProps {
   prontoAvisar: number;
   instalacoes: number;
   pendentes: number;
+  insumosAlertActive?: boolean;
   onGlobalClick?: () => void;
   onArteClick?: () => void;
   onProducaoClick?: () => void;
@@ -27,19 +29,23 @@ const MetricCard = ({
   value,
   onClick,
   className,
+  attention,
 }: {
   label: string;
   value: number;
   onClick?: () => void;
   className?: string;
+  attention?: boolean;
 }) => {
   const isInteractive = Boolean(onClick);
   return (
     <Card
       className={cn(
-        "flex min-w-[160px] flex-col gap-1 p-3",
+        "relative flex min-w-[160px] flex-col gap-1 p-3",
         isInteractive &&
           "cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+        attention &&
+          "border-red-300 bg-red-50 text-red-950 ring-2 ring-red-300/80 animate-pulse [animation-duration:1.2s] motion-reduce:animate-none",
         className
       )}
       role={isInteractive ? "button" : undefined}
@@ -54,7 +60,15 @@ const MetricCard = ({
       }}
     >
       <span className="text-xs uppercase text-muted-foreground">{label}</span>
-      <span className="text-xl font-semibold">{value}</span>
+      <div className="flex items-center gap-2">
+        {attention && (
+          <ArrowRight
+            className="h-5 w-5 text-red-700 animate-[inboxArrow_900ms_ease-in-out_infinite] motion-reduce:animate-none"
+            aria-hidden
+          />
+        )}
+        <span className="text-xl font-semibold">{value}</span>
+      </div>
     </Card>
   );
 };
@@ -69,6 +83,7 @@ export default function MetricsBar({
   prontoAvisar,
   instalacoes,
   pendentes,
+  insumosAlertActive = false,
   onGlobalClick,
   onArteClick,
   onProducaoClick,
@@ -82,11 +97,7 @@ export default function MetricsBar({
   return (
     <div className="flex flex-wrap gap-3">
       <MetricCard label="GLOBAL" value={global} onClick={onGlobalClick} />
-      <MetricCard
-        label="Total em Arte"
-        value={totalArte}
-        onClick={onArteClick}
-      />
+      <MetricCard label="Total em Arte" value={totalArte} onClick={onArteClick} />
       <MetricCard
         label="Total em Produção"
         value={totalProducao}
@@ -97,6 +108,7 @@ export default function MetricsBar({
           label="Aguardando Insumos"
           value={aguardandoInsumos}
           onClick={onAguardandoInsumosClick}
+          attention={insumosAlertActive && aguardandoInsumos > 0}
         />
       )}
       {typeof producaoExterna === "number" && onProducaoExternaClick && (
@@ -106,11 +118,7 @@ export default function MetricsBar({
           onClick={onProducaoExternaClick}
         />
       )}
-      <MetricCard
-        label="Atrasados"
-        value={overdue}
-        onClick={onAtrasadosClick}
-      />
+      <MetricCard label="Atrasados" value={overdue} onClick={onAtrasadosClick} />
       <MetricCard
         label="Pronto/Avisar"
         value={prontoAvisar}
