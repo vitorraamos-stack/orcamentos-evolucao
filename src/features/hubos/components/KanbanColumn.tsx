@@ -7,9 +7,10 @@ interface KanbanColumnProps {
   title: string;
   count: number;
   children: ReactNode;
+  headerAction?: ReactNode;
 }
 
-export default function KanbanColumn({ id, title, count, children }: KanbanColumnProps) {
+export default function KanbanColumn({ id, title, count, children, headerAction }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
@@ -20,8 +21,11 @@ export default function KanbanColumn({ id, title, count, children }: KanbanColum
         isOver && 'border-primary/60 bg-primary/5'
       )}
     >
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
+          {headerAction}
+        </div>
         <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{count}</span>
       </div>
       <div className="flex flex-col gap-3">{children}</div>
