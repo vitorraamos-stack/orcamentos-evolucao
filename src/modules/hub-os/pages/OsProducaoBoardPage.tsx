@@ -16,7 +16,7 @@ const formatDateTime = (value: string) =>
   new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
 export default function OsProducaoBoardPage() {
-  const { user } = useAuth();
+  const { user, hasModuleAccess } = useAuth();
   const [, setLocation] = useLocation();
   const [orders, setOrders] = useState<Os[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,8 +119,15 @@ export default function OsProducaoBoardPage() {
           const items = ordersByStatus.get(status) ?? [];
           return (
             <div key={status} className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{status}</h2>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{status}</h2>
+                  {status === 'Acabamento' && hasModuleAccess('hub_os_kiosk') && (
+                    <Button size="sm" variant="outline" onClick={() => setLocation('/os/kiosk')}>
+                      Quiosque
+                    </Button>
+                  )}
+                </div>
                 <Badge variant="secondary">{items.length}</Badge>
               </div>
               <div className="space-y-3">

@@ -56,8 +56,9 @@ export default function OsDetailPage() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute('/os/:id');
   const osId = params?.id;
-  const isKioskMode = new URLSearchParams(window.location.search).get('kiosk') === '1';
-  const { user } = useAuth();
+  const queryParamKiosk = new URLSearchParams(window.location.search).get('kiosk');
+  const { user, hasModuleAccess } = useAuth();
+  const isKioskMode = queryParamKiosk === '1' && hasModuleAccess('hub_os_kiosk');
   const [order, setOrder] = useState<Os | null>(null);
   const [events, setEvents] = useState<OsEvent[]>([]);
   const [payments, setPayments] = useState<OsPaymentProof[]>([]);
