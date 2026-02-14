@@ -33,6 +33,20 @@ const buildFinanceNoteHistory = ({
   return [existing?.trim(), entry].filter(Boolean).join("\n\n");
 };
 
+const formatDatePtBr = (value?: string | null) => {
+  if (!value) return "—";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split("-");
+    if (year && month && day) {
+      return `${day}/${month}/${year}`;
+    }
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString("pt-BR");
+};
+
 export default function OsPendentesPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
@@ -216,7 +230,7 @@ export default function OsPendentesPage() {
                   {item.os_orders?.client_name ?? "Sem cliente"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Venc.: {item.due_date ?? "—"}
+                  Venc.: {formatDatePtBr(item.due_date)}
                 </p>
               </button>
             ))}
@@ -325,7 +339,7 @@ export default function OsPendentesPage() {
                 </p>
                 <p>
                   <span className="font-medium">Data 2ª parcela:</span>{" "}
-                  {selected.due_date ?? "—"}
+                  {formatDatePtBr(selected.due_date)}
                 </p>
                 {selected.notes && (
                   <p className="whitespace-pre-wrap">
