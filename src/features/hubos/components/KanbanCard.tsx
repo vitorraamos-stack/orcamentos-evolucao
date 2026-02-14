@@ -126,7 +126,11 @@ export default function KanbanCard({
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        {deliveryDate && <Badge variant="secondary">Entrega: {formatDeliveryDate(deliveryDate)}</Badge>}
+        {deliveryDate && (
+          <Badge className="border-yellow-300 bg-yellow-100 text-yellow-900 hover:bg-yellow-100">
+            Entrega: {formatDeliveryDate(deliveryDate)}
+          </Badge>
+        )}
         {reproducao && <Badge variant="destructive">Reprodução</Badge>}
         {letraCaixa && <Badge variant="secondary">Letra Caixa</Badge>}
         {productionTag && prodStatus === 'Produção' && (
