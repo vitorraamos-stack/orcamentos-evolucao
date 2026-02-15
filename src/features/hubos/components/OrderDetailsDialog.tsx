@@ -1,12 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import * as DialogUi from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -300,16 +294,16 @@ export default function OrderDetailsDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{title || defaultTitle || "Detalhes da OS"}</DialogTitle>
-          <DialogDescription className="text-sm text-muted-foreground">
+    <DialogUi.Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogUi.DialogContent className="max-w-2xl">
+        <DialogUi.DialogHeader>
+          <DialogUi.DialogTitle>{title || defaultTitle || "Detalhes da OS"}</DialogUi.DialogTitle>
+          <DialogUi.DialogDescription className="text-sm text-muted-foreground">
             Status atual: {formatStatus(order)}
             <br />
             Criado por: {createdByName || "Não identificado"}
-          </DialogDescription>
-        </DialogHeader>
+          </DialogUi.DialogDescription>
+        </DialogUi.DialogHeader>
         <div className="grid gap-4">
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
@@ -509,7 +503,7 @@ export default function OrderDetailsDialog({
             </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </DialogUi.DialogContent>
+    </DialogUi.Dialog>
   );
 }

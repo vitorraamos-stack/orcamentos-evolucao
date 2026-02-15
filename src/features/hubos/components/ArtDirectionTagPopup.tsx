@@ -1,5 +1,5 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { Dialog } from '@/components/ui/dialog';
+import * as DialogUi from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ART_DIRECTION_TAG_CONFIG } from '../artDirectionTagConfig';
 import type { ArtDirectionTag } from '../types';
@@ -14,7 +14,7 @@ export default function ArtDirectionTagPopup({ open, onOpenChange, tag }: ArtDir
   const config = ART_DIRECTION_TAG_CONFIG[tag];
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogUi.Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 fixed inset-0 z-50 bg-black/30 backdrop-blur-sm" />
         <DialogPrimitive.Content
@@ -34,6 +34,6 @@ export default function ArtDirectionTagPopup({ open, onOpenChange, tag }: ArtDir
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
-    </Dialog>
+    </DialogUi.Dialog>
   );
 }
