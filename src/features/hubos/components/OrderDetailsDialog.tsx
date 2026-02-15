@@ -172,6 +172,12 @@ export default function OrderDetailsDialog({
         payload.production_tag = productionTag || null;
         payload.insumos_details = productionTag === "AGUARDANDO_INSUMOS" ? insumosDetails.trim() : order.insumos_details;
 
+        if (productionTag === "EM_PRODUCAO") {
+          payload.insumos_return_notes = null;
+          payload.insumos_resolved_at = null;
+          payload.insumos_resolved_by = null;
+        }
+
         if (productionTag === "AGUARDANDO_INSUMOS" && !order.insumos_requested_at) {
           payload.insumos_requested_at = new Date().toISOString();
         }
