@@ -70,7 +70,10 @@ const isOverdue = (order: OsOrder) => {
 
 const playInsumosAlertSound = () => {
   if (typeof window === "undefined") return;
-  const AudioContextCtor = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  const AudioContextCtor =
+    window.AudioContext ||
+    (window as Window & { webkitAudioContext?: typeof AudioContext })
+      .webkitAudioContext;
   if (!AudioContextCtor) return;
 
   const context = new AudioContextCtor();
@@ -134,9 +137,13 @@ export default function HubOS() {
   >({});
   const [pendingInstallmentsCount, setPendingInstallmentsCount] = useState(0);
   const [insumosReturnNotesDraft, setInsumosReturnNotesDraft] = useState("");
-  const [insumosRequestDetailsDraft, setInsumosRequestDetailsDraft] = useState("");
-  const [updatingInsumosTransition, setUpdatingInsumosTransition] = useState(false);
-  const [insumosRequesterName, setInsumosRequesterName] = useState<string | null>(null);
+  const [insumosRequestDetailsDraft, setInsumosRequestDetailsDraft] =
+    useState("");
+  const [updatingInsumosTransition, setUpdatingInsumosTransition] =
+    useState(false);
+  const [insumosRequesterName, setInsumosRequesterName] = useState<
+    string | null
+  >(null);
   const previousInsumosIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedInsumosRef = useRef(false);
   const hasAppliedKioskSearch = useRef(false);
@@ -158,11 +165,10 @@ export default function HubOS() {
 
   useEffect(() => {
     if (!kioskSearch || hasAppliedKioskSearch.current) return;
-    setFilters((prev) => ({ ...prev, search: kioskSearch }));
+    setFilters(prev => ({ ...prev, search: kioskSearch }));
     setActiveTab("producao");
     hasAppliedKioskSearch.current = true;
   }, [kioskSearch]);
-
 
   const loadPendingInstallments = async () => {
     try {
@@ -296,9 +302,12 @@ export default function HubOS() {
     }
 
     const selectedOrder = orders.find(
-      order => order.id === selectedInboxId && order.production_tag === "AGUARDANDO_INSUMOS"
+      order =>
+        order.id === selectedInboxId &&
+        order.production_tag === "AGUARDANDO_INSUMOS"
     );
-    const requesterId = selectedOrder?.updated_by ?? selectedOrder?.created_by ?? null;
+    const requesterId =
+      selectedOrder?.updated_by ?? selectedOrder?.created_by ?? null;
 
     if (!selectedOrder?.insumos_requested_at || !requesterId) {
       setInsumosRequesterName(null);
@@ -313,7 +322,10 @@ export default function HubOS() {
         }
       })
       .catch(error => {
-        console.error("Erro ao carregar responsável pela solicitação de insumos.", error);
+        console.error(
+          "Erro ao carregar responsável pela solicitação de insumos.",
+          error
+        );
         if (active) {
           setInsumosRequesterName(requesterId);
         }
@@ -369,7 +381,10 @@ export default function HubOS() {
       try {
         playInsumosAlertSound();
       } catch (error) {
-        console.warn("Não foi possível reproduzir o alerta sonoro de insumos.", error);
+        console.warn(
+          "Não foi possível reproduzir o alerta sonoro de insumos.",
+          error
+        );
       }
     }
 
@@ -543,7 +558,7 @@ export default function HubOS() {
     }, 200);
     const clearTimer = window.setTimeout(() => {
       setHighlightId(null);
-    setHasOpenedKioskOrder(false);
+      setHasOpenedKioskOrder(false);
     }, 2200);
     return () => {
       window.clearTimeout(scrollTimer);
@@ -911,12 +926,12 @@ export default function HubOS() {
                   count={items.length}
                   headerAction={
                     columns === PROD_COLUMNS &&
-                    status === 'Em Acabamento' &&
-                    hasModuleAccess('hub_os_kiosk') ? (
+                    status === "Em Acabamento" &&
+                    hasModuleAccess("hub_os_kiosk") ? (
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => setLocation('/os/kiosk')}
+                        onClick={() => setLocation("/os/kiosk")}
                       >
                         Quiosque
                       </Button>
@@ -938,6 +953,7 @@ export default function HubOS() {
                       letraCaixa={order.letra_caixa}
                       prodStatus={order.prod_status}
                       productionTag={order.production_tag}
+                      insumosReturnNotes={order.insumos_return_notes}
                       artDirectionTag={order.art_direction_tag}
                       assetIndicator={assetIndicatorByOsId[order.id] ?? null}
                       highlightId={highlightId}
@@ -959,8 +975,9 @@ export default function HubOS() {
   };
 
   useEffect(() => {
-    if (!kioskOpenOrderId || hasOpenedKioskOrder.current || orders.length === 0) return;
-    const targetOrder = orders.find((order) => order.id === kioskOpenOrderId);
+    if (!kioskOpenOrderId || hasOpenedKioskOrder.current || orders.length === 0)
+      return;
+    const targetOrder = orders.find(order => order.id === kioskOpenOrderId);
     if (!targetOrder) return;
     setSelectedOrder(targetOrder);
     setDialogOpen(true);
@@ -1011,14 +1028,28 @@ export default function HubOS() {
 
       <MetricsBar
         {...metrics}
-        aguardandoInsumos={canViewAguardandoInsumos ? aguardandoInsumosOrders.length : undefined}
-        producaoExterna={canViewProducaoExterna ? producaoExternaOrders.length : undefined}
-        insumosAlertActive={canViewAguardandoInsumos && aguardandoInsumosOrders.length > 0}
+        aguardandoInsumos={
+          canViewAguardandoInsumos ? aguardandoInsumosOrders.length : undefined
+        }
+        producaoExterna={
+          canViewProducaoExterna ? producaoExternaOrders.length : undefined
+        }
+        insumosAlertActive={
+          canViewAguardandoInsumos && aguardandoInsumosOrders.length > 0
+        }
         onGlobalClick={() => openInbox("global")}
         onArteClick={() => openInbox("arte")}
         onProducaoClick={() => openInbox("producao")}
-        onAguardandoInsumosClick={canViewAguardandoInsumos ? () => openInbox("aguardandoInsumos") : undefined}
-        onProducaoExternaClick={canViewProducaoExterna ? () => openInbox("producaoExterna") : undefined}
+        onAguardandoInsumosClick={
+          canViewAguardandoInsumos
+            ? () => openInbox("aguardandoInsumos")
+            : undefined
+        }
+        onProducaoExternaClick={
+          canViewProducaoExterna
+            ? () => openInbox("producaoExterna")
+            : undefined
+        }
         onAtrasadosClick={() => openInbox("atrasados")}
         onProntoAvisarClick={() => openInbox("prontoAvisar")}
         onInstalacoesClick={() => openInbox("instalacoes")}
@@ -1090,8 +1121,12 @@ export default function HubOS() {
             inboxKey === "aguardandoInsumos"
               ? order => (
                   <div className="space-y-1 rounded-md border border-red-200 bg-red-50 p-2 text-xs">
-                    <p className="font-medium text-red-900">Material necessário</p>
-                    <p className="whitespace-pre-line text-red-800">{order.insumos_details || "(não informado)"}</p>
+                    <p className="font-medium text-red-900">
+                      Material necessário
+                    </p>
+                    <p className="whitespace-pre-line text-red-800">
+                      {order.insumos_details || "(não informado)"}
+                    </p>
                   </div>
                 )
               : undefined
@@ -1101,21 +1136,39 @@ export default function HubOS() {
               ? order => (
                   <div className="grid gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm">
                     <div>
-                      <p className="text-xs uppercase text-red-800">Detalhes do material necessário</p>
-                      <p className="whitespace-pre-line text-red-950">{order.insumos_details || "(não informado)"}</p>
+                      <p className="text-xs uppercase text-red-800">
+                        Detalhes do material necessário
+                      </p>
+                      <p className="whitespace-pre-line text-red-950">
+                        {order.insumos_details || "(não informado)"}
+                      </p>
                     </div>
                     {order.insumos_requested_at && (
                       <div>
-                        <p className="text-xs uppercase text-red-800">Solicitado em</p>
-                        <p className="text-red-900">{new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(order.insumos_requested_at))} {insumosRequesterName ? `• ${insumosRequesterName}` : ""}</p>
+                        <p className="text-xs uppercase text-red-800">
+                          Solicitado em
+                        </p>
+                        <p className="text-red-900">
+                          {new Intl.DateTimeFormat("pt-BR", {
+                            dateStyle: "short",
+                            timeStyle: "short",
+                          }).format(new Date(order.insumos_requested_at))}{" "}
+                          {insumosRequesterName
+                            ? `• ${insumosRequesterName}`
+                            : ""}
+                        </p>
                       </div>
                     )}
                     <div className="space-y-1">
-                      <Label htmlFor="insumos-return-inline">Observações para retorno à Produção</Label>
+                      <Label htmlFor="insumos-return-inline">
+                        Observações para retorno à Produção
+                      </Label>
                       <Textarea
                         id="insumos-return-inline"
                         value={insumosReturnNotesDraft}
-                        onChange={event => setInsumosReturnNotesDraft(event.target.value)}
+                        onChange={event =>
+                          setInsumosReturnNotesDraft(event.target.value)
+                        }
                         placeholder="Descreva o que foi liberado e orientações para a produção..."
                         rows={3}
                       />
@@ -1127,18 +1180,26 @@ export default function HubOS() {
                     order.prod_status === "Produção" ? (
                       <div className="grid gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
                         <div className="space-y-1">
-                          <p className="text-xs uppercase text-amber-800">Observações / Material necessário</p>
+                          <p className="text-xs uppercase text-amber-800">
+                            Observações / Material necessário
+                          </p>
                           <Textarea
                             value={insumosRequestDetailsDraft}
-                            onChange={event => setInsumosRequestDetailsDraft(event.target.value)}
+                            onChange={event =>
+                              setInsumosRequestDetailsDraft(event.target.value)
+                            }
                             placeholder="Ex: chapa ACM 3mm, fita VHB, tinta..."
                             rows={3}
                           />
                         </div>
                         {order.insumos_return_notes && (
                           <div>
-                            <p className="text-xs uppercase text-amber-800">Última observação de retorno</p>
-                            <p className="whitespace-pre-line text-amber-950">{order.insumos_return_notes}</p>
+                            <p className="text-xs uppercase text-amber-800">
+                              Última observação de retorno
+                            </p>
+                            <p className="whitespace-pre-line text-amber-950">
+                              {order.insumos_return_notes}
+                            </p>
                           </div>
                         )}
                       </div>
