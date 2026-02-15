@@ -175,11 +175,6 @@ export default function KanbanCard({
             {productionTagBadge.label}
           </Badge>
         )}
-        {prodStatus === "Produção" && hasInsumosReturnNotes && (
-          <Badge className={returnNotesBadgeClassName}>
-            Obs: {trimmedInsumosReturnNotes}
-          </Badge>
-        )}
         {artDirectionTag && (
           <Badge
             className="border-0 text-white"
@@ -205,6 +200,16 @@ export default function KanbanCard({
           </Badge>
         )}
       </div>
+      {prodStatus === "Produção" && hasInsumosReturnNotes && (
+        <div className="rounded-md border border-yellow-300 bg-yellow-50 px-2 py-1">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-yellow-800">
+            Observações de Insumos
+          </p>
+          <p className="whitespace-pre-line text-xs text-yellow-950">
+            {trimmedInsumosReturnNotes}
+          </p>
+        </div>
+      )}
       {showArchive && (
         <div className="mt-2 border-t border-border/60 pt-2">
           <div className="inline-flex w-fit flex-wrap gap-2">
