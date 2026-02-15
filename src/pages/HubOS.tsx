@@ -26,7 +26,7 @@ import {
 import { getLatestAssetJobsByOsId } from "@/features/hubos/assetJobs";
 import KanbanColumn from "@/features/hubos/components/KanbanColumn";
 import KanbanCard from "@/features/hubos/components/KanbanCard";
-import OrderDetailsDialog from "@/features/hubos/components/OrderDetailsDialog";
+import ServiceOrderDialog from "@/features/hubos/components/ServiceOrderDialog";
 import CreateOSDialog from "@/features/hubos/components/CreateOSDialog";
 import ArtDirectionTagPopup from "@/features/hubos/components/ArtDirectionTagPopup";
 import FiltersBar from "@/features/hubos/components/FiltersBar";
@@ -1234,7 +1234,7 @@ export default function HubOS() {
         />
       )}
 
-      <OrderDetailsDialog
+      <ServiceOrderDialog
         order={selectedOrder}
         open={dialogOpen}
         onOpenChange={open => {

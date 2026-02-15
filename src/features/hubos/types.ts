@@ -25,6 +25,7 @@ export type ProdStatus =
 
 export type OsOrder = {
   id: string;
+  os_number?: number | null;
   sale_number: string;
   client_name: string;
   title: string | null;
@@ -50,6 +51,7 @@ export type OsOrder = {
   archived: boolean;
   archived_at: string | null;
   archived_by: string | null;
+  folder_path?: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
