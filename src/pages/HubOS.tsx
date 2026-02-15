@@ -141,6 +141,7 @@ export default function HubOS() {
     useState("");
   const [updatingInsumosTransition, setUpdatingInsumosTransition] =
     useState(false);
+  const [markingInsumosReadyOrderId, setMarkingInsumosReadyOrderId] = useState<string | null>(null);
   const [insumosRequesterName, setInsumosRequesterName] = useState<
     string | null
   >(null);
@@ -835,6 +836,42 @@ export default function HubOS() {
     }
   };
 
+  const handleMarkAsInProduction = async (order: OsOrder) => {
+    if (markingInsumosReadyOrderId) return;
+
+    try {
+      setMarkingInsumosReadyOrderId(order.id);
+      const updated = await updateOrder(order.id, {
+        production_tag: "EM_PRODUCAO",
+        insumos_return_notes: null,
+        updated_at: new Date().toISOString(),
+        updated_by: user?.id ?? null,
+      });
+
+      try {
+        await createOrderEvent({
+          os_id: order.id,
+          type: "insumos_acknowledged",
+          payload: {
+            previous_production_tag: order.production_tag,
+            next_production_tag: "EM_PRODUCAO",
+          },
+          created_by: user?.id ?? null,
+        });
+      } catch (eventError) {
+        console.error("Erro ao registrar auditoria de confirmação de insumos.", eventError);
+      }
+
+      updateLocalOrder(updated);
+      toast.success("Badge atualizada para Em Produção.");
+    } catch (error) {
+      console.error("Erro ao marcar OS como em produção.", error);
+      toast.error("Não foi possível atualizar o status para Em Produção.");
+    } finally {
+      setMarkingInsumosReadyOrderId(null);
+    }
+  };
+
   const openInbox = (key: InboxKey) => {
     setDialogOpen(false);
     setSelectedOrder(null);
@@ -963,6 +1000,8 @@ export default function HubOS() {
                         setDialogOpen(true);
                       }}
                       onArchive={() => handleArchive(order)}
+                      onMarkInsumosAsInProduction={() => handleMarkAsInProduction(order)}
+                      markingInsumosAsInProduction={markingInsumosReadyOrderId === order.id}
                     />
                   ))}
                 </KanbanColumn>
