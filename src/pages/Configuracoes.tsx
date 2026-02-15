@@ -43,6 +43,21 @@ const moduleLabelByKey = APP_MODULES.reduce<Record<string, string>>((acc, module
   return acc;
 }, {});
 
+
+const LEGACY_MODULE_LABELS: Record<string, string> = {
+  hub_os_producao_extras: 'Hub OS - Produção (Extras)',
+};
+
+const getModuleLabel = (moduleKey: string) => {
+  const normalized = moduleKey.trim().toLowerCase();
+  return (
+    moduleLabelByKey[moduleKey] ||
+    moduleLabelByKey[normalized] ||
+    LEGACY_MODULE_LABELS[normalized] ||
+    moduleKey
+  );
+};
+
 export default function Configuracoes() {
   const { session, hubPermissions } = useAuth();
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -417,7 +432,7 @@ export default function Configuracoes() {
                         {user.modules?.length ? (
                           user.modules.map((moduleKey) => (
                             <Badge key={moduleKey} variant="outline">
-                              {moduleLabelByKey[moduleKey] || moduleKey}
+                              {getModuleLabel(moduleKey)}
                             </Badge>
                           ))
                         ) : (

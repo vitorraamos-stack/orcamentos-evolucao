@@ -1,16 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import * as DialogUi from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -33,6 +26,9 @@ type InstallationsInboxProps = {
   onBack: () => void;
   onEdit: (order: OsOrder) => void;
   onOpenKanban: (order: OsOrder) => void;
+  renderOrderExtra?: (order: OsOrder) => ReactNode;
+  selectedOrderExtra?: (order: OsOrder) => ReactNode;
+  selectedOrderActions?: (order: OsOrder) => ReactNode;
 };
 
 type QuickFilter = "today" | "week" | "overdue" | "all";
@@ -155,6 +151,9 @@ export default function InstallationsInbox({
   onBack,
   onEdit,
   onOpenKanban,
+  renderOrderExtra,
+  selectedOrderExtra,
+  selectedOrderActions,
 }: InstallationsInboxProps) {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [optimizeOpen, setOptimizeOpen] = useState(false);
@@ -345,31 +344,6 @@ export default function InstallationsInbox({
     }
   };
 
-  const handleCopyAddress = async () => {
-    if (!selectedOrder) return;
-    if (!selectedOrder.address) {
-      toast.error("Sem endereço para copiar.");
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(selectedOrder.address);
-      toast.success("Endereço copiado para a área de transferência.");
-    } catch (error) {
-      console.error(error);
-      toast.error("Não foi possível copiar o endereço.");
-    }
-  };
-
-  const handleOpenWhatsapp = () => {
-    if (!selectedOrder) return;
-    const summary = `Instalação OS ${selectedOrder.sale_number} - ${selectedOrder.client_name} | Entrega: ${formatDate(
-      selectedOrder.delivery_date
-    )} | Endereço: ${selectedOrder.address || "(não informado)"}`;
-    const url = `https://wa.me/?text=${encodeURIComponent(summary)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
-    toast.success("Abrindo WhatsApp...");
-  };
-
   const handleOpenKanban = () => {
     if (!selectedOrder) return;
     onOpenKanban(selectedOrder);
@@ -449,18 +423,18 @@ export default function InstallationsInbox({
         </div>
       </div>
 
-      <Dialog
+      <DialogUi.Dialog
         open={showOptimizeRoute && optimizeOpen}
         onOpenChange={setOptimizeOpen}
       >
-        <DialogContent className="max-h-[calc(100vh-2rem)] w-[96vw] overflow-y-auto sm:max-w-5xl lg:max-w-6xl">
-          <DialogHeader>
-            <DialogTitle>Otimizar rota de instalações</DialogTitle>
-            <DialogDescription>
+        <DialogUi.DialogContent className="max-h-[calc(100vh-2rem)] w-[96vw] overflow-y-auto sm:max-w-5xl lg:max-w-6xl">
+          <DialogUi.DialogHeader>
+            <DialogUi.DialogTitle>Otimizar rota de instalações</DialogUi.DialogTitle>
+            <DialogUi.DialogDescription>
               Selecione a data, escolha as OS e opcionalmente informe ponto de
               partida/chegada.
-            </DialogDescription>
-          </DialogHeader>
+            </DialogUi.DialogDescription>
+          </DialogUi.DialogHeader>
 
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-2">
@@ -747,16 +721,16 @@ export default function InstallationsInbox({
             </div>
           )}
 
-          <DialogFooter>
+          <DialogUi.DialogFooter>
             <Button variant="outline" onClick={() => setOptimizeOpen(false)}>
               Fechar
             </Button>
             <Button onClick={handleOptimizeRoute} disabled={optimizing}>
               {optimizing ? "Otimizando..." : "Gerar rota"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </DialogUi.DialogFooter>
+        </DialogUi.DialogContent>
+      </DialogUi.Dialog>
 
       <div className="flex flex-col gap-4 lg:flex-row">
         <div className="flex w-full flex-col gap-3 lg:w-[380px] lg:min-w-[360px] lg:max-w-[420px]">
@@ -851,6 +825,7 @@ export default function InstallationsInbox({
                       )}
                       <Badge>{formatLogisticType(order.logistic_type)}</Badge>
                     </div>
+                    {renderOrderExtra?.(order)}
                   </button>
                 );
               })
@@ -925,19 +900,16 @@ export default function InstallationsInbox({
                 </div>
               </div>
 
+              {selectedOrderExtra?.(selectedOrder)}
+
               <div className="flex flex-wrap gap-2">
+                {selectedOrderActions?.(selectedOrder)}
                 <Button onClick={() => onEdit(selectedOrder)}>Editar</Button>
                 <Button variant="outline" onClick={handleOpenKanban}>
                   Abrir no Kanban
                 </Button>
                 <Button variant="outline" onClick={handleCopySummary}>
                   Copiar resumo
-                </Button>
-                <Button variant="outline" onClick={handleCopyAddress}>
-                  Copiar endereço
-                </Button>
-                <Button variant="outline" onClick={handleOpenWhatsapp}>
-                  Abrir WhatsApp
                 </Button>
               </div>
             </div>
