@@ -1,11 +1,5 @@
 import { useRef, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import * as DialogUi from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -548,7 +542,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   };
 
   return (
-    <Dialog
+    <DialogUi.Dialog
       open={open}
       onOpenChange={nextOpen => {
         if (!nextOpen && confirmDraftDialogOpen) {
@@ -561,19 +555,19 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
         }
       }}
     >
-      <DialogTrigger asChild>
+      <DialogUi.DialogTrigger asChild>
         <Button>Gerar Ordem de Serviço</Button>
-      </DialogTrigger>
-      <DialogContent
+      </DialogUi.DialogTrigger>
+      <DialogUi.DialogContent
         className="max-h-[calc(100vh-2rem)] w-[95vw] overflow-y-auto sm:max-w-4xl lg:max-w-5xl"
         onInteractOutside={event => {
           event.preventDefault();
           setConfirmDraftDialogOpen(true);
         }}
       >
-        <DialogHeader>
-          <DialogTitle>Nova Ordem de Serviço</DialogTitle>
-        </DialogHeader>
+        <DialogUi.DialogHeader>
+          <DialogUi.DialogTitle>Nova Ordem de Serviço</DialogUi.DialogTitle>
+        </DialogUi.DialogHeader>
         <div className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-4">
@@ -995,7 +989,7 @@ Orientações para a criação de arte:`}
             {pendingOrder ? "Enviar arquivos" : "Gerar Ordem de Serviço"}
           </Button>
         </div>
-      </DialogContent>
+      </DialogUi.DialogContent>
 
       <AlertDialog
         open={confirmDraftDialogOpen}
@@ -1017,6 +1011,6 @@ Orientações para a criação de arte:`}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Dialog>
+    </DialogUi.Dialog>
   );
 }

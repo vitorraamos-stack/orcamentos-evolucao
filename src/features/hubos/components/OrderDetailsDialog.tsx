@@ -1,12 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import * as DialogUi from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,6 +58,7 @@ export default function OrderDetailsDialog({
   const [logisticType, setLogisticType] = useState<LogisticType>("retirada");
   const [address, setAddress] = useState("");
   const [productionTag, setProductionTag] = useState<ProductionTag | "">("");
+  const [insumosDetails, setInsumosDetails] = useState("");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [moving, setMoving] = useState(false);
@@ -79,6 +74,7 @@ export default function OrderDetailsDialog({
     setLogisticType(order.logistic_type ?? "retirada");
     setAddress(order.address ?? "");
     setProductionTag(order.production_tag ?? "");
+    setInsumosDetails(order.insumos_details ?? "");
     setEditing(false);
   }, [order, open]);
 
@@ -151,6 +147,11 @@ export default function OrderDetailsDialog({
       return;
     }
 
+    if (order.prod_status === "Produção" && productionTag === "AGUARDANDO_INSUMOS" && !insumosDetails.trim()) {
+      toast.error("Informe os detalhes do material necessário.");
+      return;
+    }
+
     try {
       setSaving(true);
       const normalizedDeliveryDate = normalizeDate(deliveryDate);
@@ -169,6 +170,11 @@ export default function OrderDetailsDialog({
 
       if (order.prod_status === "Produção") {
         payload.production_tag = productionTag || null;
+        payload.insumos_details = productionTag === "AGUARDANDO_INSUMOS" ? insumosDetails.trim() : order.insumos_details;
+
+        if (productionTag === "AGUARDANDO_INSUMOS" && !order.insumos_requested_at) {
+          payload.insumos_requested_at = new Date().toISOString();
+        }
       }
 
       const updated = await updateOrder(order.id, {
@@ -288,16 +294,16 @@ export default function OrderDetailsDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{title || defaultTitle || "Detalhes da OS"}</DialogTitle>
-          <DialogDescription className="text-sm text-muted-foreground">
+    <DialogUi.Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogUi.DialogContent className="max-w-2xl">
+        <DialogUi.DialogHeader>
+          <DialogUi.DialogTitle>{title || defaultTitle || "Detalhes da OS"}</DialogUi.DialogTitle>
+          <DialogUi.DialogDescription className="text-sm text-muted-foreground">
             Status atual: {formatStatus(order)}
             <br />
             Criado por: {createdByName || "Não identificado"}
-          </DialogDescription>
-        </DialogHeader>
+          </DialogUi.DialogDescription>
+        </DialogUi.DialogHeader>
         <div className="grid gap-4">
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
@@ -423,6 +429,19 @@ export default function OrderDetailsDialog({
             </div>
           )}
 
+          {order?.prod_status === "Produção" && productionTag === "AGUARDANDO_INSUMOS" && (
+            <div className="space-y-1">
+              <Label>Detalhes do material necessário</Label>
+              <Textarea
+                value={insumosDetails}
+                onChange={event => setInsumosDetails(event.target.value)}
+                placeholder="Ex: chapa ACM 3mm, fita dupla face VHB, tinta..."
+                rows={4}
+                disabled={!editing}
+              />
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-2">
             {!order?.prod_status && (
               <Button
@@ -484,7 +503,7 @@ export default function OrderDetailsDialog({
             </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </DialogUi.DialogContent>
+    </DialogUi.Dialog>
   );
 }
