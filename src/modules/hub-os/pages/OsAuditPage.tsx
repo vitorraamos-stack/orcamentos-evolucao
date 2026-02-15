@@ -25,8 +25,25 @@ const EVENT_OPTIONS = [
   { value: 'FINANCE_INSTALLMENT_STATUS_CHANGED', label: 'Financeiro (status parcela)' },
 ];
 
+const EVENT_LABELS = EVENT_OPTIONS.reduce<Record<string, string>>((accumulator, option) => {
+  accumulator[option.value] = option.label;
+  return accumulator;
+}, {});
+
 const formatDateTime = (value: string) =>
   new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+
+const formatEventLabel = (eventType: string) => {
+  if (EVENT_LABELS[eventType]) {
+    return EVENT_LABELS[eventType];
+  }
+
+  return eventType
+    .toLowerCase()
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
 
 const formatUser = (event: OsOrderEvent) => {
   const payload = event.payload as Record<string, unknown> | null;
@@ -255,7 +272,7 @@ export default function OsAuditPage() {
                   <TableCell>{formatUser(event)}</TableCell>
                   <TableCell>{formatOs(event)}</TableCell>
                   <TableCell>
-                    <Badge variant="outline">{event.type}</Badge>
+                    <Badge variant="outline">{formatEventLabel(event.type)}</Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{formatDetails(event)}</TableCell>
                 </TableRow>
