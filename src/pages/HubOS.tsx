@@ -133,8 +133,6 @@ export default function HubOS() {
   const [insumosRequesterName, setInsumosRequesterName] = useState<string | null>(null);
   const previousInsumosIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedInsumosRef = useRef(false);
-  const hasAppliedKioskSearch = useRef(false);
-  const hasOpenedKioskOrder = useRef(false);
 
   useEffect(() => {
     if (
@@ -815,6 +813,8 @@ export default function HubOS() {
   };
 
   const openInbox = (key: InboxKey) => {
+    setDialogOpen(false);
+    setSelectedOrder(null);
     setInboxKey(key);
     setViewMode("inbox");
     setSelectedInboxId(null);
