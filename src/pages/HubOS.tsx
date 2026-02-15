@@ -123,9 +123,11 @@ export default function HubOS() {
   const kioskOpenOrderId = selectedInboxId;
   const setKioskOpenOrderId = setSelectedInboxId;
   // Backward-compatible alias to prevent runtime crashes if stale/legacy code references hasOpenedKioskOrder.
-  const [hasOpenedInboxOrder, setHasOpenedInboxOrder] = useState(false);
-  const hasOpenedKioskOrder = hasOpenedInboxOrder;
-  const setHasOpenedKioskOrder = setHasOpenedInboxOrder;
+  const hasOpenedInboxOrderRef = useRef(false);
+  const hasOpenedKioskOrder = hasOpenedInboxOrderRef;
+  const setHasOpenedKioskOrder = (value: boolean) => {
+    hasOpenedInboxOrderRef.current = value;
+  };
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [assetJobByOsId, setAssetJobByOsId] = useState<
     Record<string, AssetJob | null>
@@ -137,6 +139,7 @@ export default function HubOS() {
   const [insumosRequesterName, setInsumosRequesterName] = useState<string | null>(null);
   const previousInsumosIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedInsumosRef = useRef(false);
+  const hasAppliedKioskSearch = useRef(false);
 
   useEffect(() => {
     if (
