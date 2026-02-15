@@ -122,6 +122,10 @@ export default function HubOS() {
   // Backward-compatible alias to prevent runtime crashes if stale/legacy code references kioskOpenOrderId.
   const kioskOpenOrderId = selectedInboxId;
   const setKioskOpenOrderId = setSelectedInboxId;
+  // Backward-compatible alias to prevent runtime crashes if stale/legacy code references hasOpenedKioskOrder.
+  const [hasOpenedInboxOrder, setHasOpenedInboxOrder] = useState(false);
+  const hasOpenedKioskOrder = hasOpenedInboxOrder;
+  const setHasOpenedKioskOrder = setHasOpenedInboxOrder;
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [assetJobByOsId, setAssetJobByOsId] = useState<
     Record<string, AssetJob | null>
@@ -133,29 +137,6 @@ export default function HubOS() {
   const [insumosRequesterName, setInsumosRequesterName] = useState<string | null>(null);
   const previousInsumosIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedInsumosRef = useRef(false);
-
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const fromKiosk = searchParams.get("kiosk") === "1";
-    const incomingSearch = searchParams.get("search") ?? "";
-    const incomingOrderId = searchParams.get("openOrderId");
-
-    if (!fromKiosk || (!incomingSearch && !incomingOrderId)) {
-      return;
-    }
-
-    setViewMode("inbox");
-    setInboxKey("instalacoes");
-    setActiveTab("producao");
-
-    if (incomingSearch) {
-      setKioskSearch(incomingSearch);
-    }
-
-    if (incomingOrderId) {
-      setKioskOpenOrderId(incomingOrderId);
-    }
-  }, [setKioskOpenOrderId, setKioskSearch]);
 
   useEffect(() => {
     if (
@@ -559,6 +540,7 @@ export default function HubOS() {
     }, 200);
     const clearTimer = window.setTimeout(() => {
       setHighlightId(null);
+    setHasOpenedKioskOrder(false);
     }, 2200);
     return () => {
       window.clearTimeout(scrollTimer);
@@ -843,6 +825,7 @@ export default function HubOS() {
     setSelectedInboxId(null);
     setInboxSearch("");
     setHighlightId(null);
+    setHasOpenedKioskOrder(false);
   };
 
   const inboxMeta = useMemo(() => {
@@ -1086,7 +1069,10 @@ export default function HubOS() {
           selectedId={kioskOpenOrderId}
           searchValue={kioskSearch}
           onSearchChange={setKioskSearch}
-          onSelect={setKioskOpenOrderId}
+          onSelect={id => {
+            setHasOpenedKioskOrder(Boolean(id));
+            setKioskOpenOrderId(id);
+          }}
           onBack={() => setViewMode("kanban")}
           onEdit={order => {
             setSelectedOrder(order);
