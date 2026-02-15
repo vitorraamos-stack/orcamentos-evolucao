@@ -149,6 +149,14 @@ export default function HubOS() {
     }
   }, [hubPermissions.canViewArteBoard, hubPermissions.canViewProducaoBoard]);
 
+  useEffect(() => {
+    if (!kioskSearch || hasAppliedKioskSearch.current) return;
+    setFilters((prev) => ({ ...prev, search: kioskSearch }));
+    setActiveTab("producao");
+    hasAppliedKioskSearch.current = true;
+  }, [kioskSearch]);
+
+
   const loadPendingInstallments = async () => {
     try {
       const pending = await fetchPendingSecondInstallments();
@@ -892,6 +900,19 @@ export default function HubOS() {
                   id={status}
                   title={status}
                   count={items.length}
+                  headerAction={
+                    columns === PROD_COLUMNS &&
+                    status === 'Em Acabamento' &&
+                    hasModuleAccess('hub_os_kiosk') ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setLocation('/os/kiosk')}
+                      >
+                        Quiosque
+                      </Button>
+                    ) : null
+                  }
                 >
                   {items.map(order => (
                     <KanbanCard
@@ -927,6 +948,16 @@ export default function HubOS() {
       </DndContext>
     );
   };
+
+  useEffect(() => {
+    if (!kioskOpenOrderId || hasOpenedKioskOrder.current || orders.length === 0) return;
+    const targetOrder = orders.find((order) => order.id === kioskOpenOrderId);
+    if (!targetOrder) return;
+    setSelectedOrder(targetOrder);
+    setDialogOpen(true);
+    setActiveTab("producao");
+    hasOpenedKioskOrder.current = true;
+  }, [kioskOpenOrderId, orders]);
 
   if (!hubPermissions.canViewHubOS) {
     return (

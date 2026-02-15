@@ -5,10 +5,11 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run check:dialog-imports && vite build",
     "preview": "vite preview",
     "check": "tsc --noEmit",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "check:dialog-imports": "node tools/check-dialog-imports.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
