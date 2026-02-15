@@ -133,6 +133,8 @@ export default function HubOS() {
   const [insumosRequesterName, setInsumosRequesterName] = useState<string | null>(null);
   const previousInsumosIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedInsumosRef = useRef(false);
+  const hasAppliedKioskSearch = useRef(false);
+  const hasOpenedKioskOrder = useRef(false);
 
   useEffect(() => {
     if (
@@ -1158,49 +1160,6 @@ export default function HubOS() {
           }
         />
       )}
-
-      <Dialog
-        open={Boolean(resolveInsumosOrder)}
-        onOpenChange={open => {
-          if (!open) {
-            setResolveInsumosOrder(null);
-            setResolveInsumosNotes("");
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Concluir pedido de material</DialogTitle>
-            <DialogDescription>
-              Informe as observações ao devolver o card para produção.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="insumos-return-notes">Observações ao devolver o card</Label>
-            <Textarea
-              id="insumos-return-notes"
-              value={resolveInsumosNotes}
-              onChange={event => setResolveInsumosNotes(event.target.value)}
-              placeholder="Descreva o material liberado e orientações para produção..."
-              rows={4}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setResolveInsumosOrder(null);
-                setResolveInsumosNotes("");
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={handleResolveInsumos} disabled={resolvingInsumos}>
-              Concluir
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <OrderDetailsDialog
         order={selectedOrder}
