@@ -37,6 +37,11 @@ export type OsOrder = {
   address_geocoded_at?: string | null;
   address_geocode_provider?: string | null;
   production_tag: ProductionTag | null;
+  insumos_details: string | null;
+  insumos_return_notes: string | null;
+  insumos_requested_at: string | null;
+  insumos_resolved_at: string | null;
+  insumos_resolved_by: string | null;
   art_direction_tag: ArtDirectionTag | null;
   art_status: ArtStatus;
   prod_status: ProdStatus | null;
