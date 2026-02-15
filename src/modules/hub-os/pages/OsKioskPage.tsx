@@ -1,10 +1,11 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { toast } from 'sonner';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchOsByCode } from '../api';
 import { sanitizeOsCode } from '../utils';
+import { KioskShell } from '../kiosk/KioskShell';
 
 type KioskErrorType = 'invalid_code' | 'not_found' | 'session' | 'network' | 'unknown';
 
@@ -50,6 +51,19 @@ export default function OsKioskPage() {
 
   useEffect(() => {
     focusInput();
+  }, []);
+
+  useEffect(() => {
+    const handleEscShortcut = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setCode('');
+      setErrorType(null);
+      focusInput();
+    };
+
+    window.addEventListener('keydown', handleEscShortcut);
+    return () => window.removeEventListener('keydown', handleEscShortcut);
   }, []);
 
   const handleSearch = async (event: FormEvent<HTMLFormElement>) => {
@@ -113,29 +127,41 @@ export default function OsKioskPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
-      <Card className="w-full max-w-3xl">
-        <CardHeader className="space-y-2 text-center">
-          <CardTitle className="text-3xl">Modo quiosque · Acabamento</CardTitle>
-          <p className="text-sm text-muted-foreground">Digite ou escaneie o número da OS e pressione Enter.</p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSearch} className="space-y-3">
-            <Input
-              ref={inputRef}
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              placeholder="Ex.: OS#85468"
-              autoComplete="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              disabled={loading}
-              className="h-16 text-center text-2xl font-semibold"
-            />
-            {errorMessage ? <p className="text-center text-sm text-destructive">{errorMessage}</p> : null}
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+    <KioskShell
+      title="Modo Quiosque · Acabamento"
+      subtitle="Foco total para leitura de etiquetas"
+      statusMessage={loading ? 'Buscando OS...' : errorMessage ? 'Erro na leitura. Pronto para nova tentativa.' : 'Pronto · aguardando leitura...'}
+      onBackgroundInteract={focusInput}
+    >
+      <form onSubmit={handleSearch} className="mx-auto flex w-full max-w-5xl flex-col items-center gap-6" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="space-y-2 text-center">
+          <p className="text-4xl font-black tracking-wide sm:text-5xl">ESCANEIE A ETIQUETA</p>
+          <p className="text-base text-muted-foreground sm:text-xl">ou digite o número da OS e pressione Enter</p>
+        </div>
+
+        <Input
+          ref={inputRef}
+          value={code}
+          onChange={(event) => setCode(event.target.value)}
+          onFocus={(event) => event.currentTarget.select()}
+          placeholder="Ex.: OS#85468"
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          disabled={loading}
+          className="h-20 w-full max-w-3xl rounded-2xl border-2 px-8 text-center text-3xl font-bold shadow-sm sm:h-24 sm:text-4xl"
+        />
+
+        <Button type="submit" size="lg" disabled={loading} className="h-16 min-w-48 text-2xl font-extrabold tracking-wide">
+          {loading ? 'BUSCANDO...' : 'BUSCAR'}
+        </Button>
+
+        {errorMessage ? (
+          <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-6 py-3 text-center text-lg font-semibold text-destructive">
+            {errorMessage}
+          </p>
+        ) : null}
+      </form>
+    </KioskShell>
   );
 }

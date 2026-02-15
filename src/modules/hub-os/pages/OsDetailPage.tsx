@@ -30,6 +30,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ARTE_STATUSES, PRODUCAO_STATUSES } from '../statuses';
 import { MAX_ASSET_FILE_SIZE_BYTES, resolveAssetContentType, sanitizeFilename } from '@/features/hubos/assetUtils';
 import { invokeEdgeFunction } from '@/lib/supabase/invokeEdgeFunction';
+import { KioskShell } from '../kiosk/KioskShell';
 
 const paymentSchema = z.object({
   method: z.enum(['PIX', 'CARTAO', 'AGENDADO', 'OUTRO']),
@@ -482,30 +483,30 @@ export default function OsDetailPage() {
 
   if (isKioskMode) {
     return (
-      <div className="mx-auto w-full max-w-5xl space-y-6 pb-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-3xl font-semibold">OS #{order.os_number ?? '—'}</h1>
-            <p className="text-sm text-muted-foreground">Modo quiosque · somente leitura</p>
-          </div>
+      <KioskShell
+        title={`OS #${order.os_number ?? '—'}`}
+        subtitle="Modo quiosque · somente leitura"
+        statusMessage="Pronto para nova leitura"
+        mainClassName="items-stretch overflow-auto"
+        headerAction={
           <Button size="lg" onClick={() => setLocation('/os/kiosk')}>
             Nova busca
           </Button>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Resumo para acabamento</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+        }
+      >
+        <div className="grid w-full gap-4 xl:grid-cols-[1.1fr,1fr]">
+          <Card>
+            <CardHeader>
+              <CardTitle>Dados rápidos</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2">
               <div>
                 <p className="text-xs text-muted-foreground">Título</p>
-                <p className="font-medium">{order.title || '—'}</p>
+                <p className="text-lg font-medium">{order.title || '—'}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Cliente</p>
-                <p className="font-medium">{order.client_name || order.customer_name || '—'}</p>
+                <p className="text-lg font-medium">{order.client_name || order.customer_name || '—'}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Nº da venda</p>
@@ -515,21 +516,6 @@ export default function OsDetailPage() {
                 <p className="text-xs text-muted-foreground">Criada em</p>
                 <p className="font-medium">{formatDateTime(order.created_at)}</p>
               </div>
-            </div>
-
-            <Separator />
-
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Descrição técnica</p>
-              <p className="whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-sm">{order.description || '—'}</p>
-            </div>
-
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Observações</p>
-              <p className="whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-sm">{order.notes || '—'}</p>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               <div>
                 <p className="text-xs text-muted-foreground">Status Arte</p>
                 <p className="font-medium">{order.status_arte || '—'}</p>
@@ -538,63 +524,85 @@ export default function OsDetailPage() {
                 <p className="text-xs text-muted-foreground">Status Produção</p>
                 <p className="font-medium">{order.status_producao || '—'}</p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Tipo de saída</p>
-                <p className="font-medium">{formatDeliveryType(order.delivery_type)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Data de entrega</p>
-                <p className="font-medium">{order.delivery_date || '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Letra caixa</p>
-                <p className="font-medium">{order.has_letra_caixa ? 'Sim' : 'Não'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Reprodução</p>
-                <p className="font-medium">{order.is_reproducao ? 'Sim' : 'Não'}</p>
-              </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            {order.is_reproducao ? (
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Motivo da reprodução</p>
-                <p className="whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-sm">{order.repro_motivo || '—'}</p>
-              </div>
-            ) : null}
-
-            {order.delivery_type === 'INSTALACAO' ? (
-              <div className="rounded-md border p-4">
-                <p className="mb-2 text-sm font-semibold">Dados de instalação</p>
-                <div className="grid gap-3 md:grid-cols-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Data</p>
-                    <p className="font-medium">{order.installation_date || '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Janela de horário</p>
-                    <p className="font-medium">{order.installation_time_window || '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Contato no local</p>
-                    <p className="font-medium">{order.on_site_contact || '—'}</p>
-                  </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Detalhes</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Tipo de saída</p>
+                  <p className="font-medium">{formatDeliveryType(order.delivery_type)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Data de entrega</p>
+                  <p className="font-medium">{order.delivery_date || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Letra caixa</p>
+                  <p className="font-medium">{order.has_letra_caixa ? 'Sim' : 'Não'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Reprodução</p>
+                  <p className="font-medium">{order.is_reproducao ? 'Sim' : 'Não'}</p>
                 </div>
               </div>
-            ) : null}
 
-            {order.folder_path ? (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">Caminho da pasta</p>
-                <div className="rounded-md border p-3 text-xs break-all">{order.folder_path}</div>
-                <Button variant="outline" size="sm" onClick={handleCopyFolderPath}>
-                  <Copy className="mr-2 h-4 w-4" /> Copiar caminho
-                </Button>
+              <Separator />
+
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Descrição técnica</p>
+                <p className="whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-sm">{order.description || '—'}</p>
               </div>
-            ) : null}
-          </CardContent>
-        </Card>
-      </div>
+
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Observações</p>
+                <p className="whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-sm">{order.notes || '—'}</p>
+              </div>
+
+              {order.is_reproducao ? (
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Motivo da reprodução</p>
+                  <p className="whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-sm">{order.repro_motivo || '—'}</p>
+                </div>
+              ) : null}
+
+              {order.delivery_type === 'INSTALACAO' ? (
+                <div className="rounded-md border p-4">
+                  <p className="mb-2 text-sm font-semibold">Dados de instalação</p>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Data</p>
+                      <p className="font-medium">{order.installation_date || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Janela de horário</p>
+                      <p className="font-medium">{order.installation_time_window || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Contato no local</p>
+                      <p className="font-medium">{order.on_site_contact || '—'}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {order.folder_path ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">Caminho da pasta</p>
+                  <div className="rounded-md border p-3 text-xs break-all">{order.folder_path}</div>
+                  <Button variant="outline" size="sm" onClick={handleCopyFolderPath}>
+                    <Copy className="mr-2 h-4 w-4" /> Copiar caminho
+                  </Button>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        </div>
+      </KioskShell>
     );
   }
 
