@@ -135,6 +135,29 @@ export default function HubOS() {
   const hasLoadedInsumosRef = useRef(false);
 
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const fromKiosk = searchParams.get("kiosk") === "1";
+    const incomingSearch = searchParams.get("search") ?? "";
+    const incomingOrderId = searchParams.get("openOrderId");
+
+    if (!fromKiosk || (!incomingSearch && !incomingOrderId)) {
+      return;
+    }
+
+    setViewMode("inbox");
+    setInboxKey("instalacoes");
+    setActiveTab("producao");
+
+    if (incomingSearch) {
+      setKioskSearch(incomingSearch);
+    }
+
+    if (incomingOrderId) {
+      setKioskOpenOrderId(incomingOrderId);
+    }
+  }, [setKioskOpenOrderId, setKioskSearch]);
+
+  useEffect(() => {
     if (
       hubPermissions.canViewArteBoard &&
       !hubPermissions.canViewProducaoBoard
