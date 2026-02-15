@@ -17,16 +17,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ArrowLeft, FolderOpen, Copy } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { createOrderEvent, fetchUserDisplayNameById, updateOrder } from "../api";
 import { ART_COLUMNS, PROD_COLUMNS } from "../constants";
-import type { LogisticType, OsOrder, ProductionTag } from "../types";
-import { useAuth } from "@/contexts/AuthContext";
 import {
-  copyToClipboard,
-  getNetworkBasePath,
-  toFileUriFromUncPath,
-} from "@/features/hubos/networkPath";
+  ART_DIRECTION_TAG_CONFIG,
+  ART_DIRECTION_TAGS,
+} from "../artDirectionTagConfig";
+import type {
+  ArtDirectionTag,
+  LogisticType,
+  OsOrder,
+  ProductionTag,
+} from "../types";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ServiceOrderDialogProps {
   order: OsOrder | null;
@@ -67,6 +71,7 @@ export default function ServiceOrderDialog({
 }: ServiceOrderDialogProps) {
   const { user, isAdmin } = useAuth();
   const initialFocusRef = useRef<HTMLInputElement | null>(null);
+
   const [saleNumber, setSaleNumber] = useState("");
   const [clientName, setClientName] = useState("");
   const [title, setTitle] = useState("");
@@ -74,6 +79,7 @@ export default function ServiceOrderDialog({
   const [deliveryDate, setDeliveryDate] = useState("");
   const [logisticType, setLogisticType] = useState<LogisticType>("retirada");
   const [address, setAddress] = useState("");
+  const [artDirectionTag, setArtDirectionTag] = useState<ArtDirectionTag | null>(null);
   const [productionTag, setProductionTag] = useState<ProductionTag | "">("");
   const [insumosDetails, setInsumosDetails] = useState("");
   const [editing, setEditing] = useState(false);
@@ -91,6 +97,7 @@ export default function ServiceOrderDialog({
     setDeliveryDate(formatDateDisplay(order.delivery_date));
     setLogisticType(order.logistic_type ?? "retirada");
     setAddress(order.address ?? "");
+    setArtDirectionTag(order.art_direction_tag ?? null);
     setProductionTag(order.production_tag ?? "");
     setInsumosDetails(order.insumos_details ?? "");
     setEditing(false);
@@ -118,13 +125,19 @@ export default function ServiceOrderDialog({
         if (active) setCreatedByName(order.created_by);
       }
     };
+
     loadCreatedByName();
+
     return () => {
       active = false;
     };
   }, [order?.created_by]);
 
-  const defaultTitle = useMemo(() => [saleNumber, clientName].filter(Boolean).join(" - ").trim(), [saleNumber, clientName]);
+  const defaultTitle = useMemo(
+    () => [saleNumber, clientName].filter(Boolean).join(" - ").trim(),
+    [saleNumber, clientName]
+  );
+
   const isDirty = useMemo(() => {
     if (!order) return false;
     return (
@@ -135,13 +148,23 @@ export default function ServiceOrderDialog({
       deliveryDate !== formatDateDisplay(order.delivery_date) ||
       logisticType !== (order.logistic_type ?? "retirada") ||
       address !== (order.address ?? "") ||
+      artDirectionTag !== (order.art_direction_tag ?? null) ||
       productionTag !== (order.production_tag ?? "") ||
       insumosDetails !== (order.insumos_details ?? "")
     );
-  }, [address, clientName, deliveryDate, description, insumosDetails, logisticType, order, productionTag, saleNumber, title]);
-
-  const networkPath = order?.folder_path ?? null;
-  const networkPathDisplay = networkPath || getNetworkBasePath() || "Caminho de rede indisponível";
+  }, [
+    address,
+    artDirectionTag,
+    clientName,
+    deliveryDate,
+    description,
+    insumosDetails,
+    logisticType,
+    order,
+    productionTag,
+    saleNumber,
+    title,
+  ]);
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen && editing && isDirty) {
@@ -153,10 +176,21 @@ export default function ServiceOrderDialog({
 
   const handleSave = async () => {
     if (!order) return;
-    if (logisticType === "instalacao" && !address.trim()) return toast.error("Informe o endereço de instalação.");
-    if (order.prod_status === "Produção" && productionTag === "AGUARDANDO_INSUMOS" && !insumosDetails.trim()) {
-      return toast.error("Informe os detalhes do material necessário.");
+
+    if (logisticType === "instalacao" && !address.trim()) {
+      toast.error("Informe o endereço de instalação.");
+      return;
     }
+
+    if (
+      order.prod_status === "Produção" &&
+      productionTag === "AGUARDANDO_INSUMOS" &&
+      !insumosDetails.trim()
+    ) {
+      toast.error("Informe os detalhes do material necessário.");
+      return;
+    }
+
     try {
       setSaving(true);
       const payload: Partial<OsOrder> = {
@@ -167,41 +201,28 @@ export default function ServiceOrderDialog({
         delivery_date: normalizeDate(deliveryDate),
         logistic_type: logisticType,
         address: logisticType === "retirada" ? null : address.trim() || null,
+        art_direction_tag: artDirectionTag,
         production_tag: productionTag || null,
         updated_at: new Date().toISOString(),
         updated_by: user?.id ?? null,
       };
+
+      if (order.prod_status === "Produção") {
+        payload.insumos_details =
+          productionTag === "AGUARDANDO_INSUMOS" ? insumosDetails.trim() : order.insumos_details;
+      }
+
       const updated = await updateOrder(order.id, payload);
       onUpdated(updated);
       setEditing(false);
       toast.success("OS atualizada com sucesso.");
       onOpenChange(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Erro ao salvar as alterações.");
+      toast.error(
+        error instanceof Error ? error.message : "Erro ao salvar as alterações."
+      );
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleCopyPath = async () => {
-    if (!networkPathDisplay) return;
-    try {
-      await copyToClipboard(networkPathDisplay);
-      toast.success("Caminho copiado.");
-    } catch {
-      toast.error("Não foi possível copiar o caminho.");
-    }
-  };
-
-  const handleOpenFolder = async () => {
-    if (!networkPath) return;
-    const fileUrl = toFileUriFromUncPath(networkPath);
-    try {
-      if (!fileUrl) throw new Error("invalid");
-      window.open(fileUrl, "_blank", "noopener,noreferrer");
-    } catch {
-      await handleCopyPath();
-      toast.message("Não foi possível abrir automaticamente. Caminho copiado — cole no Explorador de Arquivos.");
     }
   };
 
@@ -215,7 +236,12 @@ export default function ServiceOrderDialog({
         updated_at: new Date().toISOString(),
         updated_by: user?.id ?? null,
       });
-      await createOrderEvent({ os_id: order.id, type: "status_change", payload: { board: "producao" }, created_by: user?.id ?? null });
+      await createOrderEvent({
+        os_id: order.id,
+        type: "status_change",
+        payload: { board: "producao" },
+        created_by: user?.id ?? null,
+      });
       onUpdated(updated);
       toast.success("Card enviado para Produção.");
       onOpenChange(false);
@@ -251,72 +277,186 @@ export default function ServiceOrderDialog({
   return (
     <>
       <DialogUi.Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogUi.DialogContent className="flex h-[90vh] w-[95vw] max-w-6xl flex-col overflow-hidden p-0">
-          <DialogUi.DialogHeader className="border-b px-6 py-4">
-            <DialogUi.DialogTitle>{`OS #${order?.os_number ?? order?.sale_number ?? ""}`}</DialogUi.DialogTitle>
-            <DialogUi.DialogDescription>Status atual • {order?.prod_status ?? order?.art_status} · Criado por: {createdByName || "—"}</DialogUi.DialogDescription>
+        <DialogUi.DialogContent className="max-h-[calc(100vh-2rem)] w-[95vw] overflow-y-auto sm:max-w-4xl lg:max-w-5xl">
+          <DialogUi.DialogHeader>
+            <DialogUi.DialogTitle>
+              {`OS #${order?.os_number ?? order?.sale_number ?? ""}`}
+            </DialogUi.DialogTitle>
+            <DialogUi.DialogDescription>
+              Status atual • {order?.prod_status ?? order?.art_status} · Criado por: {createdByName || "—"}
+            </DialogUi.DialogDescription>
           </DialogUi.DialogHeader>
 
-          <div className="flex-1 overflow-y-auto px-6 py-4">
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="space-y-4">
-                <div className="space-y-1"><Label>Nº da venda</Label><Input ref={initialFocusRef} value={saleNumber} onChange={e => setSaleNumber(e.target.value)} disabled={!editing} /></div>
-                <div className="space-y-1"><Label>Cliente</Label><Input value={clientName} onChange={e => setClientName(e.target.value)} disabled={!editing} /></div>
-                <div className="space-y-1"><Label>Data de entrega</Label><Input value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} placeholder="dd/mm/aaaa" disabled={!editing} /></div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label>Nº da venda</Label>
+                <Input
+                  ref={initialFocusRef}
+                  value={saleNumber}
+                  onChange={e => setSaleNumber(e.target.value)}
+                  disabled={!editing}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Cliente</Label>
+                <Input
+                  value={clientName}
+                  onChange={e => setClientName(e.target.value)}
+                  disabled={!editing}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Data de entrega</Label>
+                <Input
+                  value={deliveryDate}
+                  onChange={e => setDeliveryDate(e.target.value)}
+                  placeholder="dd/mm/aaaa"
+                  disabled={!editing}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo de logística</Label>
+                <RadioGroup
+                  value={logisticType}
+                  onValueChange={value => editing && setLogisticType(value as LogisticType)}
+                  disabled={!editing}
+                >
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    <label className="flex items-center gap-2">
+                      <RadioGroupItem value="retirada" />Retirada
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <RadioGroupItem value="entrega" />Entrega
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <RadioGroupItem value="instalacao" />Instalação
+                    </label>
+                  </div>
+                </RadioGroup>
+              </div>
+              {logisticType !== "retirada" && (
+                <div className="space-y-1">
+                  <Label>Endereço</Label>
+                  <Input
+                    value={address}
+                    onChange={e => setAddress(e.target.value)}
+                    disabled={!editing}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label>Descrição</Label>
+                <Textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  rows={8}
+                  disabled={!editing}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tag de direcionamento</Label>
+                <div className="flex flex-wrap gap-2">
+                  {ART_DIRECTION_TAGS.map(tag => {
+                    const config = ART_DIRECTION_TAG_CONFIG[tag];
+                    const isSelected = artDirectionTag === tag;
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => editing && setArtDirectionTag(tag)}
+                        disabled={!editing}
+                        className="rounded-full border px-3 py-1 text-xs font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                        style={{
+                          borderColor: config.color,
+                          backgroundColor: isSelected ? config.color : "transparent",
+                          color: isSelected ? "#FFFFFF" : config.color,
+                        }}
+                      >
+                        {config.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {order?.prod_status === "Produção" && (
                 <div className="space-y-2">
-                  <Label>Tipo de logística</Label>
-                  <RadioGroup value={logisticType} onValueChange={value => editing && setLogisticType(value as LogisticType)}>
+                  <Label>Tag de produção</Label>
+                  <RadioGroup
+                    value={productionTag}
+                    onValueChange={value => editing && setProductionTag(value as ProductionTag)}
+                    disabled={!editing}
+                  >
                     <div className="flex flex-wrap gap-4 text-sm">
-                      <label className="flex items-center gap-2"><RadioGroupItem value="retirada" />Retirada</label>
-                      <label className="flex items-center gap-2"><RadioGroupItem value="entrega" />Entrega</label>
-                      <label className="flex items-center gap-2"><RadioGroupItem value="instalacao" />Instalação</label>
+                      <label className="flex items-center gap-2"><RadioGroupItem value="EM_PRODUCAO" />Em Produção</label>
+                      <label className="flex items-center gap-2"><RadioGroupItem value="AGUARDANDO_INSUMOS" />Aguardando Insumos</label>
+                      <label className="flex items-center gap-2"><RadioGroupItem value="PRODUCAO_EXTERNA" />Produção Externa</label>
+                      <label className="flex items-center gap-2"><RadioGroupItem value="PRONTO" />Pronto</label>
                     </div>
                   </RadioGroup>
                 </div>
-                {logisticType !== "retirada" && (
-                  <div className="space-y-1"><Label>Endereço</Label><Input value={address} onChange={e => setAddress(e.target.value)} disabled={!editing} /></div>
+              )}
+
+              {order?.prod_status === "Produção" &&
+                productionTag === "AGUARDANDO_INSUMOS" && (
+                  <div className="space-y-1">
+                    <Label>Detalhes de insumos</Label>
+                    <Textarea
+                      value={insumosDetails}
+                      onChange={e => setInsumosDetails(e.target.value)}
+                      rows={4}
+                      disabled={!editing}
+                    />
+                  </div>
                 )}
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-1"><Label>Descrição</Label><Textarea value={description} onChange={e => setDescription(e.target.value)} rows={8} disabled={!editing} /></div>
-                <div className="space-y-1"><Label>Tag de direcionamento</Label><Input value={productionTag || "—"} onChange={e => setProductionTag(e.target.value as ProductionTag)} disabled={!editing} /></div>
-                {order?.prod_status === "Produção" && productionTag === "AGUARDANDO_INSUMOS" && (
-                  <div className="space-y-1"><Label>Detalhes de insumos</Label><Textarea value={insumosDetails} onChange={e => setInsumosDetails(e.target.value)} rows={4} disabled={!editing} /></div>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-6 space-y-3 rounded-md border p-4">
-              <Label>Anexos (opcional)</Label>
-              <p className="text-sm text-muted-foreground">Arte e referências e documentos financeiros continuam disponíveis no fluxo atual da OS.</p>
-            </div>
-
-            <div className="mt-4 space-y-3 rounded-md border p-4">
-              <Label>Pasta de Arte (Rede)</Label>
-              <p className="truncate rounded bg-muted px-3 py-2 font-mono text-xs" title={networkPathDisplay}>{networkPathDisplay}</p>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" onClick={handleCopyPath}><Copy className="mr-2 h-4 w-4" />Copiar caminho</Button>
-                <Button variant="outline" onClick={handleOpenFolder} disabled={!networkPath}><FolderOpen className="mr-2 h-4 w-4" />Abrir pasta</Button>
-              </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t px-6 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex gap-2">
-              {!order?.prod_status && <Button variant="secondary" onClick={moveToProduction} disabled={moving}>Enviar para Produção</Button>}
-              {order?.prod_status && isAdmin && <Button variant="outline" onClick={moveBackToArt} disabled={moving}><ArrowLeft className="mr-2 h-4 w-4" />Voltar para Arte</Button>}
+              {!order?.prod_status && (
+                <Button variant="secondary" onClick={moveToProduction} disabled={moving}>
+                  Enviar para Produção
+                </Button>
+              )}
+              {order?.prod_status && isAdmin && (
+                <Button variant="outline" onClick={moveBackToArt} disabled={moving}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />Voltar para Arte
+                </Button>
+              )}
             </div>
             <div className="flex gap-2">
               {isAdmin && onDelete && (
                 <AlertDialog>
-                  <AlertDialogTrigger asChild><Button variant="destructive">Excluir</Button></AlertDialogTrigger>
-                  <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Excluir OS?</AlertDialogTitle><AlertDialogDescription>Essa ação não pode ser desfeita.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDelete}>Confirmar</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive">Excluir</Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir OS?</AlertDialogTitle>
+                      <AlertDialogDescription>Essa ação não pode ser desfeita.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDelete}>Confirmar</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
                 </AlertDialog>
               )}
-              <Button variant="outline" onClick={() => handleOpenChange(false)}>Fechar</Button>
-              <Button variant="secondary" onClick={() => setEditing(true)} disabled={editing}>Editar</Button>
-              <Button onClick={handleSave} disabled={!editing || saving}>{saving ? "Salvando..." : "Salvar alterações"}</Button>
+              <Button variant="outline" onClick={() => handleOpenChange(false)}>
+                Fechar
+              </Button>
+              <Button variant="secondary" onClick={() => setEditing(true)} disabled={editing}>
+                Editar
+              </Button>
+              <Button onClick={handleSave} disabled={!editing || saving}>
+                {saving ? "Salvando..." : "Salvar alterações"}
+              </Button>
             </div>
           </div>
         </DialogUi.DialogContent>
@@ -330,7 +470,14 @@ export default function ServiceOrderDialog({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Continuar editando</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setDiscardDialogOpen(false); onOpenChange(false); }}>Descartar e fechar</AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => {
+                setDiscardDialogOpen(false);
+                onOpenChange(false);
+              }}
+            >
+              Descartar e fechar
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
