@@ -105,17 +105,16 @@ export default function KanbanCard({
     listeners,
     setNodeRef,
     transform,
-    transition,
     isDragging,
   } = useDraggable({ id });
 
   const style = {
     transform: CSS.Translate.toString(transform),
-    transition,
   };
 
   const trimmedInsumosReturnNotes = insumosReturnNotes?.trim() ?? "";
   const hasInsumosReturnNotes = trimmedInsumosReturnNotes.length > 0;
+  const formattedDeliveryDate = formatDeliveryDate(deliveryDate);
   const shouldShowMaterialReadyBadge =
     prodStatus === "Instalação Agendada" && productionTag === "PRONTO";
   const productionTagBadge =
