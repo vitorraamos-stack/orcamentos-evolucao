@@ -116,9 +116,13 @@ export default function KanbanCard({
 
   const trimmedInsumosReturnNotes = insumosReturnNotes?.trim() ?? "";
   const hasInsumosReturnNotes = trimmedInsumosReturnNotes.length > 0;
+  const shouldShowMaterialReadyBadge =
+    prodStatus === "Instalação Agendada" && productionTag === "PRONTO";
   const productionTagBadge =
     productionTag === "EM_PRODUCAO" && hasInsumosReturnNotes
       ? { label: "Insumo disponível", className: returnNotesBadgeClassName }
+      : shouldShowMaterialReadyBadge
+        ? { label: "Material Pronto", className: productionTagConfig.PRONTO.className }
       : productionTag
         ? productionTagConfig[productionTag]
         : null;
@@ -174,7 +178,8 @@ export default function KanbanCard({
         )}
         {reproducao && <Badge variant="destructive">Reprodução</Badge>}
         {letraCaixa && <Badge variant="secondary">Letra Caixa</Badge>}
-        {productionTagBadge && prodStatus === "Produção" && (
+        {productionTagBadge &&
+          (prodStatus === "Produção" || shouldShowMaterialReadyBadge) && (
           <Badge className={productionTagBadge.className}>
             {productionTagBadge.label}
           </Badge>
