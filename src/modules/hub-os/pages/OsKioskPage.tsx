@@ -381,6 +381,9 @@ export default function OsKioskPage() {
       if (destino === "retirada" && isEntregaOrRetiradaTag(currentTag)) {
         setListaProntoAvisar(prev => upsertList(prev, updatedOrder));
         setListaOSEmbalagem(prev => prev.filter(item => item.key !== order.key));
+        setMaterialProntoIds(prev =>
+          prev.includes(order.key) ? prev : [...prev, order.key]
+        );
       }
 
       if (destino === "entrega" && isEntregaOrRetiradaTag(currentTag)) {
@@ -822,6 +825,11 @@ export default function OsKioskPage() {
                               Produção • {getOrderProductionStatus(order)}
                             </Badge>
                             <Badge variant="outline">{toTagLabel(getOrderTag(order))}</Badge>
+                            {materialProntoIds.includes(order.key) ? (
+                              <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
+                                Material Pronto
+                              </Badge>
+                            ) : null}
                           </div>
                         </Card>
                       ))
@@ -844,6 +852,11 @@ export default function OsKioskPage() {
                             <Badge variant="outline">
                               {toTagLabel(getOrderTag(summarySelectedOrder))}
                             </Badge>
+                            {materialProntoIds.includes(summarySelectedOrder.key) ? (
+                              <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
+                                Material Pronto
+                              </Badge>
+                            ) : null}
                           </div>
                         </div>
                         <Badge variant="outline">
