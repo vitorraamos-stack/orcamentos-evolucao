@@ -151,6 +151,8 @@ export default function HubOS() {
   const previousInsumosIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedInsumosRef = useRef(false);
   const hasAppliedKioskSearch = useRef(false);
+  const isKioskMode =
+    new URLSearchParams(window.location.search).get("kiosk") === "1";
 
   useEffect(() => {
     if (
@@ -1260,6 +1262,7 @@ export default function HubOS() {
                     ) : null
                 : undefined
           }
+          showMaterialReadyByStatusOnly={isKioskMode}
           selectedOrderActions={
             inboxKey === "aguardandoInsumos"
               ? order => (

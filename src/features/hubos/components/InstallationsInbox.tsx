@@ -29,6 +29,7 @@ type InstallationsInboxProps = {
   renderOrderExtra?: (order: OsOrder) => ReactNode;
   selectedOrderExtra?: (order: OsOrder) => ReactNode;
   selectedOrderActions?: (order: OsOrder) => ReactNode;
+  showMaterialReadyByStatusOnly?: boolean;
 };
 
 type QuickFilter = "today" | "week" | "overdue" | "all";
@@ -96,8 +97,12 @@ const parseDeliveryDate = (value: string | null) => {
 
 const isFinalized = (order: OsOrder) => order.prod_status === FINAL_PROD_STATUS;
 
-const isMaterialReadyForInstallation = (order: OsOrder) =>
-  order.prod_status === "Instalação Agendada" && order.production_tag === "PRONTO";
+const isMaterialReadyForInstallation = (
+  order: OsOrder,
+  showMaterialReadyByStatusOnly: boolean
+) =>
+  order.prod_status === "Instalação Agendada" &&
+  (order.production_tag === "PRONTO" || showMaterialReadyByStatusOnly);
 
 const skippedReasonLabel: Record<string, string> = {
   missing_address: "Sem endereço cadastrado",
@@ -157,6 +162,7 @@ export default function InstallationsInbox({
   renderOrderExtra,
   selectedOrderExtra,
   selectedOrderActions,
+  showMaterialReadyByStatusOnly = false,
 }: InstallationsInboxProps) {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [optimizeOpen, setOptimizeOpen] = useState(false);
@@ -819,7 +825,7 @@ export default function InstallationsInbox({
                         <Badge variant="destructive">ATRASADA</Badge>
                       )}
                       {isToday && <Badge>HOJE</Badge>}
-                      {isMaterialReadyForInstallation(order) && (
+                      {isMaterialReadyForInstallation(order, showMaterialReadyByStatusOnly) && (
                         <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
                           Material Pronto
                         </Badge>
@@ -867,7 +873,7 @@ export default function InstallationsInbox({
                     <Badge variant="destructive">ATRASADA</Badge>
                   )}
                   {getIsToday(selectedOrder) && <Badge>HOJE</Badge>}
-                  {isMaterialReadyForInstallation(selectedOrder) && (
+                  {isMaterialReadyForInstallation(selectedOrder, showMaterialReadyByStatusOnly) && (
                     <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
                       Material Pronto
                     </Badge>
