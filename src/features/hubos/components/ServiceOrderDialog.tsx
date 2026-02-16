@@ -233,12 +233,15 @@ export default function ServiceOrderDialog({
     const nextTag = value as ProductionTag;
     if (nextTag === productionTag) return;
 
+    setProductionTag(nextTag);
+
     if (nextTag === "AGUARDANDO_INSUMOS" && !insumosDetails.trim()) {
-      toast.error("Informe os detalhes do material necessário antes de marcar como Aguardando Insumos.");
+      if (!editing) {
+        setEditing(true);
+      }
+      toast.message("Preencha os detalhes de insumos para concluir a alteração da tag.");
       return;
     }
-
-    setProductionTag(nextTag);
 
     if (editing) {
       return;
