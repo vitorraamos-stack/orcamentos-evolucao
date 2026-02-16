@@ -30,15 +30,20 @@ type KioskOrder = {
 
 type KioskDestination = "retirada" | "entrega" | "instalacao";
 
+type KioskSummaryCategory = "instalacoes" | "prontoAvisar" | "logistica";
+
 type KioskPersistedState = {
   version: number;
   listaOSAcabamentoEntregaRetirada: KioskOrder[];
   listaOSAcabamentoInstalacao: KioskOrder[];
   listaOSEmbalagem: KioskOrder[];
+  listaInstalacoes: KioskOrder[];
+  listaProntoAvisar: KioskOrder[];
+  listaLogistica: KioskOrder[];
   materialProntoIds: string[];
 };
 
-const KIOSK_STORAGE_KEY = "hubos:kiosk:state:v1";
+const KIOSK_STORAGE_KEY = "hubos:kiosk:state:v2";
 
 const KIOSK_STATUS_DESTINATIONS = {
   retirada: {
@@ -147,17 +152,6 @@ const upsertList = (items: KioskOrder[], nextOrder: KioskOrder) => {
   return [nextOrder, ...items];
 };
 
-const isEntregaOuRetirada = (deliveryType: DeliveryType | null) =>
-  deliveryType === "ENTREGA" || deliveryType === "RETIRADA";
-
-const getOrderTitle = (order: Os) =>
-  order.title || `${order.sale_number ?? ""} - ${order.client_name}`.trim();
-
-const KIOSK_DESTINATIONS = {
-  retirada: "PRONTO/AVISAR",
-  entrega: "Logística",
-  instalacao: "Instalação Agendada",
-} as const;
 
 export default function OsKioskPage() {
   const { user } = useAuth();
@@ -174,6 +168,11 @@ export default function OsKioskPage() {
   const [listaOSAcabamentoInstalacao, setListaOSAcabamentoInstalacao] =
     useState<KioskOrder[]>([]);
   const [listaOSEmbalagem, setListaOSEmbalagem] = useState<KioskOrder[]>([]);
+  const [listaInstalacoes, setListaInstalacoes] = useState<KioskOrder[]>([]);
+  const [listaProntoAvisar, setListaProntoAvisar] = useState<KioskOrder[]>([]);
+  const [listaLogistica, setListaLogistica] = useState<KioskOrder[]>([]);
+  const [summaryModalCategory, setSummaryModalCategory] =
+    useState<KioskSummaryCategory | null>(null);
 
   const attemptFullscreen = async () => {
     if (document.fullscreenElement) {
@@ -198,7 +197,7 @@ export default function OsKioskPage() {
       const rawState = localStorage.getItem(KIOSK_STORAGE_KEY);
       if (!rawState) return;
       const parsedState = JSON.parse(rawState) as KioskPersistedState;
-      if (!parsedState || parsedState.version !== 1) return;
+      if (!parsedState || parsedState.version !== 2) return;
 
       setListaOSAcabamentoEntregaRetirada(
         parsedState.listaOSAcabamentoEntregaRetirada ?? []
@@ -207,6 +206,9 @@ export default function OsKioskPage() {
         parsedState.listaOSAcabamentoInstalacao ?? []
       );
       setListaOSEmbalagem(parsedState.listaOSEmbalagem ?? []);
+      setListaInstalacoes(parsedState.listaInstalacoes ?? []);
+      setListaProntoAvisar(parsedState.listaProntoAvisar ?? []);
+      setListaLogistica(parsedState.listaLogistica ?? []);
       setMaterialProntoIds(parsedState.materialProntoIds ?? []);
     } catch (error) {
       console.error("Falha ao carregar estado do quiosque:", error);
@@ -215,10 +217,13 @@ export default function OsKioskPage() {
 
   useEffect(() => {
     const payload: KioskPersistedState = {
-      version: 1,
+      version: 2,
       listaOSAcabamentoEntregaRetirada,
       listaOSAcabamentoInstalacao,
       listaOSEmbalagem,
+      listaInstalacoes,
+      listaProntoAvisar,
+      listaLogistica,
       materialProntoIds,
     };
     localStorage.setItem(KIOSK_STORAGE_KEY, JSON.stringify(payload));
@@ -226,6 +231,9 @@ export default function OsKioskPage() {
     listaOSAcabamentoEntregaRetirada,
     listaOSAcabamentoInstalacao,
     listaOSEmbalagem,
+    listaInstalacoes,
+    listaProntoAvisar,
+    listaLogistica,
     materialProntoIds,
   ]);
 
@@ -239,8 +247,12 @@ export default function OsKioskPage() {
 
     if (isEntregaOrRetiradaTag(tag)) {
       setListaOSAcabamentoEntregaRetirada(prev => upsertList(prev, order));
-      setListaOSEmbalagem(prev => upsertList(prev, order));
     }
+  };
+
+  const moverParaEmbalagem = (order: KioskOrder) => {
+    setListaOSEmbalagem(prev => upsertList(prev, order));
+    toast.success("OS movida para Embalagem.");
   };
 
   const resolveKioskOrder = async (lookup: KioskLookupResult) => {
@@ -330,22 +342,26 @@ export default function OsKioskPage() {
       }
 
       setListaOSAcabamentoEntregaRetirada(prev =>
-        prev.map(item => (item.key === order.key ? updatedOrder : item))
+        prev.filter(item => item.key !== order.key)
       );
       setListaOSAcabamentoInstalacao(prev =>
-        prev.map(item => (item.key === order.key ? updatedOrder : item))
+        prev.filter(item => item.key !== order.key)
       );
 
       if (destino === "instalacao") {
         setMaterialProntoIds(prev =>
           prev.includes(order.key) ? prev : [...prev, order.key]
         );
+        setListaInstalacoes(prev => upsertList(prev, updatedOrder));
       }
 
-      if (
-        (destino === "entrega" || destino === "retirada") &&
-        isEntregaOrRetiradaTag(currentTag)
-      ) {
+      if (destino === "retirada" && isEntregaOrRetiradaTag(currentTag)) {
+        setListaProntoAvisar(prev => upsertList(prev, updatedOrder));
+        setListaOSEmbalagem(prev => prev.filter(item => item.key !== order.key));
+      }
+
+      if (destino === "entrega" && isEntregaOrRetiradaTag(currentTag)) {
+        setListaLogistica(prev => upsertList(prev, updatedOrder));
         setListaOSEmbalagem(prev =>
           prev.filter(item => item.key !== order.key)
         );
@@ -367,11 +383,17 @@ export default function OsKioskPage() {
     () =>
       listaOSAcabamentoEntregaRetirada.length +
       listaOSAcabamentoInstalacao.length +
-      listaOSEmbalagem.length,
+      listaOSEmbalagem.length +
+      listaInstalacoes.length +
+      listaProntoAvisar.length +
+      listaLogistica.length,
     [
       listaOSAcabamentoEntregaRetirada.length,
       listaOSAcabamentoInstalacao.length,
       listaOSEmbalagem.length,
+      listaInstalacoes.length,
+      listaProntoAvisar.length,
+      listaLogistica.length,
     ]
   );
 
@@ -389,6 +411,19 @@ export default function OsKioskPage() {
       </span>
     </button>
   );
+
+  const kioskSummaryConfig: Record<
+    KioskSummaryCategory,
+    { title: string; orders: KioskOrder[] }
+  > = {
+    instalacoes: { title: "Instalações", orders: listaInstalacoes },
+    prontoAvisar: { title: "Pronto/Avisar", orders: listaProntoAvisar },
+    logistica: { title: "Logística", orders: listaLogistica },
+  };
+
+  const summaryModalData = summaryModalCategory
+    ? kioskSummaryConfig[summaryModalCategory]
+    : null;
 
   const renderOrderCard = (order: KioskOrder, children?: ReactNode) => (
     <Card
@@ -450,6 +485,65 @@ export default function OsKioskPage() {
           <Badge variant="secondary">{totalCards} OS em exibição</Badge>
         </div>
 
+        <div className="mb-4 grid gap-3 md:grid-cols-3">
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => setSummaryModalCategory("instalacoes")}
+            onKeyDown={event => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              setSummaryModalCategory("instalacoes");
+            }}
+            className="cursor-pointer p-3 transition hover:border-primary/60 hover:bg-muted/20"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Instalações
+              </h3>
+              <Badge variant="outline">{listaInstalacoes.length}</Badge>
+            </div>
+          </Card>
+
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => setSummaryModalCategory("prontoAvisar")}
+            onKeyDown={event => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              setSummaryModalCategory("prontoAvisar");
+            }}
+            className="cursor-pointer p-3 transition hover:border-primary/60 hover:bg-muted/20"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Pronto/Avisar
+              </h3>
+              <Badge variant="outline">{listaProntoAvisar.length}</Badge>
+            </div>
+          </Card>
+
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => setSummaryModalCategory("logistica")}
+            onKeyDown={event => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              setSummaryModalCategory("logistica");
+            }}
+            className="cursor-pointer p-3 transition hover:border-primary/60 hover:bg-muted/20"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Logística
+              </h3>
+              <Badge variant="outline">{listaLogistica.length}</Badge>
+            </div>
+          </Card>
+        </div>
+
         <div className="grid gap-4 xl:grid-cols-2">
           <Card className="space-y-4 p-4">
             <div className="flex items-center justify-between">
@@ -474,7 +568,18 @@ export default function OsKioskPage() {
                     </Card>
                   )}
                   {listaOSAcabamentoEntregaRetirada.map(order =>
-                    renderOrderCard(order)
+                    renderOrderCard(
+                      order,
+                      <Button
+                        disabled={processingId === order.key}
+                        onClick={event => {
+                          event.stopPropagation();
+                          moverParaEmbalagem(order);
+                        }}
+                      >
+                        Pronto para embalar
+                      </Button>
+                    )
                   )}
                 </div>
               </div>
@@ -521,9 +626,8 @@ export default function OsKioskPage() {
           </Card>
 
           <Card className="space-y-4 p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center">
               <h2 className="text-xl font-semibold">Embalagem</h2>
-              <AddOrderButton label="ADICIONAR NOVA OS" />
             </div>
 
             <div className="space-y-2">
@@ -557,7 +661,7 @@ export default function OsKioskPage() {
                           void moverOS(order, "entrega");
                         }}
                       >
-                        Pronto para a entrega
+                        Pronto para a logística
                       </Button>
                     ) : null}
                   </>
@@ -567,6 +671,56 @@ export default function OsKioskPage() {
           </Card>
         </div>
       </div>
+
+      <Dialog
+        open={summaryModalCategory !== null}
+        onOpenChange={open => {
+          if (!open) setSummaryModalCategory(null);
+        }}
+      >
+        <DialogContent className="h-[82vh] w-[94vw] max-w-[1280px] p-6">
+          {summaryModalData ? (
+            <div className="flex h-full flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-2xl font-semibold">{summaryModalData.title}</h3>
+                <Badge variant="secondary">
+                  {summaryModalData.orders.length} OS
+                </Badge>
+              </div>
+
+              <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+                {summaryModalData.orders.length === 0 ? (
+                  <Card className="p-4 text-sm text-muted-foreground">
+                    Nenhuma OS.
+                  </Card>
+                ) : (
+                  summaryModalData.orders.map(order => (
+                    <Card
+                      key={order.key}
+                      className="grid gap-3 p-4 md:grid-cols-[220px_1fr]"
+                    >
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">OS</p>
+                        <p className="text-lg font-semibold">
+                          #{getOrderDisplayNumber(order)}
+                        </p>
+                        <Badge variant="outline">{toTagLabel(getOrderTag(order))}</Badge>
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="font-semibold">{getKioskOrderTitle(order)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {getOrderDescription(order) ?? "Sem descrição."}
+                        </p>
+                      </div>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
         <DialogContent className="h-[60vh] w-[70vw] min-w-[600px] max-w-[1000px] p-8">
