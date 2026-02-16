@@ -30,7 +30,7 @@ type KioskOrder = {
 
 type KioskDestination = "retirada" | "entrega" | "instalacao";
 
-const KIOSK_DESTINATIONS = {
+const KIOSK_STATUS_DESTINATIONS = {
   retirada: {
     legacy: "PRONTO/AVISAR",
     hub: "Pronto / Avisar Cliente",
@@ -62,7 +62,7 @@ const toTagLabel = (tag: DeliveryType | null) => {
   return "Instalação";
 };
 
-const getOrderTitle = (order: KioskOrder) => {
+const getKioskOrderTitle = (order: KioskOrder) => {
   if (order.source === "os") {
     const legacyOrder = order.legacyOrder;
     if (!legacyOrder) return "Sem título";
@@ -89,7 +89,7 @@ const getOrderDisplayNumber = (order: KioskOrder) => {
   return order.hubOrder?.os_number ?? order.hubOrder?.sale_number ?? "—";
 };
 
-const isEntregaOuRetirada = (tag: DeliveryType | null) =>
+const isEntregaOrRetiradaTag = (tag: DeliveryType | null) =>
   tag === "ENTREGA" || tag === "RETIRADA";
 
 const upsertList = (items: KioskOrder[], nextOrder: KioskOrder) => {
@@ -151,7 +151,7 @@ export default function OsKioskPage() {
       return;
     }
 
-    if (isEntregaOuRetirada(tag)) {
+    if (isEntregaOrRetiradaTag(tag)) {
       setListaOSAcabamentoEntregaRetirada(prev => upsertList(prev, order));
       setListaOSEmbalagem(prev => upsertList(prev, order));
     }
@@ -198,7 +198,7 @@ export default function OsKioskPage() {
 
       if (order.source === "os" && order.legacyOrder) {
         const updatedLegacyOrder = await updateOs(order.legacyOrder.id, {
-          status_producao: KIOSK_DESTINATIONS[destino].legacy,
+          status_producao: KIOSK_STATUS_DESTINATIONS[destino].legacy,
           updated_at: new Date().toISOString(),
         });
 
@@ -207,7 +207,7 @@ export default function OsKioskPage() {
           type: "status_producao_changed",
           payload: {
             from: order.legacyOrder.status_producao,
-            to: KIOSK_DESTINATIONS[destino].legacy,
+            to: KIOSK_STATUS_DESTINATIONS[destino].legacy,
             source: "kiosk",
           },
           created_by: user?.id ?? null,
@@ -221,7 +221,7 @@ export default function OsKioskPage() {
 
       if (order.source === "os_orders" && order.hubOrder) {
         const updatedHubOrder = await updateOrder(order.hubOrder.id, {
-          prod_status: KIOSK_DESTINATIONS[destino].hub,
+          prod_status: KIOSK_STATUS_DESTINATIONS[destino].hub,
           updated_at: new Date().toISOString(),
           updated_by: user?.id ?? null,
         });
@@ -231,7 +231,7 @@ export default function OsKioskPage() {
           type: "prod_status_changed",
           payload: {
             from: order.hubOrder.prod_status,
-            to: KIOSK_DESTINATIONS[destino].hub,
+            to: KIOSK_STATUS_DESTINATIONS[destino].hub,
             source: "kiosk",
           },
           created_by: user?.id ?? null,
@@ -258,14 +258,14 @@ export default function OsKioskPage() {
 
       if (
         (destino === "entrega" || destino === "retirada") &&
-        isEntregaOuRetirada(currentTag)
+        isEntregaOrRetiradaTag(currentTag)
       ) {
         setListaOSEmbalagem(prev =>
           prev.filter(item => item.key !== order.key)
         );
       }
 
-      toast.success(`Movido para ${KIOSK_DESTINATIONS[destino].hub}.`);
+      toast.success(`Movido para ${KIOSK_STATUS_DESTINATIONS[destino].hub}.`);
     } catch (error) {
       console.error(error);
       toast.error("Falha ao mover a OS. Tente novamente.");
@@ -361,7 +361,9 @@ export default function OsKioskPage() {
                       <p className="text-xs text-muted-foreground">
                         OS #{getOrderDisplayNumber(order)}
                       </p>
-                      <p className="font-semibold">{getOrderTitle(order)}</p>
+                      <p className="font-semibold">
+                        {getKioskOrderTitle(order)}
+                      </p>
                       <Badge variant="secondary">
                         {toTagLabel(getOrderTag(order))}
                       </Badge>
@@ -390,7 +392,9 @@ export default function OsKioskPage() {
                       <p className="text-xs text-muted-foreground">
                         OS #{getOrderDisplayNumber(order)}
                       </p>
-                      <p className="font-semibold">{getOrderTitle(order)}</p>
+                      <p className="font-semibold">
+                        {getKioskOrderTitle(order)}
+                      </p>
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="secondary">Instalação</Badge>
                         {materialProntoIds.includes(order.key) ? (
@@ -431,7 +435,7 @@ export default function OsKioskPage() {
                     <p className="text-xs text-muted-foreground">
                       OS #{getOrderDisplayNumber(order)}
                     </p>
-                    <p className="font-semibold">{getOrderTitle(order)}</p>
+                    <p className="font-semibold">{getKioskOrderTitle(order)}</p>
                     <Badge variant="secondary">{toTagLabel(tag)}</Badge>
 
                     {tag === "RETIRADA" ? (
