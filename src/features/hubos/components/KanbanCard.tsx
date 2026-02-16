@@ -116,7 +116,9 @@ export default function KanbanCard({
   const hasInsumosReturnNotes = trimmedInsumosReturnNotes.length > 0;
   const formattedDeliveryDate = formatDeliveryDate(deliveryDate);
   const shouldShowMaterialReadyBadge =
-    prodStatus === "Instalação Agendada" && productionTag === "PRONTO";
+    (prodStatus === "Instalação Agendada" ||
+      prodStatus === "Pronto / Avisar Cliente") &&
+    productionTag === "PRONTO";
   const productionTagBadge =
     productionTag === "EM_PRODUCAO" && hasInsumosReturnNotes
       ? { label: "Insumo disponível", className: returnNotesBadgeClassName }
