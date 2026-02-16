@@ -30,6 +30,8 @@ type KioskOrder = {
 
 type KioskDestination = "retirada" | "entrega" | "instalacao";
 
+type KioskSummaryCategory = "instalacoes" | "prontoAvisar" | "logistica";
+
 type KioskPersistedState = {
   version: number;
   listaOSAcabamentoEntregaRetirada: KioskOrder[];
@@ -169,6 +171,8 @@ export default function OsKioskPage() {
   const [listaInstalacoes, setListaInstalacoes] = useState<KioskOrder[]>([]);
   const [listaProntoAvisar, setListaProntoAvisar] = useState<KioskOrder[]>([]);
   const [listaLogistica, setListaLogistica] = useState<KioskOrder[]>([]);
+  const [summaryModalCategory, setSummaryModalCategory] =
+    useState<KioskSummaryCategory | null>(null);
 
   const attemptFullscreen = async () => {
     if (document.fullscreenElement) {
@@ -408,6 +412,19 @@ export default function OsKioskPage() {
     </button>
   );
 
+  const kioskSummaryConfig: Record<
+    KioskSummaryCategory,
+    { title: string; orders: KioskOrder[] }
+  > = {
+    instalacoes: { title: "Instalações", orders: listaInstalacoes },
+    prontoAvisar: { title: "Pronto/Avisar", orders: listaProntoAvisar },
+    logistica: { title: "Logística", orders: listaLogistica },
+  };
+
+  const summaryModalData = summaryModalCategory
+    ? kioskSummaryConfig[summaryModalCategory]
+    : null;
+
   const renderOrderCard = (order: KioskOrder, children?: ReactNode) => (
     <Card
       key={order.key}
@@ -469,61 +486,60 @@ export default function OsKioskPage() {
         </div>
 
         <div className="mb-4 grid gap-3 md:grid-cols-3">
-          <Card className="space-y-2 p-3">
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => setSummaryModalCategory("instalacoes")}
+            onKeyDown={event => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              setSummaryModalCategory("instalacoes");
+            }}
+            className="cursor-pointer p-3 transition hover:border-primary/60 hover:bg-muted/20"
+          >
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 Instalações
               </h3>
               <Badge variant="outline">{listaInstalacoes.length}</Badge>
             </div>
-            <div className="space-y-1">
-              {listaInstalacoes.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Nenhuma OS.</p>
-              ) : (
-                listaInstalacoes.slice(0, 3).map(order => (
-                  <p key={order.key} className="truncate text-xs">
-                    OS #{getOrderDisplayNumber(order)}
-                  </p>
-                ))
-              )}
-            </div>
           </Card>
-          <Card className="space-y-2 p-3">
+
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => setSummaryModalCategory("prontoAvisar")}
+            onKeyDown={event => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              setSummaryModalCategory("prontoAvisar");
+            }}
+            className="cursor-pointer p-3 transition hover:border-primary/60 hover:bg-muted/20"
+          >
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 Pronto/Avisar
               </h3>
               <Badge variant="outline">{listaProntoAvisar.length}</Badge>
             </div>
-            <div className="space-y-1">
-              {listaProntoAvisar.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Nenhuma OS.</p>
-              ) : (
-                listaProntoAvisar.slice(0, 3).map(order => (
-                  <p key={order.key} className="truncate text-xs">
-                    OS #{getOrderDisplayNumber(order)}
-                  </p>
-                ))
-              )}
-            </div>
           </Card>
-          <Card className="space-y-2 p-3">
+
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => setSummaryModalCategory("logistica")}
+            onKeyDown={event => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              setSummaryModalCategory("logistica");
+            }}
+            className="cursor-pointer p-3 transition hover:border-primary/60 hover:bg-muted/20"
+          >
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 Logística
               </h3>
               <Badge variant="outline">{listaLogistica.length}</Badge>
-            </div>
-            <div className="space-y-1">
-              {listaLogistica.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Nenhuma OS.</p>
-              ) : (
-                listaLogistica.slice(0, 3).map(order => (
-                  <p key={order.key} className="truncate text-xs">
-                    OS #{getOrderDisplayNumber(order)}
-                  </p>
-                ))
-              )}
             </div>
           </Card>
         </div>
@@ -655,6 +671,56 @@ export default function OsKioskPage() {
           </Card>
         </div>
       </div>
+
+      <Dialog
+        open={summaryModalCategory !== null}
+        onOpenChange={open => {
+          if (!open) setSummaryModalCategory(null);
+        }}
+      >
+        <DialogContent className="h-[82vh] w-[94vw] max-w-[1280px] p-6">
+          {summaryModalData ? (
+            <div className="flex h-full flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-2xl font-semibold">{summaryModalData.title}</h3>
+                <Badge variant="secondary">
+                  {summaryModalData.orders.length} OS
+                </Badge>
+              </div>
+
+              <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+                {summaryModalData.orders.length === 0 ? (
+                  <Card className="p-4 text-sm text-muted-foreground">
+                    Nenhuma OS.
+                  </Card>
+                ) : (
+                  summaryModalData.orders.map(order => (
+                    <Card
+                      key={order.key}
+                      className="grid gap-3 p-4 md:grid-cols-[220px_1fr]"
+                    >
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">OS</p>
+                        <p className="text-lg font-semibold">
+                          #{getOrderDisplayNumber(order)}
+                        </p>
+                        <Badge variant="outline">{toTagLabel(getOrderTag(order))}</Badge>
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="font-semibold">{getKioskOrderTitle(order)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {getOrderDescription(order) ?? "Sem descrição."}
+                        </p>
+                      </div>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
         <DialogContent className="h-[60vh] w-[70vw] min-w-[600px] max-w-[1000px] p-8">
