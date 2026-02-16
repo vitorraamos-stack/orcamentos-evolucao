@@ -158,6 +158,11 @@ export default function KanbanCard({
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-semibold">{title}</p>
             <Badge variant="outline">{logisticLabel[logisticType]}</Badge>
+            {deliveryDate && (
+              <Badge className="border-yellow-300 bg-yellow-100 text-yellow-900 hover:bg-yellow-100">
+                Entrega: {formattedDeliveryDate}
+              </Badge>
+            )}
           </div>
           <p className="text-xs text-muted-foreground">{clientName}</p>
         </div>
@@ -171,11 +176,6 @@ export default function KanbanCard({
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        {deliveryDate && (
-          <Badge className="border-yellow-300 bg-yellow-100 text-yellow-900 hover:bg-yellow-100">
-            Entrega: {formatDeliveryDate(deliveryDate)}
-          </Badge>
-        )}
         {reproducao && <Badge variant="destructive">Reprodução</Badge>}
         {letraCaixa && <Badge variant="secondary">Letra Caixa</Badge>}
         {productionTagBadge &&

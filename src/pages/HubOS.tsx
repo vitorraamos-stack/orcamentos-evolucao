@@ -103,6 +103,9 @@ const playInsumosAlertSound = () => {
   }, 700);
 };
 
+const getDisplayArtStatus = (status: ArtStatus): ArtStatus =>
+  status === "Ajustes" ? "Para Aprovação" : status;
+
 export default function HubOS() {
   const { user, isAdmin, hubPermissions, hasModuleAccess } = useAuth();
   const [, setLocation] = useLocation();
@@ -239,7 +242,9 @@ export default function HubOS() {
   const arteOrders = useMemo(
     () =>
       filteredOrders.filter(
-        order => !order.prod_status && ART_COLUMNS.includes(order.art_status)
+        order =>
+          !order.prod_status &&
+          ART_COLUMNS.includes(getDisplayArtStatus(order.art_status))
       ),
     [filteredOrders]
   );
@@ -655,7 +660,7 @@ export default function HubOS() {
     const order = orders.find(item => item.id === active.id);
     if (!order) return;
     const nextStatus = over.id as ArtStatus;
-    if (order.art_status === nextStatus) return;
+    if (getDisplayArtStatus(order.art_status) === nextStatus) return;
 
     const inboxStatus = ART_COLUMNS[0];
     const inCreationStatus = ART_COLUMNS[1];
@@ -962,7 +967,7 @@ export default function HubOS() {
             {columns.map(status => {
               const items = ordersList.filter(order =>
                 columns === ART_COLUMNS
-                  ? order.art_status === status
+                  ? getDisplayArtStatus(order.art_status) === status
                   : order.prod_status === status
               );
               return (

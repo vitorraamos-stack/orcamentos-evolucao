@@ -110,6 +110,17 @@ export const fetchOrders = async () => {
   return data as OsOrder[];
 };
 
+export const fetchOrderById = async (id: string) => {
+  const { data, error } = await supabase
+    .from("os_orders")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data as OsOrder;
+};
+
 export const createOrder = async (payload: Partial<OsOrder>) => {
   const { data, error } = await supabase
     .from("os_orders")
