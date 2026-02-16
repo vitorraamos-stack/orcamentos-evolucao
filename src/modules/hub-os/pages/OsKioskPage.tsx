@@ -271,6 +271,9 @@ export default function OsKioskPage() {
 
   const moverParaEmbalagem = (order: KioskOrder) => {
     setListaOSEmbalagem(prev => upsertList(prev, order));
+    setListaOSAcabamentoEntregaRetirada(prev =>
+      prev.filter(item => item.key !== order.key)
+    );
     toast.success("OS movida para Embalagem.");
   };
 
