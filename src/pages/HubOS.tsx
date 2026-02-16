@@ -724,13 +724,23 @@ export default function HubOS() {
     const nextStatus = over.id as ProdStatus;
     if (order.prod_status === nextStatus) return;
 
+    const nextProductionTag =
+      nextStatus === "Instalação Agendada"
+        ? "PRONTO"
+        : order.production_tag;
+
     const previous = order;
-    const optimistic = { ...order, prod_status: nextStatus } satisfies OsOrder;
+    const optimistic = {
+      ...order,
+      prod_status: nextStatus,
+      production_tag: nextProductionTag,
+    } satisfies OsOrder;
     updateLocalOrder(optimistic);
 
     try {
       const updated = await updateOrder(order.id, {
         prod_status: nextStatus,
+        production_tag: nextProductionTag,
         updated_at: new Date().toISOString(),
         updated_by: user?.id ?? null,
       });
