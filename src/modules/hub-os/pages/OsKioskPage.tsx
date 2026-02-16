@@ -4,15 +4,99 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { fetchOsById, fetchOsByCode, updateOs, createOsEvent } from "../api";
-import type { DeliveryType, Os } from "../types";
-import { KioskOsLookupPanel } from "../kiosk/KioskOsLookupPanel";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  fetchOrderById,
+  updateOrder,
+  createOrderEvent,
+} from "@/features/hubos/api";
+import type { OsOrder } from "@/features/hubos/types";
+import {
+  fetchOsById,
+  fetchOsByCode,
+  updateOs,
+  createOsEvent,
+  type KioskLookupResult,
+} from "../api";
+import { KioskOsLookupPanel } from "../kiosk/KioskOsLookupPanel";
+import type { DeliveryType, Os } from "../types";
 
-const toTagLabel = (deliveryType: DeliveryType | null) => {
-  if (deliveryType === "ENTREGA") return "Entrega";
-  if (deliveryType === "RETIRADA") return "Retirada";
+type KioskOrder = {
+  key: string;
+  source: KioskLookupResult["source"];
+  legacyOrder?: Os;
+  hubOrder?: OsOrder;
+};
+
+type KioskDestination = "retirada" | "entrega" | "instalacao";
+
+const KIOSK_DESTINATIONS = {
+  retirada: {
+    legacy: "PRONTO/AVISAR",
+    hub: "Pronto / Avisar Cliente",
+  },
+  entrega: {
+    legacy: "Logística",
+    hub: "Logística (Entrega/Transportadora)",
+  },
+  instalacao: {
+    legacy: "Instalação Agendada",
+    hub: "Instalação Agendada",
+  },
+} as const;
+
+const getOrderTag = (order: KioskOrder): DeliveryType | null => {
+  if (order.source === "os") {
+    return order.legacyOrder?.delivery_type ?? null;
+  }
+
+  if (!order.hubOrder) return null;
+  if (order.hubOrder.logistic_type === "entrega") return "ENTREGA";
+  if (order.hubOrder.logistic_type === "retirada") return "RETIRADA";
+  return "INSTALACAO";
+};
+
+const toTagLabel = (tag: DeliveryType | null) => {
+  if (tag === "ENTREGA") return "Entrega";
+  if (tag === "RETIRADA") return "Retirada";
   return "Instalação";
+};
+
+const getOrderTitle = (order: KioskOrder) => {
+  if (order.source === "os") {
+    const legacyOrder = order.legacyOrder;
+    if (!legacyOrder) return "Sem título";
+    return (
+      legacyOrder.title ||
+      `${legacyOrder.sale_number ?? ""} - ${legacyOrder.client_name}`.trim()
+    );
+  }
+
+  const hubOrder = order.hubOrder;
+  if (!hubOrder) return "Sem título";
+  return (
+    hubOrder.title || `${hubOrder.sale_number} - ${hubOrder.client_name}`.trim()
+  );
+};
+
+const getOrderDisplayNumber = (order: KioskOrder) => {
+  if (order.source === "os") {
+    return (
+      order.legacyOrder?.os_number ?? order.legacyOrder?.sale_number ?? "—"
+    );
+  }
+
+  return order.hubOrder?.os_number ?? order.hubOrder?.sale_number ?? "—";
+};
+
+const isEntregaOuRetirada = (tag: DeliveryType | null) =>
+  tag === "ENTREGA" || tag === "RETIRADA";
+
+const upsertList = (items: KioskOrder[], nextOrder: KioskOrder) => {
+  if (items.some(item => item.key === nextOrder.key)) {
+    return items.map(item => (item.key === nextOrder.key ? nextOrder : item));
+  }
+  return [nextOrder, ...items];
 };
 
 const isEntregaOuRetirada = (deliveryType: DeliveryType | null) =>
@@ -36,10 +120,10 @@ export default function OsKioskPage() {
   const [
     listaOSAcabamentoEntregaRetirada,
     setListaOSAcabamentoEntregaRetirada,
-  ] = useState<Os[]>([]);
+  ] = useState<KioskOrder[]>([]);
   const [listaOSAcabamentoInstalacao, setListaOSAcabamentoInstalacao] =
-    useState<Os[]>([]);
-  const [listaOSEmbalagem, setListaOSEmbalagem] = useState<Os[]>([]);
+    useState<KioskOrder[]>([]);
+  const [listaOSEmbalagem, setListaOSEmbalagem] = useState<KioskOrder[]>([]);
 
   const attemptFullscreen = async () => {
     if (document.fullscreenElement) {
@@ -59,75 +143,129 @@ export default function OsKioskPage() {
     void attemptFullscreen();
   }, []);
 
-  const upsertList = (items: Os[], order: Os) => {
-    if (items.some(item => item.id === order.id)) {
-      return items.map(item => (item.id === order.id ? order : item));
-    }
-    return [order, ...items];
-  };
+  const addOrderToColumns = (order: KioskOrder) => {
+    const tag = getOrderTag(order);
 
-  const addOrderToColumns = (order: Os) => {
-    if (order.delivery_type === "INSTALACAO") {
+    if (tag === "INSTALACAO") {
       setListaOSAcabamentoInstalacao(prev => upsertList(prev, order));
       return;
     }
 
-    if (isEntregaOuRetirada(order.delivery_type)) {
+    if (isEntregaOuRetirada(tag)) {
       setListaOSAcabamentoEntregaRetirada(prev => upsertList(prev, order));
       setListaOSEmbalagem(prev => upsertList(prev, order));
     }
   };
 
+  const resolveKioskOrder = async (lookup: KioskLookupResult) => {
+    if (lookup.source === "os") {
+      const legacyOrder = await fetchOsById(lookup.id);
+      return {
+        key: `os:${lookup.id}`,
+        source: lookup.source,
+        legacyOrder,
+      } as KioskOrder;
+    }
+
+    const hubOrder = await fetchOrderById(lookup.id);
+    return {
+      key: `os_orders:${lookup.id}`,
+      source: lookup.source,
+      hubOrder,
+    } as KioskOrder;
+  };
+
   const handleAddByCode = async (sanitizedCode: string) => {
     const lookup = await fetchOsByCode(sanitizedCode);
-    if (!lookup || lookup.source !== "os") {
+    if (!lookup) {
       throw new Error("OS não encontrada. Verifique o número da etiqueta.");
     }
 
-    const order = await fetchOsById(lookup.id);
-    addOrderToColumns(order);
+    const kioskOrder = await resolveKioskOrder(lookup);
+    addOrderToColumns(kioskOrder);
     setAddModalOpen(false);
     toast.success(
-      `OS #${order.os_number ?? order.sale_number ?? "—"} adicionada ao quiosque.`
+      `OS #${getOrderDisplayNumber(kioskOrder)} adicionada ao quiosque.`
     );
   };
 
-  const moverOS = async (order: Os, destino: string) => {
+  const moverOS = async (order: KioskOrder, destino: KioskDestination) => {
     try {
-      setProcessingId(order.id);
-      const updatedOrder = await updateOs(order.id, {
-        status_producao: destino,
-        updated_at: new Date().toISOString(),
-      });
+      setProcessingId(order.key);
+      const currentTag = getOrderTag(order);
 
-      await createOsEvent({
-        os_id: order.id,
-        type: "status_producao_changed",
-        payload: { from: order.status_producao, to: destino, source: "kiosk" },
-        created_by: user?.id ?? null,
-      });
+      let updatedOrder: KioskOrder = order;
+
+      if (order.source === "os" && order.legacyOrder) {
+        const updatedLegacyOrder = await updateOs(order.legacyOrder.id, {
+          status_producao: KIOSK_DESTINATIONS[destino].legacy,
+          updated_at: new Date().toISOString(),
+        });
+
+        await createOsEvent({
+          os_id: order.legacyOrder.id,
+          type: "status_producao_changed",
+          payload: {
+            from: order.legacyOrder.status_producao,
+            to: KIOSK_DESTINATIONS[destino].legacy,
+            source: "kiosk",
+          },
+          created_by: user?.id ?? null,
+        });
+
+        updatedOrder = {
+          ...order,
+          legacyOrder: updatedLegacyOrder,
+        };
+      }
+
+      if (order.source === "os_orders" && order.hubOrder) {
+        const updatedHubOrder = await updateOrder(order.hubOrder.id, {
+          prod_status: KIOSK_DESTINATIONS[destino].hub,
+          updated_at: new Date().toISOString(),
+          updated_by: user?.id ?? null,
+        });
+
+        await createOrderEvent({
+          os_id: order.hubOrder.id,
+          type: "prod_status_changed",
+          payload: {
+            from: order.hubOrder.prod_status,
+            to: KIOSK_DESTINATIONS[destino].hub,
+            source: "kiosk",
+          },
+          created_by: user?.id ?? null,
+        });
+
+        updatedOrder = {
+          ...order,
+          hubOrder: updatedHubOrder,
+        };
+      }
 
       setListaOSAcabamentoEntregaRetirada(prev =>
-        prev.map(item => (item.id === order.id ? updatedOrder : item))
+        prev.map(item => (item.key === order.key ? updatedOrder : item))
       );
       setListaOSAcabamentoInstalacao(prev =>
-        prev.map(item => (item.id === order.id ? updatedOrder : item))
+        prev.map(item => (item.key === order.key ? updatedOrder : item))
       );
 
-      if (destino === KIOSK_DESTINATIONS.instalacao) {
+      if (destino === "instalacao") {
         setMaterialProntoIds(prev =>
-          prev.includes(order.id) ? prev : [...prev, order.id]
+          prev.includes(order.key) ? prev : [...prev, order.key]
         );
       }
 
       if (
-        destino === KIOSK_DESTINATIONS.entrega ||
-        destino === KIOSK_DESTINATIONS.retirada
+        (destino === "entrega" || destino === "retirada") &&
+        isEntregaOuRetirada(currentTag)
       ) {
-        setListaOSEmbalagem(prev => prev.filter(item => item.id !== order.id));
+        setListaOSEmbalagem(prev =>
+          prev.filter(item => item.key !== order.key)
+        );
       }
 
-      toast.success(`Movido para ${destino}.`);
+      toast.success(`Movido para ${KIOSK_DESTINATIONS[destino].hub}.`);
     } catch (error) {
       console.error(error);
       toast.error("Falha ao mover a OS. Tente novamente.");
@@ -219,13 +357,13 @@ export default function OsKioskPage() {
                     </Card>
                   )}
                   {listaOSAcabamentoEntregaRetirada.map(order => (
-                    <Card key={order.id} className="space-y-2 p-3">
+                    <Card key={order.key} className="space-y-2 p-3">
                       <p className="text-xs text-muted-foreground">
-                        OS #{order.os_number ?? order.sale_number ?? "—"}
+                        OS #{getOrderDisplayNumber(order)}
                       </p>
                       <p className="font-semibold">{getOrderTitle(order)}</p>
                       <Badge variant="secondary">
-                        {toTagLabel(order.delivery_type)}
+                        {toTagLabel(getOrderTag(order))}
                       </Badge>
                     </Card>
                   ))}
@@ -248,24 +386,22 @@ export default function OsKioskPage() {
                     </Card>
                   )}
                   {listaOSAcabamentoInstalacao.map(order => (
-                    <Card key={order.id} className="space-y-3 p-3">
+                    <Card key={order.key} className="space-y-3 p-3">
                       <p className="text-xs text-muted-foreground">
-                        OS #{order.os_number ?? order.sale_number ?? "—"}
+                        OS #{getOrderDisplayNumber(order)}
                       </p>
                       <p className="font-semibold">{getOrderTitle(order)}</p>
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="secondary">Instalação</Badge>
-                        {materialProntoIds.includes(order.id) ? (
+                        {materialProntoIds.includes(order.key) ? (
                           <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
                             Material Pronto
                           </Badge>
                         ) : null}
                       </div>
                       <Button
-                        disabled={processingId === order.id}
-                        onClick={() =>
-                          void moverOS(order, KIOSK_DESTINATIONS.instalacao)
-                        }
+                        disabled={processingId === order.key}
+                        onClick={() => void moverOS(order, "instalacao")}
                       >
                         Pronto para a Instalação
                       </Button>
@@ -288,39 +424,36 @@ export default function OsKioskPage() {
                   Nenhuma OS.
                 </Card>
               )}
-              {listaOSEmbalagem.map(order => (
-                <Card key={order.id} className="space-y-3 p-3">
-                  <p className="text-xs text-muted-foreground">
-                    OS #{order.os_number ?? order.sale_number ?? "—"}
-                  </p>
-                  <p className="font-semibold">{getOrderTitle(order)}</p>
-                  <Badge variant="secondary">
-                    {toTagLabel(order.delivery_type)}
-                  </Badge>
+              {listaOSEmbalagem.map(order => {
+                const tag = getOrderTag(order);
+                return (
+                  <Card key={order.key} className="space-y-3 p-3">
+                    <p className="text-xs text-muted-foreground">
+                      OS #{getOrderDisplayNumber(order)}
+                    </p>
+                    <p className="font-semibold">{getOrderTitle(order)}</p>
+                    <Badge variant="secondary">{toTagLabel(tag)}</Badge>
 
-                  {order.delivery_type === "RETIRADA" ? (
-                    <Button
-                      disabled={processingId === order.id}
-                      onClick={() =>
-                        void moverOS(order, KIOSK_DESTINATIONS.retirada)
-                      }
-                    >
-                      Pronto para a retirada
-                    </Button>
-                  ) : null}
+                    {tag === "RETIRADA" ? (
+                      <Button
+                        disabled={processingId === order.key}
+                        onClick={() => void moverOS(order, "retirada")}
+                      >
+                        Pronto para a retirada
+                      </Button>
+                    ) : null}
 
-                  {order.delivery_type === "ENTREGA" ? (
-                    <Button
-                      disabled={processingId === order.id}
-                      onClick={() =>
-                        void moverOS(order, KIOSK_DESTINATIONS.entrega)
-                      }
-                    >
-                      Pronto para a entrega
-                    </Button>
-                  ) : null}
-                </Card>
-              ))}
+                    {tag === "ENTREGA" ? (
+                      <Button
+                        disabled={processingId === order.key}
+                        onClick={() => void moverOS(order, "entrega")}
+                      >
+                        Pronto para a entrega
+                      </Button>
+                    ) : null}
+                  </Card>
+                );
+              })}
             </div>
           </Card>
         </div>
