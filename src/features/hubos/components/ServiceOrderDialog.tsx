@@ -85,6 +85,7 @@ export default function ServiceOrderDialog({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [moving, setMoving] = useState(false);
+  const [updatingProductionTag, setUpdatingProductionTag] = useState(false);
   const [createdByName, setCreatedByName] = useState<string | null>(null);
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
 
@@ -223,6 +224,48 @@ export default function ServiceOrderDialog({
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleProductionTagChange = async (value: string) => {
+    if (!order?.prod_status) return;
+
+    const nextTag = value as ProductionTag;
+    if (nextTag === productionTag) return;
+
+    if (nextTag === "AGUARDANDO_INSUMOS" && !insumosDetails.trim()) {
+      toast.error("Informe os detalhes do material necessário antes de marcar como Aguardando Insumos.");
+      return;
+    }
+
+    setProductionTag(nextTag);
+
+    if (editing) {
+      return;
+    }
+
+    try {
+      setUpdatingProductionTag(true);
+      const payload: Partial<OsOrder> = {
+        production_tag: nextTag,
+        updated_at: new Date().toISOString(),
+        updated_by: user?.id ?? null,
+      };
+
+      if (nextTag === "AGUARDANDO_INSUMOS") {
+        payload.insumos_details = insumosDetails.trim();
+      }
+
+      const updated = await updateOrder(order.id, payload);
+      onUpdated(updated);
+      toast.success("Tag de produção atualizada.");
+    } catch (error) {
+      setProductionTag(order.production_tag ?? "");
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível atualizar a tag de produção."
+      );
+    } finally {
+      setUpdatingProductionTag(false);
     }
   };
 
@@ -392,8 +435,8 @@ export default function ServiceOrderDialog({
                   <Label>Tag de produção</Label>
                   <RadioGroup
                     value={productionTag}
-                    onValueChange={value => editing && setProductionTag(value as ProductionTag)}
-                    disabled={!editing}
+                    onValueChange={handleProductionTagChange}
+                    disabled={updatingProductionTag}
                   >
                     <div className="flex flex-wrap gap-4 text-sm">
                       <label className="flex items-center gap-2"><RadioGroupItem value="EM_PRODUCAO" />Em Produção</label>
