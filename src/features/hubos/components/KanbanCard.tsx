@@ -40,6 +40,8 @@ interface KanbanCardProps {
   showArchive?: boolean;
   onOpen?: () => void;
   onArchive?: () => void;
+  onMarkInsumosAsInProduction?: () => void;
+  markingInsumosAsInProduction?: boolean;
 }
 
 const logisticLabel: Record<LogisticType, string> = {
@@ -95,6 +97,8 @@ export default function KanbanCard({
   showArchive = false,
   onOpen,
   onArchive,
+  onMarkInsumosAsInProduction,
+  markingInsumosAsInProduction = false,
 }: KanbanCardProps) {
   const {
     attributes,
@@ -112,9 +116,13 @@ export default function KanbanCard({
 
   const trimmedInsumosReturnNotes = insumosReturnNotes?.trim() ?? "";
   const hasInsumosReturnNotes = trimmedInsumosReturnNotes.length > 0;
+  const shouldShowMaterialReadyBadge =
+    prodStatus === "Instalação Agendada" && productionTag === "PRONTO";
   const productionTagBadge =
     productionTag === "EM_PRODUCAO" && hasInsumosReturnNotes
       ? { label: "Insumo disponível", className: returnNotesBadgeClassName }
+      : shouldShowMaterialReadyBadge
+        ? { label: "Material Pronto", className: productionTagConfig.PRONTO.className }
       : productionTag
         ? productionTagConfig[productionTag]
         : null;
@@ -170,7 +178,8 @@ export default function KanbanCard({
         )}
         {reproducao && <Badge variant="destructive">Reprodução</Badge>}
         {letraCaixa && <Badge variant="secondary">Letra Caixa</Badge>}
-        {productionTagBadge && prodStatus === "Produção" && (
+        {productionTagBadge &&
+          (prodStatus === "Produção" || shouldShowMaterialReadyBadge) && (
           <Badge className={productionTagBadge.className}>
             {productionTagBadge.label}
           </Badge>
@@ -201,13 +210,28 @@ export default function KanbanCard({
         )}
       </div>
       {prodStatus === "Produção" && hasInsumosReturnNotes && (
-        <div className="rounded-md border border-yellow-300 bg-yellow-50 px-2 py-1">
+        <div className="space-y-2 rounded-md border border-yellow-300 bg-yellow-50 px-2 py-1">
           <p className="text-[11px] font-medium uppercase tracking-wide text-yellow-800">
             Observações de Insumos
           </p>
           <p className="whitespace-pre-line text-xs text-yellow-950">
             {trimmedInsumosReturnNotes}
           </p>
+          {productionTag === "EM_PRODUCAO" && onMarkInsumosAsInProduction && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 border-yellow-400 bg-white text-yellow-900 hover:bg-yellow-100"
+              onPointerDown={event => event.stopPropagation()}
+              onClick={event => {
+                event.stopPropagation();
+                onMarkInsumosAsInProduction();
+              }}
+              disabled={markingInsumosAsInProduction}
+            >
+              {markingInsumosAsInProduction ? "Atualizando..." : "Marcar como Em Produção"}
+            </Button>
+          )}
         </div>
       )}
       {showArchive && (
