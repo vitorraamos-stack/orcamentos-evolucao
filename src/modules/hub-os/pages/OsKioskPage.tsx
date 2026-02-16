@@ -610,9 +610,8 @@ export default function OsKioskPage() {
           </Card>
 
           <Card className="space-y-4 p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center">
               <h2 className="text-xl font-semibold">Embalagem</h2>
-              <AddOrderButton label="ADICIONAR NOVA OS" />
             </div>
 
             <div className="space-y-2">
