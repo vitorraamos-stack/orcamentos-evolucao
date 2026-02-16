@@ -143,6 +143,22 @@ const getOrderProductionStatus = (order: KioskOrder) => {
   return order.hubOrder?.prod_status ?? "—";
 };
 
+const getOrderHeadline = (order: KioskOrder) => {
+  const displayNumber = String(getOrderDisplayNumber(order)).trim();
+  const title = getKioskOrderTitle(order).trim();
+  if (!displayNumber) return title;
+
+  const normalizedTitle = title.toLowerCase();
+  const normalizedNumber = displayNumber.toLowerCase();
+  const startsWithNumber =
+    normalizedTitle.startsWith(`${normalizedNumber} -`) ||
+    normalizedTitle.startsWith(`#${normalizedNumber} -`) ||
+    normalizedTitle.startsWith(`${normalizedNumber}-`) ||
+    normalizedTitle.startsWith(`#${normalizedNumber}-`);
+
+  return startsWithNumber ? title : `${displayNumber} - ${title}`;
+};
+
 const isEntregaOrRetiradaTag = (tag: DeliveryType | null) =>
   tag === "ENTREGA" || tag === "RETIRADA";
 
@@ -792,7 +808,7 @@ export default function OsKioskPage() {
                         >
                           <div className="flex items-start justify-between gap-2">
                             <p className="font-semibold">
-                              {getOrderDisplayNumber(order)} - {getKioskOrderTitle(order)}
+                              {getOrderHeadline(order)}
                             </p>
                             <Badge variant="outline" className="whitespace-nowrap">
                               {formatDatePtBr(getOrderDeliveryDate(order))}
@@ -816,7 +832,7 @@ export default function OsKioskPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <h4 className="text-3xl font-semibold">
-                            {getOrderDisplayNumber(summarySelectedOrder)} - {getKioskOrderTitle(summarySelectedOrder)}
+                            {getOrderHeadline(summarySelectedOrder)}
                           </h4>
                           <div className="mt-2 flex flex-wrap gap-2">
                             <Badge variant="secondary">
