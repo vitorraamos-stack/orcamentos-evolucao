@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   createOrderEvent,
@@ -173,6 +174,8 @@ export default function OsKioskPage() {
   const [listaLogistica, setListaLogistica] = useState<KioskOrder[]>([]);
   const [summaryModalCategory, setSummaryModalCategory] =
     useState<KioskSummaryCategory | null>(null);
+  const [summarySearch, setSummarySearch] = useState("");
+  const [summarySelectedKey, setSummarySelectedKey] = useState<string | null>(null);
 
   const attemptFullscreen = async () => {
     if (document.fullscreenElement) {
@@ -426,6 +429,55 @@ export default function OsKioskPage() {
     ? kioskSummaryConfig[summaryModalCategory]
     : null;
 
+  const summaryFilteredOrders = useMemo(() => {
+    if (!summaryModalData) return [];
+
+    const search = summarySearch.trim().toLowerCase();
+    if (!search) return summaryModalData.orders;
+
+    return summaryModalData.orders.filter(order => {
+      const orderNumber = String(getOrderDisplayNumber(order)).toLowerCase();
+      const title = getKioskOrderTitle(order).toLowerCase();
+      const description = (getOrderDescription(order) ?? "").toLowerCase();
+      const client = getOrderClientName(order).toLowerCase();
+      return (
+        orderNumber.includes(search) ||
+        title.includes(search) ||
+        description.includes(search) ||
+        client.includes(search)
+      );
+    });
+  }, [summaryModalData, summarySearch]);
+
+  useEffect(() => {
+    if (!summaryModalData) {
+      setSummarySelectedKey(null);
+      return;
+    }
+
+    if (
+      summarySelectedKey &&
+      summaryFilteredOrders.some(order => order.key === summarySelectedKey)
+    ) {
+      return;
+    }
+
+    setSummarySelectedKey(summaryFilteredOrders[0]?.key ?? null);
+  }, [summaryFilteredOrders, summaryModalData, summarySelectedKey]);
+
+  const summarySelectedOrder = useMemo(
+    () =>
+      summaryFilteredOrders.find(order => order.key === summarySelectedKey) ??
+      null,
+    [summaryFilteredOrders, summarySelectedKey]
+  );
+
+  useEffect(() => {
+    setSummarySearch("");
+    setSummarySelectedKey(null);
+  }, [summaryModalCategory]);
+
+
   const renderOrderCard = (order: KioskOrder, children?: ReactNode) => (
     <Card
       key={order.key}
@@ -676,47 +728,157 @@ export default function OsKioskPage() {
       <Dialog
         open={summaryModalCategory !== null}
         onOpenChange={open => {
-          if (!open) setSummaryModalCategory(null);
+          if (!open) {
+            setSummaryModalCategory(null);
+            setSummarySearch("");
+            setSummarySelectedKey(null);
+          }
         }}
       >
-        <DialogContent className="h-[82vh] w-[94vw] max-w-[1280px] p-6">
+        <DialogContent className="h-[86vh] w-[96vw] max-w-[1360px] p-6">
           {summaryModalData ? (
             <div className="flex h-full flex-col gap-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-2xl font-semibold">{summaryModalData.title}</h3>
-                <Badge variant="secondary">
-                  {summaryModalData.orders.length} OS
-                </Badge>
+                <div>
+                  <h3 className="text-3xl font-semibold">
+                    {summaryModalData.title} ({summaryFilteredOrders.length}/{summaryModalData.orders.length})
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {summaryFilteredOrders.length} OS
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSummaryModalCategory(null);
+                    setSummarySearch("");
+                    setSummarySelectedKey(null);
+                  }}
+                >
+                  Voltar
+                </Button>
               </div>
 
-              <div className="flex-1 space-y-3 overflow-y-auto pr-1">
-                {summaryModalData.orders.length === 0 ? (
-                  <Card className="p-4 text-sm text-muted-foreground">
-                    Nenhuma OS.
-                  </Card>
-                ) : (
-                  summaryModalData.orders.map(order => (
-                    <Card
-                      key={order.key}
-                      className="grid gap-3 p-4 md:grid-cols-[220px_1fr]"
-                    >
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">OS</p>
-                        <p className="text-lg font-semibold">
-                          #{getOrderDisplayNumber(order)}
-                        </p>
-                        <Badge variant="outline">{toTagLabel(getOrderTag(order))}</Badge>
+              <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[380px_1fr]">
+                <Card className="space-y-3 p-4">
+                  <Input
+                    value={summarySearch}
+                    onChange={event => setSummarySearch(event.target.value)}
+                    placeholder="Pesquisar..."
+                  />
+
+                  <div className="max-h-[58vh] space-y-2 overflow-y-auto pr-1">
+                    {summaryFilteredOrders.length === 0 ? (
+                      <Card className="p-3 text-sm text-muted-foreground">
+                        Nenhuma OS.
+                      </Card>
+                    ) : (
+                      summaryFilteredOrders.map(order => (
+                        <Card
+                          key={order.key}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setSummarySelectedKey(order.key)}
+                          onKeyDown={event => {
+                            if (event.key !== "Enter" && event.key !== " ") return;
+                            event.preventDefault();
+                            setSummarySelectedKey(order.key);
+                          }}
+                          className={
+                            summarySelectedKey === order.key
+                              ? "cursor-pointer space-y-2 border-primary bg-primary/5 p-3"
+                              : "cursor-pointer space-y-2 p-3"
+                          }
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-semibold">
+                              {getOrderDisplayNumber(order)} - {getKioskOrderTitle(order)}
+                            </p>
+                            <Badge variant="outline" className="whitespace-nowrap">
+                              {formatDatePtBr(getOrderDeliveryDate(order))}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant="secondary">
+                              Produção • {getOrderProductionStatus(order)}
+                            </Badge>
+                            <Badge variant="outline">{toTagLabel(getOrderTag(order))}</Badge>
+                          </div>
+                        </Card>
+                      ))
+                    )}
+                  </div>
+                </Card>
+
+                <Card className="min-h-0 overflow-y-auto p-5">
+                  {summarySelectedOrder ? (
+                    <div className="space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 className="text-3xl font-semibold">
+                            {getOrderDisplayNumber(summarySelectedOrder)} - {getKioskOrderTitle(summarySelectedOrder)}
+                          </h4>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Badge variant="secondary">
+                              Produção • {getOrderProductionStatus(summarySelectedOrder)}
+                            </Badge>
+                            <Badge variant="outline">
+                              {toTagLabel(getOrderTag(summarySelectedOrder))}
+                            </Badge>
+                          </div>
+                        </div>
+                        <Badge variant="outline">
+                          {formatDatePtBr(getOrderDeliveryDate(summarySelectedOrder))}
+                        </Badge>
                       </div>
 
-                      <div className="space-y-2">
-                        <p className="font-semibold">{getKioskOrderTitle(order)}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {getOrderDescription(order) ?? "Sem descrição."}
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Cliente
+                        </p>
+                        <p className="font-medium">{getOrderClientName(summarySelectedOrder)}</p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Descrição detalhada
+                        </p>
+                        <p className="whitespace-pre-wrap font-medium">
+                          {getOrderDescription(summarySelectedOrder) ?? "Sem descrição."}
                         </p>
                       </div>
-                    </Card>
-                  ))
-                )}
+
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Data de entrega
+                        </p>
+                        <p className="font-medium">
+                          {formatDatePtBr(getOrderDeliveryDate(summarySelectedOrder))}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Endereço
+                        </p>
+                        <p className="font-medium">
+                          {getOrderAddress(summarySelectedOrder) ?? "—"}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Flags
+                        </p>
+                        <p className="font-medium">(nenhuma)</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Selecione uma OS na lista para ver os detalhes.
+                    </p>
+                  )}
+                </Card>
               </div>
             </div>
           ) : null}
