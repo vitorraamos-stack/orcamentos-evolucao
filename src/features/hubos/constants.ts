@@ -4,7 +4,6 @@ export const ART_COLUMNS: ArtStatus[] = [
   'Caixa de Entrada',
   'Em Criação',
   'Para Aprovação',
-  'Ajustes',
   'Produzir',
 ];
 
