@@ -735,7 +735,7 @@ export default function OsKioskPage() {
           }
         }}
       >
-        <DialogContent className="h-[86vh] w-[96vw] max-w-[1360px] p-6">
+        <DialogContent className="h-[90vh] w-[98vw] max-w-[98vw] p-4 sm:p-6 xl:max-w-[1400px]">
           {summaryModalData ? (
             <div className="flex h-full flex-col gap-4">
               <div className="flex items-center justify-between">
@@ -759,15 +759,15 @@ export default function OsKioskPage() {
                 </Button>
               </div>
 
-              <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[380px_1fr]">
-                <Card className="space-y-3 p-4">
+              <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
+                <Card className="min-h-0 space-y-3 p-4">
                   <Input
                     value={summarySearch}
                     onChange={event => setSummarySearch(event.target.value)}
                     placeholder="Pesquisar..."
                   />
 
-                  <div className="max-h-[58vh] space-y-2 overflow-y-auto pr-1">
+                  <div className="max-h-[62vh] space-y-2 overflow-y-auto pr-1">
                     {summaryFilteredOrders.length === 0 ? (
                       <Card className="p-3 text-sm text-muted-foreground">
                         Nenhuma OS.
@@ -810,7 +810,7 @@ export default function OsKioskPage() {
                   </div>
                 </Card>
 
-                <Card className="min-h-0 overflow-y-auto p-5">
+                <Card className="min-h-0 overflow-y-auto p-4 sm:p-5">
                   {summarySelectedOrder ? (
                     <div className="space-y-4">
                       <div className="flex items-start justify-between gap-3">
