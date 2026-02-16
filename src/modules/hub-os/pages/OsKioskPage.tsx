@@ -169,6 +169,15 @@ const upsertList = (items: KioskOrder[], nextOrder: KioskOrder) => {
   return [nextOrder, ...items];
 };
 
+const isOrderFinalizado = (order: KioskOrder) => {
+  const legacyStatus = (order.legacyOrder?.status_producao ?? "").toLowerCase();
+  const hubStatus = (order.hubOrder?.prod_status ?? "").toLowerCase();
+
+  return legacyStatus.includes("finaliz") || hubStatus.includes("finaliz");
+};
+
+const filterActiveOrders = (orders: KioskOrder[]) =>
+  orders.filter(order => !isOrderFinalizado(order));
 
 export default function OsKioskPage() {
   const { user } = useAuth();
@@ -192,6 +201,20 @@ export default function OsKioskPage() {
     useState<KioskSummaryCategory | null>(null);
   const [summarySearch, setSummarySearch] = useState("");
   const [summarySelectedKey, setSummarySelectedKey] = useState<string | null>(null);
+
+  const removeOrderFromAllLists = (orderKey: string) => {
+    setListaOSAcabamentoEntregaRetirada(prev =>
+      prev.filter(item => item.key !== orderKey)
+    );
+    setListaOSAcabamentoInstalacao(prev =>
+      prev.filter(item => item.key !== orderKey)
+    );
+    setListaOSEmbalagem(prev => prev.filter(item => item.key !== orderKey));
+    setListaInstalacoes(prev => prev.filter(item => item.key !== orderKey));
+    setListaProntoAvisar(prev => prev.filter(item => item.key !== orderKey));
+    setListaLogistica(prev => prev.filter(item => item.key !== orderKey));
+    setMaterialProntoIds(prev => prev.filter(id => id !== orderKey));
+  };
 
   const attemptFullscreen = async () => {
     if (document.fullscreenElement) {
@@ -219,15 +242,15 @@ export default function OsKioskPage() {
       if (!parsedState || parsedState.version !== 2) return;
 
       setListaOSAcabamentoEntregaRetirada(
-        parsedState.listaOSAcabamentoEntregaRetirada ?? []
+        filterActiveOrders(parsedState.listaOSAcabamentoEntregaRetirada ?? [])
       );
       setListaOSAcabamentoInstalacao(
-        parsedState.listaOSAcabamentoInstalacao ?? []
+        filterActiveOrders(parsedState.listaOSAcabamentoInstalacao ?? [])
       );
-      setListaOSEmbalagem(parsedState.listaOSEmbalagem ?? []);
-      setListaInstalacoes(parsedState.listaInstalacoes ?? []);
-      setListaProntoAvisar(parsedState.listaProntoAvisar ?? []);
-      setListaLogistica(parsedState.listaLogistica ?? []);
+      setListaOSEmbalagem(filterActiveOrders(parsedState.listaOSEmbalagem ?? []));
+      setListaInstalacoes(filterActiveOrders(parsedState.listaInstalacoes ?? []));
+      setListaProntoAvisar(filterActiveOrders(parsedState.listaProntoAvisar ?? []));
+      setListaLogistica(filterActiveOrders(parsedState.listaLogistica ?? []));
       setMaterialProntoIds(parsedState.materialProntoIds ?? []);
     } catch (error) {
       console.error("Falha ao carregar estado do quiosque:", error);
@@ -257,6 +280,11 @@ export default function OsKioskPage() {
   ]);
 
   const addOrderToColumns = (order: KioskOrder) => {
+    if (isOrderFinalizado(order)) {
+      toast.info("OS já está em Finalizados e não será exibida no quiosque.");
+      return;
+    }
+
     const tag = getOrderTag(order);
 
     if (tag === "INSTALACAO") {
@@ -362,6 +390,13 @@ export default function OsKioskPage() {
           ...order,
           hubOrder: updatedHubOrder,
         };
+      }
+
+      if (isOrderFinalizado(updatedOrder)) {
+        removeOrderFromAllLists(order.key);
+        setSelectedOrder(current => (current?.key === order.key ? null : current));
+        toast.success("OS finalizada removida do quiosque.");
+        return;
       }
 
       setListaOSAcabamentoEntregaRetirada(prev =>
