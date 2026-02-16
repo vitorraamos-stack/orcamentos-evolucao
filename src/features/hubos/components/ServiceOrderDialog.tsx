@@ -277,7 +277,10 @@ export default function ServiceOrderDialog({
   return (
     <>
       <DialogUi.Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogUi.DialogContent className="max-h-[calc(100vh-2rem)] w-[95vw] overflow-y-auto sm:max-w-4xl lg:max-w-5xl">
+        <DialogUi.DialogContent
+          overlayClassName="bg-black/45 backdrop-blur-[2px]"
+          className="max-h-[calc(100vh-2rem)] w-[95vw] overflow-y-auto sm:max-w-4xl lg:max-w-5xl"
+        >
           <DialogUi.DialogHeader>
             <DialogUi.DialogTitle>
               {`OS #${order?.os_number ?? order?.sale_number ?? ""}`}
