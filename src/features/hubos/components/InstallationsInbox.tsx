@@ -96,6 +96,9 @@ const parseDeliveryDate = (value: string | null) => {
 
 const isFinalized = (order: OsOrder) => order.prod_status === FINAL_PROD_STATUS;
 
+const isMaterialReadyForInstallation = (order: OsOrder) =>
+  order.prod_status === "Instalação Agendada" && order.production_tag === "PRONTO";
+
 const skippedReasonLabel: Record<string, string> = {
   missing_address: "Sem endereço cadastrado",
   geocode_failed: "Falha ao geocodificar endereço",
@@ -816,6 +819,11 @@ export default function InstallationsInbox({
                         <Badge variant="destructive">ATRASADA</Badge>
                       )}
                       {isToday && <Badge>HOJE</Badge>}
+                      {isMaterialReadyForInstallation(order) && (
+                        <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
+                          Material Pronto
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       {order.delivery_date && (
@@ -859,6 +867,11 @@ export default function InstallationsInbox({
                     <Badge variant="destructive">ATRASADA</Badge>
                   )}
                   {getIsToday(selectedOrder) && <Badge>HOJE</Badge>}
+                  {isMaterialReadyForInstallation(selectedOrder) && (
+                    <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
+                      Material Pronto
+                    </Badge>
+                  )}
                 </div>
               </div>
 
