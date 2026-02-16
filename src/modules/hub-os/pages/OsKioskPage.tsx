@@ -370,6 +370,7 @@ export default function OsKioskPage() {
       if (order.source === "os_orders" && order.hubOrder) {
         const updatedHubOrder = await updateOrder(order.hubOrder.id, {
           prod_status: KIOSK_STATUS_DESTINATIONS[destino].hub,
+          production_tag: destino === "instalacao" ? "PRONTO" : order.hubOrder.production_tag,
           updated_at: new Date().toISOString(),
           updated_by: user?.id ?? null,
         });
