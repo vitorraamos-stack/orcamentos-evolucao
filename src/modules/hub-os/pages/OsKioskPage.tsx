@@ -99,6 +99,18 @@ const upsertList = (items: KioskOrder[], nextOrder: KioskOrder) => {
   return [nextOrder, ...items];
 };
 
+const isEntregaOuRetirada = (deliveryType: DeliveryType | null) =>
+  deliveryType === "ENTREGA" || deliveryType === "RETIRADA";
+
+const getOrderTitle = (order: Os) =>
+  order.title || `${order.sale_number ?? ""} - ${order.client_name}`.trim();
+
+const KIOSK_DESTINATIONS = {
+  retirada: "PRONTO/AVISAR",
+  entrega: "Logística",
+  instalacao: "Instalação Agendada",
+} as const;
+
 export default function OsKioskPage() {
   const { user } = useAuth();
   const [addModalOpen, setAddModalOpen] = useState(false);
