@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   createOrderEvent,
@@ -29,6 +30,8 @@ type KioskOrder = {
 };
 
 type KioskDestination = "retirada" | "entrega" | "instalacao";
+
+type KioskSummaryCategory = "instalacoes" | "prontoAvisar" | "logistica";
 
 type KioskPersistedState = {
   version: number;
@@ -140,6 +143,22 @@ const getOrderProductionStatus = (order: KioskOrder) => {
   return order.hubOrder?.prod_status ?? "—";
 };
 
+const getOrderHeadline = (order: KioskOrder) => {
+  const displayNumber = String(getOrderDisplayNumber(order)).trim();
+  const title = getKioskOrderTitle(order).trim();
+  if (!displayNumber) return title;
+
+  const normalizedTitle = title.toLowerCase();
+  const normalizedNumber = displayNumber.toLowerCase();
+  const startsWithNumber =
+    normalizedTitle.startsWith(`${normalizedNumber} -`) ||
+    normalizedTitle.startsWith(`#${normalizedNumber} -`) ||
+    normalizedTitle.startsWith(`${normalizedNumber}-`) ||
+    normalizedTitle.startsWith(`#${normalizedNumber}-`);
+
+  return startsWithNumber ? title : `${displayNumber} - ${title}`;
+};
+
 const isEntregaOrRetiradaTag = (tag: DeliveryType | null) =>
   tag === "ENTREGA" || tag === "RETIRADA";
 
@@ -169,6 +188,10 @@ export default function OsKioskPage() {
   const [listaInstalacoes, setListaInstalacoes] = useState<KioskOrder[]>([]);
   const [listaProntoAvisar, setListaProntoAvisar] = useState<KioskOrder[]>([]);
   const [listaLogistica, setListaLogistica] = useState<KioskOrder[]>([]);
+  const [summaryModalCategory, setSummaryModalCategory] =
+    useState<KioskSummaryCategory | null>(null);
+  const [summarySearch, setSummarySearch] = useState("");
+  const [summarySelectedKey, setSummarySelectedKey] = useState<string | null>(null);
 
   const attemptFullscreen = async () => {
     if (document.fullscreenElement) {
@@ -248,6 +271,9 @@ export default function OsKioskPage() {
 
   const moverParaEmbalagem = (order: KioskOrder) => {
     setListaOSEmbalagem(prev => upsertList(prev, order));
+    setListaOSAcabamentoEntregaRetirada(prev =>
+      prev.filter(item => item.key !== order.key)
+    );
     toast.success("OS movida para Embalagem.");
   };
 
@@ -355,6 +381,9 @@ export default function OsKioskPage() {
       if (destino === "retirada" && isEntregaOrRetiradaTag(currentTag)) {
         setListaProntoAvisar(prev => upsertList(prev, updatedOrder));
         setListaOSEmbalagem(prev => prev.filter(item => item.key !== order.key));
+        setMaterialProntoIds(prev =>
+          prev.includes(order.key) ? prev : [...prev, order.key]
+        );
       }
 
       if (destino === "entrega" && isEntregaOrRetiradaTag(currentTag)) {
@@ -408,6 +437,68 @@ export default function OsKioskPage() {
       </span>
     </button>
   );
+
+  const kioskSummaryConfig: Record<
+    KioskSummaryCategory,
+    { title: string; orders: KioskOrder[] }
+  > = {
+    instalacoes: { title: "Instalações", orders: listaInstalacoes },
+    prontoAvisar: { title: "Pronto/Avisar", orders: listaProntoAvisar },
+    logistica: { title: "Logística", orders: listaLogistica },
+  };
+
+  const summaryModalData = summaryModalCategory
+    ? kioskSummaryConfig[summaryModalCategory]
+    : null;
+
+  const summaryFilteredOrders = useMemo(() => {
+    if (!summaryModalData) return [];
+
+    const search = summarySearch.trim().toLowerCase();
+    if (!search) return summaryModalData.orders;
+
+    return summaryModalData.orders.filter(order => {
+      const orderNumber = String(getOrderDisplayNumber(order)).toLowerCase();
+      const title = getKioskOrderTitle(order).toLowerCase();
+      const description = (getOrderDescription(order) ?? "").toLowerCase();
+      const client = getOrderClientName(order).toLowerCase();
+      return (
+        orderNumber.includes(search) ||
+        title.includes(search) ||
+        description.includes(search) ||
+        client.includes(search)
+      );
+    });
+  }, [summaryModalData, summarySearch]);
+
+  useEffect(() => {
+    if (!summaryModalData) {
+      setSummarySelectedKey(null);
+      return;
+    }
+
+    if (
+      summarySelectedKey &&
+      summaryFilteredOrders.some(order => order.key === summarySelectedKey)
+    ) {
+      return;
+    }
+
+    setSummarySelectedKey(summaryFilteredOrders[0]?.key ?? null);
+  }, [summaryFilteredOrders, summaryModalData, summarySelectedKey]);
+
+  const summarySelectedOrder = useMemo(
+    () =>
+      summaryFilteredOrders.find(order => order.key === summarySelectedKey) ??
+      null,
+    [summaryFilteredOrders, summarySelectedKey]
+  );
+
+  useEffect(() => {
+    setSummarySearch("");
+    setSummarySelectedKey(null);
+  }, [summaryModalCategory]);
+
 
   const renderOrderCard = (order: KioskOrder, children?: ReactNode) => (
     <Card
@@ -470,61 +561,60 @@ export default function OsKioskPage() {
         </div>
 
         <div className="mb-4 grid gap-3 md:grid-cols-3">
-          <Card className="space-y-2 p-3">
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => setSummaryModalCategory("instalacoes")}
+            onKeyDown={event => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              setSummaryModalCategory("instalacoes");
+            }}
+            className="cursor-pointer p-3 transition hover:border-primary/60 hover:bg-muted/20"
+          >
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 Instalações
               </h3>
               <Badge variant="outline">{listaInstalacoes.length}</Badge>
             </div>
-            <div className="space-y-1">
-              {listaInstalacoes.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Nenhuma OS.</p>
-              ) : (
-                listaInstalacoes.slice(0, 3).map(order => (
-                  <p key={order.key} className="truncate text-xs">
-                    OS #{getOrderDisplayNumber(order)}
-                  </p>
-                ))
-              )}
-            </div>
           </Card>
-          <Card className="space-y-2 p-3">
+
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => setSummaryModalCategory("prontoAvisar")}
+            onKeyDown={event => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              setSummaryModalCategory("prontoAvisar");
+            }}
+            className="cursor-pointer p-3 transition hover:border-primary/60 hover:bg-muted/20"
+          >
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 Pronto/Avisar
               </h3>
               <Badge variant="outline">{listaProntoAvisar.length}</Badge>
             </div>
-            <div className="space-y-1">
-              {listaProntoAvisar.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Nenhuma OS.</p>
-              ) : (
-                listaProntoAvisar.slice(0, 3).map(order => (
-                  <p key={order.key} className="truncate text-xs">
-                    OS #{getOrderDisplayNumber(order)}
-                  </p>
-                ))
-              )}
-            </div>
           </Card>
-          <Card className="space-y-2 p-3">
+
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => setSummaryModalCategory("logistica")}
+            onKeyDown={event => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              setSummaryModalCategory("logistica");
+            }}
+            className="cursor-pointer p-3 transition hover:border-primary/60 hover:bg-muted/20"
+          >
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 Logística
               </h3>
               <Badge variant="outline">{listaLogistica.length}</Badge>
-            </div>
-            <div className="space-y-1">
-              {listaLogistica.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Nenhuma OS.</p>
-              ) : (
-                listaLogistica.slice(0, 3).map(order => (
-                  <p key={order.key} className="truncate text-xs">
-                    OS #{getOrderDisplayNumber(order)}
-                  </p>
-                ))
-              )}
             </div>
           </Card>
         </div>
@@ -611,9 +701,8 @@ export default function OsKioskPage() {
           </Card>
 
           <Card className="space-y-4 p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center">
               <h2 className="text-xl font-semibold">Embalagem</h2>
-              <AddOrderButton label="ADICIONAR NOVA OS" />
             </div>
 
             <div className="space-y-2">
@@ -657,6 +746,176 @@ export default function OsKioskPage() {
           </Card>
         </div>
       </div>
+
+      <Dialog
+        open={summaryModalCategory !== null}
+        onOpenChange={open => {
+          if (!open) {
+            setSummaryModalCategory(null);
+            setSummarySearch("");
+            setSummarySelectedKey(null);
+          }
+        }}
+      >
+        <DialogContent className="h-[90vh] w-[98vw] max-w-[98vw] p-4 sm:p-6 xl:max-w-[1400px]">
+          {summaryModalData ? (
+            <div className="flex h-full flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-3xl font-semibold">
+                    {summaryModalData.title} ({summaryFilteredOrders.length}/{summaryModalData.orders.length})
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {summaryFilteredOrders.length} OS
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSummaryModalCategory(null);
+                    setSummarySearch("");
+                    setSummarySelectedKey(null);
+                  }}
+                >
+                  Voltar
+                </Button>
+              </div>
+
+              <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
+                <Card className="min-h-0 space-y-3 p-4">
+                  <Input
+                    value={summarySearch}
+                    onChange={event => setSummarySearch(event.target.value)}
+                    placeholder="Pesquisar..."
+                  />
+
+                  <div className="max-h-[62vh] space-y-2 overflow-y-auto pr-1">
+                    {summaryFilteredOrders.length === 0 ? (
+                      <Card className="p-3 text-sm text-muted-foreground">
+                        Nenhuma OS.
+                      </Card>
+                    ) : (
+                      summaryFilteredOrders.map(order => (
+                        <Card
+                          key={order.key}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setSummarySelectedKey(order.key)}
+                          onKeyDown={event => {
+                            if (event.key !== "Enter" && event.key !== " ") return;
+                            event.preventDefault();
+                            setSummarySelectedKey(order.key);
+                          }}
+                          className={
+                            summarySelectedKey === order.key
+                              ? "cursor-pointer space-y-2 border-primary bg-primary/5 p-3"
+                              : "cursor-pointer space-y-2 p-3"
+                          }
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-semibold">
+                              {getOrderHeadline(order)}
+                            </p>
+                            <Badge variant="outline" className="whitespace-nowrap">
+                              {formatDatePtBr(getOrderDeliveryDate(order))}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant="secondary">
+                              Produção • {getOrderProductionStatus(order)}
+                            </Badge>
+                            <Badge variant="outline">{toTagLabel(getOrderTag(order))}</Badge>
+                            {materialProntoIds.includes(order.key) ? (
+                              <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
+                                Material Pronto
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </Card>
+                      ))
+                    )}
+                  </div>
+                </Card>
+
+                <Card className="min-h-0 overflow-y-auto p-4 sm:p-5">
+                  {summarySelectedOrder ? (
+                    <div className="space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 className="text-3xl font-semibold">
+                            {getOrderHeadline(summarySelectedOrder)}
+                          </h4>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Badge variant="secondary">
+                              Produção • {getOrderProductionStatus(summarySelectedOrder)}
+                            </Badge>
+                            <Badge variant="outline">
+                              {toTagLabel(getOrderTag(summarySelectedOrder))}
+                            </Badge>
+                            {materialProntoIds.includes(summarySelectedOrder.key) ? (
+                              <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
+                                Material Pronto
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </div>
+                        <Badge variant="outline">
+                          {formatDatePtBr(getOrderDeliveryDate(summarySelectedOrder))}
+                        </Badge>
+                      </div>
+
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Cliente
+                        </p>
+                        <p className="font-medium">{getOrderClientName(summarySelectedOrder)}</p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Descrição detalhada
+                        </p>
+                        <p className="whitespace-pre-wrap font-medium">
+                          {getOrderDescription(summarySelectedOrder) ?? "Sem descrição."}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Data de entrega
+                        </p>
+                        <p className="font-medium">
+                          {formatDatePtBr(getOrderDeliveryDate(summarySelectedOrder))}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Endereço
+                        </p>
+                        <p className="font-medium">
+                          {getOrderAddress(summarySelectedOrder) ?? "—"}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Flags
+                        </p>
+                        <p className="font-medium">(nenhuma)</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Selecione uma OS na lista para ver os detalhes.
+                    </p>
+                  )}
+                </Card>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
         <DialogContent className="h-[60vh] w-[70vw] min-w-[600px] max-w-[1000px] p-8">
