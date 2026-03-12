@@ -10,7 +10,7 @@ import { fetchOsByCode } from "../api";
 import {
   fetchKioskBoard,
   moveKioskOrder,
-  registerKioskOrder,
+  registerKioskOrderByCode,
 } from "../kiosk/api";
 import { KIOSK_POLL_INTERVAL_MS, KIOSK_STAGE_LABELS } from "../kiosk/constants";
 import { KioskOsLookupPanel } from "../kiosk/KioskOsLookupPanel";
@@ -137,14 +137,7 @@ export default function OsKioskPage() {
   const handleAddByCode = async (sanitizedCode: string) => {
     if (!terminalId) throw new Error("Terminal não inicializado.");
 
-    const lookup = await fetchOsByCode(sanitizedCode);
-    if (!lookup) {
-      throw new Error("OS não encontrada. Verifique o número da etiqueta.");
-    }
-
-    const created = await registerKioskOrder({
-      sourceType: lookup.source,
-      sourceId: lookup.id,
+    const created = await registerKioskOrderByCode({
       lookupCode: sanitizedCode,
       actorId: user?.id ?? null,
       terminalId,

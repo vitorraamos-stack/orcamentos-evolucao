@@ -51,6 +51,15 @@ export const parseKioskError = (error: unknown) => {
   if (details.includes("KIOSK_INVALID_ACTION")) {
     return "Ação inválida para este card no quiosque.";
   }
+  if (details.includes("KIOSK_AUTH_REQUIRED") || normalized.includes("auth required") || normalized.includes("usuário não autenticado")) {
+    return "Sessão expirada no quiosque. Faça login novamente para continuar.";
+  }
+  if (details.includes("KIOSK_INVALID_CODE")) {
+    return "Código inválido. Escaneie novamente a etiqueta da OS.";
+  }
+  if (normalized.includes("could not find") && normalized.includes("kiosk_board")) {
+    return "Integração do quiosque indisponível no backend. Aplique as migrations mais recentes do Hub OS.";
+  }
   if (normalized.includes("jwt") || normalized.includes("permission") || normalized.includes("permiss")) {
     return "Você não tem permissão para executar esta ação no quiosque.";
   }

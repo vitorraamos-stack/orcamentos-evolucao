@@ -37,6 +37,7 @@ describe("kiosk helpers", () => {
     expect(parseKioskError({ code: "23505" })).toContain("já está no quiosque");
     expect(parseKioskError({ details: "KIOSK_UPSTREAM_NOT_FOUND" })).toContain("não encontrada");
     expect(parseKioskError(new TypeError("Failed to fetch"))).toContain("Falha de rede");
+    expect(parseKioskError({ details: "KIOSK_AUTH_REQUIRED" })).toContain("Sessão expirada");
   });
 
   it("gera e persiste terminal_id", () => {
