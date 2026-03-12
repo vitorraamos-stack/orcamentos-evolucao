@@ -62,6 +62,9 @@ export const parseKioskError = (error: unknown) => {
   if (normalized.includes("could not find") && normalized.includes("kiosk_board")) {
     return "Integração do quiosque indisponível no backend. Aplique as migrations mais recentes do Hub OS.";
   }
+  if (normalized.includes("is ambiguous") && normalized.includes("id")) {
+    return "Integração do quiosque desatualizada no banco. Aplique as migrations mais recentes e tente novamente.";
+  }
   if (normalized.includes("jwt") || normalized.includes("permission") || normalized.includes("permiss")) {
     return "Você não tem permissão para executar esta ação no quiosque.";
   }
