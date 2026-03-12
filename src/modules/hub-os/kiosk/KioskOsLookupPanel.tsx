@@ -87,20 +87,24 @@ export function KioskOsLookupPanel({
           ? error.message
           : "Erro ao consultar OS. Tente novamente.";
       const normalizedMessage = message.toLowerCase();
+      let nextErrorType: KioskErrorType = "unknown";
+
       if (normalizedMessage.includes("não encontrada")) {
-        setErrorType("not_found");
+        nextErrorType = "not_found";
       } else if (
         normalizedMessage.includes("já passou pelo modo quiosque") ||
         normalizedMessage.includes("não pode ser duplicada")
       ) {
-        setErrorType("duplicate");
+        nextErrorType = "duplicate";
       } else if (isNetworkError(error)) {
-        setErrorType("network");
-      } else {
-        setErrorType("unknown");
+        nextErrorType = "network";
       }
 
-      toast.error(message);
+      setErrorType(nextErrorType);
+
+      if (nextErrorType !== "duplicate") {
+        toast.error(message);
+      }
       focusInput();
     } finally {
       setLoading(false);
