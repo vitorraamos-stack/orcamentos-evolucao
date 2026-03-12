@@ -93,7 +93,8 @@ export function KioskOsLookupPanel({
         nextErrorType = "not_found";
       } else if (
         normalizedMessage.includes("já passou pelo modo quiosque") ||
-        normalizedMessage.includes("não pode ser duplicada")
+        normalizedMessage.includes("não pode ser duplicada") ||
+        normalizedMessage.includes("já está no quiosque")
       ) {
         nextErrorType = "duplicate";
       } else if (isNetworkError(error)) {
