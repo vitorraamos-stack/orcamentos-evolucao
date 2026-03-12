@@ -7,14 +7,38 @@ import type {
   KioskSourceType,
 } from "./types";
 
+type RpcLikeError = {
+  message?: string;
+  details?: string;
+  hint?: string;
+  code?: string;
+};
+
 const isMissingRpcError = (error: unknown) => {
   const message = String((error as { message?: string })?.message ?? "").toLowerCase();
   return message.includes("could not find") || message.includes("function") || message.includes("pgrst202");
 };
 
+const toError = (error: unknown) => {
+  if (error instanceof Error) return error;
+  const rpcError = (error ?? {}) as RpcLikeError;
+  const message = rpcError.message || rpcError.details || "Erro ao consultar OS. Tente novamente.";
+  if (rpcError.code || rpcError.details) {
+    return new Error(message, {
+      cause: {
+        code: rpcError.code,
+        details: rpcError.details,
+        hint: rpcError.hint,
+      },
+    });
+  }
+
+  return new Error(message);
+};
+
 export const fetchKioskBoard = async () => {
   const { data, error } = await supabase.rpc("kiosk_board_list");
-  if (error) throw error;
+  if (error) throw toError(error);
   return (data ?? []) as KioskBoardCard[];
 };
 
@@ -34,7 +58,7 @@ const registerKioskOrderBySource = async (params: {
   });
 
   if (secureResponse.error && !isMissingRpcError(secureResponse.error)) {
-    throw secureResponse.error;
+    throw toError(secureResponse.error);
   }
 
   if (!secureResponse.error && secureResponse.data) {
@@ -49,7 +73,7 @@ const registerKioskOrderBySource = async (params: {
     p_terminal_id: params.terminalId,
   });
 
-  if (legacyResponse.error) throw legacyResponse.error;
+  if (legacyResponse.error) throw toError(legacyResponse.error);
   return legacyResponse.data as KioskBoardCard;
 };
 
@@ -65,14 +89,20 @@ export const registerKioskOrderByCode = async (params: {
   });
 
   if (secureResponse.error && !isMissingRpcError(secureResponse.error)) {
-    throw secureResponse.error;
+    throw toError(secureResponse.error);
   }
 
   if (!secureResponse.error && secureResponse.data) {
     return secureResponse.data as KioskBoardCard;
   }
 
-  const lookup = await fetchOsByCode(params.lookupCode);
+  let lookup;
+  try {
+    lookup = await fetchOsByCode(params.lookupCode);
+  } catch (error) {
+    throw toError(error);
+  }
+
   if (!lookup) {
     throw new Error("OS não encontrada. Verifique o número da etiqueta.");
   }
@@ -101,7 +131,7 @@ export const moveKioskOrder = async (params: {
 
   let data = secureResponse.data;
   if (secureResponse.error && !isMissingRpcError(secureResponse.error)) {
-    throw secureResponse.error;
+    throw toError(secureResponse.error);
   }
 
   if (secureResponse.error) {
@@ -112,7 +142,7 @@ export const moveKioskOrder = async (params: {
       p_terminal_id: params.terminalId,
     });
 
-    if (fallback.error) throw fallback.error;
+    if (fallback.error) throw toError(fallback.error);
     data = fallback.data;
   }
 

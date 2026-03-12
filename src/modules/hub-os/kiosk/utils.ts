@@ -31,12 +31,14 @@ export const parseKioskError = (error: unknown) => {
     message?: string;
     code?: string;
     details?: string;
+    cause?: { code?: string; details?: string };
   };
 
   const normalized = String(candidate?.message ?? "").toLowerCase();
-  const details = String(candidate?.details ?? "");
+  const details = String(candidate?.details ?? candidate?.cause?.details ?? "");
+  const code = String(candidate?.code ?? candidate?.cause?.code ?? "");
 
-  if (candidate?.code === DUPLICATE_DB_CODE || details.includes("KIOSK_DUPLICATE")) {
+  if (code === DUPLICATE_DB_CODE || details.includes("KIOSK_DUPLICATE")) {
     return "Essa OS já está no quiosque.";
   }
   if (details.includes("KIOSK_UPSTREAM_NOT_FOUND") || normalized.includes("não encontrada")) {
