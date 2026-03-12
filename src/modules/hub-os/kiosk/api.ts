@@ -23,6 +23,14 @@ const toError = (error: unknown) => {
   if (error instanceof Error) return error;
   const rpcError = (error ?? {}) as RpcLikeError;
   const message = rpcError.message || rpcError.details || "Erro ao consultar OS. Tente novamente.";
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("column") && normalized.includes("os_number") && normalized.includes("does not exist")) {
+    return new Error(
+      "Integração do quiosque desatualizada no banco. Aplique as migrations mais recentes do Hub OS e tente novamente."
+    );
+  }
+
   if (rpcError.code || rpcError.details) {
     return new Error(message, {
       cause: {
