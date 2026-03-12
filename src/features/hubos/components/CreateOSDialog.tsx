@@ -387,6 +387,8 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   };
 
   const handleSubmit = async () => {
+    const trimmedAddress = address.trim();
+
     const assetValidation = validateFiles(selectedFiles);
     if (!assetValidation.ok) {
       toast.error(assetValidation.error ?? "Arquivos inválidos.");
@@ -457,6 +459,10 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
       toast.error("Preencha os campos obrigatórios.");
       return;
     }
+    if (logisticType !== "retirada" && !trimmedAddress) {
+      toast.error("O endereço é obrigatório para entrega e instalação.");
+      return;
+    }
     if (!selectedArtDirectionTag) {
       toast.error("Selecione a tag de direcionamento de arte.");
       return;
@@ -470,7 +476,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
         description,
         delivery_date: deliveryDate,
         logistic_type: logisticType,
-        address: logisticType === "retirada" ? null : address || null,
+        address: logisticType === "retirada" ? null : trimmedAddress,
         art_status: ART_COLUMNS[0],
         prod_status: null,
         art_direction_tag: selectedArtDirectionTag,
@@ -626,10 +632,11 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
 
               {logisticType !== "retirada" && (
                 <div className="space-y-1">
-                  <Label>Endereço (opcional)</Label>
+                  <Label>Endereço</Label>
                   <Input
                     value={address}
                     onChange={event => setAddress(event.target.value)}
+                    required
                     disabled={Boolean(pendingOrder)}
                   />
                 </div>
