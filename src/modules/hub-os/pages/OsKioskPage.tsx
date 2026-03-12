@@ -7,74 +7,27 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  createOrderEvent,
-  fetchOrderById,
-  updateOrder,
-} from "@/features/hubos/api";
-import type { OsOrder } from "@/features/hubos/types";
-import {
-  createOsEvent,
-  fetchOsByCode,
-  fetchOsById,
-  type KioskLookupResult,
-  updateOs,
-} from "../api";
+  fetchKioskBoard,
+  moveKioskOrder,
+  registerKioskOrderByCode,
+} from "../kiosk/api";
+import { KIOSK_POLL_INTERVAL_MS, KIOSK_STAGE_LABELS } from "../kiosk/constants";
 import { KioskOsLookupPanel } from "../kiosk/KioskOsLookupPanel";
-import type { DeliveryType, Os } from "../types";
+import {
+  applyMoveResult,
+  getOrCreateTerminalId,
+  parseKioskError,
+  resolveMoveAction,
+  upsertCard,
+} from "../kiosk/utils";
+import type { KioskBoardCard, KioskMoveAction } from "../kiosk/types";
 
-type KioskOrder = {
-  key: string;
-  source: KioskLookupResult["source"];
-  legacyOrder?: Os;
-  hubOrder?: OsOrder;
-};
+type KioskSummaryCategory = "instalacoes" | "pronto_avisar" | "logistica";
 
-type KioskDestination = "retirada" | "entrega" | "instalacao";
-
-type KioskSummaryCategory = "instalacoes" | "prontoAvisar" | "logistica";
-
-type KioskPersistedState = {
-  version: number;
-  listaOSAcabamentoEntregaRetirada: KioskOrder[];
-  listaOSAcabamentoInstalacao: KioskOrder[];
-  listaOSEmbalagem: KioskOrder[];
-  listaInstalacoes: KioskOrder[];
-  listaProntoAvisar: KioskOrder[];
-  listaLogistica: KioskOrder[];
-  materialProntoIds: string[];
-};
-
-const KIOSK_STORAGE_KEY = "hubos:kiosk:state:v2";
-
-const KIOSK_STATUS_DESTINATIONS = {
-  retirada: {
-    legacy: "PRONTO/AVISAR",
-    hub: "Pronto / Avisar Cliente",
-  },
-  entrega: {
-    legacy: "Logística",
-    hub: "Logística (Entrega/Transportadora)",
-  },
-  instalacao: {
-    legacy: "Instalação Agendada",
-    hub: "Instalação Agendada",
-  },
-} as const;
-
-const getOrderTag = (order: KioskOrder): DeliveryType | null => {
-  if (order.source === "os") {
-    return order.legacyOrder?.delivery_type ?? null;
-  }
-
-  if (!order.hubOrder) return null;
-  if (order.hubOrder.logistic_type === "entrega") return "ENTREGA";
-  if (order.hubOrder.logistic_type === "retirada") return "RETIRADA";
-  return "INSTALACAO";
-};
-
-const toTagLabel = (tag: DeliveryType | null) => {
-  if (tag === "ENTREGA") return "Entrega";
-  if (tag === "RETIRADA") return "Retirada";
+const toTagLabel = (mode: string | null) => {
+  const normalized = (mode ?? "").toLowerCase();
+  if (normalized.includes("entrega")) return "Entrega";
+  if (normalized.includes("retirada")) return "Retirada";
   return "Instalação";
 };
 
@@ -85,136 +38,52 @@ const formatDatePtBr = (value?: string | null) => {
   return parsed.toLocaleDateString("pt-BR");
 };
 
-const getKioskOrderTitle = (order: KioskOrder) => {
-  if (order.source === "os") {
-    const legacyOrder = order.legacyOrder;
-    if (!legacyOrder) return "Sem título";
-    return (
-      legacyOrder.title ||
-      `${legacyOrder.sale_number ?? ""} - ${legacyOrder.client_name}`.trim()
-    );
-  }
-
-  const hubOrder = order.hubOrder;
-  if (!hubOrder) return "Sem título";
-  return (
-    hubOrder.title || `${hubOrder.sale_number} - ${hubOrder.client_name}`.trim()
-  );
+const getHeadline = (order: KioskBoardCard) => {
+  const display = String(order.os_number ?? order.sale_number ?? "").trim();
+  const title = (order.title ?? `${order.sale_number ?? ""} - ${order.client_name ?? ""}`).trim();
+  return display ? `${display} - ${title}` : title || "Sem título";
 };
-
-const getOrderDisplayNumber = (order: KioskOrder) => {
-  if (order.source === "os") {
-    return (
-      order.legacyOrder?.os_number ?? order.legacyOrder?.sale_number ?? "—"
-    );
-  }
-
-  return order.hubOrder?.os_number ?? order.hubOrder?.sale_number ?? "—";
-};
-
-const getOrderClientName = (order: KioskOrder) => {
-  if (order.source === "os") {
-    return (
-      order.legacyOrder?.client_name || order.legacyOrder?.customer_name || "—"
-    );
-  }
-  return order.hubOrder?.client_name ?? "—";
-};
-
-const getOrderDeliveryDate = (order: KioskOrder) => {
-  if (order.source === "os") return order.legacyOrder?.delivery_date ?? null;
-  return order.hubOrder?.delivery_date ?? null;
-};
-
-const getOrderAddress = (order: KioskOrder) => {
-  if (order.source === "os") return order.legacyOrder?.address ?? null;
-  return order.hubOrder?.address ?? null;
-};
-
-const getOrderDescription = (order: KioskOrder) => {
-  if (order.source === "os") {
-    return order.legacyOrder?.description ?? order.legacyOrder?.notes ?? null;
-  }
-  return order.hubOrder?.description ?? null;
-};
-
-const getOrderProductionStatus = (order: KioskOrder) => {
-  if (order.source === "os") return order.legacyOrder?.status_producao ?? "—";
-  return order.hubOrder?.prod_status ?? "—";
-};
-
-const getOrderHeadline = (order: KioskOrder) => {
-  const displayNumber = String(getOrderDisplayNumber(order)).trim();
-  const title = getKioskOrderTitle(order).trim();
-  if (!displayNumber) return title;
-
-  const normalizedTitle = title.toLowerCase();
-  const normalizedNumber = displayNumber.toLowerCase();
-  const startsWithNumber =
-    normalizedTitle.startsWith(`${normalizedNumber} -`) ||
-    normalizedTitle.startsWith(`#${normalizedNumber} -`) ||
-    normalizedTitle.startsWith(`${normalizedNumber}-`) ||
-    normalizedTitle.startsWith(`#${normalizedNumber}-`);
-
-  return startsWithNumber ? title : `${displayNumber} - ${title}`;
-};
-
-const isEntregaOrRetiradaTag = (tag: DeliveryType | null) =>
-  tag === "ENTREGA" || tag === "RETIRADA";
-
-const upsertList = (items: KioskOrder[], nextOrder: KioskOrder) => {
-  if (items.some(item => item.key === nextOrder.key)) {
-    return items.map(item => (item.key === nextOrder.key ? nextOrder : item));
-  }
-  return [nextOrder, ...items];
-};
-
-const isOrderFinalizado = (order: KioskOrder) => {
-  const legacyStatus = (order.legacyOrder?.status_producao ?? "").toLowerCase();
-  const hubStatus = (order.hubOrder?.prod_status ?? "").toLowerCase();
-
-  return legacyStatus.includes("finaliz") || hubStatus.includes("finaliz");
-};
-
-const filterActiveOrders = (orders: KioskOrder[]) =>
-  orders.filter(order => !isOrderFinalizado(order));
 
 export default function OsKioskPage() {
   const { user } = useAuth();
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<KioskOrder | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<KioskBoardCard | null>(null);
   const [fullscreenBlocked, setFullscreenBlocked] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [materialProntoIds, setMaterialProntoIds] = useState<string[]>([]);
-  const [
-    listaOSAcabamentoEntregaRetirada,
-    setListaOSAcabamentoEntregaRetirada,
-  ] = useState<KioskOrder[]>([]);
-  const [listaOSAcabamentoInstalacao, setListaOSAcabamentoInstalacao] =
-    useState<KioskOrder[]>([]);
-  const [listaOSEmbalagem, setListaOSEmbalagem] = useState<KioskOrder[]>([]);
-  const [listaInstalacoes, setListaInstalacoes] = useState<KioskOrder[]>([]);
-  const [listaProntoAvisar, setListaProntoAvisar] = useState<KioskOrder[]>([]);
-  const [listaLogistica, setListaLogistica] = useState<KioskOrder[]>([]);
-  const [summaryModalCategory, setSummaryModalCategory] =
-    useState<KioskSummaryCategory | null>(null);
+  const [summaryModalCategory, setSummaryModalCategory] = useState<KioskSummaryCategory | null>(null);
   const [summarySearch, setSummarySearch] = useState("");
   const [summarySelectedKey, setSummarySelectedKey] = useState<string | null>(null);
+  const [cards, setCards] = useState<KioskBoardCard[]>([]);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [terminalId, setTerminalId] = useState<string | null>(null);
 
-  const removeOrderFromAllLists = (orderKey: string) => {
-    setListaOSAcabamentoEntregaRetirada(prev =>
-      prev.filter(item => item.key !== orderKey)
-    );
-    setListaOSAcabamentoInstalacao(prev =>
-      prev.filter(item => item.key !== orderKey)
-    );
-    setListaOSEmbalagem(prev => prev.filter(item => item.key !== orderKey));
-    setListaInstalacoes(prev => prev.filter(item => item.key !== orderKey));
-    setListaProntoAvisar(prev => prev.filter(item => item.key !== orderKey));
-    setListaLogistica(prev => prev.filter(item => item.key !== orderKey));
-    setMaterialProntoIds(prev => prev.filter(id => id !== orderKey));
-  };
+  const listaOSAcabamentoEntregaRetirada = useMemo(
+    () => cards.filter(card => card.current_stage === "acabamento_entrega_retirada"),
+    [cards]
+  );
+  const listaOSAcabamentoInstalacao = useMemo(
+    () => cards.filter(card => card.current_stage === "acabamento_instalacao"),
+    [cards]
+  );
+  const listaOSEmbalagem = useMemo(
+    () => cards.filter(card => card.current_stage === "embalagem"),
+    [cards]
+  );
+  const listaInstalacoes = useMemo(
+    () => cards.filter(card => card.current_stage === "instalacoes"),
+    [cards]
+  );
+  const listaProntoAvisar = useMemo(
+    () => cards.filter(card => card.current_stage === "pronto_avisar"),
+    [cards]
+  );
+  const listaLogistica = useMemo(
+    () => cards.filter(card => card.current_stage === "logistica"),
+    [cards]
+  );
 
   const attemptFullscreen = async () => {
     if (document.fullscreenElement) {
@@ -235,246 +104,83 @@ export default function OsKioskPage() {
   }, []);
 
   useEffect(() => {
-    try {
-      const rawState = localStorage.getItem(KIOSK_STORAGE_KEY);
-      if (!rawState) return;
-      const parsedState = JSON.parse(rawState) as KioskPersistedState;
-      if (!parsedState || parsedState.version !== 2) return;
-
-      setListaOSAcabamentoEntregaRetirada(
-        filterActiveOrders(parsedState.listaOSAcabamentoEntregaRetirada ?? [])
-      );
-      setListaOSAcabamentoInstalacao(
-        filterActiveOrders(parsedState.listaOSAcabamentoInstalacao ?? [])
-      );
-      setListaOSEmbalagem(filterActiveOrders(parsedState.listaOSEmbalagem ?? []));
-      setListaInstalacoes(filterActiveOrders(parsedState.listaInstalacoes ?? []));
-      setListaProntoAvisar(filterActiveOrders(parsedState.listaProntoAvisar ?? []));
-      setListaLogistica(filterActiveOrders(parsedState.listaLogistica ?? []));
-      setMaterialProntoIds(parsedState.materialProntoIds ?? []);
-    } catch (error) {
-      console.error("Falha ao carregar estado do quiosque:", error);
-    }
+    setTerminalId(getOrCreateTerminalId());
   }, []);
 
+  const syncBoard = async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsSyncing(true);
+
+    try {
+      const list = await fetchKioskBoard();
+      setCards(list);
+      setSyncError(null);
+      setLastSyncAt(new Date().toISOString());
+    } catch (error) {
+      setSyncError(parseKioskError(error));
+    } finally {
+      if (!opts?.silent) setIsSyncing(false);
+    }
+  };
+
   useEffect(() => {
-    const payload: KioskPersistedState = {
-      version: 2,
-      listaOSAcabamentoEntregaRetirada,
-      listaOSAcabamentoInstalacao,
-      listaOSEmbalagem,
-      listaInstalacoes,
-      listaProntoAvisar,
-      listaLogistica,
-      materialProntoIds,
-    };
-    localStorage.setItem(KIOSK_STORAGE_KEY, JSON.stringify(payload));
-  }, [
-    listaOSAcabamentoEntregaRetirada,
-    listaOSAcabamentoInstalacao,
-    listaOSEmbalagem,
-    listaInstalacoes,
-    listaProntoAvisar,
-    listaLogistica,
-    materialProntoIds,
-  ]);
+    if (!terminalId) return;
 
-  const addOrderToColumns = (order: KioskOrder) => {
-    if (isOrderFinalizado(order)) {
-      toast.info("OS já está em Finalizados e não será exibida no quiosque.");
-      return;
-    }
+    void syncBoard();
+    const interval = window.setInterval(() => {
+      void syncBoard({ silent: true });
+    }, KIOSK_POLL_INTERVAL_MS);
 
-    const tag = getOrderTag(order);
-
-    if (tag === "INSTALACAO") {
-      setListaOSAcabamentoInstalacao(prev => upsertList(prev, order));
-      return;
-    }
-
-    if (isEntregaOrRetiradaTag(tag)) {
-      setListaOSAcabamentoEntregaRetirada(prev => upsertList(prev, order));
-    }
-  };
-
-  const moverParaEmbalagem = (order: KioskOrder) => {
-    setListaOSEmbalagem(prev => upsertList(prev, order));
-    setListaOSAcabamentoEntregaRetirada(prev =>
-      prev.filter(item => item.key !== order.key)
-    );
-    toast.success("OS movida para Embalagem.");
-  };
-
-  const resolveKioskOrder = async (lookup: KioskLookupResult) => {
-    if (lookup.source === "os") {
-      const legacyOrder = await fetchOsById(lookup.id);
-      return {
-        key: `os:${lookup.id}`,
-        source: lookup.source,
-        legacyOrder,
-      } as KioskOrder;
-    }
-
-    const hubOrder = await fetchOrderById(lookup.id);
-    return {
-      key: `os_orders:${lookup.id}`,
-      source: lookup.source,
-      hubOrder,
-    } as KioskOrder;
-  };
-
-  const isOrderAlreadyInKiosk = (orderKey: string) => {
-    return (
-      listaOSAcabamentoEntregaRetirada.some(item => item.key === orderKey) ||
-      listaOSAcabamentoInstalacao.some(item => item.key === orderKey) ||
-      listaOSEmbalagem.some(item => item.key === orderKey) ||
-      listaInstalacoes.some(item => item.key === orderKey) ||
-      listaProntoAvisar.some(item => item.key === orderKey) ||
-      listaLogistica.some(item => item.key === orderKey)
-    );
-  };
+    return () => window.clearInterval(interval);
+  }, [terminalId]);
 
   const handleAddByCode = async (sanitizedCode: string) => {
-    const lookup = await fetchOsByCode(sanitizedCode);
-    if (!lookup) {
-      throw new Error("OS não encontrada. Verifique o número da etiqueta.");
-    }
+    if (!terminalId) throw new Error("Terminal não inicializado.");
 
-    const kioskOrder = await resolveKioskOrder(lookup);
+    const created = await registerKioskOrderByCode({
+      lookupCode: sanitizedCode,
+      actorId: user?.id ?? null,
+      terminalId,
+    });
 
-    if (isOrderAlreadyInKiosk(kioskOrder.key)) {
-      throw new Error(
-        "Essa OS já passou pelo modo quiosque e não pode ser duplicada."
-      );
-    }
-
-    addOrderToColumns(kioskOrder);
+    setCards(prev => upsertCard(prev, created));
     setAddModalOpen(false);
-    toast.success(
-      `OS #${getOrderDisplayNumber(kioskOrder)} adicionada ao quiosque.`
-    );
+    setLastSyncAt(new Date().toISOString());
+    toast.success(`OS #${created.os_number ?? created.sale_number ?? "—"} adicionada ao quiosque.`);
   };
 
-  const moverOS = async (order: KioskOrder, destino: KioskDestination) => {
+  const runMove = async (order: KioskBoardCard, action: KioskMoveAction) => {
+    if (!terminalId) {
+      toast.error("Terminal não inicializado.");
+      return;
+    }
+
     try {
-      setProcessingId(order.key);
-      const currentTag = getOrderTag(order);
+      setProcessingId(order.order_key);
+      const result = await moveKioskOrder({
+        orderKey: order.order_key,
+        action,
+        actorId: user?.id ?? null,
+        terminalId,
+      });
 
-      let updatedOrder: KioskOrder = order;
-
-      if (order.source === "os" && order.legacyOrder) {
-        const updatedLegacyOrder = await updateOs(order.legacyOrder.id, {
-          status_producao: KIOSK_STATUS_DESTINATIONS[destino].legacy,
-          updated_at: new Date().toISOString(),
-        });
-
-        await createOsEvent({
-          os_id: order.legacyOrder.id,
-          type: "status_producao_changed",
-          payload: {
-            from: order.legacyOrder.status_producao,
-            to: KIOSK_STATUS_DESTINATIONS[destino].legacy,
-            source: "kiosk",
-          },
-          created_by: user?.id ?? null,
-        });
-
-        updatedOrder = {
-          ...order,
-          legacyOrder: updatedLegacyOrder,
-        };
-      }
-
-      if (order.source === "os_orders" && order.hubOrder) {
-        const updatedHubOrder = await updateOrder(order.hubOrder.id, {
-          prod_status: KIOSK_STATUS_DESTINATIONS[destino].hub,
-          production_tag: destino === "instalacao" ? "PRONTO" : order.hubOrder.production_tag,
-          updated_at: new Date().toISOString(),
-          updated_by: user?.id ?? null,
-        });
-
-        await createOrderEvent({
-          os_id: order.hubOrder.id,
-          type: "prod_status_changed",
-          payload: {
-            from: order.hubOrder.prod_status,
-            to: KIOSK_STATUS_DESTINATIONS[destino].hub,
-            source: "kiosk",
-          },
-          created_by: user?.id ?? null,
-        });
-
-        updatedOrder = {
-          ...order,
-          hubOrder: updatedHubOrder,
-        };
-      }
-
-      if (isOrderFinalizado(updatedOrder)) {
-        removeOrderFromAllLists(order.key);
-        setSelectedOrder(current => (current?.key === order.key ? null : current));
-        toast.success("OS finalizada removida do quiosque.");
-        return;
-      }
-
-      setListaOSAcabamentoEntregaRetirada(prev =>
-        prev.filter(item => item.key !== order.key)
-      );
-      setListaOSAcabamentoInstalacao(prev =>
-        prev.filter(item => item.key !== order.key)
-      );
-
-      if (destino === "instalacao") {
-        setMaterialProntoIds(prev =>
-          prev.includes(order.key) ? prev : [...prev, order.key]
-        );
-        setListaInstalacoes(prev => upsertList(prev, updatedOrder));
-      }
-
-      if (destino === "retirada" && isEntregaOrRetiradaTag(currentTag)) {
-        setListaProntoAvisar(prev => upsertList(prev, updatedOrder));
-        setListaOSEmbalagem(prev => prev.filter(item => item.key !== order.key));
-        setMaterialProntoIds(prev =>
-          prev.includes(order.key) ? prev : [...prev, order.key]
-        );
-      }
-
-      if (destino === "entrega" && isEntregaOrRetiradaTag(currentTag)) {
-        setListaLogistica(prev => upsertList(prev, updatedOrder));
-        setListaOSEmbalagem(prev =>
-          prev.filter(item => item.key !== order.key)
-        );
-      }
-
+      setCards(prev => applyMoveResult(prev, result));
       setSelectedOrder(current =>
-        current?.key === order.key ? updatedOrder : current
+        current?.order_key === order.order_key && !result.removed ? result : current
       );
-      toast.success(`Movido para ${KIOSK_STATUS_DESTINATIONS[destino].hub}.`);
+      if (result.removed) {
+        setSelectedOrder(current => (current?.order_key === order.order_key ? null : current));
+      }
+      setLastSyncAt(new Date().toISOString());
+      setSyncError(null);
+      toast.success(result.result_message || "Movimentação concluída.");
     } catch (error) {
-      console.error(error);
-      toast.error("Falha ao mover a OS. Tente novamente.");
+      toast.error(parseKioskError(error));
     } finally {
       setProcessingId(null);
     }
   };
 
-  const totalCards = useMemo(
-    () =>
-      listaOSAcabamentoEntregaRetirada.length +
-      listaOSAcabamentoInstalacao.length +
-      listaOSEmbalagem.length +
-      listaInstalacoes.length +
-      listaProntoAvisar.length +
-      listaLogistica.length,
-    [
-      listaOSAcabamentoEntregaRetirada.length,
-      listaOSAcabamentoInstalacao.length,
-      listaOSEmbalagem.length,
-      listaInstalacoes.length,
-      listaProntoAvisar.length,
-      listaLogistica.length,
-    ]
-  );
+  const totalCards = cards.length;
 
   const AddOrderButton = ({ label }: { label: string }) => (
     <button
@@ -485,41 +191,30 @@ export default function OsKioskPage() {
       <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground">
         +
       </span>
-      <span className="text-sm font-bold tracking-wide text-primary sm:text-base">
-        {label}
-      </span>
+      <span className="text-sm font-bold tracking-wide text-primary sm:text-base">{label}</span>
     </button>
   );
 
-  const kioskSummaryConfig: Record<
-    KioskSummaryCategory,
-    { title: string; orders: KioskOrder[] }
-  > = {
+  const kioskSummaryConfig: Record<KioskSummaryCategory, { title: string; orders: KioskBoardCard[] }> = {
     instalacoes: { title: "Instalações", orders: listaInstalacoes },
-    prontoAvisar: { title: "Pronto/Avisar", orders: listaProntoAvisar },
+    pronto_avisar: { title: "Pronto/Avisar", orders: listaProntoAvisar },
     logistica: { title: "Logística", orders: listaLogistica },
   };
 
-  const summaryModalData = summaryModalCategory
-    ? kioskSummaryConfig[summaryModalCategory]
-    : null;
+  const summaryModalData = summaryModalCategory ? kioskSummaryConfig[summaryModalCategory] : null;
 
   const summaryFilteredOrders = useMemo(() => {
     if (!summaryModalData) return [];
-
     const search = summarySearch.trim().toLowerCase();
     if (!search) return summaryModalData.orders;
 
     return summaryModalData.orders.filter(order => {
-      const orderNumber = String(getOrderDisplayNumber(order)).toLowerCase();
-      const title = getKioskOrderTitle(order).toLowerCase();
-      const description = (getOrderDescription(order) ?? "").toLowerCase();
-      const client = getOrderClientName(order).toLowerCase();
+      const orderNumber = String(order.os_number ?? order.sale_number ?? "").toLowerCase();
       return (
         orderNumber.includes(search) ||
-        title.includes(search) ||
-        description.includes(search) ||
-        client.includes(search)
+        (order.title ?? "").toLowerCase().includes(search) ||
+        (order.description ?? "").toLowerCase().includes(search) ||
+        (order.client_name ?? "").toLowerCase().includes(search)
       );
     });
   }, [summaryModalData, summarySearch]);
@@ -532,18 +227,16 @@ export default function OsKioskPage() {
 
     if (
       summarySelectedKey &&
-      summaryFilteredOrders.some(order => order.key === summarySelectedKey)
+      summaryFilteredOrders.some(order => order.order_key === summarySelectedKey)
     ) {
       return;
     }
 
-    setSummarySelectedKey(summaryFilteredOrders[0]?.key ?? null);
+    setSummarySelectedKey(summaryFilteredOrders[0]?.order_key ?? null);
   }, [summaryFilteredOrders, summaryModalData, summarySelectedKey]);
 
   const summarySelectedOrder = useMemo(
-    () =>
-      summaryFilteredOrders.find(order => order.key === summarySelectedKey) ??
-      null,
+    () => summaryFilteredOrders.find(order => order.order_key === summarySelectedKey) ?? null,
     [summaryFilteredOrders, summarySelectedKey]
   );
 
@@ -552,10 +245,9 @@ export default function OsKioskPage() {
     setSummarySelectedKey(null);
   }, [summaryModalCategory]);
 
-
-  const renderOrderCard = (order: KioskOrder, children?: ReactNode) => (
+  const renderOrderCard = (order: KioskBoardCard, children?: ReactNode) => (
     <Card
-      key={order.key}
+      key={order.order_key}
       role="button"
       tabIndex={0}
       onClick={() => {
@@ -570,105 +262,77 @@ export default function OsKioskPage() {
       }}
       className="space-y-3 p-3 transition hover:border-primary/60 hover:bg-muted/20"
     >
-      <p className="text-xs text-muted-foreground">
-        OS #{getOrderDisplayNumber(order)}
-      </p>
-      <p className="font-semibold">{getKioskOrderTitle(order)}</p>
+      <p className="text-xs text-muted-foreground">OS #{order.os_number ?? order.sale_number ?? "—"}</p>
+      <p className="font-semibold">{order.title ?? getHeadline(order)}</p>
       <div className="flex flex-wrap gap-2">
-        <Badge variant="secondary">{toTagLabel(getOrderTag(order))}</Badge>
+        <Badge variant="secondary">{toTagLabel(order.delivery_mode)}</Badge>
       </div>
       {children}
     </Card>
   );
+
+  const renderMoveButton = (order: KioskBoardCard) => {
+    const action = resolveMoveAction({
+      stage: order.current_stage,
+      deliveryMode: order.delivery_mode,
+    });
+    if (!action) return null;
+
+    const labelByAction: Record<KioskMoveAction, string> = {
+      to_packaging: "Pronto para embalar",
+      to_installations: "Pronto para a Instalação",
+      to_ready_notify: "Pronto para a retirada",
+      to_logistics: "Pronto para a logística",
+      remove_if_finalized: "Remover finalizada",
+    };
+
+    return (
+      <Button
+        disabled={processingId === order.order_key}
+        onClick={event => {
+          event.stopPropagation();
+          void runMove(order, action);
+        }}
+      >
+        {labelByAction[action]}
+      </Button>
+    );
+  };
 
   return (
     <div className="min-h-[100dvh] bg-background p-4 sm:p-6 lg:p-8">
       {fullscreenBlocked ? (
         <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-400/60 bg-amber-50 px-4 py-2 text-sm text-amber-900">
           <span>Clique para entrar em Tela Cheia</span>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => void attemptFullscreen()}
-          >
+          <Button size="sm" variant="outline" onClick={() => void attemptFullscreen()}>
             Entrar em Tela Cheia
           </Button>
         </div>
       ) : null}
 
-      <div
-        className={
-          addModalOpen
-            ? "pointer-events-none select-none blur-[2px] brightness-75"
-            : ""
-        }
-      >
+      <div className={addModalOpen ? "pointer-events-none select-none blur-[2px] brightness-75" : ""}>
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold">Modo Quiosque</h1>
-            <p className="text-sm text-muted-foreground">
-              Acabamento e Embalagem em tela cheia.
+            <p className="text-sm text-muted-foreground">Acabamento e Embalagem em tela cheia.</p>
+            <p className="text-xs text-muted-foreground">
+              {isSyncing ? "Sincronizando..." : "Sincronizado"}
+              {lastSyncAt ? ` • Última sincronização: ${new Date(lastSyncAt).toLocaleTimeString("pt-BR")}` : ""}
             </p>
+            {syncError ? <p className="text-xs text-amber-700">{syncError}</p> : null}
           </div>
           <Badge variant="secondary">{totalCards} OS em exibição</Badge>
         </div>
 
         <div className="mb-4 grid gap-3 md:grid-cols-3">
-          <Card
-            role="button"
-            tabIndex={0}
-            onClick={() => setSummaryModalCategory("instalacoes")}
-            onKeyDown={event => {
-              if (event.key !== "Enter" && event.key !== " ") return;
-              event.preventDefault();
-              setSummaryModalCategory("instalacoes");
-            }}
-            className="cursor-pointer p-3 transition hover:border-primary/60 hover:bg-muted/20"
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Instalações
-              </h3>
-              <Badge variant="outline">{listaInstalacoes.length}</Badge>
-            </div>
+          <Card role="button" tabIndex={0} onClick={() => setSummaryModalCategory("instalacoes")} className="cursor-pointer p-3 transition hover:border-primary/60 hover:bg-muted/20">
+            <div className="flex items-center justify-between"><h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Instalações</h3><Badge variant="outline">{listaInstalacoes.length}</Badge></div>
           </Card>
-
-          <Card
-            role="button"
-            tabIndex={0}
-            onClick={() => setSummaryModalCategory("prontoAvisar")}
-            onKeyDown={event => {
-              if (event.key !== "Enter" && event.key !== " ") return;
-              event.preventDefault();
-              setSummaryModalCategory("prontoAvisar");
-            }}
-            className="cursor-pointer p-3 transition hover:border-primary/60 hover:bg-muted/20"
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Pronto/Avisar
-              </h3>
-              <Badge variant="outline">{listaProntoAvisar.length}</Badge>
-            </div>
+          <Card role="button" tabIndex={0} onClick={() => setSummaryModalCategory("pronto_avisar")} className="cursor-pointer p-3 transition hover:border-primary/60 hover:bg-muted/20">
+            <div className="flex items-center justify-between"><h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Pronto/Avisar</h3><Badge variant="outline">{listaProntoAvisar.length}</Badge></div>
           </Card>
-
-          <Card
-            role="button"
-            tabIndex={0}
-            onClick={() => setSummaryModalCategory("logistica")}
-            onKeyDown={event => {
-              if (event.key !== "Enter" && event.key !== " ") return;
-              event.preventDefault();
-              setSummaryModalCategory("logistica");
-            }}
-            className="cursor-pointer p-3 transition hover:border-primary/60 hover:bg-muted/20"
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Logística
-              </h3>
-              <Badge variant="outline">{listaLogistica.length}</Badge>
-            </div>
+          <Card role="button" tabIndex={0} onClick={() => setSummaryModalCategory("logistica")} className="cursor-pointer p-3 transition hover:border-primary/60 hover:bg-muted/20">
+            <div className="flex items-center justify-between"><h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Logística</h3><Badge variant="outline">{listaLogistica.length}</Badge></div>
           </Card>
         </div>
 
@@ -681,290 +345,86 @@ export default function OsKioskPage() {
 
             <div className="space-y-3">
               <div className="rounded-lg border bg-muted/20 p-3">
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    Entrega/Retirada
-                  </h3>
-                  <Badge variant="outline">
-                    {listaOSAcabamentoEntregaRetirada.length}
-                  </Badge>
-                </div>
+                <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Entrega/Retirada</h3><Badge variant="outline">{listaOSAcabamentoEntregaRetirada.length}</Badge></div>
                 <div className="space-y-2">
-                  {listaOSAcabamentoEntregaRetirada.length === 0 && (
-                    <Card className="p-3 text-xs text-muted-foreground">
-                      Nenhuma OS.
-                    </Card>
-                  )}
-                  {listaOSAcabamentoEntregaRetirada.map(order =>
-                    renderOrderCard(
-                      order,
-                      <Button
-                        disabled={processingId === order.key}
-                        onClick={event => {
-                          event.stopPropagation();
-                          moverParaEmbalagem(order);
-                        }}
-                      >
-                        Pronto para embalar
-                      </Button>
-                    )
-                  )}
+                  {listaOSAcabamentoEntregaRetirada.length === 0 ? <Card className="p-3 text-xs text-muted-foreground">Nenhuma OS.</Card> : null}
+                  {listaOSAcabamentoEntregaRetirada.map(order => renderOrderCard(order, renderMoveButton(order)))}
                 </div>
               </div>
 
               <div className="rounded-lg border bg-muted/20 p-3">
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    Instalação
-                  </h3>
-                  <Badge variant="outline">
-                    {listaOSAcabamentoInstalacao.length}
-                  </Badge>
-                </div>
+                <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Instalação</h3><Badge variant="outline">{listaOSAcabamentoInstalacao.length}</Badge></div>
                 <div className="space-y-2">
-                  {listaOSAcabamentoInstalacao.length === 0 && (
-                    <Card className="p-3 text-xs text-muted-foreground">
-                      Nenhuma OS.
-                    </Card>
-                  )}
-                  {listaOSAcabamentoInstalacao.map(order =>
-                    renderOrderCard(
-                      order,
-                      <>
-                        {materialProntoIds.includes(order.key) ? (
-                          <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
-                            Material Pronto
-                          </Badge>
-                        ) : null}
-                        <Button
-                          disabled={processingId === order.key}
-                          onClick={event => {
-                            event.stopPropagation();
-                            void moverOS(order, "instalacao");
-                          }}
-                        >
-                          Pronto para a Instalação
-                        </Button>
-                      </>
-                    )
-                  )}
+                  {listaOSAcabamentoInstalacao.length === 0 ? <Card className="p-3 text-xs text-muted-foreground">Nenhuma OS.</Card> : null}
+                  {listaOSAcabamentoInstalacao.map(order => renderOrderCard(order, <>{order.material_ready ? <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">Material Pronto</Badge> : null}{renderMoveButton(order)}</>))}
                 </div>
               </div>
             </div>
           </Card>
 
           <Card className="space-y-4 p-4">
-            <div className="flex items-center">
-              <h2 className="text-xl font-semibold">Embalagem</h2>
-            </div>
-
+            <div className="flex items-center"><h2 className="text-xl font-semibold">Embalagem</h2></div>
             <div className="space-y-2">
-              {listaOSEmbalagem.length === 0 && (
-                <Card className="p-3 text-xs text-muted-foreground">
-                  Nenhuma OS.
-                </Card>
-              )}
-              {listaOSEmbalagem.map(order => {
-                const tag = getOrderTag(order);
-                return renderOrderCard(
-                  order,
-                  <>
-                    {tag === "RETIRADA" ? (
-                      <Button
-                        disabled={processingId === order.key}
-                        onClick={event => {
-                          event.stopPropagation();
-                          void moverOS(order, "retirada");
-                        }}
-                      >
-                        Pronto para a retirada
-                      </Button>
-                    ) : null}
-
-                    {tag === "ENTREGA" ? (
-                      <Button
-                        disabled={processingId === order.key}
-                        onClick={event => {
-                          event.stopPropagation();
-                          void moverOS(order, "entrega");
-                        }}
-                      >
-                        Pronto para a logística
-                      </Button>
-                    ) : null}
-                  </>
-                );
-              })}
+              {listaOSEmbalagem.length === 0 ? <Card className="p-3 text-xs text-muted-foreground">Nenhuma OS.</Card> : null}
+              {listaOSEmbalagem.map(order => renderOrderCard(order, renderMoveButton(order)))}
             </div>
           </Card>
         </div>
       </div>
 
-      <Dialog
-        open={summaryModalCategory !== null}
-        onOpenChange={open => {
-          if (!open) {
-            setSummaryModalCategory(null);
-            setSummarySearch("");
-            setSummarySelectedKey(null);
-          }
-        }}
-      >
+      <Dialog open={summaryModalCategory !== null} onOpenChange={open => !open && setSummaryModalCategory(null)}>
         <DialogContent className="h-[90vh] w-[98vw] max-w-[98vw] p-4 sm:p-6 xl:max-w-[1400px]">
           {summaryModalData ? (
             <div className="flex h-full flex-col gap-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-3xl font-semibold">
-                    {summaryModalData.title} ({summaryFilteredOrders.length}/{summaryModalData.orders.length})
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {summaryFilteredOrders.length} OS
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSummaryModalCategory(null);
-                    setSummarySearch("");
-                    setSummarySelectedKey(null);
-                  }}
-                >
-                  Voltar
-                </Button>
+                <h3 className="text-3xl font-semibold">{summaryModalData.title} ({summaryFilteredOrders.length}/{summaryModalData.orders.length})</h3>
+                <Button variant="outline" onClick={() => setSummaryModalCategory(null)}>Voltar</Button>
               </div>
-
               <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
                 <Card className="min-h-0 space-y-3 p-4">
-                  <Input
-                    value={summarySearch}
-                    onChange={event => setSummarySearch(event.target.value)}
-                    placeholder="Pesquisar..."
-                  />
-
-                  <div className="max-h-[62vh] space-y-2 overflow-y-auto pr-1">
-                    {summaryFilteredOrders.length === 0 ? (
-                      <Card className="p-3 text-sm text-muted-foreground">
-                        Nenhuma OS.
+                  <Input value={summarySearch} onChange={event => setSummarySearch(event.target.value)} placeholder="Buscar OS" />
+                  <div className="min-h-0 space-y-2 overflow-y-auto">
+                    {summaryFilteredOrders.map(order => (
+                      <Card key={order.order_key} role="button" tabIndex={0} onClick={() => setSummarySelectedKey(order.order_key)} className={summarySelectedKey === order.order_key ? "cursor-pointer space-y-2 border-primary bg-primary/5 p-3" : "cursor-pointer space-y-2 p-3"}>
+                        <p className="font-semibold">{getHeadline(order)}</p>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="secondary">Produção • {order.upstream_status ?? "—"}</Badge>
+                          <Badge variant="outline">{toTagLabel(order.delivery_mode)}</Badge>
+                          {order.material_ready ? <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">Material Pronto</Badge> : null}
+                        </div>
                       </Card>
-                    ) : (
-                      summaryFilteredOrders.map(order => (
-                        <Card
-                          key={order.key}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => setSummarySelectedKey(order.key)}
-                          onKeyDown={event => {
-                            if (event.key !== "Enter" && event.key !== " ") return;
-                            event.preventDefault();
-                            setSummarySelectedKey(order.key);
-                          }}
-                          className={
-                            summarySelectedKey === order.key
-                              ? "cursor-pointer space-y-2 border-primary bg-primary/5 p-3"
-                              : "cursor-pointer space-y-2 p-3"
-                          }
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="font-semibold">
-                              {getOrderHeadline(order)}
-                            </p>
-                            <Badge variant="outline" className="whitespace-nowrap">
-                              {formatDatePtBr(getOrderDeliveryDate(order))}
-                            </Badge>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <Badge variant="secondary">
-                              Produção • {getOrderProductionStatus(order)}
-                            </Badge>
-                            <Badge variant="outline">{toTagLabel(getOrderTag(order))}</Badge>
-                            {materialProntoIds.includes(order.key) ? (
-                              <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
-                                Material Pronto
-                              </Badge>
-                            ) : null}
-                          </div>
-                        </Card>
-                      ))
-                    )}
+                    ))}
                   </div>
                 </Card>
-
                 <Card className="min-h-0 overflow-y-auto p-4 sm:p-5">
                   {summarySelectedOrder ? (
                     <div className="space-y-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <h4 className="text-3xl font-semibold">
-                            {getOrderHeadline(summarySelectedOrder)}
-                          </h4>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            <Badge variant="secondary">
-                              Produção • {getOrderProductionStatus(summarySelectedOrder)}
-                            </Badge>
-                            <Badge variant="outline">
-                              {toTagLabel(getOrderTag(summarySelectedOrder))}
-                            </Badge>
-                            {materialProntoIds.includes(summarySelectedOrder.key) ? (
-                              <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
-                                Material Pronto
-                              </Badge>
-                            ) : null}
-                          </div>
-                        </div>
-                        <Badge variant="outline">
-                          {formatDatePtBr(getOrderDeliveryDate(summarySelectedOrder))}
-                        </Badge>
-                      </div>
-
-                      <div>
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                          Cliente
-                        </p>
-                        <p className="font-medium">{getOrderClientName(summarySelectedOrder)}</p>
-                      </div>
-
-                      <div>
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                          Descrição detalhada
-                        </p>
-                        <p className="whitespace-pre-wrap font-medium">
-                          {getOrderDescription(summarySelectedOrder) ?? "Sem descrição."}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                          Data de entrega
-                        </p>
-                        <p className="font-medium">
-                          {formatDatePtBr(getOrderDeliveryDate(summarySelectedOrder))}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                          Endereço
-                        </p>
-                        <p className="font-medium">
-                          {getOrderAddress(summarySelectedOrder) ?? "—"}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                          Flags
-                        </p>
-                        <p className="font-medium">(nenhuma)</p>
-                      </div>
+                      <h4 className="text-3xl font-semibold">{getHeadline(summarySelectedOrder)}</h4>
+                      <p className="text-sm text-muted-foreground">{KIOSK_STAGE_LABELS[summarySelectedOrder.current_stage]}</p>
+                      <p><strong>Cliente:</strong> {summarySelectedOrder.client_name ?? "—"}</p>
+                      <p><strong>Descrição:</strong> {summarySelectedOrder.description ?? "Sem descrição."}</p>
+                      <p><strong>Data de entrega:</strong> {formatDatePtBr(summarySelectedOrder.delivery_date)}</p>
+                      <p><strong>Endereço:</strong> {summarySelectedOrder.address ?? "—"}</p>
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Selecione uma OS na lista para ver os detalhes.
-                    </p>
+                    <p className="text-sm text-muted-foreground">Selecione uma OS na lista para ver os detalhes.</p>
                   )}
                 </Card>
               </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-w-xl">
+          {selectedOrder ? (
+            <div className="space-y-3">
+              <h3 className="text-xl font-semibold">{getHeadline(selectedOrder)}</h3>
+              <p><strong>Cliente:</strong> {selectedOrder.client_name ?? "—"}</p>
+              <p><strong>Descrição:</strong> {selectedOrder.description ?? "Sem descrição."}</p>
+              <p><strong>Data:</strong> {formatDatePtBr(selectedOrder.delivery_date)}</p>
+              <p><strong>Etapa:</strong> {KIOSK_STAGE_LABELS[selectedOrder.current_stage]}</p>
             </div>
           ) : null}
         </DialogContent>
@@ -978,68 +438,6 @@ export default function OsKioskPage() {
             onCancel={() => setAddModalOpen(false)}
             autoFocus
           />
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="w-[92vw] max-w-[820px] p-6">
-          {selectedOrder ? (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-xl font-semibold">
-                  OS #{getOrderDisplayNumber(selectedOrder)}
-                </h3>
-                <p className="text-muted-foreground">
-                  {getKioskOrderTitle(selectedOrder)}
-                </p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-md border p-3">
-                  <p className="text-xs text-muted-foreground">Cliente</p>
-                  <p className="font-medium">
-                    {getOrderClientName(selectedOrder)}
-                  </p>
-                </div>
-                <div className="rounded-md border p-3">
-                  <p className="text-xs text-muted-foreground">Tag logística</p>
-                  <p className="font-medium">
-                    {toTagLabel(getOrderTag(selectedOrder))}
-                  </p>
-                </div>
-                <div className="rounded-md border p-3">
-                  <p className="text-xs text-muted-foreground">
-                    Data de entrega
-                  </p>
-                  <p className="font-medium">
-                    {formatDatePtBr(getOrderDeliveryDate(selectedOrder))}
-                  </p>
-                </div>
-                <div className="rounded-md border p-3">
-                  <p className="text-xs text-muted-foreground">
-                    Status Produção
-                  </p>
-                  <p className="font-medium">
-                    {getOrderProductionStatus(selectedOrder)}
-                  </p>
-                </div>
-                <div className="rounded-md border p-3 sm:col-span-2">
-                  <p className="text-xs text-muted-foreground">Endereço</p>
-                  <p className="font-medium">
-                    {getOrderAddress(selectedOrder) ?? "—"}
-                  </p>
-                </div>
-                <div className="rounded-md border p-3 sm:col-span-2">
-                  <p className="text-xs text-muted-foreground">
-                    Descrição / Observações
-                  </p>
-                  <p className="whitespace-pre-wrap font-medium">
-                    {getOrderDescription(selectedOrder) ?? "—"}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : null}
         </DialogContent>
       </Dialog>
     </div>
