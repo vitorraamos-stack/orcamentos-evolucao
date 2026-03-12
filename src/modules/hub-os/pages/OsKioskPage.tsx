@@ -323,6 +323,17 @@ export default function OsKioskPage() {
     } as KioskOrder;
   };
 
+  const isOrderAlreadyInKiosk = (orderKey: string) => {
+    return (
+      listaOSAcabamentoEntregaRetirada.some(item => item.key === orderKey) ||
+      listaOSAcabamentoInstalacao.some(item => item.key === orderKey) ||
+      listaOSEmbalagem.some(item => item.key === orderKey) ||
+      listaInstalacoes.some(item => item.key === orderKey) ||
+      listaProntoAvisar.some(item => item.key === orderKey) ||
+      listaLogistica.some(item => item.key === orderKey)
+    );
+  };
+
   const handleAddByCode = async (sanitizedCode: string) => {
     const lookup = await fetchOsByCode(sanitizedCode);
     if (!lookup) {
@@ -330,6 +341,13 @@ export default function OsKioskPage() {
     }
 
     const kioskOrder = await resolveKioskOrder(lookup);
+
+    if (isOrderAlreadyInKiosk(kioskOrder.key)) {
+      throw new Error(
+        "Essa OS já passou pelo modo quiosque e não pode ser duplicada."
+      );
+    }
+
     addOrderToColumns(kioskOrder);
     setAddModalOpen(false);
     toast.success(
