@@ -4,7 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { sanitizeOsCode } from "../utils";
 
-type KioskErrorType = "invalid_code" | "not_found" | "network" | "unknown";
+type KioskErrorType =
+  | "invalid_code"
+  | "not_found"
+  | "duplicate"
+  | "network"
+  | "unknown";
 
 type KioskOsLookupPanelProps = {
   onFoundCode: (sanitizedCode: string) => Promise<void>;
@@ -35,6 +40,9 @@ export function KioskOsLookupPanel({
     if (errorType === "invalid_code") return "Informe apenas o número da OS.";
     if (errorType === "not_found")
       return "OS não encontrada. Verifique o número da etiqueta.";
+    if (errorType === "duplicate") {
+      return "Essa OS já passou pelo modo quiosque e não pode ser duplicada.";
+    }
     if (errorType === "network") return "Falha de rede. Tente novamente.";
     if (errorType === "unknown")
       return "Erro ao consultar OS. Tente novamente.";
@@ -78,15 +86,25 @@ export function KioskOsLookupPanel({
         error instanceof Error
           ? error.message
           : "Erro ao consultar OS. Tente novamente.";
-      if (message.toLowerCase().includes("não encontrada")) {
-        setErrorType("not_found");
+      const normalizedMessage = message.toLowerCase();
+      let nextErrorType: KioskErrorType = "unknown";
+
+      if (normalizedMessage.includes("não encontrada")) {
+        nextErrorType = "not_found";
+      } else if (
+        normalizedMessage.includes("já passou pelo modo quiosque") ||
+        normalizedMessage.includes("não pode ser duplicada")
+      ) {
+        nextErrorType = "duplicate";
       } else if (isNetworkError(error)) {
-        setErrorType("network");
-      } else {
-        setErrorType("unknown");
+        nextErrorType = "network";
       }
 
-      toast.error(message);
+      setErrorType(nextErrorType);
+
+      if (nextErrorType !== "duplicate") {
+        toast.error(message);
+      }
       focusInput();
     } finally {
       setLoading(false);
