@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DndContext, DragEndEvent } from "@dnd-kit/core";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -155,6 +155,17 @@ export default function HubOS() {
   const [insumosRequesterName, setInsumosRequesterName] = useState<
     string | null
   >(null);
+  const isOrderAvisado = useCallback(
+    (order: OsOrder) => isAvisado(buildHubOrderFlowKeyFromOsOrdersId(order.id)),
+    [isAvisado]
+  );
+
+  const isOrderRetirado = useCallback(
+    (order: OsOrder) =>
+      isRetirado(buildHubOrderFlowKeyFromOsOrdersId(order.id)),
+    [isRetirado]
+  );
+
   const previousInsumosIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedInsumosRef = useRef(false);
   const hasAppliedKioskSearch = useRef(false);
@@ -271,8 +282,13 @@ export default function HubOS() {
   );
 
   const activeProducaoOrders = useMemo(
-    () => producaoOrders.filter(order => order.prod_status !== "Finalizados"),
-    [producaoOrders, isRetirado]
+    () =>
+      producaoOrders.filter(
+        order =>
+          order.prod_status !== "Finalizados" &&
+          !(order.prod_status === "Pronto / Avisar Cliente" && isOrderRetirado(order))
+      ),
+    [producaoOrders, isOrderRetirado]
   );
 
   const openOrders = useMemo(
@@ -300,7 +316,7 @@ export default function HubOS() {
           order.prod_status === "Pronto / Avisar Cliente" &&
           !isOrderRetirado(order)
       ),
-    [producaoOrders]
+    [producaoOrders, isOrderRetirado]
   );
 
   const instalacaoOrders = useMemo(
@@ -472,8 +488,8 @@ export default function HubOS() {
 
   const visibleOrders = useMemo(() => {
     if (viewMode === "inbox") return inboxOrders;
-    return activeTab === "arte" ? arteOrders : producaoOrders;
-  }, [activeTab, arteOrders, inboxOrders, producaoOrders, viewMode]);
+    return activeTab === "arte" ? arteOrders : activeProducaoOrders;
+  }, [activeProducaoOrders, activeTab, arteOrders, inboxOrders, viewMode]);
 
   const visibleOrderIds = useMemo(
     () => visibleOrders.map(order => order.id),
