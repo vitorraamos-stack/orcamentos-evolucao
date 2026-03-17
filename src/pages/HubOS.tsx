@@ -47,6 +47,11 @@ const defaultFilters: HubOsFilters = {
 const normalize = (value: string) => value.toLowerCase();
 
 const FINAL_PROD_STATUS = PROD_COLUMNS[PROD_COLUMNS.length - 1];
+const HUB_OS_STORAGE_KEY = "hub_os:inbox:v1";
+
+type HubInboxPersistedState = {
+  avisadoIds: string[];
+};
 const DONE_ASSET_STATUSES = new Set(["CLEANED", "DONE", "DONE_CLEANUP_FAILED"]);
 type InboxKey =
   | "global"
@@ -125,6 +130,7 @@ export default function HubOS() {
   const kioskSearch = inboxSearch;
   const setKioskSearch = setInboxSearch;
   const [selectedInboxId, setSelectedInboxId] = useState<string | null>(null);
+  const [avisadoIds, setAvisadoIds] = useState<string[]>([]);
   // Backward-compatible alias to prevent runtime crashes if stale/legacy code references kioskOpenOrderId.
   const kioskOpenOrderId = selectedInboxId;
   const setKioskOpenOrderId = setSelectedInboxId;
@@ -144,7 +150,9 @@ export default function HubOS() {
     useState("");
   const [updatingInsumosTransition, setUpdatingInsumosTransition] =
     useState(false);
-  const [markingInsumosReadyOrderId, setMarkingInsumosReadyOrderId] = useState<string | null>(null);
+  const [markingInsumosReadyOrderId, setMarkingInsumosReadyOrderId] = useState<
+    string | null
+  >(null);
   const [insumosRequesterName, setInsumosRequesterName] = useState<
     string | null
   >(null);
@@ -175,6 +183,31 @@ export default function HubOS() {
     setActiveTab("producao");
     hasAppliedKioskSearch.current = true;
   }, [kioskSearch]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(HUB_OS_STORAGE_KEY);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as Partial<HubInboxPersistedState> | null;
+      if (!parsed || typeof parsed !== "object") return;
+
+      const restoredAvisado = Array.isArray(parsed.avisadoIds)
+        ? parsed.avisadoIds.filter(
+            (item): item is string => typeof item === "string"
+          )
+        : [];
+
+      setAvisadoIds(restoredAvisado);
+    } catch {
+      setAvisadoIds([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    const payload: HubInboxPersistedState = { avisadoIds };
+    localStorage.setItem(HUB_OS_STORAGE_KEY, JSON.stringify(payload));
+  }, [avisadoIds]);
 
   const loadPendingInstallments = async () => {
     try {
@@ -580,6 +613,67 @@ export default function HubOS() {
     );
   };
 
+  const isOrderAvisado = (order: OsOrder) => avisadoIds.includes(order.id);
+
+  const toggleAvisado = (order: OsOrder) => {
+    const alreadyAvisado = isOrderAvisado(order);
+
+    setAvisadoIds(prev =>
+      alreadyAvisado
+        ? prev.filter(orderId => orderId !== order.id)
+        : [...prev, order.id]
+    );
+
+    toast.success(
+      alreadyAvisado
+        ? `OS ${order.sale_number} desmarcada como avisada.`
+        : `OS ${order.sale_number} marcada como avisada.`
+    );
+  };
+
+  const handleMarcarComoRetirado = async (order: OsOrder) => {
+    const previous = order;
+    const optimistic = {
+      ...order,
+      prod_status: "Finalizados",
+    } satisfies OsOrder;
+
+    updateLocalOrder(optimistic);
+    setAvisadoIds(prev => prev.filter(orderId => orderId !== order.id));
+
+    try {
+      const updated = await updateOrder(order.id, {
+        prod_status: "Finalizados",
+        updated_at: new Date().toISOString(),
+        updated_by: user?.id ?? null,
+      });
+      updateLocalOrder(updated);
+
+      try {
+        await createOrderEvent({
+          os_id: order.id,
+          type: "status_change",
+          payload: {
+            board: "producao",
+            from: order.prod_status,
+            to: "Finalizados",
+            actor_name:
+              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
+          },
+          created_by: user?.id ?? null,
+        });
+      } catch (eventError) {
+        console.error("Erro ao registrar auditoria de retirada.", eventError);
+      }
+
+      toast.success("OS marcada como retirado e enviada para Finalizados.");
+    } catch (error) {
+      console.error("Erro ao marcar OS como retirada.", error);
+      updateLocalOrder(previous);
+      toast.error("Não foi possível marcar a OS como retirada.");
+    }
+  };
+
   const handleArchive = async (order: OsOrder) => {
     const previous = orders;
     setOrders(prev => prev.filter(item => item.id !== order.id));
@@ -727,9 +821,7 @@ export default function HubOS() {
     if (order.prod_status === nextStatus) return;
 
     const nextProductionTag =
-      nextStatus === "Instalação Agendada"
-        ? "PRONTO"
-        : order.production_tag;
+      nextStatus === "Instalação Agendada" ? "PRONTO" : order.production_tag;
 
     const previous = order;
     const optimistic = {
@@ -876,7 +968,10 @@ export default function HubOS() {
           created_by: user?.id ?? null,
         });
       } catch (eventError) {
-        console.error("Erro ao registrar auditoria de confirmação de insumos.", eventError);
+        console.error(
+          "Erro ao registrar auditoria de confirmação de insumos.",
+          eventError
+        );
       }
 
       updateLocalOrder(updated);
@@ -1017,8 +1112,12 @@ export default function HubOS() {
                         setDialogOpen(true);
                       }}
                       onArchive={() => handleArchive(order)}
-                      onMarkInsumosAsInProduction={() => handleMarkAsInProduction(order)}
-                      markingInsumosAsInProduction={markingInsumosReadyOrderId === order.id}
+                      onMarkInsumosAsInProduction={() =>
+                        handleMarkAsInProduction(order)
+                      }
+                      markingInsumosAsInProduction={
+                        markingInsumosReadyOrderId === order.id
+                      }
                     />
                   ))}
                 </KanbanColumn>
@@ -1286,7 +1385,41 @@ export default function HubOS() {
                         Enviar para Aguardando Insumos
                       </Button>
                     ) : null
-                : undefined
+                : inboxKey === "prontoAvisar"
+                  ? order => (
+                      <>
+                        <Button
+                          variant={
+                            isOrderAvisado(order) ? "default" : "outline"
+                          }
+                          className={
+                            isOrderAvisado(order)
+                              ? "bg-emerald-600 text-white hover:bg-emerald-600"
+                              : ""
+                          }
+                          onClick={() => toggleAvisado(order)}
+                        >
+                          AVISADO
+                        </Button>
+                        {order.logistic_type === "retirada" ? (
+                          <Button
+                            variant="outline"
+                            onClick={() => void handleMarcarComoRetirado(order)}
+                          >
+                            RETIRADO
+                          </Button>
+                        ) : null}
+                      </>
+                    )
+                  : undefined
+          }
+          getOrderClassName={
+            inboxKey === "prontoAvisar"
+              ? order =>
+                  isOrderAvisado(order)
+                    ? "border-emerald-500 bg-emerald-50/80 hover:border-emerald-600 hover:bg-emerald-100/70"
+                    : undefined
+              : undefined
           }
         />
       )}
