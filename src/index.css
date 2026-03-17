@@ -46,45 +46,45 @@
   /* Industrial Precision Theme */
   /* Base Slate Colors */
   --background: oklch(0.98 0.005 240); /* Slate-50 ish */
-  --foreground: oklch(0.20 0.02 240); /* Slate-900 */
-  
+  --foreground: oklch(0.2 0.02 240); /* Slate-900 */
+
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.20 0.02 240);
-  
+  --card-foreground: oklch(0.2 0.02 240);
+
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.20 0.02 240);
-  
+  --popover-foreground: oklch(0.2 0.02 240);
+
   /* Primary Action: Cyan-600 (CMYK Cyan feel) */
-  --primary: oklch(0.60 0.15 230); 
+  --primary: oklch(0.6 0.15 230);
   --primary-foreground: oklch(0.98 0 0);
-  
+
   --secondary: oklch(0.94 0.01 240); /* Slate-100 */
-  --secondary-foreground: oklch(0.20 0.02 240);
-  
+  --secondary-foreground: oklch(0.2 0.02 240);
+
   --muted: oklch(0.94 0.01 240);
   --muted-foreground: oklch(0.55 0.02 240);
-  
+
   --accent: oklch(0.94 0.01 240);
-  --accent-foreground: oklch(0.20 0.02 240);
-  
+  --accent-foreground: oklch(0.2 0.02 240);
+
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  
+
   --border: oklch(0.88 0.01 240); /* Slate-200 */
   --input: oklch(0.88 0.01 240);
-  --ring: oklch(0.60 0.15 230);
-  
+  --ring: oklch(0.6 0.15 230);
+
   --radius: 0.3rem; /* Sharper corners for industrial feel */
-  
+
   /* Sidebar: Dark Slate */
-  --sidebar: oklch(0.20 0.02 240); /* Slate-900 */
+  --sidebar: oklch(0.2 0.02 240); /* Slate-900 */
   --sidebar-foreground: oklch(0.98 0.005 240);
-  --sidebar-primary: oklch(0.60 0.15 230);
+  --sidebar-primary: oklch(0.6 0.15 230);
   --sidebar-primary-foreground: oklch(0.98 0 0);
   --sidebar-accent: oklch(0.25 0.02 240);
   --sidebar-accent-foreground: oklch(0.98 0.005 240);
-  --sidebar-border: oklch(0.30 0.02 240);
-  --sidebar-ring: oklch(0.60 0.15 230);
+  --sidebar-border: oklch(0.3 0.02 240);
+  --sidebar-ring: oklch(0.6 0.15 230);
 }
 
 .dark {
@@ -94,27 +94,27 @@
   --card-foreground: oklch(0.98 0.005 240);
   --popover: oklch(0.18 0.01 240);
   --popover-foreground: oklch(0.98 0.005 240);
-  --primary: oklch(0.60 0.15 230);
+  --primary: oklch(0.6 0.15 230);
   --primary-foreground: oklch(0.98 0 0);
   --secondary: oklch(0.25 0.01 240);
   --secondary-foreground: oklch(0.98 0.005 240);
   --muted: oklch(0.25 0.01 240);
-  --muted-foreground: oklch(0.70 0.01 240);
+  --muted-foreground: oklch(0.7 0.01 240);
   --accent: oklch(0.25 0.01 240);
   --accent-foreground: oklch(0.98 0.005 240);
   --destructive: oklch(0.5 0.2 25);
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.30 0.01 240);
-  --input: oklch(0.30 0.01 240);
-  --ring: oklch(0.60 0.15 230);
+  --border: oklch(0.3 0.01 240);
+  --input: oklch(0.3 0.01 240);
+  --ring: oklch(0.6 0.15 230);
   --sidebar: oklch(0.12 0.01 240);
   --sidebar-foreground: oklch(0.98 0.005 240);
-  --sidebar-primary: oklch(0.60 0.15 230);
+  --sidebar-primary: oklch(0.6 0.15 230);
   --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.20 0.01 240);
+  --sidebar-accent: oklch(0.2 0.01 240);
   --sidebar-accent-foreground: oklch(0.98 0.005 240);
   --sidebar-border: oklch(0.25 0.01 240);
-  --sidebar-ring: oklch(0.60 0.15 230);
+  --sidebar-ring: oklch(0.6 0.15 230);
 }
 
 @layer base {
@@ -125,7 +125,12 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
   /* Typography overrides */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-semibold tracking-tight;
   }
 }
@@ -133,15 +138,76 @@
 @layer utilities {
   .font-mono-nums {
     font-variant-numeric: tabular-nums;
-    font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
+    font-family: "JetBrains Mono", "Roboto Mono", monospace;
   }
 }
 
 @keyframes inboxArrow {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateX(-2px);
   }
   50% {
     transform: translateX(6px);
+  }
+}
+
+@media print {
+  @page {
+    size: 50mm 30mm;
+    margin: 0;
+  }
+
+  html,
+  body {
+    width: 50mm;
+    height: 30mm;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  #print-label-area,
+  #print-label-area * {
+    visibility: visible !important;
+  }
+
+  #print-label-area {
+    display: block !important;
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 50mm;
+    height: 30mm;
+    margin: 0;
+    padding: 2mm;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: #fff;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    overflow: hidden;
+    font-size: 9px;
+    line-height: 1.2;
+  }
+
+  #print-label-area * {
+    color: #000 !important;
+  }
+
+  #print-label-area img {
+    width: 17mm !important;
+    height: 17mm !important;
+    object-fit: contain;
+  }
+
+  .no-print {
+    display: none !important;
   }
 }
