@@ -168,8 +168,13 @@
     background: #fff;
   }
 
-  body > * {
-    display: none !important;
+  body * {
+    visibility: hidden !important;
+  }
+
+  #print-label-area,
+  #print-label-area * {
+    visibility: visible !important;
   }
 
   #print-label-area {
