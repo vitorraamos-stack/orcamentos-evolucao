@@ -19,6 +19,7 @@ import {
   archiveOrder,
   createOrderEvent,
   deleteOrder,
+  fetchAvisadoOrderIds,
   fetchOrders,
   fetchUserDisplayNameById,
   updateOrder,
@@ -223,6 +224,9 @@ export default function HubOS() {
       setLoading(true);
       const data = await fetchOrders();
       setOrders(data);
+
+      const avisado = await fetchAvisadoOrderIds(data.map(order => order.id));
+      setAvisadoIds(avisado);
     } catch (error) {
       console.error(error);
       toast.error("Não foi possível carregar o Hub OS.");
@@ -238,6 +242,13 @@ export default function HubOS() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "os_orders" },
+        () => {
+          loadOrders();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "os_orders_event" },
         () => {
           loadOrders();
         }
@@ -615,8 +626,9 @@ export default function HubOS() {
 
   const isOrderAvisado = (order: OsOrder) => avisadoIds.includes(order.id);
 
-  const toggleAvisado = (order: OsOrder) => {
+  const toggleAvisado = async (order: OsOrder) => {
     const alreadyAvisado = isOrderAvisado(order);
+    const nextAvisado = !alreadyAvisado;
 
     setAvisadoIds(prev =>
       alreadyAvisado
@@ -624,11 +636,32 @@ export default function HubOS() {
         : [...prev, order.id]
     );
 
-    toast.success(
-      alreadyAvisado
-        ? `OS ${order.sale_number} desmarcada como avisada.`
-        : `OS ${order.sale_number} marcada como avisada.`
-    );
+    try {
+      await createOrderEvent({
+        os_id: order.id,
+        type: "avisado_toggle",
+        payload: {
+          avisado: nextAvisado,
+          actor_name:
+            user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
+        },
+        created_by: user?.id ?? null,
+      });
+
+      toast.success(
+        alreadyAvisado
+          ? `OS ${order.sale_number} desmarcada como avisada.`
+          : `OS ${order.sale_number} marcada como avisada.`
+      );
+    } catch (error) {
+      console.error("Erro ao atualizar estado avisado.", error);
+      setAvisadoIds(prev =>
+        alreadyAvisado
+          ? [...prev, order.id]
+          : prev.filter(orderId => orderId !== order.id)
+      );
+      toast.error("Não foi possível atualizar o estado avisado.");
+    }
   };
 
   const handleMarcarComoRetirado = async (order: OsOrder) => {
@@ -657,6 +690,17 @@ export default function HubOS() {
             board: "producao",
             from: order.prod_status,
             to: "Finalizados",
+            actor_name:
+              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
+          },
+          created_by: user?.id ?? null,
+        });
+
+        await createOrderEvent({
+          os_id: order.id,
+          type: "avisado_toggle",
+          payload: {
+            avisado: false,
             actor_name:
               user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
           },
@@ -1397,7 +1441,7 @@ export default function HubOS() {
                               ? "bg-emerald-600 text-white hover:bg-emerald-600"
                               : ""
                           }
-                          onClick={() => toggleAvisado(order)}
+                          onClick={() => void toggleAvisado(order)}
                         >
                           AVISADO
                         </Button>
