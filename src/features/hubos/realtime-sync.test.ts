@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { shouldApplyHubOrdersResponse } from "./boardSync";
+import { describe, expect, it, vi } from "vitest";
+import {
+  createCoalescedRefetchScheduler,
+  isRealtimeChannelHealthy,
+  shouldApplyHubOrdersResponse,
+  shouldRefreshOnVisibility,
+  shouldRunRecoverySync,
+} from "./boardSync";
 import {
   isOrderInProntoAvisarColumn,
   selectProntoAvisarOrders,
@@ -73,4 +79,83 @@ describe("hub board realtime selectors", () => {
     const stateAfterFailure = shouldApplyFailed ? [] : previousSnapshot;
     expect(stateAfterFailure).toEqual(previousSnapshot);
   });
+
+
+  it("ressincroniza no visibilitychange quando aba volta para visible", () => {
+    expect(shouldRefreshOnVisibility("visible")).toBe(true);
+    expect(shouldRefreshOnVisibility("hidden")).toBe(false);
+  });
+
+
+  it("marca canal realtime como saudável apenas quando SUBSCRIBED", () => {
+    expect(isRealtimeChannelHealthy("SUBSCRIBED")).toBe(true);
+    expect(isRealtimeChannelHealthy("TIMED_OUT")).toBe(false);
+    expect(isRealtimeChannelHealthy("CHANNEL_ERROR")).toBe(false);
+  });
+
+  it("executa recovery sync só quando canal está indisponível, online e visível", () => {
+    expect(
+      shouldRunRecoverySync({
+        isSubscribed: false,
+        isOnline: true,
+        visibilityState: "visible",
+      })
+    ).toBe(true);
+
+    expect(
+      shouldRunRecoverySync({
+        isSubscribed: true,
+        isOnline: true,
+        visibilityState: "visible",
+      })
+    ).toBe(false);
+
+    expect(
+      shouldRunRecoverySync({
+        isSubscribed: false,
+        isOnline: false,
+        visibilityState: "visible",
+      })
+    ).toBe(false);
+
+    expect(
+      shouldRunRecoverySync({
+        isSubscribed: false,
+        isOnline: true,
+        visibilityState: "hidden",
+      })
+    ).toBe(false);
+  });
+  it("coalesce eventos realtime próximos em um único refresh", () => {
+    vi.useFakeTimers();
+    const refetch = vi.fn();
+    const scheduler = createCoalescedRefetchScheduler(refetch, { delayMs: 180 });
+
+    scheduler.schedule();
+    scheduler.schedule();
+    scheduler.schedule();
+
+    vi.advanceTimersByTime(179);
+    expect(refetch).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    expect(refetch).toHaveBeenCalledTimes(1);
+
+    vi.useRealTimers();
+  });
+
+  it("permite cancelar refresh pendente no cleanup", () => {
+    vi.useFakeTimers();
+    const refetch = vi.fn();
+    const scheduler = createCoalescedRefetchScheduler(refetch, { delayMs: 120 });
+
+    scheduler.schedule();
+    scheduler.cancel();
+
+    vi.advanceTimersByTime(200);
+    expect(refetch).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+
 });
