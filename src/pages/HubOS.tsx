@@ -300,6 +300,11 @@ export default function HubOS() {
     [filteredOrders]
   );
 
+  const activeProducaoOrders = useMemo(
+    () => producaoOrders.filter(order => order.prod_status !== "Finalizados"),
+    [producaoOrders]
+  );
+
   const openOrders = useMemo(
     () => orders.filter(order => order.prod_status !== "Finalizados"),
     [orders]
@@ -448,7 +453,7 @@ export default function HubOS() {
     return {
       global: openOrders.length,
       totalArte: arteOrders.length,
-      totalProducao: producaoOrders.length,
+      totalProducao: activeProducaoOrders.length,
       overdue: overdueOrders.length,
       prontoAvisar: prontoAvisarOrders.length,
       instalacoes: instalacaoOrders.length,
@@ -456,11 +461,11 @@ export default function HubOS() {
     };
   }, [
     arteOrders,
+    activeProducaoOrders.length,
     instalacaoOrders.length,
     openOrders.length,
     overdueOrders.length,
     pendingInstallmentsCount,
-    producaoOrders.length,
     prontoAvisarOrders.length,
   ]);
 
