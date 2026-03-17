@@ -146,7 +146,7 @@ export default function OsKanbanPage() {
                   return (
                     <Card
                       key={order.id}
-                      className={`space-y-3 p-4 ${avisado ? "border-emerald-500 bg-emerald-50/80" : ""}`}
+                      className="space-y-3 p-4"
                     >
                       <div className="space-y-1">
                         <p className="text-xs text-muted-foreground">
@@ -165,6 +165,11 @@ export default function OsKanbanPage() {
                         <p className="text-xs text-muted-foreground">
                           {order.title}
                         </p>
+                        {avisado && (
+                          <Badge className="bg-yellow-400 text-zinc-900 hover:bg-yellow-400">
+                            AVISADO
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex items-center justify-between text-xs">
                         <Badge variant="outline">{order.payment_status}</Badge>
@@ -194,7 +199,7 @@ export default function OsKanbanPage() {
                             variant={avisado ? "default" : "outline"}
                             className={
                               avisado
-                                ? "bg-emerald-600 text-white hover:bg-emerald-600"
+                                ? "bg-yellow-400 text-zinc-900 hover:bg-yellow-500"
                                 : ""
                             }
                             disabled={pendingFlowKeys.includes(
@@ -233,7 +238,7 @@ export default function OsKanbanPage() {
                           {retirada && (
                             <Button
                               size="sm"
-                              variant="outline"
+                              className="bg-emerald-600 text-white hover:bg-emerald-700"
                               disabled={pendingFlowKeys.includes(
                                 buildHubOrderFlowKeyFromOsId(order.id)
                               )}
