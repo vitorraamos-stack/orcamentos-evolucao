@@ -35,7 +35,14 @@ import MetricsBar from "@/features/hubos/components/MetricsBar";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchPendingSecondInstallments } from "@/features/hubos/finance";
-import { shouldApplyHubOrdersResponse } from "@/features/hubos/boardSync";
+import {
+  createCoalescedRefetchScheduler,
+  isRealtimeChannelHealthy,
+  shouldApplyHubOrdersResponse,
+  shouldRefreshOnVisibility,
+  shouldRunRecoverySync,
+  shouldRunSafetySync,
+} from "@/features/hubos/boardSync";
 import { selectProntoAvisarOrders } from "@/features/hubos/selectors";
 import { buildHubOrderFlowKeyFromOsOrdersId } from "@/modules/hub-os/order-flow-key";
 import { useGlobalOrderFlowState } from "@/modules/hub-os/order-flow-state";
@@ -158,7 +165,12 @@ export default function HubOS() {
     string | null
   >(null);
   const loadOrdersSeqRef = useRef(0);
-  const realtimeRefreshTimeoutRef = useRef<number | null>(null);
+  const coalescedRefreshRef = useRef<ReturnType<
+    typeof createCoalescedRefetchScheduler
+  > | null>(null);
+  const realtimeRecoveryIntervalRef = useRef<number | null>(null);
+  const isRealtimeSubscribedRef = useRef(false);
+  const lastSuccessfulSyncAtRef = useRef(0);
   const isMountedRef = useRef(true);
   const lastOrdersSnapshotRef = useRef<OsOrder[]>([]);
   const isOrderAvisado = useCallback(
@@ -227,6 +239,7 @@ export default function HubOS() {
       }
 
       lastOrdersSnapshotRef.current = data;
+      lastSuccessfulSyncAtRef.current = Date.now();
       setOrders(data);
     } catch (error) {
       console.error(error);
@@ -244,18 +257,58 @@ export default function HubOS() {
   }, []);
 
   const scheduleOrdersRefresh = useCallback(() => {
-    if (realtimeRefreshTimeoutRef.current) {
-      window.clearTimeout(realtimeRefreshTimeoutRef.current);
-    }
-
-    realtimeRefreshTimeoutRef.current = window.setTimeout(() => {
-      void loadOrders();
-    }, 180);
-  }, [loadOrders]);
+    coalescedRefreshRef.current?.schedule();
+  }, []);
 
   useEffect(() => {
     isMountedRef.current = true;
+    coalescedRefreshRef.current = createCoalescedRefetchScheduler(() => {
+      void loadOrders();
+    });
+
+    const stopRealtimeRecovery = () => {
+      if (realtimeRecoveryIntervalRef.current !== null) {
+        window.clearInterval(realtimeRecoveryIntervalRef.current);
+        realtimeRecoveryIntervalRef.current = null;
+      }
+    };
+
+    const startRealtimeRecovery = () => {
+      if (realtimeRecoveryIntervalRef.current !== null) return;
+
+      realtimeRecoveryIntervalRef.current = window.setInterval(() => {
+        const isOnline = navigator.onLine;
+        const visibilityState = document.visibilityState;
+
+        if (
+          shouldRunRecoverySync({
+            isSubscribed: isRealtimeSubscribedRef.current,
+            isOnline,
+            visibilityState,
+          })
+        ) {
+          scheduleOrdersRefresh();
+          return;
+        }
+
+        const elapsedMsSinceLastSync = Date.now() - lastSuccessfulSyncAtRef.current;
+        if (
+          shouldRunSafetySync({
+            isOnline,
+            visibilityState,
+            elapsedMsSinceLastSync,
+            maxStalenessMs: 15000,
+          })
+        ) {
+          scheduleOrdersRefresh();
+        }
+      }, 5000);
+    };
+
+    startRealtimeRecovery();
+    lastSuccessfulSyncAtRef.current = 0;
     void loadOrders();
+
     const channel = supabase
       .channel("hub-os-orders")
       .on(
@@ -267,19 +320,36 @@ export default function HubOS() {
       )
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "os_orders_event" },
+        { event: "*", schema: "public", table: "os_orders_event" },
         () => {
           scheduleOrdersRefresh();
         }
       )
-      .subscribe();
+      .subscribe(status => {
+        if (isRealtimeChannelHealthy(status)) {
+          isRealtimeSubscribedRef.current = true;
+          stopRealtimeRecovery();
+          scheduleOrdersRefresh();
+          return;
+        }
+
+        if (
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT" ||
+          status === "CLOSED"
+        ) {
+          isRealtimeSubscribedRef.current = false;
+          startRealtimeRecovery();
+          scheduleOrdersRefresh();
+        }
+      });
 
     const refreshFromLifecycle = () => {
-      void loadOrders();
+      scheduleOrdersRefresh();
     };
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
+      if (shouldRefreshOnVisibility(document.visibilityState)) {
         refreshFromLifecycle();
       }
     };
@@ -292,9 +362,10 @@ export default function HubOS() {
 
     return () => {
       isMountedRef.current = false;
-      if (realtimeRefreshTimeoutRef.current) {
-        window.clearTimeout(realtimeRefreshTimeoutRef.current);
-      }
+      isRealtimeSubscribedRef.current = false;
+      stopRealtimeRecovery();
+      coalescedRefreshRef.current?.cancel();
+      coalescedRefreshRef.current = null;
       window.removeEventListener("online", refreshFromLifecycle);
       window.removeEventListener("focus", refreshFromLifecycle);
       document.removeEventListener(
