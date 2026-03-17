@@ -1050,17 +1050,6 @@ export default function HubOS() {
   const handlePrintAcabamentoLabel = () => {
     if (!acabamentoLabelOrder) return;
 
-    const printWindow = window.open(
-      "",
-      "_blank",
-      "noopener,noreferrer,width=420,height=320"
-    );
-
-    if (!printWindow) {
-      toast.error("Não foi possível abrir a janela de impressão.");
-      return;
-    }
-
     const escapeHtml = (value: string) =>
       value
         .replaceAll("&", "&amp;")
@@ -1151,17 +1140,59 @@ export default function HubOS() {
   </body>
 </html>`;
 
-    printWindow.document.open();
-    printWindow.document.write(printMarkup);
-    printWindow.document.close();
+    const printWithIframe = () => {
+      const frame = document.createElement("iframe");
+      frame.setAttribute("aria-hidden", "true");
+      frame.style.position = "fixed";
+      frame.style.width = "0";
+      frame.style.height = "0";
+      frame.style.border = "0";
+      frame.style.right = "0";
+      frame.style.bottom = "0";
+
+      const cleanup = () => {
+        window.setTimeout(() => {
+          frame.remove();
+        }, 300);
+      };
+
+      frame.onload = () => {
+        const targetWindow = frame.contentWindow;
+        if (!targetWindow) {
+          cleanup();
+          toast.error("Não foi possível preparar a impressão da etiqueta.");
+          return;
+        }
+        targetWindow.focus();
+        targetWindow.print();
+        cleanup();
+      };
+
+      document.body.appendChild(frame);
+      frame.srcdoc = printMarkup;
+    };
+
+    const printWindow = window.open(
+      "",
+      "_blank",
+      "noopener,noreferrer,width=420,height=320"
+    );
+
+    if (printWindow) {
+      printWindow.document.open();
+      printWindow.document.write(printMarkup);
+      printWindow.document.close();
+      printWindow.addEventListener("load", () => {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+      });
+    } else {
+      printWithIframe();
+      toast.info("Popup bloqueado. Impressão aberta no modo compatível.");
+    }
 
     setPrintedAcabamentoLabel(true);
-
-    printWindow.addEventListener("load", () => {
-      printWindow.focus();
-      printWindow.print();
-      printWindow.close();
-    });
   };
 
   const handleConfirmAcabamentoMove = async () => {
