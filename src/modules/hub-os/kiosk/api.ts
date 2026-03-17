@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { fetchOsByCode } from "../api";
+import { assertOfficialKioskRpc, getRpcUnavailableError, isMissingRpcError } from "./contract";
 import type {
   KioskBoardCard,
   KioskBoardMoveResult,
@@ -14,10 +15,7 @@ type RpcLikeError = {
   code?: string;
 };
 
-const isMissingRpcError = (error: unknown) => {
-  const message = String((error as { message?: string })?.message ?? "").toLowerCase();
-  return message.includes("could not find") || message.includes("function") || message.includes("pgrst202");
-};
+const ALLOW_DEV_FALLBACK = import.meta.env.DEV;
 
 const toError = (error: unknown) => {
   if (error instanceof Error) return error;
@@ -46,6 +44,9 @@ const toError = (error: unknown) => {
 
 export const fetchKioskBoard = async () => {
   const { data, error } = await supabase.rpc("kiosk_board_list");
+  if (error && isMissingRpcError(error)) {
+    throw getRpcUnavailableError("kiosk_board_list");
+  }
   if (error) throw toError(error);
   return (data ?? []) as KioskBoardCard[];
 };
@@ -65,8 +66,13 @@ const registerKioskOrderBySource = async (params: {
     p_terminal_id: params.terminalId,
   });
 
-  if (secureResponse.error && !isMissingRpcError(secureResponse.error)) {
-    throw toError(secureResponse.error);
+  if (secureResponse.error) {
+    assertOfficialKioskRpc({
+      rpcName: "kiosk_board_register_secure",
+      error: secureResponse.error,
+      allowFallback: ALLOW_DEV_FALLBACK,
+      normalizeError: toError,
+    });
   }
 
   if (!secureResponse.error && secureResponse.data) {
@@ -96,8 +102,13 @@ export const registerKioskOrderByCode = async (params: {
     p_terminal_id: params.terminalId,
   });
 
-  if (secureResponse.error && !isMissingRpcError(secureResponse.error)) {
-    throw toError(secureResponse.error);
+  if (secureResponse.error) {
+    assertOfficialKioskRpc({
+      rpcName: "kiosk_board_register_by_code",
+      error: secureResponse.error,
+      allowFallback: ALLOW_DEV_FALLBACK,
+      normalizeError: toError,
+    });
   }
 
   if (!secureResponse.error && secureResponse.data) {
@@ -138,8 +149,13 @@ export const moveKioskOrder = async (params: {
   });
 
   let data = secureResponse.data;
-  if (secureResponse.error && !isMissingRpcError(secureResponse.error)) {
-    throw toError(secureResponse.error);
+  if (secureResponse.error) {
+    assertOfficialKioskRpc({
+      rpcName: "kiosk_board_move_secure",
+      error: secureResponse.error,
+      allowFallback: ALLOW_DEV_FALLBACK,
+      normalizeError: toError,
+    });
   }
 
   if (secureResponse.error) {

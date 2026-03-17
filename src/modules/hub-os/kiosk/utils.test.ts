@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { KIOSK_TERMINAL_ID_KEY } from "./constants";
-import { getOrCreateTerminalId, parseKioskError, resolveMoveAction } from "./utils";
+import {
+  getOrCreateTerminalId,
+  isUpstreamFinalized,
+  parseKioskError,
+  resolveKioskHealthState,
+  resolveMoveAction,
+  shouldApplySyncResponse,
+  shouldBlockKioskMutations,
+} from "./utils";
 
 const createStorage = () => {
   const memory = new Map<string, string>();
@@ -56,5 +64,37 @@ describe("kiosk helpers", () => {
     expect(first).toBe("abc-123");
     expect(second).toBe("abc-123");
     expect(localStorage.getItem(KIOSK_TERMINAL_ID_KEY)).toBe("abc-123");
+  });
+
+  it("calcula estado degradado e bloqueio de mutações", () => {
+    const now = Date.UTC(2026, 0, 1, 12, 0, 0);
+    const staleSync = new Date(now - 200_000).toISOString();
+
+    expect(
+      resolveKioskHealthState({
+        isOnline: true,
+        isSyncing: false,
+        lastSyncAt: staleSync,
+        lastErrorKind: "network",
+        staleAfterMs: 45_000,
+        now,
+      })
+    ).toBe("degraded");
+
+    expect(
+      shouldBlockKioskMutations({
+        healthState: "degraded",
+        lastSyncAt: staleSync,
+        criticalStaleAfterMs: 120_000,
+        now,
+      })
+    ).toBe(true);
+  });
+
+  it("detecta finalização upstream e protege contra resposta fora de ordem", () => {
+    expect(isUpstreamFinalized("Pedido finalizado")).toBe(true);
+    expect(isUpstreamFinalized("Em produção")).toBe(false);
+    expect(shouldApplySyncResponse({ requestSeq: 2, appliedSeq: 3 })).toBe(false);
+    expect(shouldApplySyncResponse({ requestSeq: 4, appliedSeq: 3 })).toBe(true);
   });
 });

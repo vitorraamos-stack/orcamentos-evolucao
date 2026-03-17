@@ -1,6 +1,8 @@
 import { KIOSK_STAGE_LABELS, KIOSK_TERMINAL_ID_KEY } from "./constants";
 import type {
   KioskBoardCard,
+  KioskErrorKind,
+  KioskHealthState,
   KioskBoardMoveResult,
   KioskBoardStage,
   KioskMoveAction,
@@ -74,6 +76,93 @@ export const parseKioskError = (error: unknown) => {
 
   return candidate?.message || "Falha inesperada ao sincronizar o quiosque.";
 };
+
+export const getKioskErrorKind = (error: unknown): KioskErrorKind => {
+  const candidate = error as {
+    message?: string;
+    details?: string;
+    cause?: { details?: string };
+  };
+  const normalized = String(candidate?.message ?? "").toLowerCase();
+  const details = String(candidate?.details ?? candidate?.cause?.details ?? "");
+
+  if (
+    details.includes("KIOSK_AUTH_REQUIRED") ||
+    normalized.includes("auth required") ||
+    normalized.includes("jwt") ||
+    normalized.includes("permission") ||
+    normalized.includes("permiss")
+  ) {
+    return "auth";
+  }
+
+  if (
+    normalized.includes("could not find") ||
+    normalized.includes("function") ||
+    normalized.includes("migration") ||
+    normalized.includes("pgrst202")
+  ) {
+    return "backend_drift";
+  }
+
+  if (
+    error instanceof TypeError ||
+    normalized.includes("network") ||
+    normalized.includes("fetch")
+  ) {
+    return "network";
+  }
+
+  return "unknown";
+};
+
+export const resolveKioskHealthState = (params: {
+  isOnline: boolean;
+  isSyncing: boolean;
+  lastSyncAt: string | null;
+  lastErrorKind: KioskErrorKind | null;
+  staleAfterMs: number;
+  now?: number;
+}): KioskHealthState => {
+  if (!params.isOnline) return "offline";
+  if (params.lastErrorKind === "auth") return "auth_error";
+
+  const now = params.now ?? Date.now();
+  const lastSyncMs = params.lastSyncAt ? new Date(params.lastSyncAt).getTime() : 0;
+  const stale = !lastSyncMs || now - lastSyncMs > params.staleAfterMs;
+
+  if (stale && params.lastErrorKind) return "degraded";
+  if (params.isSyncing) return "syncing";
+  if (stale) return "degraded";
+  return "healthy";
+};
+
+export const shouldBlockKioskMutations = (params: {
+  healthState: KioskHealthState;
+  lastSyncAt: string | null;
+  criticalStaleAfterMs: number;
+  now?: number;
+}) => {
+  if (params.healthState === "offline" || params.healthState === "auth_error") {
+    return true;
+  }
+
+  if (params.healthState !== "degraded") return false;
+
+  const now = params.now ?? Date.now();
+  const lastSyncMs = params.lastSyncAt ? new Date(params.lastSyncAt).getTime() : 0;
+  return !lastSyncMs || now - lastSyncMs > params.criticalStaleAfterMs;
+};
+
+export const isUpstreamFinalized = (status: string | null) =>
+  String(status ?? "")
+    .toLowerCase()
+    .includes("finaliz");
+
+export const shouldApplySyncResponse = (params: {
+  requestSeq: number;
+  appliedSeq: number;
+}) => params.requestSeq >= params.appliedSeq;
 
 export const upsertCard = (cards: KioskBoardCard[], nextCard: KioskBoardCard) => {
   const existing = cards.find(card => card.order_key === nextCard.order_key);
