@@ -110,6 +110,39 @@ export const fetchOrders = async () => {
   return data as OsOrder[];
 };
 
+export const fetchAvisadoOrderIds = async (orderIds: string[]) => {
+  if (orderIds.length === 0) return [] as string[];
+
+  const { data, error } = await supabase
+    .from("os_orders_event")
+    .select("os_id, payload, created_at")
+    .eq("type", "avisado_toggle")
+    .in("os_id", orderIds)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+
+  const seen = new Set<string>();
+  const avisadoIds: string[] = [];
+
+  for (const event of data ?? []) {
+    const osId = typeof event.os_id === "string" ? event.os_id : null;
+    if (!osId || seen.has(osId)) continue;
+    seen.add(osId);
+
+    const payload = event.payload;
+    const avisado =
+      payload &&
+      typeof payload === "object" &&
+      "avisado" in payload &&
+      (payload as { avisado?: unknown }).avisado === true;
+
+    if (avisado) avisadoIds.push(osId);
+  }
+
+  return avisadoIds;
+};
+
 export const fetchOrderById = async (id: string) => {
   const { data, error } = await supabase
     .from("os_orders")
