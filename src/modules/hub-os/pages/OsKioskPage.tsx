@@ -101,7 +101,12 @@ export default function OsKioskPage() {
   const isMountedRef = useRef(true);
 
   const activeCards = useMemo(
-    () => cards.filter(card => !isRetirado(card.order_key)),
+    () =>
+      cards.filter(
+        card =>
+          !isRetirado(card.order_key) &&
+          !isUpstreamFinalized(card.upstream_status)
+      ),
     [cards, isRetirado]
   );
 
@@ -355,7 +360,7 @@ export default function OsKioskPage() {
     }
   };
 
-  const totalCards = cards.length;
+  const totalCards = activeCards.length;
 
   const AddOrderButton = ({ label }: { label: string }) => (
     <button
