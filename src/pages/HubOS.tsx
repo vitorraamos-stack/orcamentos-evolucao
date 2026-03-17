@@ -1048,8 +1048,120 @@ export default function HubOS() {
   };
 
   const handlePrintAcabamentoLabel = () => {
+    if (!acabamentoLabelOrder) return;
+
+    const printWindow = window.open(
+      "",
+      "_blank",
+      "noopener,noreferrer,width=420,height=320"
+    );
+
+    if (!printWindow) {
+      toast.error("Não foi possível abrir a janela de impressão.");
+      return;
+    }
+
+    const escapeHtml = (value: string) =>
+      value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+
+    const orderNumber =
+      acabamentoLabelOrder.os_number?.toString() ||
+      acabamentoLabelOrder.sale_number;
+    const clientName = escapeHtml(acabamentoLabelOrder.client_name || "-");
+    const title = acabamentoLabelOrder.title
+      ? escapeHtml(acabamentoLabelOrder.title)
+      : "";
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+      orderNumber
+    )}`;
+
+    const printMarkup = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Etiqueta OS ${orderNumber}</title>
+    <style>
+      @page { size: 50mm 30mm; margin: 0; }
+      html, body {
+        width: 50mm;
+        height: 30mm;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #fff;
+        font-family: Arial, sans-serif;
+      }
+      .label {
+        box-sizing: border-box;
+        width: 50mm;
+        height: 30mm;
+        padding: 1.6mm;
+        color: #000;
+        display: grid;
+        grid-template-columns: 1fr 14mm;
+        grid-template-rows: auto auto auto;
+        column-gap: 1.4mm;
+        row-gap: 0.6mm;
+      }
+      .tag {
+        grid-column: 1;
+        font-size: 7px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .order {
+        grid-column: 1;
+        font-size: 10.5mm;
+        font-weight: 700;
+        line-height: 0.85;
+        margin-top: -0.3mm;
+      }
+      .qr {
+        grid-column: 2;
+        grid-row: 1 / span 3;
+        width: 14mm;
+        height: 14mm;
+        justify-self: end;
+        align-self: start;
+      }
+      .meta {
+        grid-column: 1;
+        font-size: 8px;
+        line-height: 1.15;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .meta strong { font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <div class="label">
+      <div class="tag">OS</div>
+      <div class="order">${escapeHtml(orderNumber)}</div>
+      <img class="qr" src="${qrCodeUrl}" alt="QR Code" />
+      <div class="meta"><strong>Cliente:</strong> ${clientName}</div>
+      ${title ? `<div class="meta"><strong>Título:</strong> ${title}</div>` : ""}
+    </div>
+  </body>
+</html>`;
+
+    printWindow.document.open();
+    printWindow.document.write(printMarkup);
+    printWindow.document.close();
+
     setPrintedAcabamentoLabel(true);
-    window.print();
+
+    printWindow.addEventListener("load", () => {
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
+    });
   };
 
   const handleConfirmAcabamentoMove = async () => {
