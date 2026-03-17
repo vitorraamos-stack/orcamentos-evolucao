@@ -278,11 +278,22 @@ export default function OsKioskPage() {
       const finalizedCandidates = targetCards.filter(card =>
         isUpstreamFinalized(card.upstream_status)
       );
-      if (finalizedCandidates.length === 0) return;
+
+      const cardsToCheck =
+        finalizedCandidates.length > 0 || opts?.silent
+          ? finalizedCandidates
+          : targetCards;
+
+      if (cardsToCheck.length === 0) {
+        if (!opts?.silent) {
+          toast.message("Nenhuma OS candidata para limpeza de finalizadas.");
+        }
+        return;
+      }
 
       setCleanupRunning(true);
       let removedCount = 0;
-      for (const card of finalizedCandidates) {
+      for (const card of cardsToCheck) {
         try {
           const result = await moveKioskOrder({
             orderKey: card.order_key,
@@ -305,6 +316,11 @@ export default function OsKioskPage() {
             `${removedCount} OS finalizada(s) removida(s) do quiosque.`
           );
         }
+        return;
+      }
+
+      if (!opts?.silent) {
+        toast.message("Nenhuma OS finalizada foi removida.");
       }
     },
     [cleanupRunning, terminalId, user?.id]
