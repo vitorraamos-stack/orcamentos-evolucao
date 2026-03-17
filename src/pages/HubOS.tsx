@@ -29,6 +29,7 @@ import KanbanCard from "@/features/hubos/components/KanbanCard";
 import ServiceOrderDialog from "@/features/hubos/components/ServiceOrderDialog";
 import CreateOSDialog from "@/features/hubos/components/CreateOSDialog";
 import ArtDirectionTagPopup from "@/features/hubos/components/ArtDirectionTagPopup";
+import AcabamentoLabelDialog from "@/features/hubos/components/AcabamentoLabelDialog";
 import FiltersBar from "@/features/hubos/components/FiltersBar";
 import InstallationsInbox from "@/features/hubos/components/InstallationsInbox";
 import MetricsBar from "@/features/hubos/components/MetricsBar";
@@ -153,6 +154,11 @@ export default function HubOS() {
     Record<string, AssetJob | null>
   >({});
   const [pendingInstallmentsCount, setPendingInstallmentsCount] = useState(0);
+  const [acabamentoLabelOrder, setAcabamentoLabelOrder] =
+    useState<OsOrder | null>(null);
+  const [acabamentoLabelOpen, setAcabamentoLabelOpen] = useState(false);
+  const [savingAcabamentoLabel, setSavingAcabamentoLabel] = useState(false);
+  const [printedAcabamentoLabel, setPrintedAcabamentoLabel] = useState(false);
   const [insumosReturnNotesDraft, setInsumosReturnNotesDraft] = useState("");
   const [insumosRequestDetailsDraft, setInsumosRequestDetailsDraft] =
     useState("");
@@ -291,7 +297,8 @@ export default function HubOS() {
           return;
         }
 
-        const elapsedMsSinceLastSync = Date.now() - lastSuccessfulSyncAtRef.current;
+        const elapsedMsSinceLastSync =
+          Date.now() - lastSuccessfulSyncAtRef.current;
         if (
           shouldRunSafetySync({
             isOnline,
@@ -368,10 +375,7 @@ export default function HubOS() {
       coalescedRefreshRef.current = null;
       window.removeEventListener("online", refreshFromLifecycle);
       window.removeEventListener("focus", refreshFromLifecycle);
-      document.removeEventListener(
-        "visibilitychange",
-        handleVisibilityChange
-      );
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       supabase.removeChannel(channel);
     };
   }, [loadOrders, scheduleOrdersRefresh]);
@@ -419,7 +423,10 @@ export default function HubOS() {
       producaoOrders.filter(
         order =>
           order.prod_status !== "Finalizados" &&
-          !(order.prod_status === "Pronto / Avisar Cliente" && isOrderRetirado(order))
+          !(
+            order.prod_status === "Pronto / Avisar Cliente" &&
+            isOrderRetirado(order)
+          )
       ),
     [producaoOrders, isOrderRetirado]
   );
@@ -982,6 +989,13 @@ export default function HubOS() {
     const nextStatus = over.id as ProdStatus;
     if (order.prod_status === nextStatus) return;
 
+    if (nextStatus === "Em Acabamento") {
+      setAcabamentoLabelOrder(order);
+      setPrintedAcabamentoLabel(false);
+      setAcabamentoLabelOpen(true);
+      return;
+    }
+
     const nextProductionTag =
       nextStatus === "Instalação Agendada" ? "PRONTO" : order.production_tag;
 
@@ -1021,6 +1035,62 @@ export default function HubOS() {
       console.error(error);
       toast.error("Erro ao mover card.");
       updateLocalOrder(previous);
+    }
+  };
+
+  const handleAcabamentoDialogOpenChange = (open: boolean) => {
+    setAcabamentoLabelOpen(open);
+    if (!open) {
+      setAcabamentoLabelOrder(null);
+      setSavingAcabamentoLabel(false);
+      setPrintedAcabamentoLabel(false);
+    }
+  };
+
+  const handlePrintAcabamentoLabel = () => {
+    setPrintedAcabamentoLabel(true);
+    window.print();
+  };
+
+  const handleConfirmAcabamentoMove = async () => {
+    if (!acabamentoLabelOrder) return;
+
+    setSavingAcabamentoLabel(true);
+    const order = acabamentoLabelOrder;
+
+    try {
+      const updated = await updateOrder(order.id, {
+        prod_status: "Em Acabamento",
+        updated_at: new Date().toISOString(),
+        updated_by: user?.id ?? null,
+      });
+      updateLocalOrder(updated);
+
+      try {
+        await createOrderEvent({
+          os_id: order.id,
+          type: "prod_status_changed",
+          payload: {
+            board: "producao",
+            from: order.prod_status,
+            to: "Em Acabamento",
+            source: "kanban_lightbox",
+            printed_label: printedAcabamentoLabel,
+            actor_name:
+              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
+          },
+          created_by: user?.id ?? null,
+        });
+      } catch (eventError) {
+        console.error("Erro ao registrar auditoria de status.", eventError);
+      }
+
+      toast.success("OS movida para Em Acabamento.");
+      handleAcabamentoDialogOpenChange(false);
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao mover card para Em Acabamento.");
+      setSavingAcabamentoLabel(false);
     }
   };
 
@@ -1612,6 +1682,15 @@ export default function HubOS() {
           tag={artDirectionPopupTag}
         />
       )}
+
+      <AcabamentoLabelDialog
+        open={acabamentoLabelOpen}
+        order={acabamentoLabelOrder}
+        saving={savingAcabamentoLabel}
+        onOpenChange={handleAcabamentoDialogOpenChange}
+        onConfirmMove={handleConfirmAcabamentoMove}
+        onPrintLabel={handlePrintAcabamentoLabel}
+      />
     </div>
   );
 }
