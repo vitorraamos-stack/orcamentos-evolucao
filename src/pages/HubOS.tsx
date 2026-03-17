@@ -1172,26 +1172,7 @@ export default function HubOS() {
       frame.srcdoc = printMarkup;
     };
 
-    const printWindow = window.open(
-      "",
-      "_blank",
-      "noopener,noreferrer,width=420,height=320"
-    );
-
-    if (printWindow) {
-      printWindow.document.open();
-      printWindow.document.write(printMarkup);
-      printWindow.document.close();
-      printWindow.addEventListener("load", () => {
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
-      });
-    } else {
-      printWithIframe();
-      toast.info("Popup bloqueado. Impressão aberta no modo compatível.");
-    }
-
+    printWithIframe();
     setPrintedAcabamentoLabel(true);
   };
 
