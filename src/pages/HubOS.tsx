@@ -35,6 +35,8 @@ import MetricsBar from "@/features/hubos/components/MetricsBar";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchPendingSecondInstallments } from "@/features/hubos/finance";
+import { shouldApplyHubOrdersResponse } from "@/features/hubos/boardSync";
+import { selectProntoAvisarOrders } from "@/features/hubos/selectors";
 import { buildHubOrderFlowKeyFromOsOrdersId } from "@/modules/hub-os/order-flow-key";
 import { useGlobalOrderFlowState } from "@/modules/hub-os/order-flow-state";
 
@@ -155,6 +157,10 @@ export default function HubOS() {
   const [insumosRequesterName, setInsumosRequesterName] = useState<
     string | null
   >(null);
+  const loadOrdersSeqRef = useRef(0);
+  const realtimeRefreshTimeoutRef = useRef<number | null>(null);
+  const isMountedRef = useRef(true);
+  const lastOrdersSnapshotRef = useRef<OsOrder[]>([]);
   const isOrderAvisado = useCallback(
     (order: OsOrder) => isAvisado(buildHubOrderFlowKeyFromOsOrdersId(order.id)),
     [isAvisado]
@@ -203,45 +209,101 @@ export default function HubOS() {
     }
   };
 
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
+    const requestId = ++loadOrdersSeqRef.current;
+
     try {
-      setLoading(true);
+      if (isMountedRef.current && lastOrdersSnapshotRef.current.length === 0) {
+        setLoading(true);
+      }
+
       const data = await fetchOrders();
+
+      if (
+        !isMountedRef.current ||
+        !shouldApplyHubOrdersResponse(requestId, loadOrdersSeqRef.current)
+      ) {
+        return;
+      }
+
+      lastOrdersSnapshotRef.current = data;
       setOrders(data);
     } catch (error) {
       console.error(error);
-      toast.error("Não foi possível carregar o Hub OS.");
+      if (shouldApplyHubOrdersResponse(requestId, loadOrdersSeqRef.current)) {
+        toast.error("Não foi possível carregar o Hub OS.");
+      }
     } finally {
-      setLoading(false);
+      if (
+        isMountedRef.current &&
+        shouldApplyHubOrdersResponse(requestId, loadOrdersSeqRef.current)
+      ) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
+
+  const scheduleOrdersRefresh = useCallback(() => {
+    if (realtimeRefreshTimeoutRef.current) {
+      window.clearTimeout(realtimeRefreshTimeoutRef.current);
+    }
+
+    realtimeRefreshTimeoutRef.current = window.setTimeout(() => {
+      void loadOrders();
+    }, 180);
+  }, [loadOrders]);
 
   useEffect(() => {
-    loadOrders();
+    isMountedRef.current = true;
+    void loadOrders();
     const channel = supabase
       .channel("hub-os-orders")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "os_orders" },
         () => {
-          loadOrders();
+          scheduleOrdersRefresh();
         }
       )
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "os_orders_event" },
         () => {
-          loadOrders();
+          scheduleOrdersRefresh();
         }
       )
       .subscribe();
 
+    const refreshFromLifecycle = () => {
+      void loadOrders();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshFromLifecycle();
+      }
+    };
+
+    window.addEventListener("online", refreshFromLifecycle);
+    window.addEventListener("focus", refreshFromLifecycle);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     loadPendingInstallments();
 
     return () => {
+      isMountedRef.current = false;
+      if (realtimeRefreshTimeoutRef.current) {
+        window.clearTimeout(realtimeRefreshTimeoutRef.current);
+      }
+      window.removeEventListener("online", refreshFromLifecycle);
+      window.removeEventListener("focus", refreshFromLifecycle);
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [loadOrders, scheduleOrdersRefresh]);
 
   const filteredOrders = useMemo(() => {
     const search = normalize(filters.search);
@@ -296,26 +358,13 @@ export default function HubOS() {
     [orders]
   );
 
-  function isOrderAvisado(order: OsOrder) {
-    return isAvisado(buildHubOrderFlowKeyFromOsOrdersId(order.id));
-  }
-
-  function isOrderRetirado(order: OsOrder) {
-    return isRetirado(buildHubOrderFlowKeyFromOsOrdersId(order.id));
-  }
-
   const overdueOrders = useMemo(
     () => filteredOrders.filter(isOverdue),
     [filteredOrders]
   );
 
   const prontoAvisarOrders = useMemo(
-    () =>
-      producaoOrders.filter(
-        order =>
-          order.prod_status === "Pronto / Avisar Cliente" &&
-          !isOrderRetirado(order)
-      ),
+    () => selectProntoAvisarOrders(producaoOrders, isOrderRetirado),
     [producaoOrders, isOrderRetirado]
   );
 
