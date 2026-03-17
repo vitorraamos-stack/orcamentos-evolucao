@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +36,10 @@ type InstallationsInboxProps = {
   selectedOrderExtra?: (order: OsOrder) => ReactNode;
   selectedOrderActions?: (order: OsOrder) => ReactNode;
   showMaterialReadyByStatusOnly?: boolean;
+  getOrderClassName?: (
+    order: OsOrder,
+    isSelected: boolean
+  ) => string | undefined;
 };
 
 type QuickFilter = "today" | "week" | "overdue" | "all";
@@ -163,6 +173,7 @@ export default function InstallationsInbox({
   selectedOrderExtra,
   selectedOrderActions,
   showMaterialReadyByStatusOnly = false,
+  getOrderClassName,
 }: InstallationsInboxProps) {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [optimizeOpen, setOptimizeOpen] = useState(false);
@@ -438,7 +449,9 @@ export default function InstallationsInbox({
       >
         <DialogUi.DialogContent className="max-h-[calc(100vh-2rem)] w-[96vw] overflow-y-auto sm:max-w-5xl lg:max-w-6xl">
           <DialogUi.DialogHeader>
-            <DialogUi.DialogTitle>Otimizar rota de instalações</DialogUi.DialogTitle>
+            <DialogUi.DialogTitle>
+              Otimizar rota de instalações
+            </DialogUi.DialogTitle>
             <DialogUi.DialogDescription>
               Selecione a data, escolha as OS e opcionalmente informe ponto de
               partida/chegada.
@@ -806,7 +819,8 @@ export default function InstallationsInbox({
                       isSelected
                         ? "border-primary bg-primary/5 shadow-sm"
                         : "hover:border-muted-foreground/40 hover:bg-muted/40",
-                      isOverdue && "border-l-4 border-l-destructive"
+                      isOverdue && "border-l-4 border-l-destructive",
+                      getOrderClassName?.(order, isSelected)
                     )}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -825,7 +839,10 @@ export default function InstallationsInbox({
                         <Badge variant="destructive">ATRASADA</Badge>
                       )}
                       {isToday && <Badge>HOJE</Badge>}
-                      {isMaterialReadyForInstallation(order, showMaterialReadyByStatusOnly) && (
+                      {isMaterialReadyForInstallation(
+                        order,
+                        showMaterialReadyByStatusOnly
+                      ) && (
                         <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
                           Material Pronto
                         </Badge>
@@ -873,7 +890,10 @@ export default function InstallationsInbox({
                     <Badge variant="destructive">ATRASADA</Badge>
                   )}
                   {getIsToday(selectedOrder) && <Badge>HOJE</Badge>}
-                  {isMaterialReadyForInstallation(selectedOrder, showMaterialReadyByStatusOnly) && (
+                  {isMaterialReadyForInstallation(
+                    selectedOrder,
+                    showMaterialReadyByStatusOnly
+                  ) && (
                     <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
                       Material Pronto
                     </Badge>
