@@ -13,10 +13,30 @@ export const toOrderFlowMap = (rows: HubOrderFlowRow[]) => {
 export const upsertOrderFlowRow = (
   map: OrderFlowMap,
   row: HubOrderFlowRow
-) => ({
-  ...map,
-  [row.order_key]: row,
-});
+) => {
+  const current = map[row.order_key];
+  if (!current) {
+    return {
+      ...map,
+      [row.order_key]: row,
+    };
+  }
+
+  const currentUpdatedAt = Date.parse(current.updated_at);
+  const nextUpdatedAt = Date.parse(row.updated_at);
+  if (
+    Number.isFinite(currentUpdatedAt) &&
+    Number.isFinite(nextUpdatedAt) &&
+    nextUpdatedAt < currentUpdatedAt
+  ) {
+    return map;
+  }
+
+  return {
+    ...map,
+    [row.order_key]: row,
+  };
+};
 
 export const removeOrderFlowRow = (map: OrderFlowMap, orderKey: string) => {
   const next = { ...map };
