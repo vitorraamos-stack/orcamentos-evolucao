@@ -29,6 +29,7 @@ import KanbanCard from "@/features/hubos/components/KanbanCard";
 import ServiceOrderDialog from "@/features/hubos/components/ServiceOrderDialog";
 import CreateOSDialog from "@/features/hubos/components/CreateOSDialog";
 import ArtDirectionTagPopup from "@/features/hubos/components/ArtDirectionTagPopup";
+import AcabamentoLabelDialog from "@/features/hubos/components/AcabamentoLabelDialog";
 import FiltersBar from "@/features/hubos/components/FiltersBar";
 import InstallationsInbox from "@/features/hubos/components/InstallationsInbox";
 import MetricsBar from "@/features/hubos/components/MetricsBar";
@@ -153,6 +154,11 @@ export default function HubOS() {
     Record<string, AssetJob | null>
   >({});
   const [pendingInstallmentsCount, setPendingInstallmentsCount] = useState(0);
+  const [acabamentoLabelOrder, setAcabamentoLabelOrder] =
+    useState<OsOrder | null>(null);
+  const [acabamentoLabelOpen, setAcabamentoLabelOpen] = useState(false);
+  const [savingAcabamentoLabel, setSavingAcabamentoLabel] = useState(false);
+  const [printedAcabamentoLabel, setPrintedAcabamentoLabel] = useState(false);
   const [insumosReturnNotesDraft, setInsumosReturnNotesDraft] = useState("");
   const [insumosRequestDetailsDraft, setInsumosRequestDetailsDraft] =
     useState("");
@@ -291,7 +297,8 @@ export default function HubOS() {
           return;
         }
 
-        const elapsedMsSinceLastSync = Date.now() - lastSuccessfulSyncAtRef.current;
+        const elapsedMsSinceLastSync =
+          Date.now() - lastSuccessfulSyncAtRef.current;
         if (
           shouldRunSafetySync({
             isOnline,
@@ -368,10 +375,7 @@ export default function HubOS() {
       coalescedRefreshRef.current = null;
       window.removeEventListener("online", refreshFromLifecycle);
       window.removeEventListener("focus", refreshFromLifecycle);
-      document.removeEventListener(
-        "visibilitychange",
-        handleVisibilityChange
-      );
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       supabase.removeChannel(channel);
     };
   }, [loadOrders, scheduleOrdersRefresh]);
@@ -419,7 +423,10 @@ export default function HubOS() {
       producaoOrders.filter(
         order =>
           order.prod_status !== "Finalizados" &&
-          !(order.prod_status === "Pronto / Avisar Cliente" && isOrderRetirado(order))
+          !(
+            order.prod_status === "Pronto / Avisar Cliente" &&
+            isOrderRetirado(order)
+          )
       ),
     [producaoOrders, isOrderRetirado]
   );
@@ -982,6 +989,13 @@ export default function HubOS() {
     const nextStatus = over.id as ProdStatus;
     if (order.prod_status === nextStatus) return;
 
+    if (nextStatus === "Em Acabamento") {
+      setAcabamentoLabelOrder(order);
+      setPrintedAcabamentoLabel(false);
+      setAcabamentoLabelOpen(true);
+      return;
+    }
+
     const nextProductionTag =
       nextStatus === "Instalação Agendada" ? "PRONTO" : order.production_tag;
 
@@ -1021,6 +1035,205 @@ export default function HubOS() {
       console.error(error);
       toast.error("Erro ao mover card.");
       updateLocalOrder(previous);
+    }
+  };
+
+  const handleAcabamentoDialogOpenChange = (open: boolean) => {
+    setAcabamentoLabelOpen(open);
+    if (!open) {
+      setAcabamentoLabelOrder(null);
+      setSavingAcabamentoLabel(false);
+      setPrintedAcabamentoLabel(false);
+    }
+  };
+
+  const handlePrintAcabamentoLabel = () => {
+    if (!acabamentoLabelOrder) return;
+
+    const escapeHtml = (value: string) =>
+      value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+
+    const orderNumber =
+      acabamentoLabelOrder.os_number?.toString() ||
+      acabamentoLabelOrder.sale_number;
+    const clientName = escapeHtml(acabamentoLabelOrder.client_name || "-");
+    const title = acabamentoLabelOrder.title
+      ? escapeHtml(acabamentoLabelOrder.title)
+      : "";
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+      orderNumber
+    )}`;
+
+    const printMarkup = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Etiqueta OS ${orderNumber}</title>
+    <style>
+      @page { size: 50mm 30mm; margin: 0; }
+      html, body {
+        width: 50mm;
+        height: 30mm;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #fff;
+        font-family: Arial, sans-serif;
+      }
+      .label {
+        box-sizing: border-box;
+        width: 50mm;
+        height: 30mm;
+        padding: 1.6mm;
+        color: #000;
+        display: grid;
+        grid-template-columns: 1fr 14mm;
+        grid-template-rows: auto auto auto;
+        column-gap: 1.4mm;
+        row-gap: 0.6mm;
+      }
+      .tag {
+        grid-column: 1;
+        font-size: 7px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .order {
+        grid-column: 1;
+        font-size: 10.5mm;
+        font-weight: 700;
+        line-height: 0.85;
+        margin-top: -0.3mm;
+      }
+      .qr {
+        grid-column: 2;
+        grid-row: 1 / span 3;
+        width: 14mm;
+        height: 14mm;
+        justify-self: end;
+        align-self: start;
+      }
+      .meta {
+        grid-column: 1;
+        font-size: 8px;
+        line-height: 1.15;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .meta strong { font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <div class="label">
+      <div class="tag">OS</div>
+      <div class="order">${escapeHtml(orderNumber)}</div>
+      <img class="qr" src="${qrCodeUrl}" alt="QR Code" />
+      <div class="meta"><strong>Cliente:</strong> ${clientName}</div>
+      ${title ? `<div class="meta"><strong>Título:</strong> ${title}</div>` : ""}
+    </div>
+  </body>
+</html>`;
+
+    const printWithIframe = () => {
+      const frame = document.createElement("iframe");
+      frame.setAttribute("aria-hidden", "true");
+      frame.style.position = "fixed";
+      frame.style.width = "0";
+      frame.style.height = "0";
+      frame.style.border = "0";
+      frame.style.right = "0";
+      frame.style.bottom = "0";
+
+      const cleanup = () => {
+        window.setTimeout(() => {
+          frame.remove();
+        }, 300);
+      };
+
+      frame.onload = () => {
+        const targetWindow = frame.contentWindow;
+        if (!targetWindow) {
+          cleanup();
+          toast.error("Não foi possível preparar a impressão da etiqueta.");
+          return;
+        }
+        targetWindow.focus();
+        targetWindow.print();
+        cleanup();
+      };
+
+      document.body.appendChild(frame);
+      frame.srcdoc = printMarkup;
+    };
+
+    const printWindow = window.open(
+      "",
+      "_blank",
+      "noopener,noreferrer,width=420,height=320"
+    );
+
+    if (printWindow) {
+      printWindow.document.open();
+      printWindow.document.write(printMarkup);
+      printWindow.document.close();
+      printWindow.addEventListener("load", () => {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+      });
+    } else {
+      printWithIframe();
+      toast.info("Popup bloqueado. Impressão aberta no modo compatível.");
+    }
+
+    setPrintedAcabamentoLabel(true);
+  };
+
+  const handleConfirmAcabamentoMove = async () => {
+    if (!acabamentoLabelOrder) return;
+
+    setSavingAcabamentoLabel(true);
+    const order = acabamentoLabelOrder;
+
+    try {
+      const updated = await updateOrder(order.id, {
+        prod_status: "Em Acabamento",
+        updated_at: new Date().toISOString(),
+        updated_by: user?.id ?? null,
+      });
+      updateLocalOrder(updated);
+
+      try {
+        await createOrderEvent({
+          os_id: order.id,
+          type: "prod_status_changed",
+          payload: {
+            board: "producao",
+            from: order.prod_status,
+            to: "Em Acabamento",
+            source: "kanban_lightbox",
+            printed_label: printedAcabamentoLabel,
+            actor_name:
+              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
+          },
+          created_by: user?.id ?? null,
+        });
+      } catch (eventError) {
+        console.error("Erro ao registrar auditoria de status.", eventError);
+      }
+
+      toast.success("OS movida para Em Acabamento.");
+      handleAcabamentoDialogOpenChange(false);
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao mover card para Em Acabamento.");
+      setSavingAcabamentoLabel(false);
     }
   };
 
@@ -1612,6 +1825,15 @@ export default function HubOS() {
           tag={artDirectionPopupTag}
         />
       )}
+
+      <AcabamentoLabelDialog
+        open={acabamentoLabelOpen}
+        order={acabamentoLabelOrder}
+        saving={savingAcabamentoLabel}
+        onOpenChange={handleAcabamentoDialogOpenChange}
+        onConfirmMove={handleConfirmAcabamentoMove}
+        onPrintLabel={handlePrintAcabamentoLabel}
+      />
     </div>
   );
 }
