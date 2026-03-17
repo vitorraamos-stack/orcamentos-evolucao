@@ -48,6 +48,11 @@ const defaultFilters: HubOsFilters = {
 const normalize = (value: string) => value.toLowerCase();
 
 const FINAL_PROD_STATUS = PROD_COLUMNS[PROD_COLUMNS.length - 1];
+const HUB_OS_STORAGE_KEY = "hub_os:inbox:v1";
+
+type HubInboxPersistedState = {
+  avisadoIds: string[];
+};
 const DONE_ASSET_STATUSES = new Set(["CLEANED", "DONE", "DONE_CLEANUP_FAILED"]);
 type InboxKey =
   | "global"
@@ -179,6 +184,31 @@ export default function HubOS() {
     setActiveTab("producao");
     hasAppliedKioskSearch.current = true;
   }, [kioskSearch]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(HUB_OS_STORAGE_KEY);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as Partial<HubInboxPersistedState> | null;
+      if (!parsed || typeof parsed !== "object") return;
+
+      const restoredAvisado = Array.isArray(parsed.avisadoIds)
+        ? parsed.avisadoIds.filter(
+            (item): item is string => typeof item === "string"
+          )
+        : [];
+
+      setAvisadoIds(restoredAvisado);
+    } catch {
+      setAvisadoIds([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    const payload: HubInboxPersistedState = { avisadoIds };
+    localStorage.setItem(HUB_OS_STORAGE_KEY, JSON.stringify(payload));
+  }, [avisadoIds]);
 
   const loadPendingInstallments = async () => {
     try {
