@@ -28,7 +28,7 @@ export default function AcabamentoLabelDialog({
   const orderNumber = useMemo(() => getOrderNumber(order), [order]);
   const qrCodeUrl = useMemo(
     () =>
-      `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+      `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
         orderNumber
       )}`,
     [orderNumber]
@@ -48,27 +48,27 @@ export default function AcabamentoLabelDialog({
           <div className="space-y-4">
             <div
               id="print-label-area"
-              className="thermal-print-label rounded-md border bg-white p-4 text-black"
+              className="thermal-print-label rounded-md border bg-white p-3 text-black"
             >
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-600">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-600">
                 OS
               </p>
-              <p className="font-mono text-3xl font-bold leading-none">
-                {orderNumber}
-              </p>
-              <div className="mt-3 flex justify-center">
+              <div className="mt-1 flex items-start justify-between gap-2">
+                <p className="font-mono text-2xl font-bold leading-none">
+                  {orderNumber}
+                </p>
                 <img
                   src={qrCodeUrl}
                   alt={`QR Code da OS ${orderNumber}`}
-                  className="size-36"
+                  className="size-20 shrink-0"
                 />
               </div>
-              <div className="mt-3 space-y-1 text-sm">
-                <p>
+              <div className="mt-2 space-y-0.5 text-[11px] leading-tight">
+                <p className="truncate">
                   <strong>Cliente:</strong> {order.client_name}
                 </p>
                 {order.title ? (
-                  <p className="line-clamp-2">
+                  <p className="line-clamp-1">
                     <strong>Título:</strong> {order.title}
                   </p>
                 ) : null}
