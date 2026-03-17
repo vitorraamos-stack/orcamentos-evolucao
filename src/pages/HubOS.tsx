@@ -19,7 +19,6 @@ import {
   archiveOrder,
   createOrderEvent,
   deleteOrder,
-  fetchAvisadoOrderIds,
   fetchOrders,
   fetchUserDisplayNameById,
   updateOrder,
@@ -36,6 +35,8 @@ import MetricsBar from "@/features/hubos/components/MetricsBar";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchPendingSecondInstallments } from "@/features/hubos/finance";
+import { buildHubOrderFlowKeyFromOsOrdersId } from "@/modules/hub-os/order-flow-key";
+import { useGlobalOrderFlowState } from "@/modules/hub-os/order-flow-state";
 
 const defaultFilters: HubOsFilters = {
   search: "",
@@ -48,11 +49,6 @@ const defaultFilters: HubOsFilters = {
 const normalize = (value: string) => value.toLowerCase();
 
 const FINAL_PROD_STATUS = PROD_COLUMNS[PROD_COLUMNS.length - 1];
-const HUB_OS_STORAGE_KEY = "hub_os:inbox:v1";
-
-type HubInboxPersistedState = {
-  avisadoIds: string[];
-};
 const DONE_ASSET_STATUSES = new Set(["CLEANED", "DONE", "DONE_CLEANUP_FAILED"]);
 type InboxKey =
   | "global"
@@ -131,7 +127,9 @@ export default function HubOS() {
   const kioskSearch = inboxSearch;
   const setKioskSearch = setInboxSearch;
   const [selectedInboxId, setSelectedInboxId] = useState<string | null>(null);
-  const [avisadoIds, setAvisadoIds] = useState<string[]>([]);
+  const { isAvisado, isRetirado, setAvisado, markRetirado } =
+    useGlobalOrderFlowState();
+  const [pendingFlowOrderIds, setPendingFlowOrderIds] = useState<string[]>([]);
   // Backward-compatible alias to prevent runtime crashes if stale/legacy code references kioskOpenOrderId.
   const kioskOpenOrderId = selectedInboxId;
   const setKioskOpenOrderId = setSelectedInboxId;
@@ -185,31 +183,6 @@ export default function HubOS() {
     hasAppliedKioskSearch.current = true;
   }, [kioskSearch]);
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(HUB_OS_STORAGE_KEY);
-      if (!raw) return;
-
-      const parsed = JSON.parse(raw) as Partial<HubInboxPersistedState> | null;
-      if (!parsed || typeof parsed !== "object") return;
-
-      const restoredAvisado = Array.isArray(parsed.avisadoIds)
-        ? parsed.avisadoIds.filter(
-            (item): item is string => typeof item === "string"
-          )
-        : [];
-
-      setAvisadoIds(restoredAvisado);
-    } catch {
-      setAvisadoIds([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    const payload: HubInboxPersistedState = { avisadoIds };
-    localStorage.setItem(HUB_OS_STORAGE_KEY, JSON.stringify(payload));
-  }, [avisadoIds]);
-
   const loadPendingInstallments = async () => {
     try {
       const pending = await fetchPendingSecondInstallments();
@@ -224,9 +197,6 @@ export default function HubOS() {
       setLoading(true);
       const data = await fetchOrders();
       setOrders(data);
-
-      const avisado = await fetchAvisadoOrderIds(data.map(order => order.id));
-      setAvisadoIds(avisado);
     } catch (error) {
       console.error(error);
       toast.error("Não foi possível carregar o Hub OS.");
@@ -302,7 +272,7 @@ export default function HubOS() {
 
   const activeProducaoOrders = useMemo(
     () => producaoOrders.filter(order => order.prod_status !== "Finalizados"),
-    [producaoOrders]
+    [producaoOrders, isRetirado]
   );
 
   const openOrders = useMemo(
@@ -318,7 +288,9 @@ export default function HubOS() {
   const prontoAvisarOrders = useMemo(
     () =>
       producaoOrders.filter(
-        order => order.prod_status === "Pronto / Avisar Cliente"
+        order =>
+          order.prod_status === "Pronto / Avisar Cliente" &&
+          !isOrderRetirado(order)
       ),
     [producaoOrders]
   );
@@ -629,24 +601,23 @@ export default function HubOS() {
     );
   };
 
-  const isOrderAvisado = (order: OsOrder) => avisadoIds.includes(order.id);
+  const isOrderAvisado = (order: OsOrder) =>
+    isAvisado(buildHubOrderFlowKeyFromOsOrdersId(order.id));
+
+  const isOrderRetirado = (order: OsOrder) =>
+    isRetirado(buildHubOrderFlowKeyFromOsOrdersId(order.id));
 
   const toggleAvisado = async (order: OsOrder) => {
     const alreadyAvisado = isOrderAvisado(order);
-    const nextAvisado = !alreadyAvisado;
-
-    setAvisadoIds(prev =>
-      alreadyAvisado
-        ? prev.filter(orderId => orderId !== order.id)
-        : [...prev, order.id]
-    );
+    setPendingFlowOrderIds(prev => [...prev, order.id]);
 
     try {
+      await setAvisado({ sourceType: "os_orders", sourceId: order.id });
       await createOrderEvent({
         os_id: order.id,
         type: "avisado_toggle",
         payload: {
-          avisado: nextAvisado,
+          avisado: !alreadyAvisado,
           actor_name:
             user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
         },
@@ -660,26 +631,26 @@ export default function HubOS() {
       );
     } catch (error) {
       console.error("Erro ao atualizar estado avisado.", error);
-      setAvisadoIds(prev =>
-        alreadyAvisado
-          ? [...prev, order.id]
-          : prev.filter(orderId => orderId !== order.id)
-      );
       toast.error("Não foi possível atualizar o estado avisado.");
+    } finally {
+      setPendingFlowOrderIds(prev =>
+        prev.filter(orderId => orderId !== order.id)
+      );
     }
   };
 
   const handleMarcarComoRetirado = async (order: OsOrder) => {
     const previous = order;
+    setPendingFlowOrderIds(prev => [...prev, order.id]);
     const optimistic = {
       ...order,
       prod_status: "Finalizados",
     } satisfies OsOrder;
 
     updateLocalOrder(optimistic);
-    setAvisadoIds(prev => prev.filter(orderId => orderId !== order.id));
 
     try {
+      await markRetirado({ sourceType: "os_orders", sourceId: order.id });
       const updated = await updateOrder(order.id, {
         prod_status: "Finalizados",
         updated_at: new Date().toISOString(),
@@ -720,6 +691,10 @@ export default function HubOS() {
       console.error("Erro ao marcar OS como retirada.", error);
       updateLocalOrder(previous);
       toast.error("Não foi possível marcar a OS como retirada.");
+    } finally {
+      setPendingFlowOrderIds(prev =>
+        prev.filter(orderId => orderId !== order.id)
+      );
     }
   };
 
@@ -1446,6 +1421,7 @@ export default function HubOS() {
                               ? "bg-emerald-600 text-white hover:bg-emerald-600"
                               : ""
                           }
+                          disabled={pendingFlowOrderIds.includes(order.id)}
                           onClick={() => void toggleAvisado(order)}
                         >
                           AVISADO
@@ -1453,6 +1429,7 @@ export default function HubOS() {
                         {order.logistic_type === "retirada" ? (
                           <Button
                             variant="outline"
+                            disabled={pendingFlowOrderIds.includes(order.id)}
                             onClick={() => void handleMarcarComoRetirado(order)}
                           >
                             RETIRADO
