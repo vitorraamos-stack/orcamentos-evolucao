@@ -1,19 +1,34 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'wouter';
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { fetchOsList, fetchOsStatuses, updateOs, createOsEvent } from '../api';
-import type { Os, OsStatus } from '../types';
-import { useAuth } from '@/contexts/AuthContext';
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { fetchOsList, fetchOsStatuses, updateOs, createOsEvent } from "../api";
+import type { Os, OsStatus } from "../types";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  isDeliveryRetirada,
+  useGlobalOrderFlowState,
+} from "../order-flow-state";
 
 const formatDateTime = (value: string) =>
-  new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  new Date(value).toLocaleString("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
 
 export default function OsKanbanPage() {
   const { user } = useAuth();
+  const { isAvisado, isRetirado, toggleAvisado, markRetirado } =
+    useGlobalOrderFlowState();
   const [statuses, setStatuses] = useState<OsStatus[]>([]);
   const [orders, setOrders] = useState<Os[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,12 +36,15 @@ export default function OsKanbanPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [statusData, osData] = await Promise.all([fetchOsStatuses(), fetchOsList()]);
+      const [statusData, osData] = await Promise.all([
+        fetchOsStatuses(),
+        fetchOsList(),
+      ]);
       setStatuses(statusData);
       setOrders(osData);
     } catch (error) {
       console.error(error);
-      toast.error('Não foi possível carregar o Hub OS.');
+      toast.error("Não foi possível carregar o Hub OS.");
     } finally {
       setLoading(false);
     }
@@ -38,8 +56,8 @@ export default function OsKanbanPage() {
 
   const ordersByStatus = useMemo(() => {
     const map = new Map<string, Os[]>();
-    statuses.forEach((status) => map.set(status.id, []));
-    orders.forEach((order) => {
+    statuses.forEach(status => map.set(status.id, []));
+    orders.forEach(order => {
       if (!map.has(order.status_id)) {
         map.set(order.status_id, []);
       }
@@ -56,15 +74,17 @@ export default function OsKanbanPage() {
       });
       await createOsEvent({
         os_id: order.id,
-        type: 'STATUS_CHANGED',
+        type: "STATUS_CHANGED",
         payload: { from: order.status_id, to: nextStatusId },
         created_by: user?.id ?? null,
       });
-      setOrders((prev) => prev.map((item) => (item.id === order.id ? updated : item)));
-      toast.success('Status atualizado.');
+      setOrders(prev =>
+        prev.map(item => (item.id === order.id ? updated : item))
+      );
+      toast.success("Status atualizado.");
     } catch (error) {
       console.error(error);
-      toast.error('Falha ao mover a OS.');
+      toast.error("Falha ao mover a OS.");
     }
   };
 
@@ -92,51 +112,120 @@ export default function OsKanbanPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
-        {statuses.map((status) => {
+        {statuses.map(status => {
           const items = ordersByStatus.get(status.id) ?? [];
+          const isProntoAvisarColumn =
+            status.name.trim().toLowerCase() === "pronto/avisar";
+          const visibleItems = isProntoAvisarColumn
+            ? items.filter(order => !isRetirado(order.id))
+            : items;
+
           return (
             <div key={status.id} className="space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   {status.name}
                 </h2>
-                <Badge variant="secondary">{items.length}</Badge>
+                <Badge variant="secondary">{visibleItems.length}</Badge>
               </div>
               <div className="space-y-3">
-                {items.length === 0 && (
+                {visibleItems.length === 0 && (
                   <Card className="p-4 text-xs text-muted-foreground">
                     Nenhuma OS neste status.
                   </Card>
                 )}
-                {items.map((order) => (
-                  <Card key={order.id} className="space-y-3 p-4">
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">OS #{order.os_number ?? '—'}</p>
-                      <Link href={`/os/${order.id}`}>
-                        <Button variant="link" className="h-auto p-0 text-left">
-                          <span className="text-base font-semibold">{order.customer_name}</span>
-                        </Button>
-                      </Link>
-                      <p className="text-xs text-muted-foreground">{order.title}</p>
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <Badge variant="outline">{order.payment_status}</Badge>
-                      <span className="text-muted-foreground">{formatDateTime(order.updated_at)}</span>
-                    </div>
-                    <Select value={order.status_id} onValueChange={(value) => handleMove(order, value)}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Mover para..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {statuses.map((option) => (
-                          <SelectItem key={option.id} value={option.id}>
-                            {option.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Card>
-                ))}
+                {visibleItems.map(order => {
+                  const avisado = isProntoAvisarColumn
+                    ? isAvisado(order.id)
+                    : false;
+                  const retirada = isDeliveryRetirada(order.delivery_type);
+
+                  return (
+                    <Card
+                      key={order.id}
+                      className={`space-y-3 p-4 ${avisado ? "border-emerald-500 bg-emerald-50/80" : ""}`}
+                    >
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">
+                          OS #{order.os_number ?? "—"}
+                        </p>
+                        <Link href={`/os/${order.id}`}>
+                          <Button
+                            variant="link"
+                            className="h-auto p-0 text-left"
+                          >
+                            <span className="text-base font-semibold">
+                              {order.customer_name}
+                            </span>
+                          </Button>
+                        </Link>
+                        <p className="text-xs text-muted-foreground">
+                          {order.title}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <Badge variant="outline">{order.payment_status}</Badge>
+                        <span className="text-muted-foreground">
+                          {formatDateTime(order.updated_at)}
+                        </span>
+                      </div>
+                      <Select
+                        value={order.status_id}
+                        onValueChange={value => handleMove(order, value)}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Mover para..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {statuses.map(option => (
+                            <SelectItem key={option.id} value={option.id}>
+                              {option.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {isProntoAvisarColumn && (
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant={avisado ? "default" : "outline"}
+                            className={
+                              avisado
+                                ? "bg-emerald-600 text-white hover:bg-emerald-600"
+                                : ""
+                            }
+                            onClick={event => {
+                              event.stopPropagation();
+                              toggleAvisado(order.id);
+                              toast.success(
+                                avisado
+                                  ? `OS #${order.os_number ?? order.sale_number ?? "—"} desmarcada como avisada.`
+                                  : `OS #${order.os_number ?? order.sale_number ?? "—"} marcada como avisada.`
+                              );
+                            }}
+                          >
+                            AVISADO
+                          </Button>
+                          {retirada && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={event => {
+                                event.stopPropagation();
+                                markRetirado(order.id);
+                                toast.success(
+                                  `OS #${order.os_number ?? order.sale_number ?? "—"} marcada como retirada.`
+                                );
+                              }}
+                            >
+                              RETIRADO
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           );
