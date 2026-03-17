@@ -280,6 +280,14 @@ export default function HubOS() {
     [orders]
   );
 
+  function isOrderAvisado(order: OsOrder) {
+    return isAvisado(buildHubOrderFlowKeyFromOsOrdersId(order.id));
+  }
+
+  function isOrderRetirado(order: OsOrder) {
+    return isRetirado(buildHubOrderFlowKeyFromOsOrdersId(order.id));
+  }
+
   const overdueOrders = useMemo(
     () => filteredOrders.filter(isOverdue),
     [filteredOrders]
@@ -600,12 +608,6 @@ export default function HubOS() {
       prev.map(order => (order.id === updated.id ? updated : order))
     );
   };
-
-  const isOrderAvisado = (order: OsOrder) =>
-    isAvisado(buildHubOrderFlowKeyFromOsOrdersId(order.id));
-
-  const isOrderRetirado = (order: OsOrder) =>
-    isRetirado(buildHubOrderFlowKeyFromOsOrdersId(order.id));
 
   const toggleAvisado = async (order: OsOrder) => {
     const alreadyAvisado = isOrderAvisado(order);
