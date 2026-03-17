@@ -48,6 +48,19 @@ export const useGlobalOrderFlowState = () => {
     });
 
     let reconnectTimeout: number | null = null;
+    let active = true;
+    const scheduleRefresh = () => {
+      if (!active) return;
+      if (reconnectTimeout) {
+        window.clearTimeout(reconnectTimeout);
+      }
+      reconnectTimeout = window.setTimeout(() => {
+        void refreshState().catch(error => {
+          console.error(error);
+        });
+      }, 1200);
+    };
+
     const channel = supabase
       .channel("hub-os-order-flow-state")
       .on(
@@ -72,15 +85,19 @@ export const useGlobalOrderFlowState = () => {
           setState(prev => upsertOrderFlowRow(prev, nextRow));
         }
       )
-      .subscribe();
-
-    reconnectTimeout = window.setTimeout(() => {
-      void refreshState().catch(error => {
-        console.error(error);
+      .subscribe(status => {
+        if (
+          status === "SUBSCRIBED" ||
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT" ||
+          status === "CLOSED"
+        ) {
+          scheduleRefresh();
+        }
       });
-    }, 5000);
 
     return () => {
+      active = false;
       if (reconnectTimeout) window.clearTimeout(reconnectTimeout);
       supabase.removeChannel(channel);
     };

@@ -63,6 +63,12 @@ describe("order flow global", () => {
     expect(Boolean(next["os:1"]?.avisado_at)).toBe(false);
     expect(Boolean(next["os:1"]?.retirado_at)).toBe(true);
 
+    const stale = upsertOrderFlowRow(next, {
+      ...rowAvisado,
+      updated_at: "2026-01-01T09:00:00.000Z",
+    });
+    expect(Boolean(stale["os:1"]?.retirado_at)).toBe(true);
+
     const cleared = removeOrderFlowRow(next, "os:1");
     expect(cleared["os:1"]).toBeUndefined();
   });
