@@ -1,4 +1,11 @@
-import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,7 +38,13 @@ import {
   shouldBlockKioskMutations,
   upsertCard,
 } from "../kiosk/utils";
-import type { KioskBoardCard, KioskErrorKind, KioskHealthState, KioskMoveAction } from "../kiosk/types";
+import type {
+  KioskBoardCard,
+  KioskErrorKind,
+  KioskHealthState,
+  KioskMoveAction,
+} from "../kiosk/types";
+import { useGlobalOrderFlowState } from "../order-flow-state";
 
 type KioskSummaryCategory = "instalacoes" | "pronto_avisar" | "logistica";
 
@@ -74,7 +87,7 @@ export default function OsKioskPage() {
     null
   );
   const [cards, setCards] = useState<KioskBoardCard[]>([]);
-  const [avisadoIds, setAvisadoIds] = useState<string[]>([]);
+  const { isRetirado } = useGlobalOrderFlowState();
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -87,32 +100,45 @@ export default function OsKioskPage() {
   const appliedSyncSeqRef = useRef(0);
   const isMountedRef = useRef(true);
 
-  const listaOSAcabamentoEntregaRetirada = useMemo(
+  const activeCards = useMemo(
     () =>
       cards.filter(
+        card =>
+          !isRetirado(card.order_key) &&
+          !isUpstreamFinalized(card.upstream_status)
+      ),
+    [cards, isRetirado]
+  );
+
+  const listaOSAcabamentoEntregaRetirada = useMemo(
+    () =>
+      activeCards.filter(
         card => card.current_stage === "acabamento_entrega_retirada"
       ),
-    [cards]
+    [activeCards]
   );
   const listaOSAcabamentoInstalacao = useMemo(
-    () => cards.filter(card => card.current_stage === "acabamento_instalacao"),
-    [cards]
+    () =>
+      activeCards.filter(
+        card => card.current_stage === "acabamento_instalacao"
+      ),
+    [activeCards]
   );
   const listaOSEmbalagem = useMemo(
-    () => cards.filter(card => card.current_stage === "embalagem"),
-    [cards]
+    () => activeCards.filter(card => card.current_stage === "embalagem"),
+    [activeCards]
   );
   const listaInstalacoes = useMemo(
-    () => cards.filter(card => card.current_stage === "instalacoes"),
-    [cards]
+    () => activeCards.filter(card => card.current_stage === "instalacoes"),
+    [activeCards]
   );
   const listaProntoAvisar = useMemo(
-    () => cards.filter(card => card.current_stage === "pronto_avisar"),
-    [cards]
+    () => activeCards.filter(card => card.current_stage === "pronto_avisar"),
+    [activeCards]
   );
   const listaLogistica = useMemo(
-    () => cards.filter(card => card.current_stage === "logistica"),
-    [cards]
+    () => activeCards.filter(card => card.current_stage === "logistica"),
+    [activeCards]
   );
 
   const attemptFullscreen = async () => {
@@ -143,7 +169,12 @@ export default function OsKioskPage() {
 
     try {
       const list = await fetchKioskBoard();
-      if (!shouldApplySyncResponse({ requestSeq, appliedSeq: appliedSyncSeqRef.current })) {
+      if (
+        !shouldApplySyncResponse({
+          requestSeq,
+          appliedSeq: appliedSyncSeqRef.current,
+        })
+      ) {
         return;
       }
       appliedSyncSeqRef.current = requestSeq;
@@ -152,7 +183,12 @@ export default function OsKioskPage() {
       setHealthErrorKind(null);
       setLastSyncAt(new Date().toISOString());
     } catch (error) {
-      if (!shouldApplySyncResponse({ requestSeq, appliedSeq: appliedSyncSeqRef.current })) {
+      if (
+        !shouldApplySyncResponse({
+          requestSeq,
+          appliedSeq: appliedSyncSeqRef.current,
+        })
+      ) {
         return;
       }
       appliedSyncSeqRef.current = requestSeq;
@@ -242,11 +278,22 @@ export default function OsKioskPage() {
       const finalizedCandidates = targetCards.filter(card =>
         isUpstreamFinalized(card.upstream_status)
       );
-      if (finalizedCandidates.length === 0) return;
+
+      const cardsToCheck =
+        finalizedCandidates.length > 0 || opts?.silent
+          ? finalizedCandidates
+          : targetCards;
+
+      if (cardsToCheck.length === 0) {
+        if (!opts?.silent) {
+          toast.message("Nenhuma OS candidata para limpeza de finalizadas.");
+        }
+        return;
+      }
 
       setCleanupRunning(true);
       let removedCount = 0;
-      for (const card of finalizedCandidates) {
+      for (const card of cardsToCheck) {
         try {
           const result = await moveKioskOrder({
             orderKey: card.order_key,
@@ -265,8 +312,15 @@ export default function OsKioskPage() {
       if (removedCount > 0) {
         setLastSyncAt(new Date().toISOString());
         if (!opts?.silent) {
-          toast.success(`${removedCount} OS finalizada(s) removida(s) do quiosque.`);
+          toast.success(
+            `${removedCount} OS finalizada(s) removida(s) do quiosque.`
+          );
         }
+        return;
+      }
+
+      if (!opts?.silent) {
+        toast.message("Nenhuma OS finalizada foi removida.");
       }
     },
     [cleanupRunning, terminalId, user?.id]
@@ -322,7 +376,7 @@ export default function OsKioskPage() {
     }
   };
 
-  const totalCards = cards.length;
+  const totalCards = activeCards.length;
 
   const AddOrderButton = ({ label }: { label: string }) => (
     <button
@@ -401,35 +455,6 @@ export default function OsKioskPage() {
     setSummarySearch("");
     setSummarySelectedKey(null);
   }, [summaryModalCategory]);
-
-  const isOrderAvisado = (order: KioskBoardCard) =>
-    avisadoIds.includes(order.order_key);
-
-  const isRetiradaOrder = (order: KioskBoardCard) =>
-    toTagLabel(order.delivery_mode) === "Retirada";
-
-  const toggleAvisado = (order: KioskBoardCard) => {
-    const alreadyAvisado = isOrderAvisado(order);
-
-    setAvisadoIds(prev =>
-      alreadyAvisado
-        ? prev.filter(orderKey => orderKey !== order.order_key)
-        : [...prev, order.order_key]
-    );
-
-    toast.success(
-      alreadyAvisado
-        ? `OS #${order.os_number ?? order.sale_number ?? "—"} desmarcada como avisada.`
-        : `OS #${order.os_number ?? order.sale_number ?? "—"} marcada como avisada.`
-    );
-  };
-
-  const marcarComoRetirado = (order: KioskBoardCard) => {
-    setAvisadoIds(prev =>
-      prev.filter(orderKey => orderKey !== order.order_key)
-    );
-    void runMove(order, "remove_if_finalized");
-  };
 
   const renderOrderCard = (
     order: KioskBoardCard,
@@ -520,7 +545,9 @@ export default function OsKioskPage() {
               Acabamento e Embalagem em tela cheia.
             </p>
             <p className="text-xs text-muted-foreground">
-              {healthState === "syncing" ? "Sincronizando..." : `Estado: ${healthState}`}
+              {healthState === "syncing"
+                ? "Sincronizando..."
+                : `Estado: ${healthState}`}
               {lastSyncAt
                 ? ` • Última sincronização: ${new Date(lastSyncAt).toLocaleTimeString("pt-BR")}`
                 : ""}
@@ -705,16 +732,9 @@ export default function OsKioskPage() {
                   />
                   <div className="min-h-0 space-y-2 overflow-y-auto">
                     {summaryFilteredOrders.map(order => {
-                      const isAvisado = isOrderAvisado(order);
-                      const isProntoAvisar =
-                        summaryModalCategory === "pronto_avisar";
                       const selectedClass =
                         summarySelectedKey === order.order_key
                           ? "border-primary bg-primary/5"
-                          : "";
-                      const avisadoClass =
-                        isAvisado && isProntoAvisar
-                          ? "border-emerald-500 bg-emerald-50/80"
                           : "";
 
                       return (
@@ -723,7 +743,7 @@ export default function OsKioskPage() {
                           role="button"
                           tabIndex={0}
                           onClick={() => setSummarySelectedKey(order.order_key)}
-                          className={`cursor-pointer space-y-2 p-3 ${selectedClass} ${avisadoClass}`}
+                          className={`cursor-pointer space-y-2 p-3 ${selectedClass}`}
                         >
                           <p className="font-semibold">{getHeadline(order)}</p>
                           <div className="flex flex-wrap gap-2">
@@ -739,37 +759,6 @@ export default function OsKioskPage() {
                               </Badge>
                             ) : null}
                           </div>
-                          {isProntoAvisar ? (
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                size="sm"
-                                variant={isAvisado ? "default" : "outline"}
-                                className={
-                                  isAvisado
-                                    ? "bg-emerald-600 text-white hover:bg-emerald-600"
-                                    : ""
-                                }
-                                onClick={event => {
-                                  event.stopPropagation();
-                                  toggleAvisado(order);
-                                }}
-                              >
-                                AVISADO
-                              </Button>
-                              {isRetiradaOrder(order) ? (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={event => {
-                                    event.stopPropagation();
-                                    marcarComoRetirado(order);
-                                  }}
-                                >
-                                  RETIRADO
-                                </Button>
-                              ) : null}
-                            </div>
-                          ) : null}
                         </Card>
                       );
                     })}
