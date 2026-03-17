@@ -145,3 +145,36 @@
     transform: translateX(6px);
   }
 }
+
+@media print {
+  @page {
+    size: 58mm auto;
+    margin: 3mm;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  #print-label-area,
+  #print-label-area * {
+    visibility: visible !important;
+  }
+
+  #print-label-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 52mm;
+    margin: 0;
+    padding: 2mm;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: #fff;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
