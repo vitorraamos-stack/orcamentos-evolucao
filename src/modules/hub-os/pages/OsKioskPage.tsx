@@ -46,6 +46,7 @@ import type {
   KioskMoveAction,
 } from "../kiosk/types";
 import { useGlobalOrderFlowState } from "../order-flow-state";
+import { filterKioskActiveCards } from "../order-flow-selectors";
 
 type KioskSummaryCategory = "instalacoes" | "pronto_avisar" | "logistica";
 
@@ -101,12 +102,7 @@ export default function OsKioskPage() {
   const isMountedRef = useRef(true);
 
   const activeCards = useMemo(
-    () =>
-      cards.filter(
-        card =>
-          !isRetirado(card.order_key) &&
-          !isUpstreamFinalized(card.upstream_status)
-      ),
+    () => filterKioskActiveCards(cards, isRetirado, isUpstreamFinalized),
     [cards, isRetirado]
   );
 

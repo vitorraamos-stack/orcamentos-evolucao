@@ -1,156 +1,125 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import {
+  getOrderFlowRealtimeTable,
+  listOrderFlowState,
+  markOrderFlowRetirado,
+  setOrderFlowAvisado,
+  type HubOrderFlowRow,
+} from "./order-flow-api";
+import {
+  buildHubOrderFlowKey,
+  type HubOrderFlowIdentity,
+} from "./order-flow-key";
+import {
+  removeOrderFlowRow,
+  toOrderFlowMap,
+  upsertOrderFlowRow,
+} from "./order-flow-state-utils";
 
-const ORDER_FLOW_STORAGE_KEY = "hub_os_order_flow_state_v1";
-const ORDER_FLOW_EVENT = "hub-os-order-flow-state-changed";
+type OrderFlowMap = Record<string, HubOrderFlowRow>;
 
-type PersistedOrderFlowState = {
-  version: 1;
-  avisadoIds: string[];
-  retiradoIds: string[];
-};
-
-type PersistedOrderFlowStateLegacy = {
-  avisadoIds?: unknown;
-  retiradoIds?: unknown;
-};
-
-type OrderFlowState = {
-  avisadoIds: string[];
-  retiradoIds: string[];
-};
-
-const EMPTY_STATE: OrderFlowState = {
-  avisadoIds: [],
-  retiradoIds: [],
-};
-
-const toIdList = (value: unknown) =>
-  Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
-    : [];
-
-const sanitizeState = (raw: unknown): OrderFlowState => {
-  if (!raw || typeof raw !== "object") return EMPTY_STATE;
-
-  const candidate = raw as
-    | PersistedOrderFlowState
-    | PersistedOrderFlowStateLegacy;
-  return {
-    avisadoIds: Array.from(new Set(toIdList(candidate.avisadoIds))),
-    retiradoIds: Array.from(new Set(toIdList(candidate.retiradoIds))),
-  };
-};
-
-const readState = (): OrderFlowState => {
-  if (typeof window === "undefined") return EMPTY_STATE;
-  try {
-    const raw = window.localStorage.getItem(ORDER_FLOW_STORAGE_KEY);
-    if (!raw) return EMPTY_STATE;
-    return sanitizeState(JSON.parse(raw));
-  } catch {
-    return EMPTY_STATE;
-  }
-};
-
-const writeState = (state: OrderFlowState) => {
-  if (typeof window === "undefined") return;
-  const persisted: PersistedOrderFlowState = {
-    version: 1,
-    avisadoIds: state.avisadoIds,
-    retiradoIds: state.retiradoIds,
-  };
-  window.localStorage.setItem(
-    ORDER_FLOW_STORAGE_KEY,
-    JSON.stringify(persisted)
-  );
-  window.dispatchEvent(new CustomEvent(ORDER_FLOW_EVENT));
-};
-
-const toggleId = (ids: string[], id: string) =>
-  ids.includes(id) ? ids.filter(existingId => existingId !== id) : [...ids, id];
+const EMPTY_STATE: OrderFlowMap = {};
 
 export const isDeliveryRetirada = (deliveryMode: string | null | undefined) =>
   (deliveryMode ?? "").trim().toUpperCase() === "RETIRADA";
 
 export const useGlobalOrderFlowState = () => {
-  const [state, setState] = useState<OrderFlowState>(() => readState());
+  const [state, setState] = useState<OrderFlowMap>(EMPTY_STATE);
+  const refreshSeqRef = useRef(0);
 
-  useEffect(() => {
-    const syncFromStorage = () => setState(readState());
-    const onStorage = (event: StorageEvent) => {
-      if (event.key && event.key !== ORDER_FLOW_STORAGE_KEY) return;
-      syncFromStorage();
-    };
+  const refreshState = useCallback(async () => {
+    const requestSeq = ++refreshSeqRef.current;
+    const rows = await listOrderFlowState();
+    if (requestSeq !== refreshSeqRef.current) return;
 
-    window.addEventListener("storage", onStorage);
-    window.addEventListener(ORDER_FLOW_EVENT, syncFromStorage);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener(ORDER_FLOW_EVENT, syncFromStorage);
-    };
+    setState(prev => {
+      const merged = { ...prev };
+      Object.entries(toOrderFlowMap(rows)).forEach(([key, row]) => {
+        merged[key] = row;
+      });
+      return merged;
+    });
   }, []);
 
-  const updateState = useCallback(
-    (updater: (prev: OrderFlowState) => OrderFlowState) => {
-      setState(prev => {
-        const next = updater(prev);
-        writeState(next);
-        return next;
+  useEffect(() => {
+    void refreshState().catch(error => {
+      console.error(error);
+    });
+
+    let reconnectTimeout: number | null = null;
+    const channel = supabase
+      .channel("hub-os-order-flow-state")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: getOrderFlowRealtimeTable(),
+        },
+        payload => {
+          if (payload.eventType === "DELETE") {
+            const oldRow = payload.old as { order_key?: string };
+            const oldOrderKey = oldRow?.order_key;
+            if (oldOrderKey) {
+              setState(prev => removeOrderFlowRow(prev, oldOrderKey));
+            }
+            return;
+          }
+
+          const nextRow = payload.new as HubOrderFlowRow;
+          if (!nextRow?.order_key) return;
+          setState(prev => upsertOrderFlowRow(prev, nextRow));
+        }
+      )
+      .subscribe();
+
+    reconnectTimeout = window.setTimeout(() => {
+      void refreshState().catch(error => {
+        console.error(error);
       });
-    },
-    []
-  );
+    }, 5000);
+
+    return () => {
+      if (reconnectTimeout) window.clearTimeout(reconnectTimeout);
+      supabase.removeChannel(channel);
+    };
+  }, [refreshState]);
 
   const isAvisado = useCallback(
-    (orderKey: string) => state.avisadoIds.includes(orderKey),
-    [state.avisadoIds]
+    (orderKey: string) => Boolean(state[orderKey]?.avisado_at),
+    [state]
   );
 
   const isRetirado = useCallback(
-    (orderKey: string) => state.retiradoIds.includes(orderKey),
-    [state.retiradoIds]
+    (orderKey: string) => Boolean(state[orderKey]?.retirado_at),
+    [state]
   );
 
-  const toggleAvisado = useCallback(
-    (orderKey: string) => {
-      updateState(prev => ({
-        ...prev,
-        avisadoIds: toggleId(prev.avisadoIds, orderKey),
-      }));
+  const setAvisado = useCallback(
+    async (identity: HubOrderFlowIdentity) => {
+      const orderKey = buildHubOrderFlowKey(identity);
+      const nextAvisado = !Boolean(state[orderKey]?.avisado_at);
+      const row = await setOrderFlowAvisado(identity, nextAvisado);
+      setState(prev => upsertOrderFlowRow(prev, row));
+      return row;
     },
-    [updateState]
+    [state]
   );
 
-  const markRetirado = useCallback(
-    (orderKey: string) => {
-      updateState(prev => ({
-        retiradoIds: prev.retiradoIds.includes(orderKey)
-          ? prev.retiradoIds
-          : [...prev.retiradoIds, orderKey],
-        avisadoIds: prev.avisadoIds.filter(
-          existingId => existingId !== orderKey
-        ),
-      }));
-    },
-    [updateState]
-  );
+  const markRetirado = useCallback(async (identity: HubOrderFlowIdentity) => {
+    const row = await markOrderFlowRetirado(identity);
+    setState(prev => upsertOrderFlowRow(prev, row));
+    return row;
+  }, []);
 
   return useMemo(
     () => ({
-      avisadoIds: state.avisadoIds,
-      retiradoIds: state.retiradoIds,
       isAvisado,
       isRetirado,
-      toggleAvisado,
+      setAvisado,
       markRetirado,
     }),
-    [
-      isAvisado,
-      isRetirado,
-      markRetirado,
-      state.avisadoIds,
-      state.retiradoIds,
-      toggleAvisado,
-    ]
+    [isAvisado, isRetirado, markRetirado, setAvisado]
   );
 };

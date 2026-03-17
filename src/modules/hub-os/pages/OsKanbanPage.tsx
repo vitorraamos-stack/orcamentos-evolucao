@@ -18,6 +18,8 @@ import {
   isDeliveryRetirada,
   useGlobalOrderFlowState,
 } from "../order-flow-state";
+import { buildHubOrderFlowKeyFromOsId } from "../order-flow-key";
+import { filterHubReadyToNotifyOrders } from "../order-flow-selectors";
 
 const formatDateTime = (value: string) =>
   new Date(value).toLocaleString("pt-BR", {
@@ -27,11 +29,12 @@ const formatDateTime = (value: string) =>
 
 export default function OsKanbanPage() {
   const { user } = useAuth();
-  const { isAvisado, isRetirado, toggleAvisado, markRetirado } =
+  const { isAvisado, isRetirado, setAvisado, markRetirado } =
     useGlobalOrderFlowState();
   const [statuses, setStatuses] = useState<OsStatus[]>([]);
   const [orders, setOrders] = useState<Os[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingFlowKeys, setPendingFlowKeys] = useState<string[]>([]);
 
   const loadData = async () => {
     try {
@@ -117,7 +120,7 @@ export default function OsKanbanPage() {
           const isProntoAvisarColumn =
             status.name.trim().toLowerCase() === "pronto/avisar";
           const visibleItems = isProntoAvisarColumn
-            ? items.filter(order => !isRetirado(order.id))
+            ? filterHubReadyToNotifyOrders(items, isRetirado)
             : items;
 
           return (
@@ -136,7 +139,7 @@ export default function OsKanbanPage() {
                 )}
                 {visibleItems.map(order => {
                   const avisado = isProntoAvisarColumn
-                    ? isAvisado(order.id)
+                    ? isAvisado(buildHubOrderFlowKeyFromOsId(order.id))
                     : false;
                   const retirada = isDeliveryRetirada(order.delivery_type);
 
@@ -194,14 +197,35 @@ export default function OsKanbanPage() {
                                 ? "bg-emerald-600 text-white hover:bg-emerald-600"
                                 : ""
                             }
-                            onClick={event => {
+                            disabled={pendingFlowKeys.includes(
+                              buildHubOrderFlowKeyFromOsId(order.id)
+                            )}
+                            onClick={async event => {
                               event.stopPropagation();
-                              toggleAvisado(order.id);
-                              toast.success(
-                                avisado
-                                  ? `OS #${order.os_number ?? order.sale_number ?? "—"} desmarcada como avisada.`
-                                  : `OS #${order.os_number ?? order.sale_number ?? "—"} marcada como avisada.`
+                              const orderKey = buildHubOrderFlowKeyFromOsId(
+                                order.id
                               );
+                              setPendingFlowKeys(prev => [...prev, orderKey]);
+                              try {
+                                await setAvisado({
+                                  sourceType: "os",
+                                  sourceId: order.id,
+                                });
+                                toast.success(
+                                  avisado
+                                    ? `OS #${order.os_number ?? order.sale_number ?? "—"} desmarcada como avisada.`
+                                    : `OS #${order.os_number ?? order.sale_number ?? "—"} marcada como avisada.`
+                                );
+                              } catch (error) {
+                                console.error(error);
+                                toast.error(
+                                  "Falha ao atualizar status de aviso da OS."
+                                );
+                              } finally {
+                                setPendingFlowKeys(prev =>
+                                  prev.filter(key => key !== orderKey)
+                                );
+                              }
                             }}
                           >
                             AVISADO
@@ -210,12 +234,33 @@ export default function OsKanbanPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={event => {
+                              disabled={pendingFlowKeys.includes(
+                                buildHubOrderFlowKeyFromOsId(order.id)
+                              )}
+                              onClick={async event => {
                                 event.stopPropagation();
-                                markRetirado(order.id);
-                                toast.success(
-                                  `OS #${order.os_number ?? order.sale_number ?? "—"} marcada como retirada.`
+                                const orderKey = buildHubOrderFlowKeyFromOsId(
+                                  order.id
                                 );
+                                setPendingFlowKeys(prev => [...prev, orderKey]);
+                                try {
+                                  await markRetirado({
+                                    sourceType: "os",
+                                    sourceId: order.id,
+                                  });
+                                  toast.success(
+                                    `OS #${order.os_number ?? order.sale_number ?? "—"} marcada como retirada.`
+                                  );
+                                } catch (error) {
+                                  console.error(error);
+                                  toast.error(
+                                    "Falha ao marcar OS como retirada."
+                                  );
+                                } finally {
+                                  setPendingFlowKeys(prev =>
+                                    prev.filter(key => key !== orderKey)
+                                  );
+                                }
                               }}
                             >
                               RETIRADO
