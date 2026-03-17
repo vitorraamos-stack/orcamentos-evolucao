@@ -48,3 +48,26 @@ export const createCoalescedRefetchScheduler = (
 
 export const shouldRefreshOnVisibility = (visibilityState: DocumentVisibilityState) =>
   visibilityState === "visible";
+
+
+type RealtimeChannelStatus =
+  | "SUBSCRIBED"
+  | "CHANNEL_ERROR"
+  | "TIMED_OUT"
+  | "CLOSED"
+  | "JOINING"
+  | "LEAVING";
+
+export const isRealtimeChannelHealthy = (
+  status: RealtimeChannelStatus
+) => status === "SUBSCRIBED";
+
+export const shouldRunRecoverySync = ({
+  isSubscribed,
+  isOnline,
+  visibilityState,
+}: {
+  isSubscribed: boolean;
+  isOnline: boolean;
+  visibilityState: DocumentVisibilityState;
+}) => !isSubscribed && isOnline && shouldRefreshOnVisibility(visibilityState);

@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createCoalescedRefetchScheduler,
+  isRealtimeChannelHealthy,
   shouldApplyHubOrdersResponse,
   shouldRefreshOnVisibility,
+  shouldRunRecoverySync,
 } from "./boardSync";
 import {
   isOrderInProntoAvisarColumn,
@@ -82,6 +84,47 @@ describe("hub board realtime selectors", () => {
   it("ressincroniza no visibilitychange quando aba volta para visible", () => {
     expect(shouldRefreshOnVisibility("visible")).toBe(true);
     expect(shouldRefreshOnVisibility("hidden")).toBe(false);
+  });
+
+
+  it("marca canal realtime como saudável apenas quando SUBSCRIBED", () => {
+    expect(isRealtimeChannelHealthy("SUBSCRIBED")).toBe(true);
+    expect(isRealtimeChannelHealthy("TIMED_OUT")).toBe(false);
+    expect(isRealtimeChannelHealthy("CHANNEL_ERROR")).toBe(false);
+  });
+
+  it("executa recovery sync só quando canal está indisponível, online e visível", () => {
+    expect(
+      shouldRunRecoverySync({
+        isSubscribed: false,
+        isOnline: true,
+        visibilityState: "visible",
+      })
+    ).toBe(true);
+
+    expect(
+      shouldRunRecoverySync({
+        isSubscribed: true,
+        isOnline: true,
+        visibilityState: "visible",
+      })
+    ).toBe(false);
+
+    expect(
+      shouldRunRecoverySync({
+        isSubscribed: false,
+        isOnline: false,
+        visibilityState: "visible",
+      })
+    ).toBe(false);
+
+    expect(
+      shouldRunRecoverySync({
+        isSubscribed: false,
+        isOnline: true,
+        visibilityState: "hidden",
+      })
+    ).toBe(false);
   });
   it("coalesce eventos realtime próximos em um único refresh", () => {
     vi.useFakeTimers();

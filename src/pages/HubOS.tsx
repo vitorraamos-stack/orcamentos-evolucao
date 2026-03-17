@@ -37,8 +37,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { fetchPendingSecondInstallments } from "@/features/hubos/finance";
 import {
   createCoalescedRefetchScheduler,
+  isRealtimeChannelHealthy,
   shouldApplyHubOrdersResponse,
   shouldRefreshOnVisibility,
+  shouldRunRecoverySync,
 } from "@/features/hubos/boardSync";
 import { selectProntoAvisarOrders } from "@/features/hubos/selectors";
 import { buildHubOrderFlowKeyFromOsOrdersId } from "@/modules/hub-os/order-flow-key";
@@ -165,6 +167,8 @@ export default function HubOS() {
   const coalescedRefreshRef = useRef<ReturnType<
     typeof createCoalescedRefetchScheduler
   > | null>(null);
+  const realtimeRecoveryIntervalRef = useRef<number | null>(null);
+  const isRealtimeSubscribedRef = useRef(false);
   const isMountedRef = useRef(true);
   const lastOrdersSnapshotRef = useRef<OsOrder[]>([]);
   const isOrderAvisado = useCallback(
@@ -259,7 +263,34 @@ export default function HubOS() {
       void loadOrders();
     });
 
+    const stopRealtimeRecovery = () => {
+      if (realtimeRecoveryIntervalRef.current !== null) {
+        window.clearInterval(realtimeRecoveryIntervalRef.current);
+        realtimeRecoveryIntervalRef.current = null;
+      }
+    };
+
+    const startRealtimeRecovery = () => {
+      if (realtimeRecoveryIntervalRef.current !== null) return;
+
+      realtimeRecoveryIntervalRef.current = window.setInterval(() => {
+        if (
+          !shouldRunRecoverySync({
+            isSubscribed: isRealtimeSubscribedRef.current,
+            isOnline: navigator.onLine,
+            visibilityState: document.visibilityState,
+          })
+        ) {
+          return;
+        }
+
+        scheduleOrdersRefresh();
+      }, 5000);
+    };
+
+    startRealtimeRecovery();
     void loadOrders();
+
     const channel = supabase
       .channel("hub-os-orders")
       .on(
@@ -277,12 +308,20 @@ export default function HubOS() {
         }
       )
       .subscribe(status => {
+        if (isRealtimeChannelHealthy(status)) {
+          isRealtimeSubscribedRef.current = true;
+          stopRealtimeRecovery();
+          scheduleOrdersRefresh();
+          return;
+        }
+
         if (
-          status === "SUBSCRIBED" ||
           status === "CHANNEL_ERROR" ||
           status === "TIMED_OUT" ||
           status === "CLOSED"
         ) {
+          isRealtimeSubscribedRef.current = false;
+          startRealtimeRecovery();
           scheduleOrdersRefresh();
         }
       });
@@ -305,6 +344,8 @@ export default function HubOS() {
 
     return () => {
       isMountedRef.current = false;
+      isRealtimeSubscribedRef.current = false;
+      stopRealtimeRecovery();
       coalescedRefreshRef.current?.cancel();
       coalescedRefreshRef.current = null;
       window.removeEventListener("online", refreshFromLifecycle);
