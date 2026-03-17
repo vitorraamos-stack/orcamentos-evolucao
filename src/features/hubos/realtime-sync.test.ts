@@ -5,6 +5,7 @@ import {
   shouldApplyHubOrdersResponse,
   shouldRefreshOnVisibility,
   shouldRunRecoverySync,
+  shouldRunSafetySync,
 } from "./boardSync";
 import {
   isOrderInProntoAvisarColumn,
@@ -123,6 +124,45 @@ describe("hub board realtime selectors", () => {
         isSubscribed: false,
         isOnline: true,
         visibilityState: "hidden",
+      })
+    ).toBe(false);
+  });
+
+
+  it("executa safety sync quando ficou muito tempo sem sincronizar", () => {
+    expect(
+      shouldRunSafetySync({
+        isOnline: true,
+        visibilityState: "visible",
+        elapsedMsSinceLastSync: 15000,
+        maxStalenessMs: 15000,
+      })
+    ).toBe(true);
+
+    expect(
+      shouldRunSafetySync({
+        isOnline: true,
+        visibilityState: "visible",
+        elapsedMsSinceLastSync: 12000,
+        maxStalenessMs: 15000,
+      })
+    ).toBe(false);
+
+    expect(
+      shouldRunSafetySync({
+        isOnline: false,
+        visibilityState: "visible",
+        elapsedMsSinceLastSync: 20000,
+        maxStalenessMs: 15000,
+      })
+    ).toBe(false);
+
+    expect(
+      shouldRunSafetySync({
+        isOnline: true,
+        visibilityState: "hidden",
+        elapsedMsSinceLastSync: 20000,
+        maxStalenessMs: 15000,
       })
     ).toBe(false);
   });

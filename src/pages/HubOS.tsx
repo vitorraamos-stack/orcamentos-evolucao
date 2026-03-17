@@ -41,6 +41,7 @@ import {
   shouldApplyHubOrdersResponse,
   shouldRefreshOnVisibility,
   shouldRunRecoverySync,
+  shouldRunSafetySync,
 } from "@/features/hubos/boardSync";
 import { selectProntoAvisarOrders } from "@/features/hubos/selectors";
 import { buildHubOrderFlowKeyFromOsOrdersId } from "@/modules/hub-os/order-flow-key";
@@ -169,6 +170,7 @@ export default function HubOS() {
   > | null>(null);
   const realtimeRecoveryIntervalRef = useRef<number | null>(null);
   const isRealtimeSubscribedRef = useRef(false);
+  const lastSuccessfulSyncAtRef = useRef(0);
   const isMountedRef = useRef(true);
   const lastOrdersSnapshotRef = useRef<OsOrder[]>([]);
   const isOrderAvisado = useCallback(
@@ -237,6 +239,7 @@ export default function HubOS() {
       }
 
       lastOrdersSnapshotRef.current = data;
+      lastSuccessfulSyncAtRef.current = Date.now();
       setOrders(data);
     } catch (error) {
       console.error(error);
@@ -274,21 +277,36 @@ export default function HubOS() {
       if (realtimeRecoveryIntervalRef.current !== null) return;
 
       realtimeRecoveryIntervalRef.current = window.setInterval(() => {
+        const isOnline = navigator.onLine;
+        const visibilityState = document.visibilityState;
+
         if (
-          !shouldRunRecoverySync({
+          shouldRunRecoverySync({
             isSubscribed: isRealtimeSubscribedRef.current,
-            isOnline: navigator.onLine,
-            visibilityState: document.visibilityState,
+            isOnline,
+            visibilityState,
           })
         ) {
+          scheduleOrdersRefresh();
           return;
         }
 
-        scheduleOrdersRefresh();
+        const elapsedMsSinceLastSync = Date.now() - lastSuccessfulSyncAtRef.current;
+        if (
+          shouldRunSafetySync({
+            isOnline,
+            visibilityState,
+            elapsedMsSinceLastSync,
+            maxStalenessMs: 15000,
+          })
+        ) {
+          scheduleOrdersRefresh();
+        }
       }, 5000);
     };
 
     startRealtimeRecovery();
+    lastSuccessfulSyncAtRef.current = 0;
     void loadOrders();
 
     const channel = supabase

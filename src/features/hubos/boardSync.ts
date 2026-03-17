@@ -71,3 +71,19 @@ export const shouldRunRecoverySync = ({
   isOnline: boolean;
   visibilityState: DocumentVisibilityState;
 }) => !isSubscribed && isOnline && shouldRefreshOnVisibility(visibilityState);
+
+
+export const shouldRunSafetySync = ({
+  isOnline,
+  visibilityState,
+  elapsedMsSinceLastSync,
+  maxStalenessMs,
+}: {
+  isOnline: boolean;
+  visibilityState: DocumentVisibilityState;
+  elapsedMsSinceLastSync: number;
+  maxStalenessMs: number;
+}) =>
+  isOnline &&
+  shouldRefreshOnVisibility(visibilityState) &&
+  elapsedMsSinceLastSync >= maxStalenessMs;
