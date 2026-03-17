@@ -63,6 +63,8 @@ describe("kiosk helpers", () => {
     expect(parseKioskError({ details: "KIOSK_UPSTREAM_NOT_FOUND" })).toContain("não encontrada");
     expect(parseKioskError(new TypeError("Failed to fetch"))).toContain("Falha de rede");
     expect(parseKioskError({ details: "KIOSK_AUTH_REQUIRED" })).toContain("Sessão expirada");
+    expect(parseKioskError({ details: "KIOSK_INVALID_STAGE" })).toContain("Instalações");
+    expect(parseKioskError({ details: "KIOSK_FEEDBACK_REQUIRED" })).toContain("feedback");
     expect(parseKioskError({ message: `column reference "id" is ambiguous` })).toContain("desatualizada");
     expect(
       parseKioskError({

@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { OsOrder, OsOrderEvent } from "./types";
+import type { InstallationFeedback, OsOrder, OsOrderEvent } from "./types";
 
 export type OptimizeInstallationRoutePayload = {
   dateFrom?: string | null;
@@ -409,4 +409,12 @@ export const fetchAuditUsers = async () => {
         "pt-BR"
       )
     );
+};
+
+
+export const fetchInstallationFeedbacks = async () => {
+  const { data, error } = await supabase.rpc("installation_feedbacks_list_secure");
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as InstallationFeedback[];
 };
