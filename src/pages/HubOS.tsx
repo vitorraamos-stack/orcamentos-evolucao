@@ -14,11 +14,13 @@ import type {
   HubOsFilters,
   OsOrder,
   ProdStatus,
+  InstallationFeedback,
 } from "@/features/hubos/types";
 import {
   archiveOrder,
   createOrderEvent,
   deleteOrder,
+  fetchInstallationFeedbacks,
   fetchOrders,
   fetchUserDisplayNameById,
   updateOrder,
@@ -33,6 +35,7 @@ import AcabamentoLabelDialog from "@/features/hubos/components/AcabamentoLabelDi
 import FiltersBar from "@/features/hubos/components/FiltersBar";
 import InstallationsInbox from "@/features/hubos/components/InstallationsInbox";
 import MetricsBar from "@/features/hubos/components/MetricsBar";
+import InstallationFeedbacksCard from "@/features/hubos/components/InstallationFeedbacksCard";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchPendingSecondInstallments } from "@/features/hubos/finance";
@@ -154,6 +157,9 @@ export default function HubOS() {
     Record<string, AssetJob | null>
   >({});
   const [pendingInstallmentsCount, setPendingInstallmentsCount] = useState(0);
+  const [installationFeedbacks, setInstallationFeedbacks] = useState<
+    InstallationFeedback[]
+  >([]);
   const [acabamentoLabelOrder, setAcabamentoLabelOrder] =
     useState<OsOrder | null>(null);
   const [acabamentoLabelOpen, setAcabamentoLabelOpen] = useState(false);
@@ -227,6 +233,22 @@ export default function HubOS() {
     }
   };
 
+  const canViewInstallationFeedbacks = isAdmin || hubPermissions.canManageUsers;
+
+  const loadInstallationFeedbacks = useCallback(async () => {
+    if (!canViewInstallationFeedbacks) {
+      setInstallationFeedbacks([]);
+      return;
+    }
+
+    try {
+      const list = await fetchInstallationFeedbacks();
+      setInstallationFeedbacks(list);
+    } catch (error) {
+      console.error("Erro ao carregar feedbacks de instalações", error);
+    }
+  }, [canViewInstallationFeedbacks]);
+
   const loadOrders = useCallback(async () => {
     const requestId = ++loadOrdersSeqRef.current;
 
@@ -247,6 +269,7 @@ export default function HubOS() {
       lastOrdersSnapshotRef.current = data;
       lastSuccessfulSyncAtRef.current = Date.now();
       setOrders(data);
+      void loadInstallationFeedbacks();
     } catch (error) {
       console.error(error);
       if (shouldApplyHubOrdersResponse(requestId, loadOrdersSeqRef.current)) {
@@ -260,7 +283,7 @@ export default function HubOS() {
         setLoading(false);
       }
     }
-  }, []);
+  }, [loadInstallationFeedbacks]);
 
   const scheduleOrdersRefresh = useCallback(() => {
     coalescedRefreshRef.current?.schedule();
@@ -315,6 +338,7 @@ export default function HubOS() {
     startRealtimeRecovery();
     lastSuccessfulSyncAtRef.current = 0;
     void loadOrders();
+    void loadInstallationFeedbacks();
 
     const channel = supabase
       .channel("hub-os-orders")
@@ -378,7 +402,7 @@ export default function HubOS() {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       supabase.removeChannel(channel);
     };
-  }, [loadOrders, scheduleOrdersRefresh]);
+  }, [loadInstallationFeedbacks, loadOrders, scheduleOrdersRefresh]);
 
   const filteredOrders = useMemo(() => {
     const search = normalize(filters.search);
@@ -1537,35 +1561,40 @@ export default function HubOS() {
         </div>
       </div>
 
-      <MetricsBar
-        {...metrics}
-        aguardandoInsumos={
-          canViewAguardandoInsumos ? aguardandoInsumosOrders.length : undefined
-        }
-        producaoExterna={
-          canViewProducaoExterna ? producaoExternaOrders.length : undefined
-        }
-        insumosAlertActive={
-          canViewAguardandoInsumos && aguardandoInsumosOrders.length > 0
-        }
-        onGlobalClick={() => openInbox("global")}
-        onArteClick={() => openInbox("arte")}
-        onProducaoClick={() => openInbox("producao")}
-        onAguardandoInsumosClick={
-          canViewAguardandoInsumos
-            ? () => openInbox("aguardandoInsumos")
-            : undefined
-        }
-        onProducaoExternaClick={
-          canViewProducaoExterna
-            ? () => openInbox("producaoExterna")
-            : undefined
-        }
-        onAtrasadosClick={() => openInbox("atrasados")}
-        onProntoAvisarClick={() => openInbox("prontoAvisar")}
-        onInstalacoesClick={() => openInbox("instalacoes")}
-        onPendentesClick={() => setLocation("/hub-os/pendentes")}
-      />
+      <div className="flex flex-wrap gap-3">
+        <MetricsBar
+          {...metrics}
+          aguardandoInsumos={
+            canViewAguardandoInsumos ? aguardandoInsumosOrders.length : undefined
+          }
+          producaoExterna={
+            canViewProducaoExterna ? producaoExternaOrders.length : undefined
+          }
+          insumosAlertActive={
+            canViewAguardandoInsumos && aguardandoInsumosOrders.length > 0
+          }
+          onGlobalClick={() => openInbox("global")}
+          onArteClick={() => openInbox("arte")}
+          onProducaoClick={() => openInbox("producao")}
+          onAguardandoInsumosClick={
+            canViewAguardandoInsumos
+              ? () => openInbox("aguardandoInsumos")
+              : undefined
+          }
+          onProducaoExternaClick={
+            canViewProducaoExterna
+              ? () => openInbox("producaoExterna")
+              : undefined
+          }
+          onAtrasadosClick={() => openInbox("atrasados")}
+          onProntoAvisarClick={() => openInbox("prontoAvisar")}
+          onInstalacoesClick={() => openInbox("instalacoes")}
+          onPendentesClick={() => setLocation("/hub-os/pendentes")}
+        />
+        {canViewInstallationFeedbacks ? (
+          <InstallationFeedbacksCard items={installationFeedbacks} />
+        ) : null}
+      </div>
 
       {viewMode === "kanban" ? (
         <>

@@ -12,9 +12,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   fetchKioskBoard,
+  completeKioskInstallation,
   moveKioskOrder,
   registerKioskOrderByCode,
 } from "../kiosk/api";
@@ -82,6 +84,11 @@ export default function OsKioskPage() {
   );
   const [fullscreenBlocked, setFullscreenBlocked] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+
+  const [installationDialogOrder, setInstallationDialogOrder] =
+    useState<KioskBoardCard | null>(null);
+  const [installationFeedback, setInstallationFeedback] = useState("");
+  const [isCompletingInstallation, setIsCompletingInstallation] = useState(false);
   const [summaryModalCategory, setSummaryModalCategory] =
     useState<KioskSummaryCategory | null>(null);
   const [summarySearch, setSummarySearch] = useState("");
@@ -267,6 +274,64 @@ export default function OsKioskPage() {
     );
   };
 
+  const closeInstallationDialog = () => {
+    if (isCompletingInstallation) return;
+    setInstallationDialogOrder(null);
+    setInstallationFeedback("");
+  };
+
+  const handleCompleteInstallation = async () => {
+    const order = installationDialogOrder;
+    const feedback = installationFeedback.trim();
+
+    if (!order) return;
+
+    if (isMutationBlocked) {
+      toast.error(
+        "Quiosque em estado inseguro. Atualize a sincronização antes de finalizar instalação."
+      );
+      return;
+    }
+
+    if (!terminalId) {
+      toast.error("Terminal não inicializado.");
+      return;
+    }
+
+    if (!feedback) {
+      toast.error("O feedback é obrigatório para finalizar a instalação.");
+      return;
+    }
+
+    try {
+      setProcessingId(order.order_key);
+      setIsCompletingInstallation(true);
+      const result = await completeKioskInstallation({
+        orderKey: order.order_key,
+        feedback,
+        actorId: user?.id ?? null,
+        terminalId,
+      });
+
+      setCards(prev => applyMoveResult(prev, result));
+      setSelectedOrder(current =>
+        current?.order_key === order.order_key ? null : current
+      );
+      setDetailsOpen(false);
+      setLastSyncAt(new Date().toISOString());
+      setSyncError(null);
+      setHealthErrorKind(null);
+      closeInstallationDialog();
+      toast.success(result.result_message || "Instalação finalizada com sucesso.");
+    } catch (error) {
+      setHealthErrorKind(getKioskErrorKind(error));
+      toast.error(parseKioskError(error));
+    } finally {
+      setIsCompletingInstallation(false);
+      setProcessingId(null);
+    }
+  };
+
   const runMove = async (order: KioskBoardCard, action: KioskMoveAction) => {
     if (isMutationBlocked) {
       toast.error(
@@ -423,6 +488,24 @@ export default function OsKioskPage() {
       {children}
     </Card>
   );
+
+  const renderInstallationFinalizeButton = (order: KioskBoardCard) => {
+    if (order.current_stage !== "instalacoes") return null;
+
+    return (
+      <Button
+        variant="default"
+        disabled={processingId === order.order_key || isMutationBlocked}
+        onClick={event => {
+          event.stopPropagation();
+          setInstallationDialogOrder(order);
+          setInstallationFeedback("");
+        }}
+      >
+        Finalizar instalação
+      </Button>
+    );
+  };
 
   const renderMoveButton = (order: KioskBoardCard) => {
     const action = resolveMoveAction({
@@ -709,6 +792,7 @@ export default function OsKioskPage() {
                         <strong>Endereço:</strong>{" "}
                         {summarySelectedOrder.address ?? "—"}
                       </p>
+                      {renderInstallationFinalizeButton(summarySelectedOrder)}
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
@@ -718,6 +802,63 @@ export default function OsKioskPage() {
                 </Card>
               </div>
             </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={installationDialogOrder !== null}
+        onOpenChange={open => !open && closeInstallationDialog()}
+      >
+        <DialogContent className="max-w-xl space-y-4">
+          {installationDialogOrder ? (
+            <>
+              <div className="space-y-1">
+                <h3 className="text-xl font-semibold">Finalizar instalação</h3>
+                <p className="text-sm text-muted-foreground">
+                  Informe o feedback final da instalação para concluir a OS.
+                </p>
+              </div>
+              <Card className="space-y-1 border-dashed p-3">
+                <p className="text-sm font-semibold">{getHeadline(installationDialogOrder)}</p>
+                <p className="text-xs text-muted-foreground">
+                  Cliente: {installationDialogOrder.client_name ?? "—"}
+                </p>
+              </Card>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Feedback obrigatório</label>
+                <Textarea
+                  value={installationFeedback}
+                  onChange={event => setInstallationFeedback(event.target.value)}
+                  placeholder="Descreva como a instalação foi concluída..."
+                  rows={5}
+                  disabled={isCompletingInstallation}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Sem feedback não é possível finalizar a instalação.
+                </p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={closeInstallationDialog}
+                  disabled={isCompletingInstallation}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => void handleCompleteInstallation()}
+                  disabled={
+                    isCompletingInstallation ||
+                    processingId === installationDialogOrder.order_key ||
+                    installationFeedback.trim().length === 0 ||
+                    isMutationBlocked
+                  }
+                >
+                  {isCompletingInstallation ? "Finalizando..." : "Finalizar instalação"}
+                </Button>
+              </div>
+            </>
           ) : null}
         </DialogContent>
       </Dialog>

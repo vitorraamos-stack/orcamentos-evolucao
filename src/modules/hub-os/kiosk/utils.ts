@@ -55,6 +55,12 @@ export const parseKioskError = (error: unknown) => {
   if (details.includes("KIOSK_INVALID_ACTION")) {
     return "Ação inválida para este card no quiosque.";
   }
+  if (details.includes("KIOSK_INVALID_STAGE")) {
+    return "A OS precisa estar na etapa de Instalações para ser finalizada.";
+  }
+  if (details.includes("KIOSK_FEEDBACK_REQUIRED")) {
+    return "Informe um feedback para finalizar a instalação.";
+  }
   if (details.includes("KIOSK_AUTH_REQUIRED") || normalized.includes("auth required") || normalized.includes("usuário não autenticado")) {
     return "Sessão expirada no quiosque. Faça login novamente para continuar.";
   }

@@ -132,3 +132,23 @@ export type FinanceInstallment = {
     original_name: string | null;
   } | null;
 };
+
+
+export type InstallationFeedback = {
+  id: string;
+  order_key: string;
+  source_type: "os" | "os_orders";
+  source_id: string;
+  os_number: number | null;
+  sale_number: string | null;
+  client_name: string | null;
+  title: string | null;
+  feedback: string;
+  created_by: string | null;
+  created_at: string;
+  finalized_at: string;
+  reviewed: boolean;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  reviewed_by_email: string | null;
+};

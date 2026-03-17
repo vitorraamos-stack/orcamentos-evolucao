@@ -198,3 +198,33 @@ export const moveKioskOrder = async (params: {
 
   return row as KioskBoardMoveResult;
 };
+
+export const completeKioskInstallation = async (params: {
+  orderKey: string;
+  feedback: string;
+  actorId: string | null;
+  terminalId: string;
+}) => {
+  const response = await supabase.rpc("kiosk_board_complete_installation_secure", {
+    p_order_key: params.orderKey,
+    p_feedback: params.feedback,
+    p_actor_id: params.actorId,
+    p_terminal_id: params.terminalId,
+  });
+
+  if (response.error) {
+    assertOfficialKioskRpc({
+      rpcName: "kiosk_board_complete_installation_secure",
+      error: response.error,
+      allowFallback: false,
+      normalizeError: toError,
+    });
+  }
+
+  const row = Array.isArray(response.data) ? response.data[0] : null;
+  if (!row) {
+    throw new Error("Resposta inválida ao finalizar instalação no quiosque.");
+  }
+
+  return row as KioskBoardMoveResult;
+};
