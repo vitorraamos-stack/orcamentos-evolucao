@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useMemo, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,25 +11,29 @@ import {
   moveKioskOrder,
   registerKioskOrderByCode,
 } from "../kiosk/api";
-import { KIOSK_POLL_INTERVAL_MS, KIOSK_STAGE_LABELS } from "../kiosk/constants";
+import {
+  KIOSK_CRITICAL_STALE_AFTER_MS,
+  KIOSK_POLL_INTERVAL_MS,
+  KIOSK_STAGE_LABELS,
+  KIOSK_STALE_AFTER_MS,
+} from "../kiosk/constants";
 import { KioskOsLookupPanel } from "../kiosk/KioskOsLookupPanel";
+import { useOnlineStatus } from "../kiosk/hooks";
 import {
   applyMoveResult,
   getOrCreateTerminalId,
+  getKioskErrorKind,
+  isUpstreamFinalized,
   parseKioskError,
   resolveMoveAction,
+  resolveKioskHealthState,
+  shouldApplySyncResponse,
+  shouldBlockKioskMutations,
   upsertCard,
 } from "../kiosk/utils";
-import type { KioskBoardCard, KioskMoveAction } from "../kiosk/types";
+import type { KioskBoardCard, KioskErrorKind, KioskHealthState, KioskMoveAction } from "../kiosk/types";
 
 type KioskSummaryCategory = "instalacoes" | "pronto_avisar" | "logistica";
-
-type KioskPersistedState = {
-  avisadoIds: string[];
-  listaFinalizados: KioskBoardCard[];
-};
-
-const KIOSK_STORAGE_KEY = "hub_os:kiosk:v2";
 
 const toTagLabel = (mode: string | null) => {
   const normalized = (mode ?? "").toLowerCase();
@@ -55,6 +59,7 @@ const getHeadline = (order: KioskBoardCard) => {
 
 export default function OsKioskPage() {
   const { user } = useAuth();
+  const isOnline = useOnlineStatus();
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<KioskBoardCard | null>(
@@ -70,13 +75,17 @@ export default function OsKioskPage() {
   );
   const [cards, setCards] = useState<KioskBoardCard[]>([]);
   const [avisadoIds, setAvisadoIds] = useState<string[]>([]);
-  const [listaFinalizados, setListaFinalizados] = useState<KioskBoardCard[]>(
-    []
-  );
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [terminalId, setTerminalId] = useState<string | null>(null);
+  const [healthErrorKind, setHealthErrorKind] = useState<KioskErrorKind | null>(
+    null
+  );
+  const [cleanupRunning, setCleanupRunning] = useState(false);
+  const syncRequestSeqRef = useRef(0);
+  const appliedSyncSeqRef = useRef(0);
+  const isMountedRef = useRef(true);
 
   const listaOSAcabamentoEntregaRetirada = useMemo(
     () =>
@@ -97,19 +106,9 @@ export default function OsKioskPage() {
     () => cards.filter(card => card.current_stage === "instalacoes"),
     [cards]
   );
-  const finalizadoIds = useMemo(
-    () => new Set(listaFinalizados.map(order => order.order_key)),
-    [listaFinalizados]
-  );
-
   const listaProntoAvisar = useMemo(
-    () =>
-      cards.filter(
-        card =>
-          card.current_stage === "pronto_avisar" &&
-          !finalizadoIds.has(card.order_key)
-      ),
-    [cards, finalizadoIds]
+    () => cards.filter(card => card.current_stage === "pronto_avisar"),
+    [cards]
   );
   const listaLogistica = useMemo(
     () => cards.filter(card => card.current_stage === "logistica"),
@@ -138,61 +137,38 @@ export default function OsKioskPage() {
     setTerminalId(getOrCreateTerminalId());
   }, []);
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(KIOSK_STORAGE_KEY);
-      if (!raw) return;
-
-      const parsed = JSON.parse(raw) as Partial<KioskPersistedState> | null;
-      if (!parsed || typeof parsed !== "object") return;
-
-      const restoredAvisado = Array.isArray(parsed.avisadoIds)
-        ? parsed.avisadoIds.filter(
-            (item): item is string => typeof item === "string"
-          )
-        : [];
-
-      const restoredFinalizados = Array.isArray(parsed.listaFinalizados)
-        ? parsed.listaFinalizados.filter((item): item is KioskBoardCard =>
-            Boolean(
-              item &&
-              typeof item === "object" &&
-              typeof item.order_key === "string"
-            )
-          )
-        : [];
-
-      setAvisadoIds(restoredAvisado);
-      setListaFinalizados(restoredFinalizados);
-    } catch {
-      setAvisadoIds([]);
-      setListaFinalizados([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    const payload: KioskPersistedState = {
-      avisadoIds,
-      listaFinalizados,
-    };
-
-    localStorage.setItem(KIOSK_STORAGE_KEY, JSON.stringify(payload));
-  }, [avisadoIds, listaFinalizados]);
-
-  const syncBoard = async (opts?: { silent?: boolean }) => {
+  const syncBoard = useCallback(async (opts?: { silent?: boolean }) => {
+    const requestSeq = ++syncRequestSeqRef.current;
     if (!opts?.silent) setIsSyncing(true);
 
     try {
       const list = await fetchKioskBoard();
+      if (!shouldApplySyncResponse({ requestSeq, appliedSeq: appliedSyncSeqRef.current })) {
+        return;
+      }
+      appliedSyncSeqRef.current = requestSeq;
       setCards(list);
       setSyncError(null);
+      setHealthErrorKind(null);
       setLastSyncAt(new Date().toISOString());
     } catch (error) {
+      if (!shouldApplySyncResponse({ requestSeq, appliedSeq: appliedSyncSeqRef.current })) {
+        return;
+      }
+      appliedSyncSeqRef.current = requestSeq;
       setSyncError(parseKioskError(error));
+      setHealthErrorKind(getKioskErrorKind(error));
     } finally {
-      if (!opts?.silent) setIsSyncing(false);
+      if (!opts?.silent && isMountedRef.current) setIsSyncing(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!terminalId) return;
@@ -202,10 +178,46 @@ export default function OsKioskPage() {
       void syncBoard({ silent: true });
     }, KIOSK_POLL_INTERVAL_MS);
 
-    return () => window.clearInterval(interval);
-  }, [terminalId]);
+    const onFocus = () => void syncBoard({ silent: true });
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void syncBoard({ silent: true });
+      }
+    };
+    const onOnline = () => void syncBoard({ silent: true });
+
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("online", onOnline);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("online", onOnline);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [terminalId, syncBoard]);
+
+  const healthState: KioskHealthState = resolveKioskHealthState({
+    isOnline,
+    isSyncing,
+    lastSyncAt,
+    lastErrorKind: healthErrorKind,
+    staleAfterMs: KIOSK_STALE_AFTER_MS,
+  });
+  const isMutationBlocked = shouldBlockKioskMutations({
+    healthState,
+    lastSyncAt,
+    criticalStaleAfterMs: KIOSK_CRITICAL_STALE_AFTER_MS,
+  });
 
   const handleAddByCode = async (sanitizedCode: string) => {
+    if (isMutationBlocked) {
+      throw new Error(
+        "Quiosque em modo degradado/offline. Sincronize novamente antes de registrar novas OS."
+      );
+    }
+
     if (!terminalId) throw new Error("Terminal não inicializado.");
 
     const created = await registerKioskOrderByCode({
@@ -215,6 +227,7 @@ export default function OsKioskPage() {
     });
 
     setCards(prev => upsertCard(prev, created));
+    setHealthErrorKind(null);
     setAddModalOpen(false);
     setLastSyncAt(new Date().toISOString());
     toast.success(
@@ -222,7 +235,56 @@ export default function OsKioskPage() {
     );
   };
 
+  const runCleanupFinalized = useCallback(
+    async (targetCards: KioskBoardCard[], opts?: { silent?: boolean }) => {
+      if (cleanupRunning || !terminalId) return;
+
+      const finalizedCandidates = targetCards.filter(card =>
+        isUpstreamFinalized(card.upstream_status)
+      );
+      if (finalizedCandidates.length === 0) return;
+
+      setCleanupRunning(true);
+      let removedCount = 0;
+      for (const card of finalizedCandidates) {
+        try {
+          const result = await moveKioskOrder({
+            orderKey: card.order_key,
+            action: "remove_if_finalized",
+            actorId: user?.id ?? null,
+            terminalId,
+          });
+          setCards(prev => applyMoveResult(prev, result));
+          if (result.removed) removedCount += 1;
+        } catch {
+          // Falha individual não deve ocultar os demais removíveis.
+        }
+      }
+      setCleanupRunning(false);
+
+      if (removedCount > 0) {
+        setLastSyncAt(new Date().toISOString());
+        if (!opts?.silent) {
+          toast.success(`${removedCount} OS finalizada(s) removida(s) do quiosque.`);
+        }
+      }
+    },
+    [cleanupRunning, terminalId, user?.id]
+  );
+
+  useEffect(() => {
+    if (!cards.length) return;
+    void runCleanupFinalized(cards, { silent: true });
+  }, [cards, runCleanupFinalized]);
+
   const runMove = async (order: KioskBoardCard, action: KioskMoveAction) => {
+    if (isMutationBlocked) {
+      toast.error(
+        "Quiosque em estado inseguro. Atualize a sincronização antes de movimentar OS."
+      );
+      return;
+    }
+
     if (!terminalId) {
       toast.error("Terminal não inicializado.");
       return;
@@ -250,8 +312,10 @@ export default function OsKioskPage() {
       }
       setLastSyncAt(new Date().toISOString());
       setSyncError(null);
+      setHealthErrorKind(null);
       toast.success(result.result_message || "Movimentação concluída.");
     } catch (error) {
+      setHealthErrorKind(getKioskErrorKind(error));
       toast.error(parseKioskError(error));
     } finally {
       setProcessingId(null);
@@ -264,6 +328,7 @@ export default function OsKioskPage() {
     <button
       type="button"
       className="group flex min-h-11 items-center gap-3 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-left transition hover:bg-primary/20"
+      disabled={isMutationBlocked}
       onClick={() => setAddModalOpen(true)}
     >
       <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground">
@@ -360,18 +425,10 @@ export default function OsKioskPage() {
   };
 
   const marcarComoRetirado = (order: KioskBoardCard) => {
-    setListaFinalizados(prev => {
-      if (prev.some(item => item.order_key === order.order_key)) return prev;
-      return [...prev, order];
-    });
-
     setAvisadoIds(prev =>
       prev.filter(orderKey => orderKey !== order.order_key)
     );
-
-    toast.success(
-      `OS #${order.os_number ?? order.sale_number ?? "—"} marcada como retirada e finalizada.`
-    );
+    void runMove(order, "remove_if_finalized");
   };
 
   const renderOrderCard = (
@@ -423,7 +480,7 @@ export default function OsKioskPage() {
 
     return (
       <Button
-        disabled={processingId === order.order_key}
+        disabled={processingId === order.order_key || isMutationBlocked}
         onClick={event => {
           event.stopPropagation();
           void runMove(order, action);
@@ -463,7 +520,7 @@ export default function OsKioskPage() {
               Acabamento e Embalagem em tela cheia.
             </p>
             <p className="text-xs text-muted-foreground">
-              {isSyncing ? "Sincronizando..." : "Sincronizado"}
+              {healthState === "syncing" ? "Sincronizando..." : `Estado: ${healthState}`}
               {lastSyncAt
                 ? ` • Última sincronização: ${new Date(lastSyncAt).toLocaleTimeString("pt-BR")}`
                 : ""}
@@ -471,8 +528,31 @@ export default function OsKioskPage() {
             {syncError ? (
               <p className="text-xs text-amber-700">{syncError}</p>
             ) : null}
+            {isMutationBlocked ? (
+              <p className="text-xs text-red-700">
+                Mutações bloqueadas até normalizar sync/conexão.
+              </p>
+            ) : null}
           </div>
-          <Badge variant="secondary">{totalCards} OS em exibição</Badge>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void syncBoard()}
+              disabled={isSyncing}
+            >
+              Atualizar
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void runCleanupFinalized(cards)}
+              disabled={cleanupRunning || cards.length === 0}
+            >
+              Limpar finalizadas
+            </Button>
+            <Badge variant="secondary">{totalCards} OS em exibição</Badge>
+          </div>
         </div>
 
         <div className="mb-4 grid gap-3 md:grid-cols-3">

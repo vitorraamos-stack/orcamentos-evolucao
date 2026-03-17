@@ -45,3 +45,16 @@ export type KioskBoardMoveResult = {
   result_code: string;
   result_message: string;
 } & KioskBoardCard;
+
+export type KioskHealthState =
+  | "healthy"
+  | "syncing"
+  | "degraded"
+  | "offline"
+  | "auth_error";
+
+export type KioskErrorKind =
+  | "auth"
+  | "network"
+  | "backend_drift"
+  | "unknown";

@@ -21,6 +21,8 @@ export const KIOSK_STAGE_LABELS: Record<KioskBoardStage, string> = {
 export const KIOSK_TERMINAL_ID_KEY = "hubos:kiosk:terminal-id";
 
 export const KIOSK_POLL_INTERVAL_MS = 15_000;
+export const KIOSK_STALE_AFTER_MS = 45_000;
+export const KIOSK_CRITICAL_STALE_AFTER_MS = 120_000;
 
 export const KIOSK_MOVE_LABELS: Record<KioskMoveAction, string> = {
   to_packaging: "Movido para Embalagem",
