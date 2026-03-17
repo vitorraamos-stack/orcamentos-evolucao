@@ -1,6 +1,10 @@
 import { supabase } from "@/lib/supabase";
 import { fetchOsByCode } from "../api";
-import { assertOfficialKioskRpc, getRpcUnavailableError, isMissingRpcError } from "./contract";
+import {
+  assertOfficialKioskRpc,
+  getRpcUnavailableError,
+  isMissingRpcError,
+} from "./contract";
 import type {
   KioskBoardCard,
   KioskBoardMoveResult,
@@ -20,10 +24,15 @@ const ALLOW_DEV_FALLBACK = import.meta.env.DEV;
 const toError = (error: unknown) => {
   if (error instanceof Error) return error;
   const rpcError = (error ?? {}) as RpcLikeError;
-  const message = rpcError.message || rpcError.details || "Erro ao consultar OS. Tente novamente.";
+  const message =
+    rpcError.message || rpcError.details || "Erro ao consultar OS. Tente novamente.";
   const normalized = message.toLowerCase();
 
-  if (normalized.includes("column") && normalized.includes("os_number") && normalized.includes("does not exist")) {
+  if (
+    normalized.includes("column") &&
+    normalized.includes("os_number") &&
+    normalized.includes("does not exist")
+  ) {
     return new Error(
       "Integração do quiosque desatualizada no banco. Aplique as migrations mais recentes do Hub OS e tente novamente."
     );
@@ -79,6 +88,12 @@ const registerKioskOrderBySource = async (params: {
     return secureResponse.data as KioskBoardCard;
   }
 
+  if (!ALLOW_DEV_FALLBACK) {
+    throw new Error(
+      "RPC kiosk_board_register_secure retornou resposta vazia em produção. Verifique a integração do backend do quiosque."
+    );
+  }
+
   const legacyResponse = await supabase.rpc("kiosk_board_register", {
     p_source_type: params.sourceType,
     p_source_id: params.sourceId,
@@ -113,6 +128,12 @@ export const registerKioskOrderByCode = async (params: {
 
   if (!secureResponse.error && secureResponse.data) {
     return secureResponse.data as KioskBoardCard;
+  }
+
+  if (!ALLOW_DEV_FALLBACK) {
+    throw new Error(
+      "RPC kiosk_board_register_by_code retornou resposta vazia em produção. Verifique a integração do backend do quiosque."
+    );
   }
 
   let lookup;

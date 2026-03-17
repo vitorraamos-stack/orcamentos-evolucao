@@ -50,7 +50,7 @@ export const parseKioskError = (error: unknown) => {
     return "Essa OS já está finalizada e não pode entrar no quiosque.";
   }
   if (details.includes("KIOSK_NOT_FINALIZED")) {
-    return "A OS ainda não está finalizada e não pode ser removida.";
+    return "A OS ainda não está finalizada no upstream e não pode sair do board automaticamente.";
   }
   if (details.includes("KIOSK_INVALID_ACTION")) {
     return "Ação inválida para este card no quiosque.";

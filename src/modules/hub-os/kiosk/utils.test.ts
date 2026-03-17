@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { KIOSK_TERMINAL_ID_KEY } from "./constants";
+import { KIOSK_ALLOWED_MOVE_ACTIONS, KIOSK_MOVE_CTA_LABELS, KIOSK_TERMINAL_ID_KEY } from "./constants";
 import {
   getOrCreateTerminalId,
   isUpstreamFinalized,
@@ -39,6 +39,23 @@ describe("kiosk helpers", () => {
     expect(resolveMoveAction({ stage: "acabamento_instalacao", deliveryMode: "instalacao" })).toBe("to_installations");
     expect(resolveMoveAction({ stage: "embalagem", deliveryMode: "RETIRADA" })).toBe("to_ready_notify");
     expect(resolveMoveAction({ stage: "embalagem", deliveryMode: "ENTREGA" })).toBe("to_logistics");
+    expect(resolveMoveAction({ stage: "pronto_avisar", deliveryMode: "RETIRADA" })).toBeNull();
+    expect(resolveMoveAction({ stage: "logistica", deliveryMode: "ENTREGA" })).toBeNull();
+    expect(resolveMoveAction({ stage: "instalacoes", deliveryMode: "instalacao" })).toBeNull();
+  });
+
+
+  it("mantém contrato de ação do quiosque sem retirada/finalização manual", () => {
+    expect(KIOSK_ALLOWED_MOVE_ACTIONS).toEqual([
+      "to_packaging",
+      "to_installations",
+      "to_ready_notify",
+      "to_logistics",
+    ]);
+
+    expect(Object.values(KIOSK_MOVE_CTA_LABELS).join(" ").toLowerCase()).not.toContain("avisado");
+    expect(Object.values(KIOSK_MOVE_CTA_LABELS).join(" ").toLowerCase()).not.toContain("retirado");
+    expect(KIOSK_MOVE_CTA_LABELS.to_ready_notify).toContain("Hub OS");
   });
 
   it("mapeia erros técnicos para mensagens amigáveis", () => {

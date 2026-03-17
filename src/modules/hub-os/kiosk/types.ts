@@ -12,8 +12,7 @@ export type KioskMoveAction =
   | "to_packaging"
   | "to_installations"
   | "to_ready_notify"
-  | "to_logistics"
-  | "remove_if_finalized";
+  | "to_logistics";
 
 export type KioskBoardCard = {
   id: string;
