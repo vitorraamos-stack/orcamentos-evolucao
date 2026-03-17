@@ -168,7 +168,21 @@
     background: #fff;
   }
 
-  body * {
+  body > *:not([data-radix-portal]) {
+    display: none !important;
+  }
+
+  body > [data-radix-portal] {
+    display: block !important;
+    position: fixed !important;
+    inset: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: #fff !important;
+  }
+
+  body > [data-radix-portal] * {
     visibility: hidden !important;
   }
 
