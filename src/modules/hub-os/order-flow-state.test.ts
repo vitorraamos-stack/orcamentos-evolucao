@@ -144,4 +144,41 @@ describe("order flow global", () => {
 
     expect(active).toHaveLength(0);
   });
+
+  it("remove card do Quiosque mesmo com order_key legado quando retirada existe na chave canônica", () => {
+    const cards = [
+      {
+        id: "c-legacy",
+        order_key: "2",
+        source_type: "os",
+        source_id: "2",
+        os_number: 2,
+        sale_number: null,
+        client_name: null,
+        title: "Legacy",
+        description: null,
+        address: null,
+        delivery_date: null,
+        delivery_mode: "RETIRADA",
+        production_tag: null,
+        upstream_status: "Em produção",
+        current_stage: "pronto_avisar",
+        material_ready: false,
+        terminal_id: null,
+        last_lookup_code: null,
+        created_by: null,
+        updated_by: null,
+        created_at: "2026-01-01T10:00:00.000Z",
+        updated_at: "2026-01-01T10:00:00.000Z",
+      },
+    ] satisfies KioskBoardCard[];
+
+    const active = filterKioskActiveCards(
+      cards,
+      key => key === "os:2",
+      () => false
+    );
+
+    expect(active).toHaveLength(0);
+  });
 });
