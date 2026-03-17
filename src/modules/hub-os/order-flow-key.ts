@@ -23,3 +23,6 @@ export const parseHubOrderFlowKey = (
 
 export const buildHubOrderFlowKeyFromOsId = (sourceId: string) =>
   buildHubOrderFlowKey({ sourceType: "os", sourceId });
+
+export const buildHubOrderFlowKeyFromOsOrdersId = (sourceId: string) =>
+  buildHubOrderFlowKey({ sourceType: "os_orders", sourceId });
