@@ -35,7 +35,11 @@ import MetricsBar from "@/features/hubos/components/MetricsBar";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchPendingSecondInstallments } from "@/features/hubos/finance";
-import { shouldApplyHubOrdersResponse } from "@/features/hubos/boardSync";
+import {
+  createCoalescedRefetchScheduler,
+  shouldApplyHubOrdersResponse,
+  shouldRefreshOnVisibility,
+} from "@/features/hubos/boardSync";
 import { selectProntoAvisarOrders } from "@/features/hubos/selectors";
 import { buildHubOrderFlowKeyFromOsOrdersId } from "@/modules/hub-os/order-flow-key";
 import { useGlobalOrderFlowState } from "@/modules/hub-os/order-flow-state";
@@ -158,7 +162,9 @@ export default function HubOS() {
     string | null
   >(null);
   const loadOrdersSeqRef = useRef(0);
-  const realtimeRefreshTimeoutRef = useRef<number | null>(null);
+  const coalescedRefreshRef = useRef<ReturnType<
+    typeof createCoalescedRefetchScheduler
+  > | null>(null);
   const isMountedRef = useRef(true);
   const lastOrdersSnapshotRef = useRef<OsOrder[]>([]);
   const isOrderAvisado = useCallback(
@@ -244,17 +250,15 @@ export default function HubOS() {
   }, []);
 
   const scheduleOrdersRefresh = useCallback(() => {
-    if (realtimeRefreshTimeoutRef.current) {
-      window.clearTimeout(realtimeRefreshTimeoutRef.current);
-    }
-
-    realtimeRefreshTimeoutRef.current = window.setTimeout(() => {
-      void loadOrders();
-    }, 180);
-  }, [loadOrders]);
+    coalescedRefreshRef.current?.schedule();
+  }, []);
 
   useEffect(() => {
     isMountedRef.current = true;
+    coalescedRefreshRef.current = createCoalescedRefetchScheduler(() => {
+      void loadOrders();
+    });
+
     void loadOrders();
     const channel = supabase
       .channel("hub-os-orders")
@@ -267,19 +271,28 @@ export default function HubOS() {
       )
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "os_orders_event" },
+        { event: "*", schema: "public", table: "os_orders_event" },
         () => {
           scheduleOrdersRefresh();
         }
       )
-      .subscribe();
+      .subscribe(status => {
+        if (
+          status === "SUBSCRIBED" ||
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT" ||
+          status === "CLOSED"
+        ) {
+          scheduleOrdersRefresh();
+        }
+      });
 
     const refreshFromLifecycle = () => {
-      void loadOrders();
+      scheduleOrdersRefresh();
     };
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
+      if (shouldRefreshOnVisibility(document.visibilityState)) {
         refreshFromLifecycle();
       }
     };
@@ -292,9 +305,8 @@ export default function HubOS() {
 
     return () => {
       isMountedRef.current = false;
-      if (realtimeRefreshTimeoutRef.current) {
-        window.clearTimeout(realtimeRefreshTimeoutRef.current);
-      }
+      coalescedRefreshRef.current?.cancel();
+      coalescedRefreshRef.current = null;
       window.removeEventListener("online", refreshFromLifecycle);
       window.removeEventListener("focus", refreshFromLifecycle);
       document.removeEventListener(
