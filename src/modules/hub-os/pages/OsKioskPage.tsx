@@ -20,6 +20,7 @@ import {
 } from "../kiosk/api";
 import {
   KIOSK_CRITICAL_STALE_AFTER_MS,
+  KIOSK_MOVE_CTA_LABELS,
   KIOSK_POLL_INTERVAL_MS,
   KIOSK_STAGE_LABELS,
   KIOSK_STALE_AFTER_MS,
@@ -95,7 +96,6 @@ export default function OsKioskPage() {
   const [healthErrorKind, setHealthErrorKind] = useState<KioskErrorKind | null>(
     null
   );
-  const [cleanupRunning, setCleanupRunning] = useState(false);
   const syncRequestSeqRef = useRef(0);
   const appliedSyncSeqRef = useRef(0);
   const isMountedRef = useRef(true);
@@ -271,66 +271,6 @@ export default function OsKioskPage() {
     );
   };
 
-  const runCleanupFinalized = useCallback(
-    async (targetCards: KioskBoardCard[], opts?: { silent?: boolean }) => {
-      if (cleanupRunning || !terminalId) return;
-
-      const finalizedCandidates = targetCards.filter(card =>
-        isUpstreamFinalized(card.upstream_status)
-      );
-
-      const cardsToCheck =
-        finalizedCandidates.length > 0 || opts?.silent
-          ? finalizedCandidates
-          : targetCards;
-
-      if (cardsToCheck.length === 0) {
-        if (!opts?.silent) {
-          toast.message("Nenhuma OS candidata para limpeza de finalizadas.");
-        }
-        return;
-      }
-
-      setCleanupRunning(true);
-      let removedCount = 0;
-      for (const card of cardsToCheck) {
-        try {
-          const result = await moveKioskOrder({
-            orderKey: card.order_key,
-            action: "remove_if_finalized",
-            actorId: user?.id ?? null,
-            terminalId,
-          });
-          setCards(prev => applyMoveResult(prev, result));
-          if (result.removed) removedCount += 1;
-        } catch {
-          // Falha individual não deve ocultar os demais removíveis.
-        }
-      }
-      setCleanupRunning(false);
-
-      if (removedCount > 0) {
-        setLastSyncAt(new Date().toISOString());
-        if (!opts?.silent) {
-          toast.success(
-            `${removedCount} OS finalizada(s) removida(s) do quiosque.`
-          );
-        }
-        return;
-      }
-
-      if (!opts?.silent) {
-        toast.message("Nenhuma OS finalizada foi removida.");
-      }
-    },
-    [cleanupRunning, terminalId, user?.id]
-  );
-
-  useEffect(() => {
-    if (!cards.length) return;
-    void runCleanupFinalized(cards, { silent: true });
-  }, [cards, runCleanupFinalized]);
-
   const runMove = async (order: KioskBoardCard, action: KioskMoveAction) => {
     if (isMutationBlocked) {
       toast.error(
@@ -495,14 +435,6 @@ export default function OsKioskPage() {
     });
     if (!action) return null;
 
-    const labelByAction: Record<KioskMoveAction, string> = {
-      to_packaging: "Pronto para embalar",
-      to_installations: "Pronto para a Instalação",
-      to_ready_notify: "Pronto para a retirada",
-      to_logistics: "Pronto para a logística",
-      remove_if_finalized: "Remover finalizada",
-    };
-
     return (
       <Button
         disabled={processingId === order.order_key || isMutationBlocked}
@@ -511,7 +443,7 @@ export default function OsKioskPage() {
           void runMove(order, action);
         }}
       >
-        {labelByAction[action]}
+        {KIOSK_MOVE_CTA_LABELS[action]}
       </Button>
     );
   };
@@ -569,14 +501,6 @@ export default function OsKioskPage() {
               disabled={isSyncing}
             >
               Atualizar
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => void runCleanupFinalized(cards)}
-              disabled={cleanupRunning || cards.length === 0}
-            >
-              Limpar finalizadas
             </Button>
             <Badge variant="secondary">{totalCards} OS em exibição</Badge>
           </div>
