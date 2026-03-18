@@ -4,6 +4,7 @@ import {
   getOrderFlowRealtimeTable,
   listOrderFlowState,
   markOrderFlowRetirado,
+  markOrderFlowRetiradoAndFinalize,
   setOrderFlowAvisado,
   type HubOrderFlowRow,
 } from "./order-flow-api";
@@ -32,14 +33,7 @@ export const useGlobalOrderFlowState = () => {
     const requestSeq = ++refreshSeqRef.current;
     const rows = await listOrderFlowState();
     if (requestSeq !== refreshSeqRef.current) return;
-
-    setState(prev => {
-      const merged = { ...prev };
-      Object.entries(toOrderFlowMap(rows)).forEach(([key, row]) => {
-        merged[key] = row;
-      });
-      return merged;
-    });
+    setState(toOrderFlowMap(rows));
   }, []);
 
   useEffect(() => {
@@ -130,13 +124,23 @@ export const useGlobalOrderFlowState = () => {
     return row;
   }, []);
 
+  const markRetiradoAndFinalize = useCallback(
+    async (params: { identity: HubOrderFlowIdentity; actorName: string | null }) => {
+      const result = await markOrderFlowRetiradoAndFinalize(params);
+      setState(prev => upsertOrderFlowRow(prev, result));
+      return result;
+    },
+    []
+  );
+
   return useMemo(
     () => ({
       isAvisado,
       isRetirado,
       setAvisado,
       markRetirado,
+      markRetiradoAndFinalize,
     }),
-    [isAvisado, isRetirado, markRetirado, setAvisado]
+    [isAvisado, isRetirado, markRetirado, markRetiradoAndFinalize, setAvisado]
   );
 };

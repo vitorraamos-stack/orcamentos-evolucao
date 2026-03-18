@@ -181,4 +181,48 @@ describe("order flow global", () => {
 
     expect(active).toHaveLength(0);
   });
+
+  it("refetch válido reconcilia snapshot sem manter registros fantasmas", () => {
+    const staleMap = toOrderFlowMap([
+      {
+        order_key: "os:1",
+        source_type: "os",
+        source_id: "1",
+        avisado_at: null,
+        avisado_by: null,
+        retirado_at: null,
+        retirado_by: null,
+        updated_at: "2026-01-01T10:00:00.000Z",
+      },
+      {
+        order_key: "os:ghost",
+        source_type: "os",
+        source_id: "ghost",
+        avisado_at: null,
+        avisado_by: null,
+        retirado_at: null,
+        retirado_by: null,
+        updated_at: "2026-01-01T10:00:00.000Z",
+      },
+    ] as any);
+
+    const snapshot = toOrderFlowMap([
+      {
+        order_key: "os:1",
+        source_type: "os",
+        source_id: "1",
+        avisado_at: null,
+        avisado_by: null,
+        retirado_at: "2026-01-01T11:00:00.000Z",
+        retirado_by: "u1",
+        updated_at: "2026-01-01T11:00:00.000Z",
+      },
+    ] as any);
+
+    const reconciled = snapshot;
+    expect(Object.keys(reconciled)).toEqual(["os:1"]);
+    expect(reconciled["os:ghost"]).toBeUndefined();
+    expect(staleMap["os:ghost"]).toBeDefined();
+  });
+
 });
