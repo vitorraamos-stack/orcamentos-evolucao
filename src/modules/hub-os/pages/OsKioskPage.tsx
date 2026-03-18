@@ -14,6 +14,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 import {
   fetchKioskBoard,
   completeKioskInstallation,
@@ -107,6 +108,7 @@ export default function OsKioskPage() {
   const syncRequestSeqRef = useRef(0);
   const appliedSyncSeqRef = useRef(0);
   const isMountedRef = useRef(true);
+  const realtimeRefetchTimerRef = useRef<number | null>(null);
 
   const activeCards = useMemo(
     () => filterKioskActiveCards(cards, isRetirado, isUpstreamFinalized),
@@ -234,6 +236,51 @@ export default function OsKioskPage() {
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("online", onOnline);
       document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [terminalId, syncBoard]);
+
+  useEffect(() => {
+    if (!terminalId) return;
+
+    const scheduleRealtimeRefresh = () => {
+      if (realtimeRefetchTimerRef.current) {
+        window.clearTimeout(realtimeRefetchTimerRef.current);
+      }
+      realtimeRefetchTimerRef.current = window.setTimeout(() => {
+        realtimeRefetchTimerRef.current = null;
+        void syncBoard({ silent: true });
+      }, 180);
+    };
+
+    const channel = supabase
+      .channel("kiosk-board-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "os_kiosk_board",
+        },
+        () => {
+          scheduleRealtimeRefresh();
+        }
+      )
+      .subscribe(status => {
+        if (
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT" ||
+          status === "CLOSED"
+        ) {
+          scheduleRealtimeRefresh();
+        }
+      });
+
+    return () => {
+      if (realtimeRefetchTimerRef.current) {
+        window.clearTimeout(realtimeRefetchTimerRef.current);
+        realtimeRefetchTimerRef.current = null;
+      }
+      supabase.removeChannel(channel);
     };
   }, [terminalId, syncBoard]);
 

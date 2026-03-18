@@ -136,20 +136,12 @@ export default function HubOS() {
   const [artDirectionPopupTag, setArtDirectionPopupTag] =
     useState<ArtDirectionTag | null>(null);
   const [inboxSearch, setInboxSearch] = useState("");
-  // Backward-compatible alias to prevent runtime crashes if stale/legacy code references kioskSearch.
-  const kioskSearch = inboxSearch;
-  const setKioskSearch = setInboxSearch;
   const [selectedInboxId, setSelectedInboxId] = useState<string | null>(null);
-  const { isAvisado, isRetirado, setAvisado, markRetirado } =
+  const { isAvisado, isRetirado, setAvisado, markRetiradoAndFinalize } =
     useGlobalOrderFlowState();
   const [pendingFlowOrderIds, setPendingFlowOrderIds] = useState<string[]>([]);
-  // Backward-compatible alias to prevent runtime crashes if stale/legacy code references kioskOpenOrderId.
-  const kioskOpenOrderId = selectedInboxId;
-  const setKioskOpenOrderId = setSelectedInboxId;
-  // Backward-compatible alias to prevent runtime crashes if stale/legacy code references hasOpenedKioskOrder.
   const hasOpenedInboxOrderRef = useRef(false);
-  const hasOpenedKioskOrder = hasOpenedInboxOrderRef;
-  const setHasOpenedKioskOrder = (value: boolean) => {
+  const setHasOpenedInboxOrder = (value: boolean) => {
     hasOpenedInboxOrderRef.current = value;
   };
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -218,11 +210,11 @@ export default function HubOS() {
   }, [hubPermissions.canViewArteBoard, hubPermissions.canViewProducaoBoard]);
 
   useEffect(() => {
-    if (!kioskSearch || hasAppliedKioskSearch.current) return;
-    setFilters(prev => ({ ...prev, search: kioskSearch }));
+    if (!inboxSearch || hasAppliedKioskSearch.current) return;
+    setFilters(prev => ({ ...prev, search: inboxSearch }));
     setActiveTab("producao");
     hasAppliedKioskSearch.current = true;
-  }, [kioskSearch]);
+  }, [inboxSearch]);
 
   const loadPendingInstallments = async () => {
     try {
@@ -332,7 +324,7 @@ export default function HubOS() {
         ) {
           scheduleOrdersRefresh();
         }
-      }, 5000);
+      }, 20000);
     };
 
     startRealtimeRecovery();
@@ -736,7 +728,7 @@ export default function HubOS() {
 
     const pollingInterval = window.setInterval(() => {
       loadLatestAssetJobs();
-    }, 5000);
+    }, 20000);
 
     return () => {
       active = false;
@@ -762,7 +754,7 @@ export default function HubOS() {
     }, 200);
     const clearTimer = window.setTimeout(() => {
       setHighlightId(null);
-      setHasOpenedKioskOrder(false);
+      setHasOpenedInboxOrder(false);
     }, 2200);
     return () => {
       window.clearTimeout(scrollTimer);
@@ -819,41 +811,18 @@ export default function HubOS() {
     updateLocalOrder(optimistic);
 
     try {
-      await markRetirado({ sourceType: "os_orders", sourceId: order.id });
-      const updated = await updateOrder(order.id, {
-        prod_status: "Finalizados",
-        updated_at: new Date().toISOString(),
+      const result = await markRetiradoAndFinalize({
+        identity: { sourceType: "os_orders", sourceId: order.id },
+        actorName:
+          user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
+      });
+
+      updateLocalOrder({
+        ...order,
+        prod_status: result.order_prod_status as OsOrder["prod_status"],
+        updated_at: result.order_updated_at,
         updated_by: user?.id ?? null,
       });
-      updateLocalOrder(updated);
-
-      try {
-        await createOrderEvent({
-          os_id: order.id,
-          type: "status_change",
-          payload: {
-            board: "producao",
-            from: order.prod_status,
-            to: "Finalizados",
-            actor_name:
-              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
-          },
-          created_by: user?.id ?? null,
-        });
-
-        await createOrderEvent({
-          os_id: order.id,
-          type: "avisado_toggle",
-          payload: {
-            avisado: false,
-            actor_name:
-              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
-          },
-          created_by: user?.id ?? null,
-        });
-      } catch (eventError) {
-        console.error("Erro ao registrar auditoria de retirada.", eventError);
-      }
 
       toast.success("OS marcada como retirado e enviada para Finalizados.");
     } catch (error) {
@@ -1372,7 +1341,7 @@ export default function HubOS() {
     setSelectedInboxId(null);
     setInboxSearch("");
     setHighlightId(null);
-    setHasOpenedKioskOrder(false);
+    setHasOpenedInboxOrder(false);
   };
 
   const inboxMeta = useMemo(() => {
@@ -1510,15 +1479,15 @@ export default function HubOS() {
   };
 
   useEffect(() => {
-    if (!kioskOpenOrderId || hasOpenedKioskOrder.current || orders.length === 0)
+    if (!selectedInboxId || hasOpenedInboxOrderRef.current || orders.length === 0)
       return;
-    const targetOrder = orders.find(order => order.id === kioskOpenOrderId);
+    const targetOrder = orders.find(order => order.id === selectedInboxId);
     if (!targetOrder) return;
     setSelectedOrder(targetOrder);
     setDialogOpen(true);
     setActiveTab("producao");
-    hasOpenedKioskOrder.current = true;
-  }, [kioskOpenOrderId, orders]);
+    hasOpenedInboxOrderRef.current = true;
+  }, [selectedInboxId, orders]);
 
   if (!hubPermissions.canViewHubOS) {
     return (
@@ -1640,12 +1609,12 @@ export default function HubOS() {
           title={inboxMeta.title}
           emptyMessage={inboxMeta.emptyMessage}
           showOptimizeRoute={inboxMeta.showOptimizeRoute}
-          selectedId={kioskOpenOrderId}
-          searchValue={kioskSearch}
-          onSearchChange={setKioskSearch}
+          selectedId={selectedInboxId}
+          searchValue={inboxSearch}
+          onSearchChange={setInboxSearch}
           onSelect={id => {
-            setHasOpenedKioskOrder(Boolean(id));
-            setKioskOpenOrderId(id);
+            setHasOpenedInboxOrder(Boolean(id));
+            setSelectedInboxId(id);
           }}
           onBack={() => setViewMode("kanban")}
           onEdit={order => {

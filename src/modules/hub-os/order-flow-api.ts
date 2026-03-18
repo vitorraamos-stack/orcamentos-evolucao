@@ -25,6 +25,12 @@ export type HubOrderFlowRow = {
   updated_at: string;
 };
 
+export type HubOrderFlowRetiradoFinalizeResult = HubOrderFlowRow & {
+  order_prod_status: string;
+  order_updated_at: string;
+  already_retirado: boolean;
+};
+
 const isMissingRpcError = (error: unknown) => {
   const message = String(
     (error as { message?: string })?.message ?? ""
@@ -39,6 +45,11 @@ const isMissingRpcError = (error: unknown) => {
 const normalizeError = (error: unknown) => {
   if (error instanceof Error) return error;
   const rpcError = (error ?? {}) as RpcLikeError;
+  const details = String(rpcError.details ?? "");
+  if (details.includes("ORDER_FLOW_FORBIDDEN")) {
+    return new Error("Você não tem permissão para alterar o fluxo global de OS.");
+  }
+
   const message =
     rpcError.message ||
     rpcError.details ||
@@ -150,6 +161,37 @@ export const markOrderFlowRetirado = async (
   }
 
   return response.data as HubOrderFlowRow;
+};
+
+export const markOrderFlowRetiradoAndFinalize = async (params: {
+  identity: HubOrderFlowIdentity;
+  actorName: string | null;
+}) => {
+  const response = await supabase.rpc(
+    "order_flow_mark_retirado_and_finalize_secure",
+    {
+      p_order_key: buildHubOrderFlowKey(params.identity),
+      p_source_type: params.identity.sourceType,
+      p_source_id: params.identity.sourceId,
+      p_actor_name: params.actorName,
+    }
+  );
+
+  if (response.error) {
+    if (isMissingRpcError(response.error)) {
+      throw new Error(
+        "Integração de retirada atômica indisponível. Aplique as migrations mais recentes do Hub OS."
+      );
+    }
+    throw normalizeError(response.error);
+  }
+
+  const row = Array.isArray(response.data) ? response.data[0] : response.data;
+  if (!row) {
+    throw new Error("Resposta inválida ao marcar retirada da OS.");
+  }
+
+  return row as HubOrderFlowRetiradoFinalizeResult;
 };
 
 export const getOrderFlowRealtimeTable = () => TABLE_NAME;
