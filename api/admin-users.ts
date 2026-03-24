@@ -60,7 +60,7 @@ const parseModules = (modules: unknown, allowedModuleKeys: readonly string[]) =>
   return { value: Array.from(new Set(normalized)) as AppModuleKey[] } as const;
 };
 
-async function requireAdminAuth(req: any, res: any, supabaseAdmin: ReturnType<typeof createClient>) {
+async function requireAdminAuth(req: any, res: any, supabaseAdmin: any) {
   const authHeader = (req.headers?.authorization || req.headers?.Authorization || '') as string;
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
   if (!token) {
@@ -86,7 +86,7 @@ async function requireAdminAuth(req: any, res: any, supabaseAdmin: ReturnType<ty
     return null;
   }
 
-  const normalizedRole = normalizeRole(profile?.role ?? null);
+  const normalizedRole = normalizeRole((profile as any)?.role ?? null);
   if (normalizedRole !== 'gerente') {
     jsonError(res, 403, 'forbidden', 'Acesso negado. Apenas gerente.');
     return null;
@@ -177,7 +177,7 @@ export default async function handler(req: any, res: any) {
       }
       if (!normalizedRole) return jsonError(res, 400, 'validation_error', 'Role inválido.');
       if (parsedModules && 'error' in parsedModules) {
-        return jsonError(res, 400, 'validation_error', parsedModules.error);
+        return jsonError(res, 400, 'validation_error', String(parsedModules.error));
       }
       if (String(password).length < 6) {
         return jsonError(res, 400, 'validation_error', 'A senha deve ter ao menos 6 caracteres.');
@@ -231,7 +231,7 @@ export default async function handler(req: any, res: any) {
       if (role !== undefined && !normalizedRole) return jsonError(res, 400, 'validation_error', 'Role inválido.');
       const parsedModules = parseModules(modules, allowedModuleKeys);
       if (parsedModules && 'error' in parsedModules) {
-        return jsonError(res, 400, 'validation_error', parsedModules.error);
+        return jsonError(res, 400, 'validation_error', String(parsedModules.error));
       }
       if (newPassword !== undefined && String(newPassword).length < 6) {
         return jsonError(res, 400, 'validation_error', 'A nova senha deve ter ao menos 6 caracteres.');

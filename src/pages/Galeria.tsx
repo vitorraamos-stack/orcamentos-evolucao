@@ -150,7 +150,7 @@ export default function Galeria() {
         if (signedError) throw signedError;
 
         const urlMap = signed?.reduce<Record<string, string>>((acc, item) => {
-          if (item.signedUrl) acc[item.path] = item.signedUrl;
+          if (item.signedUrl && item.path) acc[item.path] = item.signedUrl;
           return acc;
         }, {}) ?? {};
 

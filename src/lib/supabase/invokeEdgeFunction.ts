@@ -140,7 +140,7 @@ export const invokeEdgeFunction = async <T>(
 
   const invoke = (accessToken: string) =>
     supabase.functions.invoke<T>(name, {
-      body,
+      body: body as any,
       headers: buildHeaders(accessToken),
     });
 

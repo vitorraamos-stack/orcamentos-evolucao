@@ -27,7 +27,7 @@ describe('invokeEdgeFunction', () => {
 
   it('fails when anon key is missing', () => {
     process.env.VITE_SUPABASE_ANON_KEY = '';
-    expect(() => buildHeaders('token')).toThrow('VITE_SUPABASE_ANON_KEY ausente');
+    expect(() => buildHeaders('token')).toThrow('VITE_SUPABASE_ANON_KEY não configurada');
   });
 
   it('retries once on 401 after refresh', async () => {

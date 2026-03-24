@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
 import { MaterialWithTiers } from '@/types/database';
+import { fetchMaterialsWithTiers, upsertMaterialTransactional, uploadMaterialImage } from '@/features/materials/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash2, Edit, Save, X, Image as ImageIcon, FileText, AlertTriangle, Ruler } from 'lucide-react';
+import { Plus, Edit, Save, X, Image as ImageIcon, FileText, AlertTriangle, Ruler } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'wouter';
@@ -38,16 +38,13 @@ export default function Materiais() {
   const fetchMaterials = async () => {
     setLoading(true);
     try {
-      const { data: materialsData, error: materialsError } = await supabase.from('materials').select('*').order('name');
-      if (materialsError) throw materialsError;
-      const materialsWithTiers: MaterialWithTiers[] = [];
-      for (const material of materialsData) {
-        const { data: tiersData } = await supabase.from('price_tiers').select('*').eq('material_id', material.id).order('min_area');
-        materialsWithTiers.push({ ...material, tiers: tiersData || [] });
-      }
-      setMaterials(materialsWithTiers);
-    } catch (error: any) { toast.error('Erro ao carregar materiais'); }
-    finally { setLoading(false); }
+      const data = await fetchMaterialsWithTiers();
+      setMaterials(data);
+    } catch (_error: any) {
+      toast.error('Erro ao carregar materiais');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Função para tratar vírgula e converter para número (Float)
@@ -72,63 +69,51 @@ export default function Materiais() {
 
 
   const handleSave = async () => {
-    if (!name) { toast.error('Preencha os campos obrigatórios'); return; }
+    if (!name.trim()) {
+      toast.error('Nome do material é obrigatório.');
+      return;
+    }
+
     try {
-      let materialId = editingId;
-      const materialData = { 
-        name, 
-        description, 
+      await upsertMaterialTransactional({
+        material_id: editingId ?? undefined,
+        name,
+        description,
         equivalence_message: equivalenceMessage,
-        tipo_calculo: tipoCalculo,
-        min_price: minPrice ? parseNum(minPrice) : null,
-        image_url: imageUrl || null
-      };
-
-      if (editingId) {
-        const { error } = await supabase.from('materials').update(materialData).eq('id', editingId);
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase.from('materials').insert(materialData).select().single();
-        if (error) throw error;
-        materialId = data.id;
-      }
-
-      if (materialId) {
-        await supabase.from('price_tiers').delete().eq('material_id', materialId);
-        const tiersToInsert = tiers.map(t => ({
-          material_id: materialId,
-          min_area: parseNum(t.min_area),
-          max_area: t.max_area === null || t.max_area === '' ? null : parseNum(t.max_area),
-          price_per_m2: parseNum(t.price_per_m2)
-        }));
-        const { error: tiersError } = await supabase.from('price_tiers').insert(tiersToInsert);
-        if (tiersError) throw tiersError;
-      }
+        tipo_calculo: tipoCalculo === 'linear' ? 'linear' : 'm2',
+        min_price: minPrice ? parseNum(minPrice) : 0,
+        image_url: imageUrl || null,
+        tiers: tiers.map((tier) => ({
+          min_area: parseNum(tier.min_area),
+          max_area: tier.max_area === null || tier.max_area === '' ? null : parseNum(tier.max_area),
+          price_per_m2: parseNum(tier.price_per_m2),
+        })),
+      });
 
       toast.success('Material salvo com sucesso!');
       setIsDialogOpen(false);
       resetForm();
       fetchMaterials();
-    } catch (error: any) { toast.error('Erro ao salvar material'); }
+    } catch (error: any) {
+      toast.error(error?.message || 'Erro ao salvar material');
+    }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Excluir este material?')) return;
-    await supabase.from('materials').delete().eq('id', id);
-    fetchMaterials();
-  };
 
-  const handleImageUpload = (file: File | null) => {
+
+  const handleImageUpload = async (file: File | null) => {
     if (!file) {
       setImageUrl('');
       return;
     }
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = typeof reader.result === 'string' ? reader.result : '';
-      setImageUrl(result);
-    };
-    reader.readAsDataURL(file);
+
+    try {
+      const uploadedUrl = await uploadMaterialImage(file, name || 'material');
+      setImageUrl(uploadedUrl);
+      toast.success('Imagem enviada com sucesso.');
+    } catch (error: any) {
+      toast.error(error?.message || 'Falha no upload da imagem.');
+    }
   };
 
   const resetForm = () => {
@@ -225,7 +210,7 @@ export default function Materiais() {
                 <Input
                   type="file"
                   accept="image/*"
-                  onChange={e => handleImageUpload(e.target.files?.[0] ?? null)}
+                  onChange={async (e) => handleImageUpload(e.target.files?.[0] ?? null)}
                 />
                 {imageUrl && (
                   <div className="border rounded-md overflow-hidden bg-secondary/20">
