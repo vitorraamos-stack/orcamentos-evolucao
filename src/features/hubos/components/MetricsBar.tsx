@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ interface MetricsBarProps {
   onProntoAvisarClick?: () => void;
   onInstalacoesClick?: () => void;
   onPendentesClick?: () => void;
+  extraCard?: ReactNode;
 }
 
 const MetricCard = ({
@@ -93,11 +95,16 @@ export default function MetricsBar({
   onProntoAvisarClick,
   onInstalacoesClick,
   onPendentesClick,
+  extraCard,
 }: MetricsBarProps) {
   return (
     <div className="flex flex-wrap gap-3">
       <MetricCard label="GLOBAL" value={global} onClick={onGlobalClick} />
-      <MetricCard label="Total em Arte" value={totalArte} onClick={onArteClick} />
+      <MetricCard
+        label="Total em Arte"
+        value={totalArte}
+        onClick={onArteClick}
+      />
       <MetricCard
         label="Total em Produção"
         value={totalProducao}
@@ -118,7 +125,11 @@ export default function MetricsBar({
           onClick={onProducaoExternaClick}
         />
       )}
-      <MetricCard label="Atrasados" value={overdue} onClick={onAtrasadosClick} />
+      <MetricCard
+        label="Atrasados"
+        value={overdue}
+        onClick={onAtrasadosClick}
+      />
       <MetricCard
         label="Pronto/Avisar"
         value={prontoAvisar}
@@ -139,6 +150,7 @@ export default function MetricsBar({
             : undefined
         }
       />
+      {extraCard}
     </div>
   );
 }

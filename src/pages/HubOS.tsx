@@ -1479,7 +1479,11 @@ export default function HubOS() {
   };
 
   useEffect(() => {
-    if (!selectedInboxId || hasOpenedInboxOrderRef.current || orders.length === 0)
+    if (
+      !selectedInboxId ||
+      hasOpenedInboxOrderRef.current ||
+      orders.length === 0
+    )
       return;
     const targetOrder = orders.find(order => order.id === selectedInboxId);
     if (!targetOrder) return;
@@ -1530,40 +1534,40 @@ export default function HubOS() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <MetricsBar
-          {...metrics}
-          aguardandoInsumos={
-            canViewAguardandoInsumos ? aguardandoInsumosOrders.length : undefined
-          }
-          producaoExterna={
-            canViewProducaoExterna ? producaoExternaOrders.length : undefined
-          }
-          insumosAlertActive={
-            canViewAguardandoInsumos && aguardandoInsumosOrders.length > 0
-          }
-          onGlobalClick={() => openInbox("global")}
-          onArteClick={() => openInbox("arte")}
-          onProducaoClick={() => openInbox("producao")}
-          onAguardandoInsumosClick={
-            canViewAguardandoInsumos
-              ? () => openInbox("aguardandoInsumos")
-              : undefined
-          }
-          onProducaoExternaClick={
-            canViewProducaoExterna
-              ? () => openInbox("producaoExterna")
-              : undefined
-          }
-          onAtrasadosClick={() => openInbox("atrasados")}
-          onProntoAvisarClick={() => openInbox("prontoAvisar")}
-          onInstalacoesClick={() => openInbox("instalacoes")}
-          onPendentesClick={() => setLocation("/hub-os/pendentes")}
-        />
-        {canViewInstallationFeedbacks ? (
-          <InstallationFeedbacksCard items={installationFeedbacks} />
-        ) : null}
-      </div>
+      <MetricsBar
+        {...metrics}
+        aguardandoInsumos={
+          canViewAguardandoInsumos ? aguardandoInsumosOrders.length : undefined
+        }
+        producaoExterna={
+          canViewProducaoExterna ? producaoExternaOrders.length : undefined
+        }
+        insumosAlertActive={
+          canViewAguardandoInsumos && aguardandoInsumosOrders.length > 0
+        }
+        onGlobalClick={() => openInbox("global")}
+        onArteClick={() => openInbox("arte")}
+        onProducaoClick={() => openInbox("producao")}
+        onAguardandoInsumosClick={
+          canViewAguardandoInsumos
+            ? () => openInbox("aguardandoInsumos")
+            : undefined
+        }
+        onProducaoExternaClick={
+          canViewProducaoExterna
+            ? () => openInbox("producaoExterna")
+            : undefined
+        }
+        onAtrasadosClick={() => openInbox("atrasados")}
+        onProntoAvisarClick={() => openInbox("prontoAvisar")}
+        onInstalacoesClick={() => openInbox("instalacoes")}
+        onPendentesClick={() => setLocation("/hub-os/pendentes")}
+        extraCard={
+          canViewInstallationFeedbacks ? (
+            <InstallationFeedbacksCard items={installationFeedbacks} />
+          ) : undefined
+        }
+      />
 
       {viewMode === "kanban" ? (
         <>
