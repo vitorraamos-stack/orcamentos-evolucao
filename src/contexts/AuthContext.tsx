@@ -2,7 +2,8 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { APP_MODULE_KEYS, type AppModuleKey } from '@/constants/modules';
-import { getHubPermissions, normalizeRole, type HubRole } from '@/lib/hubRoles';
+import { type HubRole } from '@/lib/hubRoles';
+import { buildAuthorizationSnapshot } from '@/lib/authz';
 
 interface AuthContextType {
   user: User | null;
@@ -11,7 +12,7 @@ interface AuthContextType {
   isAdmin: boolean;
   role: string | null;
   hubRole: HubRole | null;
-  hubPermissions: ReturnType<typeof getHubPermissions>;
+  hubPermissions: ReturnType<typeof buildAuthorizationSnapshot>['permissions'];
   modules: AppModuleKey[];
   hasModuleAccess: (moduleKey: AppModuleKey) => boolean;
   signOut: () => Promise<void>;
@@ -24,7 +25,7 @@ const AuthContext = createContext<AuthContextType>({
   isAdmin: false,
   role: null,
   hubRole: null,
-  hubPermissions: getHubPermissions(null),
+  hubPermissions: buildAuthorizationSnapshot(null).permissions,
   modules: [],
   hasModuleAccess: () => false,
   signOut: async () => {},
@@ -75,9 +76,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ]);
 
       const rawRole = profileData?.role ?? null;
-      const normalizedRole = normalizeRole(rawRole);
+      const authorization = buildAuthorizationSnapshot(rawRole);
       setRole(rawRole);
-      setIsAdmin(normalizedRole === 'gerente' || currentUser.email?.includes('admin') || false);
+      setIsAdmin(authorization.isAdmin);
       const nextModules = (moduleData || [])
         .map((entry) => entry.module_key)
         .filter((moduleKey): moduleKey is AppModuleKey =>
@@ -95,7 +96,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   };
 
-  const hubPermissions = getHubPermissions(role);
+  const authorization = buildAuthorizationSnapshot(role);
+  const hubPermissions = authorization.permissions;
 
   return (
     <AuthContext.Provider

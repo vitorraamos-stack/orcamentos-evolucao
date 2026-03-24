@@ -7,7 +7,7 @@ Sistema web para cálculo de orçamentos de comunicação visual, desenvolvido c
 - **Calculadora Inteligente**: cálculo de área (cm → m²) ou **linear (ml)** e aplicação automática de faixas de preço.
 - **Gestão de Materiais**: cadastro de materiais com **valor mínimo**, descrição no orçamento, aviso de equivalência e **tabela de preços por faixa** (tiered pricing).
 - **Autenticação**: login via Supabase Auth.
-- **Permissões**: Admin x Consultor (tabela `profiles`).
+- **Permissões**: controle por papel (`profiles`) + módulos (`user_module_access`).
 - **Exportação**: botão para copiar um resumo formatado para WhatsApp.
 - **Hub OS**: criação e acompanhamento de Ordens de Serviço com Kanban, detalhes, comprovantes e auditoria.
 
@@ -21,7 +21,7 @@ Sistema web para cálculo de orçamentos de comunicação visual, desenvolvido c
 2. Vá em **SQL Editor** e execute o conteúdo do arquivo `supabase_schema.sql`.
 3. Para habilitar o Hub OS, execute também os SQLs em `supabase/migrations/20250308_hub_os.sql` e `supabase/migrations/20250310_hub_os_dual_boards.sql`.
 4. Crie seu usuário pelo **Auth** (ou pelo próprio app, se já estiver funcionando).
-5. Rode o script `force_admin_by_email.sql` (ou `fix_admin_access.sql`) para definir seu usuário como **admin**.
+5. Faça bootstrap seguro do primeiro gerente conforme `docs/auth-bootstrap-first-manager.md`.
 6. Vá em **Project Settings → API** e copie:
    - `URL`
    - `anon public key`
@@ -40,7 +40,6 @@ VITE_OS_FOLDER_BASE=\\\\servidor-pc\\...\\A_Z
 
 - `SUPABASE_URL` (pode ser a mesma do `VITE_SUPABASE_URL`)
 - `SUPABASE_SERVICE_ROLE_KEY` (NUNCA exponha essa chave no front-end)
-- `ADMIN_FUNCTION_TOKEN` (token interno para rotas administrativas)
 
 ### 3) Instalação e execução
 
@@ -164,7 +163,7 @@ supabase functions deploy optimize-installation-route
 
 6. Otimização de rota de instalações (ORS):
    - Endpoint server-side: `POST /api/hub-os/optimize-installations`
-   - Requer usuário autenticado (Bearer JWT) com role gerente/admin.
+   - Requer usuário autenticado (Bearer JWT) com role gerente.
    - Chave `ORS_API_KEY` fica apenas no servidor (sem prefixo `VITE_`).
 
 > As funções exigem usuário autenticado (JWT) e geram URLs pré-assinadas com expiração curta (10 min).
@@ -202,3 +201,12 @@ supabase functions deploy optimize-installation-route
    - `os_order_asset_jobs`: **PENDING → PROCESSING → DONE → CLEANED**.
    - O arquivo existe no SMB.
    - O objeto foi removido do R2 e `deleted_from_storage_at` está preenchido.
+
+
+## Operação em produção
+
+- Modelo de autorização e módulos: `docs/production-auth-model.md`.
+- Bootstrap seguro do primeiro gerente: `docs/auth-bootstrap-first-manager.md`.
+- Fluxo de Materiais (storage + RPC transacional): `docs/materials-production-flow.md`.
+- Estratégia canônica do Hub OS e compatibilidade legado: `docs/hub-os-canonical-strategy.md`.
+- Deploy, rollback e contingência: `docs/deploy-and-rollback.md`.

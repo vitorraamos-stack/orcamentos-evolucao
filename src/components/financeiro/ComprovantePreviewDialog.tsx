@@ -143,7 +143,7 @@ export function ComprovantePreviewDialog({
                 </div>
                 <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
                   <img
-                    src={displayUrl}
+                    src={displayUrl ?? undefined}
                     alt={filename ?? "Comprovante"}
                     className="max-h-full w-auto object-contain"
                     onError={() => setMediaError(true)}

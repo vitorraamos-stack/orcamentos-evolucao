@@ -1,23 +1,12 @@
 import { supabase } from '@/lib/supabase';
 import type { Os, OsEvent, OsPaymentProof, OsStatus, PaymentStatus } from './types';
+import { lookupOrderForKiosk } from './orderRepository';
 
 export type KioskLookupResult = {
   id: string;
   source: 'os' | 'os_orders';
 };
 
-const NOT_FOUND_CODE = 'PGRST116';
-
-const normalizeDigits = (value: string | null | undefined) =>
-  String(value ?? '').replace(/\D+/g, '');
-
-
-const hasStandaloneNumber = (value: string | null | undefined, code: string) => {
-  const source = String(value ?? '');
-  const escapedCode = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const pattern = new RegExp(`(^|\\D)${escapedCode}(\\D|$)`);
-  return pattern.test(source);
-};
 
 export const fetchOsStatuses = async () => {
   const { data, error } = await supabase
@@ -51,90 +40,7 @@ export const fetchOsById = async (id: string) => {
 };
 
 export const fetchOsByCode = async (code: string): Promise<KioskLookupResult | null> => {
-  const numericCode = Number(code);
-  const hasNumericCode = Number.isInteger(numericCode) && numericCode > 0;
-
-  if (!hasNumericCode) {
-    return null;
-  }
-
-  const { data: byOsNumber, error: byOsNumberError } = await supabase
-    .from('os')
-    .select('id')
-    .eq('os_number', numericCode)
-    .limit(1)
-    .maybeSingle();
-
-  if (byOsNumberError && byOsNumberError.code !== NOT_FOUND_CODE) throw byOsNumberError;
-  if (byOsNumber) return { id: byOsNumber.id, source: 'os' };
-
-  const { data: bySaleNumber, error: bySaleNumberError } = await supabase
-    .from('os')
-    .select('id')
-    .eq('sale_number', code)
-    .limit(1)
-    .maybeSingle();
-
-  if (bySaleNumberError && bySaleNumberError.code !== NOT_FOUND_CODE) throw bySaleNumberError;
-  if (bySaleNumber) return { id: bySaleNumber.id, source: 'os' };
-
-  const { data: fuzzySaleRows, error: fuzzySaleError } = await supabase
-    .from('os')
-    .select('id, sale_number')
-    .ilike('sale_number', `%${code}%`)
-    .limit(50);
-
-  if (fuzzySaleError) throw fuzzySaleError;
-
-  const matchByNormalizedSaleNumber = (fuzzySaleRows || []).find(
-    (row) => normalizeDigits(row.sale_number) === code
-  );
-
-  if (matchByNormalizedSaleNumber) {
-    return { id: matchByNormalizedSaleNumber.id, source: 'os' };
-  }
-
-  const { data: fuzzyTitleRows, error: fuzzyTitleError } = await supabase
-    .from('os')
-    .select('id, title')
-    .ilike('title', `%${code}%`)
-    .limit(50);
-
-  if (fuzzyTitleError) throw fuzzyTitleError;
-
-  const matchByTitleNumber = (fuzzyTitleRows || []).find((row) => hasStandaloneNumber(row.title, code));
-
-  if (matchByTitleNumber) {
-    return { id: matchByTitleNumber.id, source: 'os' };
-  }
-
-  const { data: orderBySaleNumber, error: orderBySaleNumberError } = await supabase
-    .from('os_orders')
-    .select('id')
-    .eq('sale_number', code)
-    .limit(1)
-    .maybeSingle();
-
-  if (orderBySaleNumberError && orderBySaleNumberError.code !== NOT_FOUND_CODE) throw orderBySaleNumberError;
-  if (orderBySaleNumber) return { id: orderBySaleNumber.id, source: 'os_orders' };
-
-  const { data: fuzzyOrderRows, error: fuzzyOrderError } = await supabase
-    .from('os_orders')
-    .select('id, sale_number, title')
-    .or(`sale_number.ilike.%${code}%,title.ilike.%${code}%`)
-    .limit(50);
-
-  if (fuzzyOrderError) throw fuzzyOrderError;
-
-  const matchOrder = (fuzzyOrderRows || []).find(
-    (row) => normalizeDigits(row.sale_number) === code || hasStandaloneNumber(row.title, code)
-  );
-
-  if (matchOrder) {
-    return { id: matchOrder.id, source: 'os_orders' };
-  }
-
-  return null;
+  return lookupOrderForKiosk(code);
 };
 
 export const fetchOsEvents = async (osId: string) => {
