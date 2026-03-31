@@ -16,6 +16,13 @@
 2. Papel normalizado em `profiles`.
 3. Regras de módulos mínimos para gerente.
 
+## Edge Functions de R2
+As funções `r2-presign-upload`, `r2-presign-download` e `r2-delete-objects` validam:
+1. Header `Authorization: Bearer <jwt>` obrigatório e válido em `supabase.auth.getUser(token)`.
+2. Acesso ao módulo `hub_os` em `user_module_access`.
+3. Key de objeto com prefixo permitido (`os_orders/`) e path válido.
+4. Bucket exclusivamente por segredo de ambiente (`R2_BUCKET`), sem override por payload.
+
 ## Compatibilidade legado
 - `admin` é normalizado para `gerente`.
 - `consultor` é normalizado para `consultor_vendas`.

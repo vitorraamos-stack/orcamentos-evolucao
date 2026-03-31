@@ -50,11 +50,7 @@ export const errorLog = (scope: string, event: string, data?: Record<string, unk
 };
 
 export const extractBearerToken = (request: Request) => {
-  const headersToCheck = [
-    request.headers.get('authorization'),
-    request.headers.get('Authorization'),
-    request.headers.get('x-forwarded-authorization'),
-  ];
+  const headersToCheck = [request.headers.get('authorization'), request.headers.get('Authorization')];
 
   for (const headerValue of headersToCheck) {
     if (!headerValue) continue;
@@ -170,7 +166,13 @@ export const requireAuthenticatedHubOsUser = async (
   }
 };
 
-export const getR2Bucket = () => Deno.env.get('R2_BUCKET') || 'os-artes';
+export const getR2Bucket = (): string => {
+  const bucket = Deno.env.get('R2_BUCKET');
+  if (!bucket) {
+    throw new Error('Missing required env: R2_BUCKET');
+  }
+  return bucket;
+};
 
 export const validateR2Key = (
   key: unknown,
@@ -208,11 +210,15 @@ export const validateR2Key = (
   return { ok: true, value };
 };
 
-export const rejectOrIgnoreBucket = (scope: string, providedBucket: unknown) => {
+export const rejectOrIgnoreBucket = (scope: string, providedBucket: unknown): Response | null => {
   if (providedBucket === undefined || providedBucket === null || providedBucket === '') {
     return null;
   }
 
-  infoLog(scope, 'ignored_payload_bucket', { hasBucket: true });
-  return null;
+  infoLog(scope, 'rejected_payload_bucket', { hasBucket: true });
+  return errorResponse(
+    400,
+    'invalid_input',
+    'Não informe bucket no payload. O bucket é definido exclusivamente por configuração do servidor.',
+  );
 };

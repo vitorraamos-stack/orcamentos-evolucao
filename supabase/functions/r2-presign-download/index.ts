@@ -53,7 +53,8 @@ Deno.serve(async (request) => {
       return errorResponse(400, 'invalid_json', 'JSON inválido no corpo da requisição.');
     }
 
-    rejectOrIgnoreBucket(SCOPE, payload.bucket);
+    const bucketPayloadError = rejectOrIgnoreBucket(SCOPE, payload.bucket);
+    if (bucketPayloadError) return bucketPayloadError;
 
     const keyValidation = validateR2Key(payload.key);
     if (!keyValidation.ok) {
@@ -63,7 +64,13 @@ Deno.serve(async (request) => {
     const accountId = Deno.env.get('R2_ACCOUNT_ID');
     const accessKeyId = Deno.env.get('R2_ACCESS_KEY_ID');
     const secretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY');
-    const bucket = getR2Bucket();
+    let bucket: string;
+    try {
+      bucket = getR2Bucket();
+    } catch (error) {
+      errorLog(SCOPE, 'r2_bucket_env_missing', { message: error instanceof Error ? error.message : 'unknown' });
+      return errorResponse(500, 'server_config', 'Variável R2_BUCKET não configurada.');
+    }
 
     if (!accountId || !accessKeyId || !secretAccessKey) {
       errorLog(SCOPE, 'r2_env_missing');
