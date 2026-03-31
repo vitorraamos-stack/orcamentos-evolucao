@@ -10,7 +10,8 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "check:dialog-imports": "node tools/check-dialog-imports.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "verify:prod": "npm run check && npm run test && npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

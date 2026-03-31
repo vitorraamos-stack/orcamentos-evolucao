@@ -1,245 +1,91 @@
-import { createClient } from "npm:@supabase/supabase-js";
-import { DeleteObjectsCommand, S3Client } from "npm:@aws-sdk/client-s3";
+import { DeleteObjectsCommand, S3Client } from 'npm:@aws-sdk/client-s3';
+import {
+  corsHeaders,
+  errorLog,
+  errorResponse,
+  getR2Bucket,
+  infoLog,
+  jsonResponse,
+  rejectOrIgnoreBucket,
+  requireAuthenticatedHubOsUser,
+  validateR2Key,
+} from '../_shared/r2-security.ts';
 
 type DeletePayload = {
   keys: string[];
   bucket?: string;
 };
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, apikey, x-client-info, content-type, accept, x-forwarded-authorization, x-supabase-authorization, x-supabase-auth-token, x-supabase-auth-user, x-supabase-auth-user-id, x-supabase-user, x-supabase-user-id, x-sb-user-id, x-sb-user, x-sb-auth-user, x-sb-auth-user-id, x-sb-authorization, x-sb-auth-token, x-jwt-claims, x-supabase-auth",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
-
-const jsonResponse = (status: number, body: Record<string, unknown>) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json", ...corsHeaders },
-  });
+const SCOPE = 'r2-delete-objects';
 
 const isProtectedPaymentProofKey = (key: string) =>
-  key.includes("/Financeiro/Comprovante/") || key.includes("/payment_proofs/");
+  key.includes('/Financeiro/Comprovante/') || key.includes('/payment_proofs/');
 
-const parseClaimsHeader = (request: Request) => {
-  const claimsRaw =
-    request.headers.get("x-jwt-claims") ??
-    request.headers.get("x-supabase-auth");
-  if (!claimsRaw) {
-    return null;
-  }
-
+Deno.serve(async (request) => {
   try {
-    const claims = JSON.parse(claimsRaw) as { sub?: string };
-    return claims.sub ?? null;
-  } catch {
-    return null;
-  }
-};
-
-const extractGatewayUserId = (request: Request) => {
-  return (
-    request.headers.get("x-supabase-auth-user") ??
-    request.headers.get("x-supabase-auth-user-id") ??
-    request.headers.get("x-supabase-user") ??
-    request.headers.get("x-supabase-user-id") ??
-    request.headers.get("x-sb-user-id") ??
-    request.headers.get("x-sb-user") ??
-    request.headers.get("x-sb-auth-user") ??
-    request.headers.get("x-sb-auth-user-id") ??
-    parseClaimsHeader(request)
-  );
-};
-
-const extractBearerToken = (request: Request) => {
-  const possibleAuthHeaders = [
-    request.headers.get("authorization"),
-    request.headers.get("Authorization"),
-    request.headers.get("x-forwarded-authorization"),
-    request.headers.get("x-supabase-authorization"),
-    request.headers.get("x-supabase-auth-token"),
-    request.headers.get("x-sb-authorization"),
-    request.headers.get("x-sb-auth-token"),
-  ];
-
-  for (const value of possibleAuthHeaders) {
-    if (!value) continue;
-    const trimmed = value.trim();
-    if (/^bearer\s+/i.test(trimmed)) {
-      return trimmed.replace(/^bearer\s+/i, "").trim();
-    }
-    if (trimmed.split(".").length === 3) {
-      return trimmed;
-    }
-  }
-
-  return null;
-};
-
-const decodeJwtSubject = (token: string) => {
-  const parts = token.split(".");
-  if (parts.length < 2) {
-    return null;
-  }
-  try {
-    const payload = JSON.parse(
-      atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))
-    ) as { sub?: string };
-    return payload.sub ?? null;
-  } catch {
-    return null;
-  }
-};
-
-const requireUser = async (request: Request) => {
-  const token = extractBearerToken(request);
-  const gatewayUserId = extractGatewayUserId(request);
-  console.log("[r2-delete-objects] auth context", {
-    method: request.method,
-    hasToken: Boolean(token),
-    hasGatewayUserId: Boolean(gatewayUserId),
-    hasAuthorizationHeader: Boolean(
-      request.headers.get("authorization") ||
-      request.headers.get("Authorization")
-    ),
-    hasForwardedAuthorization: Boolean(
-      request.headers.get("x-forwarded-authorization")
-    ),
-    hasSupabaseAuthToken: Boolean(request.headers.get("x-supabase-auth-token")),
-    hasApiKeyHeader: Boolean(request.headers.get("apikey")),
-  });
-
-  if (!token) {
-    if (gatewayUserId) {
-      console.log(
-        "[r2-delete-objects] fallback to gateway user id (no token)",
-        { userId: gatewayUserId }
-      );
-      return { user: { id: gatewayUserId } };
-    }
-
-    console.error("[r2-delete-objects] missing Authorization bearer token");
-    return {
-      error: jsonResponse(401, {
-        error: "Unauthorized: missing Authorization Bearer token",
-      }),
-    };
-  }
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("[r2-delete-objects] supabase env missing for auth");
-    return {
-      error: jsonResponse(500, {
-        error:
-          "Supabase env not configured: SUPABASE_URL/SUPABASE_ANON_KEY missing",
-      }),
-    };
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${token}` } },
-  });
-
-  const { data, error } = await supabase.auth.getUser(token);
-  if (error || !data?.user) {
-    const decodedSubject = decodeJwtSubject(token);
-    console.error("[r2-delete-objects] getUser failed", {
-      reason: error?.message ?? "user-not-found",
-      status: error?.status,
-      hasDecodedSubject: Boolean(decodedSubject),
-    });
-    if (gatewayUserId) {
-      console.log("[r2-delete-objects] fallback to gateway user id", {
-        userId: gatewayUserId,
-      });
-      return { user: { id: gatewayUserId } };
-    }
-    if (decodedSubject) {
-      console.log("[r2-delete-objects] fallback to decoded jwt subject", {
-        userId: decodedSubject,
-      });
-      return { user: { id: decodedSubject } };
-    }
-    return { error: jsonResponse(401, { error: "Invalid JWT" }) };
-  }
-
-  console.log("[r2-delete-objects] getUser success", { userId: data.user.id });
-  return { user: data.user };
-};
-
-Deno.serve(async request => {
-  try {
-    console.log("[r2-delete-objects] request", { method: request.method });
-
-    if (request.method === "OPTIONS") {
+    if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders });
     }
 
-    if (request.method !== "POST") {
-      return jsonResponse(405, { error: "Method not allowed" });
+    if (request.method !== 'POST') {
+      return errorResponse(405, 'method_not_allowed', 'Method not allowed.');
     }
 
-    const auth = await requireUser(request);
-    if (auth.error) {
-      return auth.error;
-    }
+    const auth = await requireAuthenticatedHubOsUser(request, SCOPE);
+    if (auth.error) return auth.error;
 
     let payload: DeletePayload;
     try {
       payload = await request.json();
     } catch {
-      return jsonResponse(400, { error: "Invalid JSON body." });
+      return errorResponse(400, 'invalid_json', 'JSON inválido no corpo da requisição.');
     }
 
-    const keys = Array.isArray(payload.keys)
-      ? payload.keys.filter(Boolean)
-      : [];
+    rejectOrIgnoreBucket(SCOPE, payload.bucket);
+
+    const keys = Array.isArray(payload.keys) ? payload.keys.filter((value): value is string => typeof value === 'string') : [];
     if (keys.length === 0) {
-      return jsonResponse(400, { error: "No keys provided." });
+      return errorResponse(400, 'invalid_input', 'Nenhuma chave válida foi informada para exclusão.');
     }
 
-    if (keys.some(key => !key.startsWith("os_orders/") || key.includes(".."))) {
-      return jsonResponse(400, { error: "Invalid object key." });
+    for (const key of keys) {
+      const keyValidation = validateR2Key(key);
+      if (!keyValidation.ok) {
+        return errorResponse(400, 'invalid_input', `Chave inválida: ${keyValidation.message}`);
+      }
     }
 
     const protectedKeys = keys.filter(isProtectedPaymentProofKey);
     if (protectedKeys.length > 0) {
-      return jsonResponse(403, {
-        error:
-          "Deletion blocked for payment proof keys in R2 (retention policy).",
-        blockedKeys: protectedKeys,
-      });
+      return errorResponse(
+        403,
+        'forbidden',
+        'Exclusão bloqueada para comprovantes financeiros (política de retenção).',
+        { blockedKeys: protectedKeys },
+      );
     }
 
-    const accountId = Deno.env.get("R2_ACCOUNT_ID");
-    const accessKeyId = Deno.env.get("R2_ACCESS_KEY_ID");
-    const secretAccessKey = Deno.env.get("R2_SECRET_ACCESS_KEY");
-    const defaultBucket = Deno.env.get("R2_BUCKET") || "os-artes";
+    const accountId = Deno.env.get('R2_ACCOUNT_ID');
+    const accessKeyId = Deno.env.get('R2_ACCESS_KEY_ID');
+    const secretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY');
+    const bucket = getR2Bucket();
 
     if (!accountId || !accessKeyId || !secretAccessKey) {
-      console.error("[r2-delete-objects] r2 env missing");
-      return jsonResponse(500, { error: "R2 env not configured" });
+      errorLog(SCOPE, 'r2_env_missing');
+      return errorResponse(500, 'server_config', 'Variáveis do R2 não configuradas.');
     }
 
     const client = new S3Client({
-      region: "auto",
+      region: 'auto',
       endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
       forcePathStyle: true,
-      credentials: {
-        accessKeyId,
-        secretAccessKey,
-      },
+      credentials: { accessKeyId, secretAccessKey },
     });
 
     const command = new DeleteObjectsCommand({
-      Bucket: payload.bucket || defaultBucket,
+      Bucket: bucket,
       Delete: {
-        Objects: keys.map(key => ({ Key: key })),
+        Objects: keys.map((key) => ({ Key: key })),
         Quiet: false,
       },
     });
@@ -247,17 +93,24 @@ Deno.serve(async request => {
     const result = await client.send(command);
     const deletedCount = result.Deleted?.length ?? 0;
     const errors =
-      result.Errors?.map(error => ({
+      result.Errors?.map((error) => ({
         key: error.Key,
         code: error.Code,
         message: error.Message,
       })) ?? [];
 
-    return jsonResponse(200, { deleted: deletedCount, errors });
+    infoLog(SCOPE, 'delete_ok', { userId: auth.user?.id, requested: keys.length, deleted: deletedCount, errorCount: errors.length });
+
+    return jsonResponse(200, {
+      ok: true,
+      data: { deleted: deletedCount, errors },
+      deleted: deletedCount,
+      errors,
+    });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unexpected error.";
-    console.error("[r2-delete-objects] unexpected error", { message });
-    return jsonResponse(500, { error: message });
+    errorLog(SCOPE, 'unexpected_error', {
+      message: error instanceof Error ? error.message : 'unknown',
+    });
+    return errorResponse(500, 'unexpected_error', 'Erro inesperado ao excluir objetos.');
   }
 });

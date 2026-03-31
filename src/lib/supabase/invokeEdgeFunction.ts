@@ -96,6 +96,14 @@ const extractErrorDetails = async (error: unknown) => {
           const body = await errorLike.context.clone().json();
           if (body && typeof body.error === 'string') {
             details = body.error;
+          } else if (
+            body &&
+            typeof body.error === 'object' &&
+            body.error &&
+            'message' in body.error &&
+            typeof (body.error as { message?: unknown }).message === 'string'
+          ) {
+            details = (body.error as { message: string }).message;
           }
         } catch {
           // noop
