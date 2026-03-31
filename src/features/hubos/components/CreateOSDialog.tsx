@@ -38,7 +38,12 @@ import {
   UploadCloud,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { ArtDirectionTag, LogisticType, OsOrder } from "../types";
+import type {
+  ArtDirectionTag,
+  DeliveryDeadlinePreset,
+  LogisticType,
+  OsOrder,
+} from "../types";
 import { createOrder } from "../api";
 import { ART_COLUMNS } from "../constants";
 import {
@@ -46,6 +51,15 @@ import {
   ART_DIRECTION_TAGS,
 } from "../artDirectionTagConfig";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  DELIVERY_DEADLINE_PRESET_CONFIG,
+  DELIVERY_DEADLINE_PRESETS,
+} from "../deliveryDeadlineConfig";
 import {
   uploadAssetsForOrder,
   uploadFinancialDocsForOrder,
@@ -55,11 +69,15 @@ import {
   ACCEPTED_ASSET_CONTENT_TYPES,
   MAX_ASSET_FILE_SIZE_BYTES,
 } from "@/features/hubos/assetUtils";
-import type { FinancialDoc, FinancialDocType, FinancialInstallmentLabel } from "@/features/hubos/assets";
+import type {
+  FinancialDoc,
+  FinancialDocType,
+  FinancialInstallmentLabel,
+} from "@/features/hubos/assets";
 
 const DEFAULT_FINANCIAL_DOC_TYPE: FinancialDocType = "PAYMENT_PROOF";
-const DEFAULT_INSTALLMENT_LABEL: FinancialInstallmentLabel = '1/1';
-const OS_DRAFT_STORAGE_KEY = 'hubos:create-os-draft';
+const DEFAULT_INSTALLMENT_LABEL: FinancialInstallmentLabel = "1/1";
+const OS_DRAFT_STORAGE_KEY = "hubos:create-os-draft";
 
 interface CreateOSDialogProps {
   onCreated: (order: OsOrder) => void;
@@ -73,6 +91,8 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   const [clientName, setClientName] = useState("");
   const [description, setDescription] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
+  const [deliveryDeadlinePreset, setDeliveryDeadlinePreset] =
+    useState<DeliveryDeadlinePreset | null>(null);
   const [logisticType, setLogisticType] = useState<LogisticType>("retirada");
   const [address, setAddress] = useState("");
   const [selectedArtDirectionTag, setSelectedArtDirectionTag] =
@@ -95,13 +115,14 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
         clientName,
         description,
         deliveryDate,
+        deliveryDeadlinePreset,
         logisticType,
         address,
         selectedArtDirectionTag,
       };
       localStorage.setItem(OS_DRAFT_STORAGE_KEY, JSON.stringify(payload));
     } catch (error) {
-      console.error('Erro ao salvar rascunho local da OS.', error);
+      console.error("Erro ao salvar rascunho local da OS.", error);
     }
   };
 
@@ -109,7 +130,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     try {
       localStorage.removeItem(OS_DRAFT_STORAGE_KEY);
     } catch (error) {
-      console.error('Erro ao limpar rascunho local da OS.', error);
+      console.error("Erro ao limpar rascunho local da OS.", error);
     }
   };
 
@@ -118,6 +139,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     setClientName("");
     setDescription("");
     setDeliveryDate("");
+    setDeliveryDeadlinePreset(null);
     setLogisticType("retirada");
     setAddress("");
     setSelectedArtDirectionTag(null);
@@ -144,6 +166,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
       Boolean(clientName.trim()) ||
       Boolean(description.trim()) ||
       Boolean(deliveryDate) ||
+      Boolean(deliveryDeadlinePreset) ||
       logisticType !== "retirada" ||
       Boolean(address.trim()) ||
       Boolean(selectedArtDirectionTag) ||
@@ -166,7 +189,10 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
         client_name: clientName.trim() || "Rascunho",
         title: "Rascunho",
         description: description.trim() || "Rascunho",
-        delivery_date: deliveryDate || null,
+        delivery_deadline_preset: deliveryDeadlinePreset,
+        delivery_deadline_started_at: null,
+        delivery_date:
+          deliveryDeadlinePreset === "CUSTOM" ? deliveryDate || null : null,
         logistic_type: logisticType,
         address: logisticType === "retirada" ? null : address || null,
         art_status: ART_COLUMNS[0],
@@ -197,6 +223,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     Boolean(clientName.trim()) ||
     Boolean(description.trim()) ||
     Boolean(deliveryDate) ||
+    Boolean(deliveryDeadlinePreset) ||
     logisticType !== "retirada" ||
     Boolean(address.trim()) ||
     Boolean(selectedArtDirectionTag) ||
@@ -220,7 +247,10 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
         client_name: clientName.trim() || "Rascunho",
         title: "Rascunho",
         description: description.trim() || "Rascunho",
-        delivery_date: deliveryDate || null,
+        delivery_deadline_preset: deliveryDeadlinePreset,
+        delivery_deadline_started_at: null,
+        delivery_date:
+          deliveryDeadlinePreset === "CUSTOM" ? deliveryDate || null : null,
         logistic_type: logisticType,
         address: logisticType === "retirada" ? null : address || null,
         art_status: ART_COLUMNS[0],
@@ -313,22 +343,31 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
               ...doc,
               type: newType,
               installmentLabel:
-                newType === 'PAYMENT_PROOF' ? doc.installmentLabel ?? DEFAULT_INSTALLMENT_LABEL : undefined,
-              secondDueDate: newType === 'PAYMENT_PROOF' ? doc.secondDueDate ?? null : undefined,
+                newType === "PAYMENT_PROOF"
+                  ? (doc.installmentLabel ?? DEFAULT_INSTALLMENT_LABEL)
+                  : undefined,
+              secondDueDate:
+                newType === "PAYMENT_PROOF"
+                  ? (doc.secondDueDate ?? null)
+                  : undefined,
             }
           : doc
       )
     );
   };
 
-  const updateInstallmentLabel = (index: number, installmentLabel: FinancialInstallmentLabel) => {
-    setFinancialDocs((current) =>
+  const updateInstallmentLabel = (
+    index: number,
+    installmentLabel: FinancialInstallmentLabel
+  ) => {
+    setFinancialDocs(current =>
       current.map((doc, itemIndex) =>
         itemIndex === index
           ? {
               ...doc,
               installmentLabel,
-              secondDueDate: installmentLabel === '1/2' ? doc.secondDueDate ?? '' : null,
+              secondDueDate:
+                installmentLabel === "1/2" ? (doc.secondDueDate ?? "") : null,
             }
           : doc
       )
@@ -336,8 +375,10 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
   };
 
   const updateSecondDueDate = (index: number, secondDueDate: string) => {
-    setFinancialDocs((current) =>
-      current.map((doc, itemIndex) => (itemIndex === index ? { ...doc, secondDueDate } : doc))
+    setFinancialDocs(current =>
+      current.map((doc, itemIndex) =>
+        itemIndex === index ? { ...doc, secondDueDate } : doc
+      )
     );
   };
 
@@ -405,10 +446,13 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
     }
 
     const invalidProofDoc = financialDocs.find(
-      (doc) => doc.type === 'PAYMENT_PROOF' && doc.installmentLabel === '1/2' && !doc.secondDueDate
+      doc =>
+        doc.type === "PAYMENT_PROOF" &&
+        doc.installmentLabel === "1/2" &&
+        !doc.secondDueDate
     );
     if (invalidProofDoc) {
-      toast.error('Para comprovante 1/2, a Data 2ª Parcela é obrigatória.');
+      toast.error("Para comprovante 1/2, a Data 2ª Parcela é obrigatória.");
       return;
     }
 
@@ -455,8 +499,13 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
       return;
     }
 
-    if (!saleNumber || !clientName || !description || !deliveryDate) {
+    if (!saleNumber || !clientName || !description || !deliveryDeadlinePreset) {
       toast.error("Preencha os campos obrigatórios.");
+      return;
+    }
+
+    if (deliveryDeadlinePreset === "CUSTOM" && !deliveryDate) {
+      toast.error("Informe a data manual para o prazo personalizado.");
       return;
     }
     if (logisticType !== "retirada" && !trimmedAddress) {
@@ -474,7 +523,10 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
         sale_number: saleNumber,
         client_name: clientName,
         description,
-        delivery_date: deliveryDate,
+        delivery_deadline_preset: deliveryDeadlinePreset,
+        delivery_deadline_started_at: null,
+        delivery_date:
+          deliveryDeadlinePreset === "CUSTOM" ? deliveryDate : null,
         logistic_type: logisticType,
         address: logisticType === "retirada" ? null : trimmedAddress,
         art_status: ART_COLUMNS[0],
@@ -594,14 +646,46 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
                     disabled={Boolean(pendingOrder)}
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label>Data de entrega</Label>
-                  <Input
-                    type="date"
-                    value={deliveryDate}
-                    onChange={event => setDeliveryDate(event.target.value)}
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Prazo de produção/entrega</Label>
+                  <RadioGroup
+                    value={deliveryDeadlinePreset ?? ""}
+                    onValueChange={value =>
+                      setDeliveryDeadlinePreset(value as DeliveryDeadlinePreset)
+                    }
                     disabled={Boolean(pendingOrder)}
-                  />
+                  >
+                    <div className="space-y-2">
+                      {DELIVERY_DEADLINE_PRESETS.map(preset => {
+                        const config = DELIVERY_DEADLINE_PRESET_CONFIG[preset];
+                        return (
+                          <Tooltip key={preset}>
+                            <TooltipTrigger asChild>
+                              <label className="flex items-center gap-2 text-sm">
+                                <RadioGroupItem value={preset} />
+                                {config.label}
+                              </label>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              {config.tooltip}
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })}
+                    </div>
+                  </RadioGroup>
+                  <div className="space-y-1">
+                    <Label>Data manual (somente prazo personalizado)</Label>
+                    <Input
+                      type="date"
+                      value={deliveryDate}
+                      onChange={event => setDeliveryDate(event.target.value)}
+                      disabled={
+                        Boolean(pendingOrder) ||
+                        deliveryDeadlinePreset !== "CUSTOM"
+                      }
+                    />
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <Label>Tipo de logística</Label>
@@ -746,6 +830,11 @@ Orientações para a criação de arte:`}
                     );
                   })}
                 </div>
+                {selectedArtDirectionTag && (
+                  <p className="text-sm font-medium text-orange-600">
+                    {ART_DIRECTION_TAG_CONFIG[selectedArtDirectionTag].text}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -938,14 +1027,22 @@ Orientações para a criação de arte:`}
                                   </SelectItem>
                                 </SelectContent>
                               </Select>
-                              {doc.type === 'PAYMENT_PROOF' && (
+                              {doc.type === "PAYMENT_PROOF" && (
                                 <>
                                   <Select
-                                    value={doc.installmentLabel ?? DEFAULT_INSTALLMENT_LABEL}
-                                    onValueChange={(value) =>
-                                      updateInstallmentLabel(index, value as FinancialInstallmentLabel)
+                                    value={
+                                      doc.installmentLabel ??
+                                      DEFAULT_INSTALLMENT_LABEL
                                     }
-                                    disabled={uploadingAssets || Boolean(pendingOrder)}
+                                    onValueChange={value =>
+                                      updateInstallmentLabel(
+                                        index,
+                                        value as FinancialInstallmentLabel
+                                      )
+                                    }
+                                    disabled={
+                                      uploadingAssets || Boolean(pendingOrder)
+                                    }
                                   >
                                     <SelectTrigger className="h-8 w-[90px] text-xs">
                                       <SelectValue />
@@ -955,15 +1052,26 @@ Orientações para a criação de arte:`}
                                       <SelectItem value="1/2">1/2</SelectItem>
                                     </SelectContent>
                                   </Select>
-                                  {(doc.installmentLabel ?? DEFAULT_INSTALLMENT_LABEL) === '1/2' && (
+                                  {(doc.installmentLabel ??
+                                    DEFAULT_INSTALLMENT_LABEL) === "1/2" && (
                                     <div className="flex items-center gap-2">
-                                      <span className="text-xs font-medium text-foreground">Data 2ª Parcela:</span>
+                                      <span className="text-xs font-medium text-foreground">
+                                        Data 2ª Parcela:
+                                      </span>
                                       <Input
                                         type="date"
                                         className="h-8 w-[170px] text-xs"
-                                        value={doc.secondDueDate ?? ''}
-                                        onChange={(event) => updateSecondDueDate(index, event.target.value)}
-                                        disabled={uploadingAssets || Boolean(pendingOrder)}
+                                        value={doc.secondDueDate ?? ""}
+                                        onChange={event =>
+                                          updateSecondDueDate(
+                                            index,
+                                            event.target.value
+                                          )
+                                        }
+                                        disabled={
+                                          uploadingAssets ||
+                                          Boolean(pendingOrder)
+                                        }
                                       />
                                     </div>
                                   )}

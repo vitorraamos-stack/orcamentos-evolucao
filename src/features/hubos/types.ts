@@ -1,27 +1,33 @@
-export type LogisticType = 'retirada' | 'entrega' | 'instalacao';
+export type LogisticType = "retirada" | "entrega" | "instalacao";
 
 export type ProductionTag =
-  | 'EM_PRODUCAO'
-  | 'PRONTO'
-  | 'AGUARDANDO_INSUMOS'
-  | 'PRODUCAO_EXTERNA';
+  | "EM_PRODUCAO"
+  | "PRONTO"
+  | "AGUARDANDO_INSUMOS"
+  | "PRODUCAO_EXTERNA";
 
-export type ArtDirectionTag = 'ARTE_PRONTA_EDICAO' | 'CRIACAO_ARTE' | 'URGENTE';
+export type ArtDirectionTag = "ARTE_PRONTA_EDICAO" | "CRIACAO_ARTE" | "URGENTE";
+
+export type DeliveryDeadlinePreset =
+  | "FAST_5_8"
+  | "STANDARD_8_12"
+  | "STRUCTURE_INSTALL_15_25"
+  | "CUSTOM";
 
 export type ArtStatus =
-  | 'Caixa de Entrada'
-  | 'Em Criação'
-  | 'Para Aprovação'
-  | 'Ajustes'
-  | 'Produzir';
+  | "Caixa de Entrada"
+  | "Em Criação"
+  | "Para Aprovação"
+  | "Ajustes"
+  | "Produzir";
 
 export type ProdStatus =
-  | 'Produção'
-  | 'Em Acabamento'
-  | 'Pronto / Avisar Cliente'
-  | 'Logística (Entrega/Transportadora)'
-  | 'Instalação Agendada'
-  | 'Finalizados';
+  | "Produção"
+  | "Em Acabamento"
+  | "Pronto / Avisar Cliente"
+  | "Logística (Entrega/Transportadora)"
+  | "Instalação Agendada"
+  | "Finalizados";
 
 export type OsOrder = {
   id: string;
@@ -31,6 +37,8 @@ export type OsOrder = {
   title: string | null;
   description: string | null;
   delivery_date: string | null;
+  delivery_deadline_preset: DeliveryDeadlinePreset | null;
+  delivery_deadline_started_at: string | null;
   logistic_type: LogisticType;
   address: string | null;
   address_lat?: number | null;
@@ -82,18 +90,18 @@ export type HubOsFilters = {
   search: string;
   reproducao: boolean;
   letraCaixa: boolean;
-  logisticType: 'all' | LogisticType;
+  logisticType: "all" | LogisticType;
   overdueOnly: boolean;
 };
 
 export type AssetJobStatus =
-  | 'UPLOADING'
-  | 'PENDING'
-  | 'PROCESSING'
-  | 'DONE'
-  | 'DONE_CLEANUP_FAILED'
-  | 'CLEANED'
-  | 'ERROR';
+  | "UPLOADING"
+  | "PENDING"
+  | "PROCESSING"
+  | "DONE"
+  | "DONE_CLEANUP_FAILED"
+  | "CLEANED"
+  | "ERROR";
 
 export type AssetJob = {
   id: string;
@@ -104,14 +112,13 @@ export type AssetJob = {
   last_error: string | null;
 };
 
-
 export type FinanceInstallmentStatus =
-  | 'AWAITING_PROOF'
-  | 'PENDING_REVIEW'
-  | 'CONCILIADO'
-  | 'LANCADO'
-  | 'REJEITADO'
-  | 'CADASTRO_PENDENTE';
+  | "AWAITING_PROOF"
+  | "PENDING_REVIEW"
+  | "CONCILIADO"
+  | "LANCADO"
+  | "REJEITADO"
+  | "CADASTRO_PENDENTE";
 
 export type FinanceInstallment = {
   id: string;
@@ -125,14 +132,16 @@ export type FinanceInstallment = {
   created_at: string;
   reviewed_at: string | null;
   reviewed_by: string | null;
-  os_orders?: Pick<OsOrder, 'id' | 'sale_number' | 'client_name' | 'created_at'> | null;
+  os_orders?: Pick<
+    OsOrder,
+    "id" | "sale_number" | "client_name" | "created_at"
+  > | null;
   os_order_assets?: {
     id: string;
     object_path: string;
     original_name: string | null;
   } | null;
 };
-
 
 export type InstallationFeedback = {
   id: string;
