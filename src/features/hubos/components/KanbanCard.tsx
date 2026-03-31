@@ -132,7 +132,7 @@ export default function KanbanCard({
           deliveryDate,
         });
   const slaOrderBase =
-    artDirectionTag && createdAt
+    !prodStatus && artDirectionTag && createdAt
       ? { art_direction_tag: artDirectionTag, created_at: createdAt }
       : null;
   const designerSlaState = slaOrderBase
