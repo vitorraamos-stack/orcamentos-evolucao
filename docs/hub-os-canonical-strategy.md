@@ -11,6 +11,13 @@
 ## Dívida remanescente
 Algumas telas de board ainda escrevem na tabela `os`. Nesta fase, mantemos compatibilidade para evitar quebra operacional.
 
+## Endpoint de otimização
+`/api/hub-os/optimize-installations` permanece síncrono por compatibilidade operacional, porém com:
+- validação rígida de payload;
+- limites conservadores de lote;
+- timeout explícito nas chamadas ORS;
+- fallback local controlado quando ORS falha.
+
 ## Cutover futuro
 - Migrar mutações de `src/modules/hub-os/pages/*` para APIs canônicas.
 - Manter fallback de leitura até validação pós-cutover.

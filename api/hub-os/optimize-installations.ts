@@ -68,6 +68,11 @@ function isValidDate(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+function isParsableIsoDate(value: string) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 function haversineDistanceKm(a: [number, number], b: [number, number]) {
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const [lon1, lat1] = a;
@@ -176,6 +181,10 @@ function parseRequestBody(
   body: unknown
 ): Required<Omit<OptimizePayload, "startAddress" | "startCoords">> &
   Pick<OptimizePayload, "startAddress" | "startCoords"> {
+  if (body !== null && typeof body !== "string" && typeof body !== "object") {
+    throw new InputValidationError("Payload inválido. Envie um objeto JSON.");
+  }
+
   const payload = (
     typeof body === "string" ? JSON.parse(body || "{}") : body || {}
   ) as OptimizePayload;
@@ -183,14 +192,14 @@ function parseRequestBody(
   if (
     payload.dateFrom !== undefined &&
     payload.dateFrom !== null &&
-    !isValidDate(payload.dateFrom)
+    (!isValidDate(payload.dateFrom) || !isParsableIsoDate(payload.dateFrom))
   ) {
-    throw new Error("dateFrom inválida. Use YYYY-MM-DD.");
+    throw new InputValidationError("dateFrom inválida. Use YYYY-MM-DD.");
   }
   if (
     payload.dateTo !== undefined &&
     payload.dateTo !== null &&
-    !isValidDate(payload.dateTo)
+    (!isValidDate(payload.dateTo) || !isParsableIsoDate(payload.dateTo))
   ) {
     throw new InputValidationError("dateTo inválida. Use YYYY-MM-DD.");
   }
@@ -202,11 +211,18 @@ function parseRequestBody(
   const dateWindowDays = Number(payload.dateWindowDays ?? 1);
   const geoClusterRadiusKm = Number(payload.geoClusterRadiusKm ?? 5);
   const maxStopsPerRoute = Number(payload.maxStopsPerRoute ?? 20);
+  if (payload.orderIds !== undefined && payload.orderIds !== null && !Array.isArray(payload.orderIds)) {
+    throw new InputValidationError("orderIds inválido. Use array de strings.");
+  }
+
+  if (payload.startAddress !== undefined && payload.startAddress !== null && typeof payload.startAddress !== "string") {
+    throw new InputValidationError("startAddress inválido. Use string.");
+  }
+
   const orderIds = Array.isArray(payload.orderIds)
-    ? payload.orderIds.filter(
-        (value): value is string =>
-          typeof value === "string" && value.trim().length > 0
-      )
+    ? payload.orderIds
+        .map((value) => (typeof value === "string" ? value.trim() : ""))
+        .filter((value) => value.length > 0)
     : null;
 
   if (!Number.isFinite(dateWindowDays) || dateWindowDays < 0 || dateWindowDays > MAX_DATE_WINDOW_DAYS) {
@@ -248,6 +264,13 @@ function parseRequestBody(
       !payload.startCoords.every((value) => Number.isFinite(value)))
   ) {
     throw new InputValidationError("startCoords inválido. Use [longitude, latitude].");
+  }
+
+  if (payload.startCoords) {
+    const [lng, lat] = payload.startCoords;
+    if (lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+      throw new InputValidationError("startCoords fora do intervalo permitido de longitude/latitude.");
+    }
   }
 
   return {
@@ -626,7 +649,11 @@ export default async function handler(req: any, res: any) {
   if (!resolvedStartCoords && parsed.startAddress) {
     try {
       resolvedStartCoords = await geocodeORS(parsed.startAddress, orsApiKey, null);
-    } catch {
+    } catch (error) {
+      console.warn("[hub-os/optimize-installations] start geocode failed", {
+        stage: "geocode_start",
+        message: error instanceof Error ? error.message : "unknown",
+      });
       return json(res, 400, {
         stage: "geocode",
         error: "Não foi possível geocodificar o ponto de partida informado.",
@@ -831,14 +858,23 @@ export default async function handler(req: any, res: any) {
             ...stops.map(stop => stop.coords),
           ];
 
-          const directionsSummary =
-            optimized.summary.distance_m !== null && optimized.summary.duration_s !== null
-              ? optimized.summary
-              : await fetchDirectionsSummary(
-                  directionsCoordinates,
-                  parsed.profile,
-                  orsApiKey
-                );
+          let directionsSummary: { distance_m: number | null; duration_s: number | null } | null = null;
+          if (optimized.summary.distance_m !== null && optimized.summary.duration_s !== null) {
+            directionsSummary = optimized.summary;
+          } else {
+            try {
+              directionsSummary = await fetchDirectionsSummary(
+                directionsCoordinates,
+                parsed.profile,
+                orsApiKey
+              );
+            } catch (error) {
+              console.warn("[hub-os/optimize-installations] directions summary failed", {
+                stage: "directions_summary",
+                message: error instanceof Error ? error.message : "unknown",
+              });
+            }
+          }
 
           groupRoutes.push({
             routeId: `${groupId}#${routeIndex + 1}`,

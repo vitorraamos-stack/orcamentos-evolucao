@@ -14,44 +14,8 @@ const jsonResponse = (status: number, body: Record<string, unknown>) =>
     headers: { 'Content-Type': 'application/json', ...corsHeaders },
   });
 
-const parseClaimsHeader = (request: Request) => {
-  const claimsRaw = request.headers.get('x-jwt-claims') ?? request.headers.get('x-supabase-auth');
-  if (!claimsRaw) {
-    return null;
-  }
-
-  try {
-    const claims = JSON.parse(claimsRaw) as { sub?: string };
-    return claims.sub ?? null;
-  } catch {
-    return null;
-  }
-};
-
-const extractGatewayUserId = (request: Request) => {
-  return (
-    request.headers.get('x-supabase-auth-user') ??
-    request.headers.get('x-supabase-auth-user-id') ??
-    request.headers.get('x-supabase-user') ??
-    request.headers.get('x-supabase-user-id') ??
-    request.headers.get('x-sb-user-id') ??
-    request.headers.get('x-sb-user') ??
-    request.headers.get('x-sb-auth-user') ??
-    request.headers.get('x-sb-auth-user-id') ??
-    parseClaimsHeader(request)
-  );
-};
-
 const extractBearerToken = (request: Request) => {
-  const possibleAuthHeaders = [
-    request.headers.get('authorization'),
-    request.headers.get('Authorization'),
-    request.headers.get('x-forwarded-authorization'),
-    request.headers.get('x-supabase-authorization'),
-    request.headers.get('x-supabase-auth-token'),
-    request.headers.get('x-sb-authorization'),
-    request.headers.get('x-sb-auth-token'),
-  ];
+  const possibleAuthHeaders = [request.headers.get('authorization'), request.headers.get('Authorization')];
 
   for (const value of possibleAuthHeaders) {
     if (!value) continue;
@@ -59,46 +23,21 @@ const extractBearerToken = (request: Request) => {
     if (/^bearer\s+/i.test(trimmed)) {
       return trimmed.replace(/^bearer\s+/i, '').trim();
     }
-    if (trimmed.split('.').length === 3) {
-      return trimmed;
-    }
   }
 
   return null;
 };
 
-const decodeJwtSubject = (token: string) => {
-  const parts = token.split('.');
-  if (parts.length < 2) {
-    return null;
-  }
-  try {
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))) as { sub?: string };
-    return payload.sub ?? null;
-  } catch {
-    return null;
-  }
-};
-
 const requireUser = async (request: Request) => {
   const token = extractBearerToken(request);
-  const gatewayUserId = extractGatewayUserId(request);
   console.log('[r2-health] auth context', {
     method: request.method,
     hasToken: Boolean(token),
-    hasGatewayUserId: Boolean(gatewayUserId),
     hasAuthorizationHeader: Boolean(request.headers.get('authorization') || request.headers.get('Authorization')),
-    hasForwardedAuthorization: Boolean(request.headers.get('x-forwarded-authorization')),
-    hasSupabaseAuthToken: Boolean(request.headers.get('x-supabase-auth-token')),
     hasApiKeyHeader: Boolean(request.headers.get('apikey')),
   });
 
   if (!token) {
-    if (gatewayUserId) {
-      console.log('[r2-health] fallback to gateway user id (no token)', { userId: gatewayUserId });
-      return { user: { id: gatewayUserId } };
-    }
-
     console.error('[r2-health] missing Authorization bearer token');
     return { error: jsonResponse(401, { error: 'Unauthorized: missing Authorization Bearer token' }) };
   }
@@ -121,20 +60,10 @@ const requireUser = async (request: Request) => {
 
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data?.user) {
-    const decodedSubject = decodeJwtSubject(token);
     console.error('[r2-health] getUser failed', {
       reason: error?.message ?? 'user-not-found',
       status: error?.status,
-      hasDecodedSubject: Boolean(decodedSubject),
     });
-    if (gatewayUserId) {
-      console.log('[r2-health] fallback to gateway user id', { userId: gatewayUserId });
-      return { user: { id: gatewayUserId } };
-    }
-    if (decodedSubject) {
-      console.log('[r2-health] fallback to decoded jwt subject', { userId: decodedSubject });
-      return { user: { id: decodedSubject } };
-    }
     return { error: jsonResponse(401, { error: 'Invalid JWT' }) };
   }
 
@@ -162,7 +91,10 @@ Deno.serve(async (request) => {
     const accountId = Deno.env.get('R2_ACCOUNT_ID');
     const accessKeyId = Deno.env.get('R2_ACCESS_KEY_ID');
     const secretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY');
-    const bucket = Deno.env.get('R2_BUCKET') || 'os-artes';
+    const bucket = Deno.env.get('R2_BUCKET');
+    if (!bucket) {
+      return jsonResponse(500, { error: 'R2_BUCKET não configurado.' });
+    }
 
     return jsonResponse(200, {
       ok: true,

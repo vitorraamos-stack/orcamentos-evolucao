@@ -13,6 +13,7 @@
 
 ## 3) R2 / Hub OS
 - Validar upload/download/delete em OS real de homologação.
+- Confirmar que payload com `bucket` é rejeitado (400) nas três Edge Functions.
 - Confirmar que comprovantes (`Financeiro/Comprovante` e `payment_proofs`) não podem ser removidos pela função de delete.
 - Validar que usuários sem módulo `hub_os` recebem 403 nas funções R2.
 

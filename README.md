@@ -31,15 +31,21 @@ Sistema web para cálculo de orçamentos de comunicação visual, desenvolvido c
 Crie um arquivo `.env` (use `.env.example` como base) e preencha:
 
 ```env
+# Front-end (Vite)
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
 VITE_OS_FOLDER_BASE=\\\\servidor-pc\\...\\A_Z
+VITE_FRONTEND_FORGE_API_KEY=...
+VITE_FRONTEND_FORGE_API_URL=...
+VITE_OAUTH_PORTAL_URL=...
+VITE_APP_ID=...
 ```
 
 > Para **gestão de usuários** (criar/excluir) via **Vercel API**, configure também no painel da Vercel:
 
 - `SUPABASE_URL` (pode ser a mesma do `VITE_SUPABASE_URL`)
 - `SUPABASE_SERVICE_ROLE_KEY` (NUNCA exponha essa chave no front-end)
+- `ORS_API_KEY` (usada em `/api/hub-os/optimize-installations`)
 
 ### 3) Instalação e execução
 
@@ -59,7 +65,8 @@ npm ci
 npm run verify:prod
 ```
 
-O workflow de CI (`.github/workflows/ci.yml`) executa `npm ci`, `npm run check`, `npm run test` e `npm run build`.
+O workflow de CI (`.github/workflows/ci.yml`) executa `npm ci` e `npm run verify:prod`.
+O contrato canônico é `npm run verify:prod` (que executa check + test + build).
 
 ## Deploy (Vercel)
 
@@ -159,8 +166,7 @@ supabase secrets set \
   R2_ACCOUNT_ID=... \
   R2_ACCESS_KEY_ID=... \
   R2_SECRET_ACCESS_KEY=... \
-  R2_BUCKET=os-artes \
-  ORS_API_KEY=...
+  R2_BUCKET=os-artes
 ```
 
 5. Publique as funções:
@@ -179,6 +185,7 @@ supabase functions deploy optimize-installation-route
    - Chave `ORS_API_KEY` fica apenas no servidor (sem prefixo `VITE_`).
 
 > As funções exigem usuário autenticado (JWT) e geram URLs pré-assinadas com expiração curta (10 min).
+> As funções **não aceitam** `bucket` enviado pelo cliente; o bucket é sempre lido do segredo `R2_BUCKET`.
 
 ### Diagnóstico rápido (R2/Edge Functions)
 
@@ -217,6 +224,8 @@ supabase functions deploy optimize-installation-route
 
 ## Operação em produção
 
+- Runtime canônico web/serverless: **Vercel**.
+- `netlify.toml` é legado e não deve ser removido sem plano explícito de descontinuação.
 - Modelo de autorização e módulos: `docs/production-auth-model.md`.
 - Bootstrap seguro do primeiro gerente: `docs/auth-bootstrap-first-manager.md`.
 - Fluxo de Materiais (storage + RPC transacional): `docs/materials-production-flow.md`.
