@@ -44,11 +44,22 @@ VITE_OS_FOLDER_BASE=\\\\servidor-pc\\...\\A_Z
 ### 3) Instalação e execução
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
 ---
+
+## Validação local e CI
+
+Validação mínima de produção:
+
+```bash
+npm ci
+npm run verify:prod
+```
+
+O workflow de CI (`.github/workflows/ci.yml`) executa `npm ci`, `npm run check`, `npm run test` e `npm run build`.
 
 ## Deploy (Vercel)
 
@@ -57,6 +68,7 @@ npm run dev
    - Front-end: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
    - Serverless (API): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
 3. O build é `npm run build` e o output é `dist/`.
+4. Validação de produção obrigatória antes de release: `npm run verify:prod`.
 
 > Rotas SPA já estão configuradas no `vercel.json`.
 
@@ -210,3 +222,4 @@ supabase functions deploy optimize-installation-route
 - Fluxo de Materiais (storage + RPC transacional): `docs/materials-production-flow.md`.
 - Estratégia canônica do Hub OS e compatibilidade legado: `docs/hub-os-canonical-strategy.md`.
 - Deploy, rollback e contingência: `docs/deploy-and-rollback.md`.
+- Checklist operacional de go-live: `docs/go-live-checklist.md`.

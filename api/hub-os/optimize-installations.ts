@@ -31,6 +31,21 @@ type GeocodedStop = {
 };
 
 const ORS_BASE_URL = "https://api.openrouteservice.org";
+const ORS_TIMEOUT_MS = 15000;
+const MAX_ORDER_IDS = 200;
+const MAX_CANDIDATES = 300;
+const MAX_DATE_WINDOW_DAYS = 14;
+const MAX_GEO_CLUSTER_RADIUS_KM = 80;
+const MAX_STOPS_PER_ROUTE = 30;
+const MIN_GEO_CLUSTER_RADIUS_KM = 0.1;
+const MIN_MAX_STOPS_PER_ROUTE = 1;
+
+class InputValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InputValidationError";
+  }
+}
 
 const normalizeRole = (role?: string | null) => {
   if (!role) return null;
@@ -177,20 +192,90 @@ function parseRequestBody(
     payload.dateTo !== null &&
     !isValidDate(payload.dateTo)
   ) {
-    throw new Error("dateTo inválida. Use YYYY-MM-DD.");
+    throw new InputValidationError("dateTo inválida. Use YYYY-MM-DD.");
+  }
+
+  if (payload.dateFrom && payload.dateTo && payload.dateFrom > payload.dateTo) {
+    throw new InputValidationError("dateFrom deve ser menor ou igual a dateTo.");
+  }
+
+  const dateWindowDays = Number(payload.dateWindowDays ?? 1);
+  const geoClusterRadiusKm = Number(payload.geoClusterRadiusKm ?? 5);
+  const maxStopsPerRoute = Number(payload.maxStopsPerRoute ?? 20);
+  const orderIds = Array.isArray(payload.orderIds)
+    ? payload.orderIds.filter(
+        (value): value is string =>
+          typeof value === "string" && value.trim().length > 0
+      )
+    : null;
+
+  if (!Number.isFinite(dateWindowDays) || dateWindowDays < 0 || dateWindowDays > MAX_DATE_WINDOW_DAYS) {
+    throw new InputValidationError(
+      `dateWindowDays inválido. Use valor entre 0 e ${MAX_DATE_WINDOW_DAYS}.`
+    );
+  }
+
+  if (
+    !Number.isFinite(geoClusterRadiusKm) ||
+    geoClusterRadiusKm < MIN_GEO_CLUSTER_RADIUS_KM ||
+    geoClusterRadiusKm > MAX_GEO_CLUSTER_RADIUS_KM
+  ) {
+    throw new InputValidationError(
+      `geoClusterRadiusKm inválido. Use valor entre ${MIN_GEO_CLUSTER_RADIUS_KM} e ${MAX_GEO_CLUSTER_RADIUS_KM}.`
+    );
+  }
+
+  if (
+    !Number.isFinite(maxStopsPerRoute) ||
+    maxStopsPerRoute < MIN_MAX_STOPS_PER_ROUTE ||
+    maxStopsPerRoute > MAX_STOPS_PER_ROUTE
+  ) {
+    throw new InputValidationError(
+      `maxStopsPerRoute inválido. Use valor entre ${MIN_MAX_STOPS_PER_ROUTE} e ${MAX_STOPS_PER_ROUTE}.`
+    );
+  }
+
+  if (orderIds && orderIds.length > MAX_ORDER_IDS) {
+    throw new InputValidationError(
+      `orderIds excede o limite de ${MAX_ORDER_IDS} itens. Filtre por data ou envie lotes menores.`
+    );
+  }
+
+  if (
+    payload.startCoords &&
+    (!Array.isArray(payload.startCoords) ||
+      payload.startCoords.length !== 2 ||
+      !payload.startCoords.every((value) => Number.isFinite(value)))
+  ) {
+    throw new InputValidationError("startCoords inválido. Use [longitude, latitude].");
   }
 
   return {
     dateFrom: payload.dateFrom ?? null,
     dateTo: payload.dateTo ?? null,
-    dateWindowDays: Number(payload.dateWindowDays ?? 1),
-    geoClusterRadiusKm: Number(payload.geoClusterRadiusKm ?? 5),
-    maxStopsPerRoute: Number(payload.maxStopsPerRoute ?? 20),
+    dateWindowDays,
+    geoClusterRadiusKm,
+    maxStopsPerRoute,
     startAddress: payload.startAddress ?? null,
     startCoords: payload.startCoords ?? null,
     profile: "driving-car",
-    orderIds: Array.isArray(payload.orderIds) ? payload.orderIds.filter((value): value is string => typeof value === "string" && value.trim().length > 0) : null,
+    orderIds,
   };
+}
+
+async function fetchWithTimeout(input: string, init: RequestInit, timeoutMs = ORS_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`Request timeout after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function requireAdminAuth(req: any, res: any, supabaseAdmin: any) {
@@ -200,7 +285,7 @@ async function requireAdminAuth(req: any, res: any, supabaseAdmin: any) {
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
 
   if (!token) {
-    json(res, 401, { error: "Token não fornecido." });
+    json(res, 401, { stage: "auth", error: "Token não fornecido." });
     return null;
   }
 
@@ -208,7 +293,7 @@ async function requireAdminAuth(req: any, res: any, supabaseAdmin: any) {
     await supabaseAdmin.auth.getUser(token);
   const user = userData?.user;
   if (authError || !user) {
-    json(res, 401, { error: "Usuário não autenticado." });
+    json(res, 401, { stage: "auth", error: "Usuário não autenticado." });
     return null;
   }
 
@@ -219,14 +304,14 @@ async function requireAdminAuth(req: any, res: any, supabaseAdmin: any) {
     .maybeSingle();
 
   if (profileError) {
-    json(res, 403, { error: "Não foi possível validar permissões." });
+    json(res, 403, { stage: "auth", error: "Não foi possível validar permissões." });
     return null;
   }
 
   const profileRole =
     (profile as { role?: string | null } | null)?.role ?? null;
   if (normalizeRole(profileRole) !== "gerente") {
-    json(res, 403, { error: "Acesso negado. Apenas gerente." });
+    json(res, 403, { stage: "auth", error: "Acesso negado. Apenas gerente." });
     return null;
   }
 
@@ -256,7 +341,7 @@ async function geocodeORS(
       url.searchParams.set("focus.point.lat", String(focusCoords[1]));
     }
 
-    const response = await fetch(url.toString());
+    const response = await fetchWithTimeout(url.toString(), { method: "GET" });
     if (!response.ok) {
       throw new Error(`ORS geocode failed (${response.status})`);
     }
@@ -425,7 +510,7 @@ async function optimizeWithORS(
   const url = new URL(`${ORS_BASE_URL}/optimization`);
   url.searchParams.set("api_key", orsApiKey);
 
-  const response = await fetch(url.toString(), {
+  const response = await fetchWithTimeout(url.toString(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -481,7 +566,7 @@ async function fetchDirectionsSummary(
   const url = new URL(`${ORS_BASE_URL}/v2/directions/${profile}`);
   url.searchParams.set('api_key', orsApiKey);
 
-  const response = await fetch(url.toString(), {
+  const response = await fetchWithTimeout(url.toString(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -532,6 +617,7 @@ export default async function handler(req: any, res: any) {
     parsed = parseRequestBody(req.body);
   } catch (error) {
     return json(res, 400, {
+      stage: "input",
       error: error instanceof Error ? error.message : "Payload inválido.",
     });
   }
@@ -542,6 +628,7 @@ export default async function handler(req: any, res: any) {
       resolvedStartCoords = await geocodeORS(parsed.startAddress, orsApiKey, null);
     } catch {
       return json(res, 400, {
+        stage: "geocode",
         error: "Não foi possível geocodificar o ponto de partida informado.",
       });
     }
@@ -565,10 +652,16 @@ export default async function handler(req: any, res: any) {
 
     const { data: rows, error: queryError } = await query;
     if (queryError) {
-      return json(res, 500, { error: queryError.message });
+      return json(res, 500, { stage: "db_query", error: queryError.message });
     }
 
     const orders = (rows ?? []) as OsCandidate[];
+    if (orders.length > MAX_CANDIDATES) {
+      return json(res, 422, {
+        stage: "input",
+        error: `Consulta retornou ${orders.length} OS. Limite de ${MAX_CANDIDATES} por chamada. Filtre por data/OS.`,
+      });
+    }
     const geocodeCache = new Map<string, [number, number]>();
     const geocoded: GeocodedStop[] = [];
     const unassigned: Array<{ os_id: string; reason: string }> = [];
@@ -606,7 +699,7 @@ export default async function handler(req: any, res: any) {
         const coords = await geocodeORS(address, orsApiKey, resolvedStartCoords);
         geocodeCache.set(address, coords);
 
-        await supabaseAdmin
+        const { error: updateGeocodeError } = await supabaseAdmin
           .from("os_orders")
           .update({
             address_lat: coords[1],
@@ -615,6 +708,13 @@ export default async function handler(req: any, res: any) {
             address_geocode_provider: "openrouteservice",
           })
           .eq("id", order.id);
+        if (updateGeocodeError) {
+          console.warn("[hub-os/optimize-installations] geocode cache update failed", {
+            stage: "db_update",
+            osId: order.id,
+            message: updateGeocodeError.message,
+          });
+        }
 
         return coords;
       } catch {
@@ -767,7 +867,7 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    await supabaseAdmin.from("os_orders_event").insert({
+    const { error: eventError } = await supabaseAdmin.from("os_orders_event").insert({
       os_id: geocoded[0]?.os.id ?? orders[0]?.id,
       type: "route_optimized",
       created_by: currentUser.id,
@@ -780,6 +880,12 @@ export default async function handler(req: any, res: any) {
         routes: totalRoutes,
       },
     });
+    if (eventError) {
+      console.warn("[hub-os/optimize-installations] route_optimized event insert failed", {
+        stage: "db_update",
+        message: eventError.message,
+      });
+    }
 
     const elapsedMs = Date.now() - startedAt;
     console.log("[hub-os/optimize-installations]", {
@@ -805,7 +911,7 @@ export default async function handler(req: any, res: any) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro inesperado.";
-    return json(res, 502, { error: `Falha na otimização ORS: ${message}` });
+    return json(res, 502, { stage: "optimization", error: `Falha na otimização ORS: ${message}` });
   }
 }
 
