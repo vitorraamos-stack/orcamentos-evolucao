@@ -50,6 +50,7 @@ import {
 import { selectProntoAvisarOrders } from "@/features/hubos/selectors";
 import { buildHubOrderFlowKeyFromOsOrdersId } from "@/modules/hub-os/order-flow-key";
 import { useGlobalOrderFlowState } from "@/modules/hub-os/order-flow-state";
+import { resolveDeliveryDate } from "@/features/hubos/deliveryDeadline";
 
 const defaultFilters: HubOsFilters = {
   search: "",
@@ -924,10 +925,25 @@ export default function HubOS() {
     const inCreationStatus = ART_COLUMNS[1];
     const previous = order;
     const shouldInitProd = nextStatus === "Produzir" && !order.prod_status;
+    const shouldStartDeliveryDeadline =
+      nextStatus === "Produzir" && !order.delivery_deadline_started_at;
+    const startAt = shouldStartDeliveryDeadline
+      ? new Date().toISOString()
+      : order.delivery_deadline_started_at;
+    const resolvedDeliveryDate = resolveDeliveryDate({
+      preset: order.delivery_deadline_preset,
+      startedAt: startAt,
+      manualDate: order.delivery_date,
+    });
     const optimistic = {
       ...order,
       art_status: nextStatus,
       prod_status: shouldInitProd ? "Produção" : order.prod_status,
+      delivery_deadline_started_at: startAt,
+      delivery_date:
+        order.delivery_deadline_preset === "CUSTOM"
+          ? order.delivery_date
+          : resolvedDeliveryDate,
     } satisfies OsOrder;
 
     updateLocalOrder(optimistic);
@@ -936,6 +952,15 @@ export default function HubOS() {
       const updated = await updateOrder(order.id, {
         art_status: nextStatus,
         prod_status: shouldInitProd ? "Produção" : order.prod_status,
+        delivery_deadline_started_at: shouldStartDeliveryDeadline
+          ? startAt
+          : order.delivery_deadline_started_at,
+        delivery_date:
+          order.delivery_deadline_preset === "CUSTOM"
+            ? order.delivery_date
+            : nextStatus === "Produzir"
+              ? resolvedDeliveryDate
+              : order.delivery_date,
         updated_at: new Date().toISOString(),
         updated_by: user?.id ?? null,
       });
@@ -1446,6 +1471,11 @@ export default function HubOS() {
                       }
                       clientName={order.client_name}
                       deliveryDate={order.delivery_date}
+                      deliveryDeadlinePreset={order.delivery_deadline_preset}
+                      deliveryDeadlineStartedAt={
+                        order.delivery_deadline_started_at
+                      }
+                      createdAt={order.created_at}
                       logisticType={order.logistic_type}
                       reproducao={order.reproducao}
                       letraCaixa={order.letra_caixa}
