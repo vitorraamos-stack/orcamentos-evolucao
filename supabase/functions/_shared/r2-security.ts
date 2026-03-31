@@ -1,7 +1,11 @@
 import { createClient, type User } from 'npm:@supabase/supabase-js';
+import {
+  extractOrderIdFromR2ScopedKey,
+  isValidOrderId,
+  validateR2ScopedKey,
+} from './r2-key-scope.ts';
 
 const HUB_OS_MODULE_KEY = 'hub_os';
-const KEY_CONTROL_CHAR_REGEX = /[\x00-\x1F\x7F]/;
 
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,6 +23,8 @@ export type ApiErrorCode =
   | 'invalid_input'
   | 'server_config'
   | 'unexpected_error';
+
+type SupabaseAuthClient = ReturnType<typeof createClient>;
 
 export const jsonResponse = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), {
@@ -91,7 +97,7 @@ const getSupabaseServiceClient = () => {
 export const requireAuthenticatedHubOsUser = async (
   request: Request,
   scope: string,
-): Promise<{ user?: User; error?: Response }> => {
+): Promise<{ user?: User; token?: string; authClient?: SupabaseAuthClient; error?: Response }> => {
   const token = extractBearerToken(request);
   if (!token) {
     return {
@@ -104,9 +110,10 @@ export const requireAuthenticatedHubOsUser = async (
   }
 
   let user: User | null = null;
+  let authClient: SupabaseAuthClient | null = null;
   try {
-    const supabase = getSupabaseAuthClient(token);
-    const { data, error } = await supabase.auth.getUser(token);
+    authClient = getSupabaseAuthClient(token);
+    const { data, error } = await authClient.auth.getUser(token);
     if (error || !data?.user) {
       infoLog(scope, 'auth_invalid_token', { reason: error?.message ?? 'user-not-found' });
       return { error: errorResponse(401, 'unauthorized', 'JWT inválido ou expirado.') };
@@ -151,7 +158,7 @@ export const requireAuthenticatedHubOsUser = async (
     }
 
     infoLog(scope, 'auth_ok', { userId: user.id });
-    return { user };
+    return { user, token, authClient };
   } catch (error) {
     errorLog(scope, 'module_access_env_missing', {
       message: error instanceof Error ? error.message : 'unknown',
@@ -177,37 +184,37 @@ export const getR2Bucket = (): string => {
 export const validateR2Key = (
   key: unknown,
   allowedPrefixes = ['os_orders/'],
-): { ok: true; value: string } | { ok: false; message: string } => {
-  if (typeof key !== 'string') {
-    return { ok: false, message: 'A chave do objeto deve ser string.' };
+): { ok: true; value: string } | { ok: false; message: string } =>
+  validateR2ScopedKey(key, allowedPrefixes);
+
+export const extractOrderIdFromR2Key = (key: string): string => extractOrderIdFromR2ScopedKey(key);
+
+export const authorizeR2OrderScope = async (
+  authClient: SupabaseAuthClient,
+  orderIds: string[],
+): Promise<{ ok: true } | { ok: false; unauthorizedOrderIds: string[] }> => {
+  const uniqueOrderIds = Array.from(new Set(orderIds.filter((orderId) => isValidOrderId(orderId))));
+  if (uniqueOrderIds.length === 0) {
+    return { ok: false, unauthorizedOrderIds: orderIds };
   }
 
-  const value = key.trim();
-  if (value.length === 0 || value.length > 1024) {
-    return { ok: false, message: 'A chave do objeto é obrigatória e deve ter até 1024 caracteres.' };
+  const { data, error } = await authClient
+    .from('os_orders')
+    .select('id')
+    .in('id', uniqueOrderIds);
+
+  if (error) {
+    throw new Error(`order_scope_query_failed:${error.message}`);
   }
 
-  if (value !== key) {
-    return { ok: false, message: 'A chave do objeto não pode conter espaços extras no início/fim.' };
+  const authorizedIds = new Set((data ?? []).map((row) => row.id as string));
+  const unauthorizedOrderIds = uniqueOrderIds.filter((orderId) => !authorizedIds.has(orderId));
+
+  if (unauthorizedOrderIds.length > 0) {
+    return { ok: false, unauthorizedOrderIds };
   }
 
-  if (!allowedPrefixes.some((prefix) => value.startsWith(prefix))) {
-    return { ok: false, message: 'Prefixo de chave não permitido.' };
-  }
-
-  if (value.includes('..')) {
-    return { ok: false, message: 'A chave do objeto não pode conter ..' };
-  }
-
-  if (KEY_CONTROL_CHAR_REGEX.test(value)) {
-    return { ok: false, message: 'A chave do objeto contém caracteres de controle inválidos.' };
-  }
-
-  if (value.includes('\\') || value.includes('//') || value.endsWith('/') || value.startsWith('/')) {
-    return { ok: false, message: 'A chave do objeto possui path malformado.' };
-  }
-
-  return { ok: true, value };
+  return { ok: true };
 };
 
 export const rejectOrIgnoreBucket = (scope: string, providedBucket: unknown): Response | null => {

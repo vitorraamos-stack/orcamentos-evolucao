@@ -2,6 +2,11 @@
   "name": "evolucao-orcamentos",
   "version": "1.0.0",
   "type": "module",
+  "packageManager": "npm@10.9.0",
+  "engines": {
+    "node": "22.x",
+    "npm": ">=10 <12"
+  },
   "license": "MIT",
   "scripts": {
     "dev": "vite",
