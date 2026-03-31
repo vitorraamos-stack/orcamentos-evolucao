@@ -1,13 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildGoogleMapsUrl,
   buildOptimizationPayload,
   clusterByGeoRadius,
+  fetchWithTimeout,
   haversineDistanceKm,
   normalizeAddress,
+  parseRequestBody,
+  TimeoutExternalError,
 } from "./optimize-installations";
 
 describe("optimize-installations helpers", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("normalizeAddress trims and collapses spaces", () => {
     expect(normalizeAddress("  Rua   A,   123  ")).toBe("Rua A, 123");
   });
@@ -112,5 +119,38 @@ describe("optimize-installations helpers", () => {
     expect(parsed.searchParams.get("api")).toBe("1");
     expect(parsed.searchParams.get("query")).toBe("-23.5505,-46.6333");
     expect(parsed.searchParams.get("waypoints")).toBeNull();
+  });
+
+  it("parseRequestBody rejects payload above max allowed bytes", () => {
+    const giantAddress = "A".repeat(200_000);
+    expect(() =>
+      parseRequestBody({
+        startAddress: giantAddress,
+      })
+    ).toThrow(/Payload excede o limite/);
+  });
+
+  it("parseRequestBody rejects batches above max order limit", () => {
+    const oversized = Array.from({ length: 201 }, (_, index) => `id-${index}`);
+    expect(() =>
+      parseRequestBody({
+        orderIds: oversized,
+      })
+    ).toThrow(/excede o limite/);
+  });
+
+  it("fetchWithTimeout throws TimeoutExternalError on abort", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        init?.signal?.dispatchEvent(new Event("abort"));
+        const abortError = new Error("aborted");
+        abortError.name = "AbortError";
+        throw abortError;
+      }
+    );
+
+    await expect(fetchWithTimeout("https://example.com", { method: "GET" }, 1)).rejects.toBeInstanceOf(
+      TimeoutExternalError
+    );
   });
 });

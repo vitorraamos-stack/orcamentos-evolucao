@@ -274,7 +274,6 @@ export const uploadAssetsForOrder = async ({
         if (deletablePaths.length > 0) {
           await invokeEdgeFunction<void>(supabase, "r2-delete-objects", {
             keys: deletablePaths,
-            bucket: ASSET_BUCKET,
           });
           await supabase
             .from("os_order_assets")
@@ -478,7 +477,6 @@ export const uploadFinancialDocsForOrder = async ({
         if (deletablePaths.length > 0) {
           await invokeEdgeFunction<void>(supabase, "r2-delete-objects", {
             keys: deletablePaths,
-            bucket: ASSET_BUCKET,
           });
           await supabase
             .from("os_order_assets")

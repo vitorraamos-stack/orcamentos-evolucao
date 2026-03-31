@@ -1,9 +1,11 @@
 import { PutObjectCommand, S3Client } from 'npm:@aws-sdk/client-s3';
 import { getSignedUrl } from 'npm:@aws-sdk/s3-request-presigner';
 import {
+  authorizeR2OrderScope,
   corsHeaders,
   errorLog,
   errorResponse,
+  extractOrderIdFromR2Key,
   getR2Bucket,
   infoLog,
   jsonResponse,
@@ -44,6 +46,9 @@ Deno.serve(async (request) => {
 
     const auth = await requireAuthenticatedHubOsUser(request, SCOPE);
     if (auth.error) return auth.error;
+    if (!auth.authClient) {
+      return errorResponse(500, 'server_config', 'Cliente de autenticação indisponível.');
+    }
 
     let payload: PresignPayload;
     try {
@@ -58,6 +63,23 @@ Deno.serve(async (request) => {
     const keyValidation = validateR2Key(payload.key);
     if (!keyValidation.ok) {
       return errorResponse(400, 'invalid_input', keyValidation.message);
+    }
+    const orderId = extractOrderIdFromR2Key(keyValidation.value);
+    try {
+      const scopeCheck = await authorizeR2OrderScope(auth.authClient, [orderId]);
+      if (!scopeCheck.ok) {
+        infoLog(SCOPE, 'order_scope_forbidden', {
+          userId: auth.user?.id,
+          unauthorizedOrderIds: scopeCheck.unauthorizedOrderIds,
+        });
+        return errorResponse(403, 'forbidden', 'Sem permissão para acessar o objeto solicitado.');
+      }
+    } catch (error) {
+      errorLog(SCOPE, 'order_scope_query_error', {
+        userId: auth.user?.id,
+        message: error instanceof Error ? error.message : 'unknown',
+      });
+      return errorResponse(403, 'forbidden', 'Não foi possível validar escopo de acesso ao objeto.');
     }
 
     if (!payload.contentType || !ALLOWED_CONTENT_TYPES.has(payload.contentType)) {
@@ -100,7 +122,11 @@ Deno.serve(async (request) => {
 
     const expiresIn = 600;
     const uploadUrl = await getSignedUrl(client, command, { expiresIn });
-    infoLog(SCOPE, 'presign_ok', { userId: auth.user?.id, keyPrefix: keyValidation.value.split('/').slice(0, 2).join('/') });
+    infoLog(SCOPE, 'presign_ok', {
+      userId: auth.user?.id,
+      orderId,
+      keyPrefix: keyValidation.value.split('/').slice(0, 2).join('/'),
+    });
 
     return jsonResponse(200, {
       ok: true,

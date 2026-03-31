@@ -32,6 +32,7 @@ type GeocodedStop = {
 
 const ORS_BASE_URL = "https://api.openrouteservice.org";
 const ORS_TIMEOUT_MS = 15000;
+const MAX_REQUEST_BODY_BYTES = 128 * 1024;
 const MAX_ORDER_IDS = 200;
 const MAX_CANDIDATES = 300;
 const MAX_DATE_WINDOW_DAYS = 14;
@@ -47,6 +48,24 @@ class InputValidationError extends Error {
   }
 }
 
+class TimeoutExternalError extends Error {
+  stage: string;
+  constructor(stage: string, message: string) {
+    super(message);
+    this.name = "TimeoutExternalError";
+    this.stage = stage;
+  }
+}
+
+class ExternalServiceError extends Error {
+  stage: string;
+  constructor(stage: string, message: string) {
+    super(message);
+    this.name = "ExternalServiceError";
+    this.stage = stage;
+  }
+}
+
 const normalizeRole = (role?: string | null) => {
   if (!role) return null;
   if (role === "admin") return "gerente";
@@ -58,6 +77,16 @@ function json(res: any, status: number, payload: any) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.end(JSON.stringify(payload));
+}
+
+function resolveBodySizeBytes(body: unknown) {
+  if (typeof body === "string") {
+    return Buffer.byteLength(body, "utf-8");
+  }
+  if (body === null || body === undefined) {
+    return 0;
+  }
+  return Buffer.byteLength(JSON.stringify(body), "utf-8");
 }
 
 function normalizeAddress(address: string) {
@@ -185,6 +214,13 @@ function parseRequestBody(
     throw new InputValidationError("Payload inválido. Envie um objeto JSON.");
   }
 
+  const bodySizeBytes = resolveBodySizeBytes(body);
+  if (bodySizeBytes > MAX_REQUEST_BODY_BYTES) {
+    throw new InputValidationError(
+      `Payload excede o limite de ${MAX_REQUEST_BODY_BYTES} bytes.`
+    );
+  }
+
   const payload = (
     typeof body === "string" ? JSON.parse(body || "{}") : body || {}
   ) as OptimizePayload;
@@ -220,9 +256,13 @@ function parseRequestBody(
   }
 
   const orderIds = Array.isArray(payload.orderIds)
-    ? payload.orderIds
-        .map((value) => (typeof value === "string" ? value.trim() : ""))
-        .filter((value) => value.length > 0)
+    ? Array.from(
+        new Set(
+          payload.orderIds
+            .map((value) => (typeof value === "string" ? value.trim() : ""))
+            .filter((value) => value.length > 0)
+        )
+      )
     : null;
 
   if (!Number.isFinite(dateWindowDays) || dateWindowDays < 0 || dateWindowDays > MAX_DATE_WINDOW_DAYS) {
@@ -293,13 +333,15 @@ async function fetchWithTimeout(input: string, init: RequestInit, timeoutMs = OR
     return await fetch(input, { ...init, signal: controller.signal });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      throw new Error(`Request timeout after ${timeoutMs}ms`);
+      throw new TimeoutExternalError("external", `Request timeout after ${timeoutMs}ms`);
     }
     throw error;
   } finally {
     clearTimeout(timeout);
   }
 }
+
+const getElapsedMs = (startedAt: number) => Date.now() - startedAt;
 
 async function requireAdminAuth(req: any, res: any, supabaseAdmin: any) {
   const authHeader = (req.headers?.authorization ||
@@ -346,6 +388,7 @@ async function geocodeORS(
   orsApiKey: string,
   focusCoords?: [number, number] | null
 ) {
+  const geocodeStartedAt = Date.now();
   const normalized = normalizeAddress(text);
   const queries = [normalized, `${normalized}, Brasil`];
 
@@ -366,7 +409,7 @@ async function geocodeORS(
 
     const response = await fetchWithTimeout(url.toString(), { method: "GET" });
     if (!response.ok) {
-      throw new Error(`ORS geocode failed (${response.status})`);
+      throw new ExternalServiceError("geocode", `ORS geocode failed (${response.status})`);
     }
 
     const data = (await response.json()) as {
@@ -393,9 +436,13 @@ async function geocodeORS(
   }
 
   if (!bestCoords) {
-    throw new Error("ORS geocode did not return coordinates");
+    throw new ExternalServiceError("geocode", "ORS geocode did not return coordinates");
   }
 
+  console.log("[hub-os/optimize-installations]", {
+    stage: "geocode",
+    durationMs: getElapsedMs(geocodeStartedAt),
+  });
   return bestCoords;
 }
 
@@ -527,6 +574,7 @@ async function optimizeWithORS(
   orsApiKey: string,
   startCoords?: [number, number] | null
 ) {
+  const optimizationStartedAt = Date.now();
   const payload = buildOptimizationPayload(stops, startCoords);
   const jobs = payload.jobs;
 
@@ -540,7 +588,7 @@ async function optimizeWithORS(
   });
 
   if (!response.ok) {
-    throw new Error(`ORS optimization failed (${response.status})`);
+    throw new ExternalServiceError("optimization", `ORS optimization failed (${response.status})`);
   }
 
   const data = (await response.json()) as {
@@ -568,6 +616,12 @@ async function optimizeWithORS(
     .map(jobId => byJobId.get(jobId))
     .filter(Boolean) as GeocodedStop[];
 
+  console.log("[hub-os/optimize-installations]", {
+    stage: "optimization",
+    durationMs: getElapsedMs(optimizationStartedAt),
+    totalStops: stops.length,
+  });
+
   return {
     orderedStops,
     summary: {
@@ -585,6 +639,7 @@ async function fetchDirectionsSummary(
   orsApiKey: string
 ) {
   if (coordinates.length < 2) return null;
+  const startedAt = Date.now();
 
   const url = new URL(`${ORS_BASE_URL}/v2/directions/${profile}`);
   url.searchParams.set('api_key', orsApiKey);
@@ -598,7 +653,9 @@ async function fetchDirectionsSummary(
     }),
   });
 
-  if (!response.ok) return null;
+  if (!response.ok) {
+    throw new ExternalServiceError("directions_summary", `ORS directions failed (${response.status})`);
+  }
 
   const payload = (await response.json()) as {
     routes?: Array<{ summary?: { distance?: number; duration?: number } }>;
@@ -607,10 +664,18 @@ async function fetchDirectionsSummary(
   const summary = payload.routes?.[0]?.summary;
   if (!summary) return null;
 
-  return {
+  const summaryData = {
     distance_m: typeof summary.distance === 'number' ? summary.distance : null,
     duration_s: typeof summary.duration === 'number' ? summary.duration : null,
   };
+
+  console.log("[hub-os/optimize-installations]", {
+    stage: "directions_summary",
+    durationMs: getElapsedMs(startedAt),
+    coordinates: coordinates.length,
+  });
+
+  return summaryData;
 }
 
 export default async function handler(req: any, res: any) {
@@ -639,9 +704,11 @@ export default async function handler(req: any, res: any) {
   try {
     parsed = parseRequestBody(req.body);
   } catch (error) {
-    return json(res, 400, {
+    const message = error instanceof Error ? error.message : "Payload inválido.";
+    const status = /excede o limite/i.test(message) ? 413 : 400;
+    return json(res, status, {
       stage: "input",
-      error: error instanceof Error ? error.message : "Payload inválido.",
+      error: message,
     });
   }
 
@@ -654,9 +721,12 @@ export default async function handler(req: any, res: any) {
         stage: "geocode_start",
         message: error instanceof Error ? error.message : "unknown",
       });
-      return json(res, 400, {
+      const timeout = error instanceof TimeoutExternalError;
+      return json(res, timeout ? 504 : 400, {
         stage: "geocode",
-        error: "Não foi possível geocodificar o ponto de partida informado.",
+        error: timeout
+          ? "Timeout ao geocodificar o ponto de partida."
+          : "Não foi possível geocodificar o ponto de partida informado.",
       });
     }
   }
@@ -690,6 +760,7 @@ export default async function handler(req: any, res: any) {
       });
     }
     const geocodeCache = new Map<string, [number, number]>();
+    const geocodeMetrics = { totalCalls: 0, cacheHits: 0, externalMs: 0 };
     const geocoded: GeocodedStop[] = [];
     const unassigned: Array<{ os_id: string; reason: string }> = [];
 
@@ -703,7 +774,10 @@ export default async function handler(req: any, res: any) {
       }
 
       const cached = geocodeCache.get(address);
-      if (cached) return cached;
+      if (cached) {
+        geocodeMetrics.cacheHits += 1;
+        return cached;
+      }
 
       const geocodeIsCurrent =
         order.address_geocode_provider === "openrouteservice" &&
@@ -723,7 +797,10 @@ export default async function handler(req: any, res: any) {
       }
 
       try {
+        const geocodeStartedAt = Date.now();
         const coords = await geocodeORS(address, orsApiKey, resolvedStartCoords);
+        geocodeMetrics.totalCalls += 1;
+        geocodeMetrics.externalMs += getElapsedMs(geocodeStartedAt);
         geocodeCache.set(address, coords);
 
         const { error: updateGeocodeError } = await supabaseAdmin
@@ -744,7 +821,11 @@ export default async function handler(req: any, res: any) {
         }
 
         return coords;
-      } catch {
+      } catch (error) {
+        if (error instanceof TimeoutExternalError) {
+          unassigned.push({ os_id: order.id, reason: "geocode_timeout" });
+          return null;
+        }
         if (order.address_lng !== null && order.address_lat !== null) {
           return [order.address_lng, order.address_lat];
         }
@@ -869,8 +950,10 @@ export default async function handler(req: any, res: any) {
                 orsApiKey
               );
             } catch (error) {
+              const fallbackReason = error instanceof TimeoutExternalError ? "directions_timeout" : "directions_unavailable";
               console.warn("[hub-os/optimize-installations] directions summary failed", {
                 stage: "directions_summary",
+                fallbackReason,
                 message: error instanceof Error ? error.message : "unknown",
               });
             }
@@ -930,6 +1013,9 @@ export default async function handler(req: any, res: any) {
       optimized: geocoded.length - unassigned.length,
       groups: groups.length,
       routes: totalRoutes,
+      geocodeCalls: geocodeMetrics.totalCalls,
+      geocodeCacheHits: geocodeMetrics.cacheHits,
+      geocodeExternalMs: geocodeMetrics.externalMs,
       elapsedMs,
     });
 
@@ -947,7 +1033,12 @@ export default async function handler(req: any, res: any) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro inesperado.";
-    return json(res, 502, { stage: "optimization", error: `Falha na otimização ORS: ${message}` });
+    const isTimeout = error instanceof TimeoutExternalError;
+    const stage = error instanceof ExternalServiceError || error instanceof TimeoutExternalError ? error.stage : "optimization";
+    return json(res, isTimeout ? 504 : 502, {
+      stage,
+      error: `Falha na otimização ORS: ${message}`,
+    });
   }
 }
 
@@ -958,4 +1049,7 @@ export {
   buildGoogleMapsUrl,
   buildOptimizationPayload,
   estimateSummaryFromStops,
+  parseRequestBody,
+  fetchWithTimeout,
+  TimeoutExternalError,
 };

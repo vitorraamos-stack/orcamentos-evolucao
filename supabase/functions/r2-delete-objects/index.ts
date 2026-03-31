@@ -1,8 +1,10 @@
 import { DeleteObjectsCommand, S3Client } from 'npm:@aws-sdk/client-s3';
 import {
+  authorizeR2OrderScope,
   corsHeaders,
   errorLog,
   errorResponse,
+  extractOrderIdFromR2Key,
   getR2Bucket,
   infoLog,
   jsonResponse,
@@ -33,6 +35,9 @@ Deno.serve(async (request) => {
 
     const auth = await requireAuthenticatedHubOsUser(request, SCOPE);
     if (auth.error) return auth.error;
+    if (!auth.authClient) {
+      return errorResponse(500, 'server_config', 'Cliente de autenticação indisponível.');
+    }
 
     let payload: DeletePayload;
     try {
@@ -49,11 +54,30 @@ Deno.serve(async (request) => {
       return errorResponse(400, 'invalid_input', 'Nenhuma chave válida foi informada para exclusão.');
     }
 
+    const orderIds: string[] = [];
     for (const key of keys) {
       const keyValidation = validateR2Key(key);
       if (!keyValidation.ok) {
         return errorResponse(400, 'invalid_input', `Chave inválida: ${keyValidation.message}`);
       }
+      orderIds.push(extractOrderIdFromR2Key(keyValidation.value));
+    }
+
+    try {
+      const scopeCheck = await authorizeR2OrderScope(auth.authClient, orderIds);
+      if (!scopeCheck.ok) {
+        infoLog(SCOPE, 'order_scope_forbidden', {
+          userId: auth.user?.id,
+          unauthorizedOrderIds: scopeCheck.unauthorizedOrderIds,
+        });
+        return errorResponse(403, 'forbidden', 'Sem permissão para excluir um ou mais objetos solicitados.');
+      }
+    } catch (error) {
+      errorLog(SCOPE, 'order_scope_query_error', {
+        userId: auth.user?.id,
+        message: error instanceof Error ? error.message : 'unknown',
+      });
+      return errorResponse(403, 'forbidden', 'Não foi possível validar escopo de exclusão dos objetos.');
     }
 
     const protectedKeys = keys.filter(isProtectedPaymentProofKey);
@@ -106,7 +130,13 @@ Deno.serve(async (request) => {
         message: error.Message,
       })) ?? [];
 
-    infoLog(SCOPE, 'delete_ok', { userId: auth.user?.id, requested: keys.length, deleted: deletedCount, errorCount: errors.length });
+    infoLog(SCOPE, 'delete_ok', {
+      userId: auth.user?.id,
+      requested: keys.length,
+      deleted: deletedCount,
+      errorCount: errors.length,
+      orderIds: Array.from(new Set(orderIds)).length,
+    });
 
     return jsonResponse(200, {
       ok: true,
