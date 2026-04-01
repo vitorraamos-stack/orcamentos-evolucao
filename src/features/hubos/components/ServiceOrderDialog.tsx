@@ -18,7 +18,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ArrowLeft } from "lucide-react";
-import { createOrderEvent, fetchUserDisplayNameById, updateOrder } from "../api";
+import {
+  createOrderEvent,
+  fetchUserDisplayNameById,
+  updateOrder,
+} from "../api";
 import { ART_COLUMNS, PROD_COLUMNS } from "../constants";
 import {
   ART_DIRECTION_TAG_CONFIG,
@@ -26,11 +30,22 @@ import {
 } from "../artDirectionTagConfig";
 import type {
   ArtDirectionTag,
+  DeliveryDeadlinePreset,
   LogisticType,
   OsOrder,
   ProductionTag,
 } from "../types";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  DELIVERY_DEADLINE_PRESET_CONFIG,
+  DELIVERY_DEADLINE_PRESETS,
+} from "../deliveryDeadlineConfig";
+import { formatDatePtBr, resolveDeliveryDate } from "../deliveryDeadline";
 
 interface ServiceOrderDialogProps {
   order: OsOrder | null;
@@ -39,15 +54,6 @@ interface ServiceOrderDialogProps {
   onUpdated: (order: OsOrder) => void;
   onDelete?: (id: string) => Promise<void> | void;
 }
-
-const formatDateDisplay = (value?: string | null) => {
-  if (!value) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const [year, month, day] = value.split("-");
-    if (year && month && day) return `${day}/${month}/${year}`;
-  }
-  return value;
-};
 
 const normalizeDate = (value: string) => {
   if (!value) return null;
@@ -77,9 +83,12 @@ export default function ServiceOrderDialog({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
+  const [deliveryDeadlinePreset, setDeliveryDeadlinePreset] =
+    useState<DeliveryDeadlinePreset | null>(null);
   const [logisticType, setLogisticType] = useState<LogisticType>("retirada");
   const [address, setAddress] = useState("");
-  const [artDirectionTag, setArtDirectionTag] = useState<ArtDirectionTag | null>(null);
+  const [artDirectionTag, setArtDirectionTag] =
+    useState<ArtDirectionTag | null>(null);
   const [productionTag, setProductionTag] = useState<ProductionTag | "">("");
   const [insumosDetails, setInsumosDetails] = useState("");
   const [editing, setEditing] = useState(false);
@@ -95,7 +104,8 @@ export default function ServiceOrderDialog({
     setClientName(order.client_name ?? "");
     setTitle(order.title ?? "");
     setDescription(order.description ?? "");
-    setDeliveryDate(formatDateDisplay(order.delivery_date));
+    setDeliveryDate(order.delivery_date ?? "");
+    setDeliveryDeadlinePreset(order.delivery_deadline_preset ?? null);
     setLogisticType(order.logistic_type ?? "retirada");
     setAddress(order.address ?? "");
     setArtDirectionTag(order.art_direction_tag ?? null);
@@ -146,7 +156,8 @@ export default function ServiceOrderDialog({
       clientName !== (order.client_name ?? "") ||
       title !== (order.title ?? "") ||
       description !== (order.description ?? "") ||
-      deliveryDate !== formatDateDisplay(order.delivery_date) ||
+      deliveryDate !== (order.delivery_date ?? "") ||
+      deliveryDeadlinePreset !== (order.delivery_deadline_preset ?? null) ||
       logisticType !== (order.logistic_type ?? "retirada") ||
       address !== (order.address ?? "") ||
       artDirectionTag !== (order.art_direction_tag ?? null) ||
@@ -158,6 +169,7 @@ export default function ServiceOrderDialog({
     artDirectionTag,
     clientName,
     deliveryDate,
+    deliveryDeadlinePreset,
     description,
     insumosDetails,
     logisticType,
@@ -192,6 +204,16 @@ export default function ServiceOrderDialog({
       return;
     }
 
+    if (!deliveryDeadlinePreset) {
+      toast.error("Selecione o prazo de produção/entrega.");
+      return;
+    }
+
+    if (deliveryDeadlinePreset === "CUSTOM" && !normalizeDate(deliveryDate)) {
+      toast.error("Informe a data manual para prazo personalizado.");
+      return;
+    }
+
     try {
       setSaving(true);
       const payload: Partial<OsOrder> = {
@@ -199,7 +221,17 @@ export default function ServiceOrderDialog({
         client_name: clientName,
         title: title.trim() || defaultTitle,
         description: description || null,
-        delivery_date: normalizeDate(deliveryDate),
+        delivery_deadline_preset: deliveryDeadlinePreset,
+        delivery_date:
+          deliveryDeadlinePreset === "CUSTOM"
+            ? normalizeDate(deliveryDate)
+            : order.delivery_deadline_started_at
+              ? resolveDeliveryDate({
+                  preset: deliveryDeadlinePreset,
+                  startedAt: order.delivery_deadline_started_at,
+                  manualDate: order.delivery_date,
+                })
+              : null,
         logistic_type: logisticType,
         address: logisticType === "retirada" ? null : address.trim() || null,
         art_direction_tag: artDirectionTag,
@@ -210,7 +242,9 @@ export default function ServiceOrderDialog({
 
       if (order.prod_status === "Produção") {
         payload.insumos_details =
-          productionTag === "AGUARDANDO_INSUMOS" ? insumosDetails.trim() : order.insumos_details;
+          productionTag === "AGUARDANDO_INSUMOS"
+            ? insumosDetails.trim()
+            : order.insumos_details;
       }
 
       const updated = await updateOrder(order.id, payload);
@@ -239,7 +273,9 @@ export default function ServiceOrderDialog({
       if (!editing) {
         setEditing(true);
       }
-      toast.message("Preencha os detalhes de insumos para concluir a alteração da tag.");
+      toast.message(
+        "Preencha os detalhes de insumos para concluir a alteração da tag."
+      );
       return;
     }
 
@@ -265,7 +301,9 @@ export default function ServiceOrderDialog({
     } catch (error) {
       setProductionTag(order.production_tag ?? "");
       toast.error(
-        error instanceof Error ? error.message : "Não foi possível atualizar a tag de produção."
+        error instanceof Error
+          ? error.message
+          : "Não foi possível atualizar a tag de produção."
       );
     } finally {
       setUpdatingProductionTag(false);
@@ -276,10 +314,24 @@ export default function ServiceOrderDialog({
     if (!order) return;
     setMoving(true);
     try {
+      const nowIso = new Date().toISOString();
+      const startedAt = order.delivery_deadline_started_at ?? nowIso;
+      const resolvedDeliveryDate = resolveDeliveryDate({
+        preset: order.delivery_deadline_preset,
+        startedAt,
+        manualDate: order.delivery_date,
+      });
+
       const updated = await updateOrder(order.id, {
         art_status: "Produzir",
         prod_status: PROD_COLUMNS[0],
-        updated_at: new Date().toISOString(),
+        delivery_deadline_started_at:
+          order.delivery_deadline_started_at ?? nowIso,
+        delivery_date:
+          order.delivery_deadline_preset === "CUSTOM"
+            ? order.delivery_date
+            : resolvedDeliveryDate,
+        updated_at: nowIso,
         updated_by: user?.id ?? null,
       });
       await createOrderEvent({
@@ -332,7 +384,8 @@ export default function ServiceOrderDialog({
               {`OS #${order?.os_number ?? order?.sale_number ?? ""}`}
             </DialogUi.DialogTitle>
             <DialogUi.DialogDescription>
-              Status atual • {order?.prod_status ?? order?.art_status} · Criado por: {createdByName || "—"}
+              Status atual • {order?.prod_status ?? order?.art_status} · Criado
+              por: {createdByName || "—"}
             </DialogUi.DialogDescription>
           </DialogUi.DialogHeader>
 
@@ -355,31 +408,72 @@ export default function ServiceOrderDialog({
                   disabled={!editing}
                 />
               </div>
-              <div className="space-y-1">
-                <Label>Data de entrega</Label>
-                <Input
-                  value={deliveryDate}
-                  onChange={e => setDeliveryDate(e.target.value)}
-                  placeholder="dd/mm/aaaa"
+              <div className="space-y-2">
+                <Label>Prazo de produção/entrega</Label>
+                <RadioGroup
+                  value={deliveryDeadlinePreset ?? ""}
+                  onValueChange={value =>
+                    editing &&
+                    setDeliveryDeadlinePreset(value as DeliveryDeadlinePreset)
+                  }
                   disabled={!editing}
-                />
+                >
+                  <div className="space-y-2 text-sm">
+                    {DELIVERY_DEADLINE_PRESETS.map(preset => {
+                      const config = DELIVERY_DEADLINE_PRESET_CONFIG[preset];
+                      return (
+                        <Tooltip key={preset}>
+                          <TooltipTrigger asChild>
+                            <label className="flex items-center gap-2">
+                              <RadioGroupItem value={preset} />
+                              {config.label}
+                            </label>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            {config.tooltip}
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
+                  </div>
+                </RadioGroup>
+                <div className="space-y-1">
+                  <Label>Data manual (somente prazo personalizado)</Label>
+                  <Input
+                    type="date"
+                    value={deliveryDate}
+                    onChange={e => setDeliveryDate(e.target.value)}
+                    placeholder="aaaa-mm-dd"
+                    disabled={!editing || deliveryDeadlinePreset !== "CUSTOM"}
+                  />
+                </div>
+                {!editing && order?.delivery_date && (
+                  <p className="text-xs text-muted-foreground">
+                    Data registrada: {formatDatePtBr(order.delivery_date)}
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Tipo de logística</Label>
                 <RadioGroup
                   value={logisticType}
-                  onValueChange={value => editing && setLogisticType(value as LogisticType)}
+                  onValueChange={value =>
+                    editing && setLogisticType(value as LogisticType)
+                  }
                   disabled={!editing}
                 >
                   <div className="flex flex-wrap gap-4 text-sm">
                     <label className="flex items-center gap-2">
-                      <RadioGroupItem value="retirada" />Retirada
+                      <RadioGroupItem value="retirada" />
+                      Retirada
                     </label>
                     <label className="flex items-center gap-2">
-                      <RadioGroupItem value="entrega" />Entrega
+                      <RadioGroupItem value="entrega" />
+                      Entrega
                     </label>
                     <label className="flex items-center gap-2">
-                      <RadioGroupItem value="instalacao" />Instalação
+                      <RadioGroupItem value="instalacao" />
+                      Instalação
                     </label>
                   </div>
                 </RadioGroup>
@@ -422,7 +516,9 @@ export default function ServiceOrderDialog({
                         className="rounded-full border px-3 py-1 text-xs font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                         style={{
                           borderColor: config.color,
-                          backgroundColor: isSelected ? config.color : "transparent",
+                          backgroundColor: isSelected
+                            ? config.color
+                            : "transparent",
                           color: isSelected ? "#FFFFFF" : config.color,
                         }}
                       >
@@ -431,6 +527,11 @@ export default function ServiceOrderDialog({
                     );
                   })}
                 </div>
+                {artDirectionTag && (
+                  <p className="text-sm font-medium text-orange-600">
+                    {ART_DIRECTION_TAG_CONFIG[artDirectionTag].text}
+                  </p>
+                )}
               </div>
 
               {order?.prod_status === "Produção" && (
@@ -442,10 +543,22 @@ export default function ServiceOrderDialog({
                     disabled={updatingProductionTag}
                   >
                     <div className="flex flex-wrap gap-4 text-sm">
-                      <label className="flex items-center gap-2"><RadioGroupItem value="EM_PRODUCAO" />Em Produção</label>
-                      <label className="flex items-center gap-2"><RadioGroupItem value="AGUARDANDO_INSUMOS" />Aguardando Insumos</label>
-                      <label className="flex items-center gap-2"><RadioGroupItem value="PRODUCAO_EXTERNA" />Produção Externa</label>
-                      <label className="flex items-center gap-2"><RadioGroupItem value="PRONTO" />Pronto</label>
+                      <label className="flex items-center gap-2">
+                        <RadioGroupItem value="EM_PRODUCAO" />
+                        Em Produção
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <RadioGroupItem value="AGUARDANDO_INSUMOS" />
+                        Aguardando Insumos
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <RadioGroupItem value="PRODUCAO_EXTERNA" />
+                        Produção Externa
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <RadioGroupItem value="PRONTO" />
+                        Pronto
+                      </label>
                     </div>
                   </RadioGroup>
                 </div>
@@ -469,13 +582,22 @@ export default function ServiceOrderDialog({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex gap-2">
               {!order?.prod_status && (
-                <Button variant="secondary" onClick={moveToProduction} disabled={moving}>
+                <Button
+                  variant="secondary"
+                  onClick={moveToProduction}
+                  disabled={moving}
+                >
                   Enviar para Produção
                 </Button>
               )}
               {order?.prod_status && isAdmin && (
-                <Button variant="outline" onClick={moveBackToArt} disabled={moving}>
-                  <ArrowLeft className="mr-2 h-4 w-4" />Voltar para Arte
+                <Button
+                  variant="outline"
+                  onClick={moveBackToArt}
+                  disabled={moving}
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Voltar para Arte
                 </Button>
               )}
             </div>
@@ -488,11 +610,15 @@ export default function ServiceOrderDialog({
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Excluir OS?</AlertDialogTitle>
-                      <AlertDialogDescription>Essa ação não pode ser desfeita.</AlertDialogDescription>
+                      <AlertDialogDescription>
+                        Essa ação não pode ser desfeita.
+                      </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDelete}>Confirmar</AlertDialogAction>
+                      <AlertDialogAction onClick={handleDelete}>
+                        Confirmar
+                      </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
@@ -500,7 +626,11 @@ export default function ServiceOrderDialog({
               <Button variant="outline" onClick={() => handleOpenChange(false)}>
                 Fechar
               </Button>
-              <Button variant="secondary" onClick={() => setEditing(true)} disabled={editing}>
+              <Button
+                variant="secondary"
+                onClick={() => setEditing(true)}
+                disabled={editing}
+              >
                 Editar
               </Button>
               <Button onClick={handleSave} disabled={!editing || saving}>
@@ -515,7 +645,9 @@ export default function ServiceOrderDialog({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
-            <AlertDialogDescription>Você possui alterações pendentes nessa OS.</AlertDialogDescription>
+            <AlertDialogDescription>
+              Você possui alterações pendentes nessa OS.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Continuar editando</AlertDialogCancel>

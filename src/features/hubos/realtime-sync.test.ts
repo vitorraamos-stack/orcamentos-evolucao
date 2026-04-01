@@ -13,10 +13,7 @@ import {
 } from "./selectors";
 import type { OsOrder } from "./types";
 
-const buildOrder = (
-  id: string,
-  prodStatus: OsOrder["prod_status"]
-): OsOrder =>
+const buildOrder = (id: string, prodStatus: OsOrder["prod_status"]): OsOrder =>
   ({
     id,
     sale_number: `S-${id}`,
@@ -26,6 +23,8 @@ const buildOrder = (
     prod_status: prodStatus,
     logistic_type: "retirada",
     delivery_date: null,
+    delivery_deadline_preset: null,
+    delivery_deadline_started_at: null,
     created_at: "2026-01-01T00:00:00.000Z",
     updated_at: "2026-01-01T00:00:00.000Z",
     created_by: null,
@@ -81,12 +80,10 @@ describe("hub board realtime selectors", () => {
     expect(stateAfterFailure).toEqual(previousSnapshot);
   });
 
-
   it("ressincroniza no visibilitychange quando aba volta para visible", () => {
     expect(shouldRefreshOnVisibility("visible")).toBe(true);
     expect(shouldRefreshOnVisibility("hidden")).toBe(false);
   });
-
 
   it("marca canal realtime como saudável apenas quando SUBSCRIBED", () => {
     expect(isRealtimeChannelHealthy("SUBSCRIBED")).toBe(true);
@@ -128,7 +125,6 @@ describe("hub board realtime selectors", () => {
     ).toBe(false);
   });
 
-
   it("executa safety sync quando ficou muito tempo sem sincronizar", () => {
     expect(
       shouldRunSafetySync({
@@ -169,7 +165,9 @@ describe("hub board realtime selectors", () => {
   it("coalesce eventos realtime próximos em um único refresh", () => {
     vi.useFakeTimers();
     const refetch = vi.fn();
-    const scheduler = createCoalescedRefetchScheduler(refetch, { delayMs: 180 });
+    const scheduler = createCoalescedRefetchScheduler(refetch, {
+      delayMs: 180,
+    });
 
     scheduler.schedule();
     scheduler.schedule();
@@ -187,7 +185,9 @@ describe("hub board realtime selectors", () => {
   it("permite cancelar refresh pendente no cleanup", () => {
     vi.useFakeTimers();
     const refetch = vi.fn();
-    const scheduler = createCoalescedRefetchScheduler(refetch, { delayMs: 120 });
+    const scheduler = createCoalescedRefetchScheduler(refetch, {
+      delayMs: 120,
+    });
 
     scheduler.schedule();
     scheduler.cancel();
@@ -197,5 +197,4 @@ describe("hub board realtime selectors", () => {
 
     vi.useRealTimers();
   });
-
 });

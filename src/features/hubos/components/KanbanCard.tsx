@@ -17,17 +17,23 @@ import { cn } from "@/lib/utils";
 import { GripVertical, Archive } from "lucide-react";
 import type {
   ArtDirectionTag,
+  DeliveryDeadlinePreset,
   LogisticType,
   ProdStatus,
   ProductionTag,
 } from "../types";
 import { ART_DIRECTION_TAG_CONFIG } from "../artDirectionTagConfig";
+import { getProductionDeadlineBadgeText } from "../deliveryDeadline";
+import { getDesignerSlaLabel, getDesignerSlaState } from "../designerSla";
 
 interface KanbanCardProps {
   id: string;
   title: string;
   clientName: string;
   deliveryDate?: string | null;
+  deliveryDeadlinePreset?: DeliveryDeadlinePreset | null;
+  deliveryDeadlineStartedAt?: string | null;
+  createdAt?: string;
   logisticType: LogisticType;
   reproducao: boolean;
   letraCaixa: boolean;
@@ -69,22 +75,14 @@ const productionTagConfig: Record<
 const returnNotesBadgeClassName =
   "bg-yellow-400 text-yellow-950 hover:bg-yellow-400";
 
-const formatDeliveryDate = (value?: string | null) => {
-  if (!value) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const [year, month, day] = value.split("-");
-    if (year && month && day) {
-      return `${day}/${month}/${year}`;
-    }
-  }
-  return value;
-};
-
 export default function KanbanCard({
   id,
   title,
   clientName,
   deliveryDate,
+  deliveryDeadlinePreset,
+  deliveryDeadlineStartedAt,
+  createdAt,
   logisticType,
   reproducao,
   letraCaixa,
@@ -100,13 +98,8 @@ export default function KanbanCard({
   onMarkInsumosAsInProduction,
   markingInsumosAsInProduction = false,
 }: KanbanCardProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    isDragging,
-  } = useDraggable({ id });
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({ id });
 
   const style = {
     transform: CSS.Translate.toString(transform),
@@ -114,7 +107,6 @@ export default function KanbanCard({
 
   const trimmedInsumosReturnNotes = insumosReturnNotes?.trim() ?? "";
   const hasInsumosReturnNotes = trimmedInsumosReturnNotes.length > 0;
-  const formattedDeliveryDate = formatDeliveryDate(deliveryDate);
   const shouldShowMaterialReadyBadge =
     (prodStatus === "Instalação Agendada" ||
       prodStatus === "Pronto / Avisar Cliente") &&
@@ -123,10 +115,43 @@ export default function KanbanCard({
     productionTag === "EM_PRODUCAO" && hasInsumosReturnNotes
       ? { label: "Insumo disponível", className: returnNotesBadgeClassName }
       : shouldShowMaterialReadyBadge
-        ? { label: "Material Pronto", className: productionTagConfig.PRONTO.className }
-      : productionTag
-        ? productionTagConfig[productionTag]
-        : null;
+        ? {
+            label: "Material Pronto",
+            className: productionTagConfig.PRONTO.className,
+          }
+        : productionTag
+          ? productionTagConfig[productionTag]
+          : null;
+  const productionBadgeText =
+    deliveryDeadlinePreset &&
+    !deliveryDeadlineStartedAt &&
+    deliveryDeadlinePreset !== "CUSTOM"
+      ? "Entrega prevista: inicia ao mover para Produzir"
+      : getProductionDeadlineBadgeText({
+          preset: deliveryDeadlinePreset,
+          deliveryDate,
+        });
+  const slaOrderBase =
+    !prodStatus &&
+    !deliveryDeadlineStartedAt &&
+    artDirectionTag &&
+    createdAt
+      ? { art_direction_tag: artDirectionTag, created_at: createdAt }
+      : null;
+  const designerSlaState = slaOrderBase
+    ? getDesignerSlaState(slaOrderBase)
+    : null;
+  const designerSlaLabel = slaOrderBase
+    ? getDesignerSlaLabel(slaOrderBase)
+    : null;
+  const designerSlaBadgeClassName =
+    designerSlaState === "overdue"
+      ? "border-red-300 bg-red-50 text-red-700"
+      : designerSlaState === "dueToday"
+        ? "border-orange-300 bg-orange-50 text-orange-700"
+        : designerSlaState === "warning"
+          ? "border-amber-300 bg-amber-50 text-amber-700"
+          : "border-slate-300 bg-slate-50 text-slate-700";
 
   return (
     <div
@@ -159,11 +184,9 @@ export default function KanbanCard({
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-semibold">{title}</p>
             <Badge variant="outline">{logisticLabel[logisticType]}</Badge>
-            {deliveryDate && (
-              <Badge className="border-yellow-300 bg-yellow-100 text-yellow-900 hover:bg-yellow-100">
-                Entrega: {formattedDeliveryDate}
-              </Badge>
-            )}
+            <Badge className="border-yellow-300 bg-yellow-100 text-yellow-900 hover:bg-yellow-100">
+              {productionBadgeText}
+            </Badge>
           </div>
           <p className="text-xs text-muted-foreground">{clientName}</p>
         </div>
@@ -181,10 +204,10 @@ export default function KanbanCard({
         {letraCaixa && <Badge variant="secondary">Letra Caixa</Badge>}
         {productionTagBadge &&
           (prodStatus === "Produção" || shouldShowMaterialReadyBadge) && (
-          <Badge className={productionTagBadge.className}>
-            {productionTagBadge.label}
-          </Badge>
-        )}
+            <Badge className={productionTagBadge.className}>
+              {productionTagBadge.label}
+            </Badge>
+          )}
         {artDirectionTag && (
           <Badge
             className="border-0 text-white"
@@ -193,6 +216,11 @@ export default function KanbanCard({
             }}
           >
             {ART_DIRECTION_TAG_CONFIG[artDirectionTag].label}
+          </Badge>
+        )}
+        {designerSlaLabel && (
+          <Badge variant="outline" className={designerSlaBadgeClassName}>
+            {designerSlaLabel}
           </Badge>
         )}
         {assetIndicator && (
@@ -230,7 +258,9 @@ export default function KanbanCard({
               }}
               disabled={markingInsumosAsInProduction}
             >
-              {markingInsumosAsInProduction ? "Atualizando..." : "Marcar como Em Produção"}
+              {markingInsumosAsInProduction
+                ? "Atualizando..."
+                : "Marcar como Em Produção"}
             </Button>
           )}
         </div>
