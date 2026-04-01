@@ -148,6 +148,11 @@ export default function ServiceOrderDialog({
     () => [saleNumber, clientName].filter(Boolean).join(" - ").trim(),
     [saleNumber, clientName]
   );
+  const shouldShowOnlySelectedDeadline =
+    !editing && Boolean(order?.prod_status);
+  const selectedDeadlineConfig = deliveryDeadlinePreset
+    ? DELIVERY_DEADLINE_PRESET_CONFIG[deliveryDeadlinePreset]
+    : null;
 
   const isDirty = useMemo(() => {
     if (!order) return false;
@@ -410,33 +415,39 @@ export default function ServiceOrderDialog({
               </div>
               <div className="space-y-2">
                 <Label>Prazo de produção/entrega</Label>
-                <RadioGroup
-                  value={deliveryDeadlinePreset ?? ""}
-                  onValueChange={value =>
-                    editing &&
-                    setDeliveryDeadlinePreset(value as DeliveryDeadlinePreset)
-                  }
-                  disabled={!editing}
-                >
-                  <div className="space-y-2 text-sm">
-                    {DELIVERY_DEADLINE_PRESETS.map(preset => {
-                      const config = DELIVERY_DEADLINE_PRESET_CONFIG[preset];
-                      return (
-                        <Tooltip key={preset}>
-                          <TooltipTrigger asChild>
-                            <label className="flex items-center gap-2">
-                              <RadioGroupItem value={preset} />
-                              {config.label}
-                            </label>
-                          </TooltipTrigger>
-                          <TooltipContent side="top">
-                            {config.tooltip}
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    })}
+                {shouldShowOnlySelectedDeadline ? (
+                  <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                    {selectedDeadlineConfig?.label ?? "Prazo não informado"}
                   </div>
-                </RadioGroup>
+                ) : (
+                  <RadioGroup
+                    value={deliveryDeadlinePreset ?? ""}
+                    onValueChange={value =>
+                      editing &&
+                      setDeliveryDeadlinePreset(value as DeliveryDeadlinePreset)
+                    }
+                    disabled={!editing}
+                  >
+                    <div className="space-y-2 text-sm">
+                      {DELIVERY_DEADLINE_PRESETS.map(preset => {
+                        const config = DELIVERY_DEADLINE_PRESET_CONFIG[preset];
+                        return (
+                          <Tooltip key={preset}>
+                            <TooltipTrigger asChild>
+                              <label className="flex items-center gap-2">
+                                <RadioGroupItem value={preset} />
+                                {config.label}
+                              </label>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              {config.tooltip}
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })}
+                    </div>
+                  </RadioGroup>
+                )}
                 <div className="space-y-1">
                   <Label>Data manual (somente prazo personalizado)</Label>
                   <Input
@@ -444,7 +455,11 @@ export default function ServiceOrderDialog({
                     value={deliveryDate}
                     onChange={e => setDeliveryDate(e.target.value)}
                     placeholder="aaaa-mm-dd"
-                    disabled={!editing || deliveryDeadlinePreset !== "CUSTOM"}
+                    disabled={
+                      shouldShowOnlySelectedDeadline ||
+                      !editing ||
+                      deliveryDeadlinePreset !== "CUSTOM"
+                    }
                   />
                 </div>
                 {!editing && order?.delivery_date && (
