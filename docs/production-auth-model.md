@@ -16,6 +16,10 @@
 2. Papel normalizado em `profiles`.
 3. Regras de módulos mínimos para gerente.
 
+## Endpoint canônico de otimização
+- O fluxo de otimização de instalações em produção é `POST /api/hub-os/optimize-installations` (Vercel Serverless).
+- Não existe rota canônica equivalente em Supabase Edge Functions.
+
 ## Edge Functions de R2
 As funções `r2-presign-upload`, `r2-presign-download` e `r2-delete-objects` validam:
 1. Header `Authorization: Bearer <jwt>` obrigatório e válido em `supabase.auth.getUser(token)`.

@@ -176,13 +176,13 @@ supabase functions deploy r2-presign-upload
 supabase functions deploy r2-presign-download
 supabase functions deploy r2-delete-objects
 supabase functions deploy r2-health
-supabase functions deploy optimize-installation-route
 ```
 
 6. Otimização de rota de instalações (ORS):
    - Endpoint server-side: `POST /api/hub-os/optimize-installations`
    - Requer usuário autenticado (Bearer JWT) com role gerente.
    - Chave `ORS_API_KEY` fica apenas no servidor (sem prefixo `VITE_`).
+   - `optimize-installation-route` (Edge Function) é legado e não faz parte do deploy canônico.
 
 > As funções exigem usuário autenticado (JWT) e geram URLs pré-assinadas com expiração curta (10 min).
 > As funções **não aceitam** `bucket` enviado pelo cliente; o bucket é sempre lido do segredo `R2_BUCKET`.

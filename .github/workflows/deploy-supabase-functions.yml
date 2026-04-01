@@ -23,4 +23,17 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: 2.52.3
-      - run: supabase functions deploy --project-ref $PROJECT_ID
+      # Deploy explícito por allowlist para evitar publicação acidental de funções legadas.
+      # Política: funções só entram em produção quando adicionadas conscientemente nesta lista.
+      # Rotas de otimização são canônicas na Vercel (/api/hub-os/optimize-installations), não em Edge Functions.
+      - run: |
+          functions=(
+            r2-presign-upload
+            r2-presign-download
+            r2-delete-objects
+            r2-health
+          )
+
+          for fn in "${functions[@]}"; do
+            supabase functions deploy "$fn" --project-ref "$PROJECT_ID"
+          done
