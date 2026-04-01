@@ -5,6 +5,7 @@
 - Confirmar variáveis da Vercel API: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ORS_API_KEY`.
 - Confirmar variáveis do front Vite: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_OS_FOLDER_BASE`.
 - Confirmar que não há secrets ausentes para integrações externas (ORS/Supabase/R2) no ambiente de produção.
+- Confirmar que o secret legado `MAPBOX_ACCESS_TOKEN` foi removido do Supabase se não houver outro consumo ativo.
 
 ## 2) Qualidade e build
 - Executar localmente:
@@ -31,10 +32,12 @@
 - Confirmar rejeição de lote acima do limite de OS por request.
 - Confirmar comportamento de timeout ORS/geocode (erro controlado com `stage` e status previsível).
 - Confirmar fallback com resposta válida quando otimização externa indisponível.
+- Confirmar que a Edge Function legada `optimize-installation-route` não está ativa no projeto Supabase.
 
 ## 6) Deploy operacional
 - Vercel é o alvo canônico do front-end/serverless.
 - Publicar Edge Functions somente após CI + verify:prod.
+- Publicar Edge Functions apenas pela allowlist canônica (`r2-presign-upload`, `r2-presign-download`, `r2-delete-objects`, `r2-health`).
 - Não usar deploy manual com variáveis ausentes.
 
 ## 7) Pós-go-live imediato

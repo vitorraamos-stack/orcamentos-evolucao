@@ -12,7 +12,9 @@
    - `vercel.json` usa `installCommand: npm ci`.
    - `vercel.json` usa `buildCommand: npm run build` (que já executa check + test + build).
 4. Deploy das Edge Functions Supabase:
-   - Workflow `deploy-supabase-functions.yml` executa `npm ci` + `npm run verify:prod` antes do `supabase functions deploy`.
+   - Workflow `deploy-supabase-functions.yml` executa `npm ci` + `npm run verify:prod` antes do deploy.
+   - O deploy é feito por allowlist explícita (`r2-presign-upload`, `r2-presign-download`, `r2-delete-objects`, `r2-health`) para evitar republicação acidental de função legada.
+   - `optimize-installation-route` não é rota canônica e não deve ser publicada.
 5. Pós-deploy (smoke test obrigatório):
    - Login e autorização admin.
    - Fluxo Hub OS (kanban/kiosk).
@@ -35,3 +37,8 @@ Workflow `ci.yml` executa:
 2. Redeploy da revisão anterior das Edge Functions Supabase.
 3. Se necessário, desabilitar temporariamente uso de fluxo novo no frontend (feature toggle operacional).
 4. Para banco: criar migration corretiva (não editar histórico aplicado).
+
+## Limpeza manual de legado (fora do repositório)
+- Se a função remota `optimize-installation-route` ainda existir no projeto Supabase, remover manualmente:
+  - `supabase functions delete optimize-installation-route --project-ref <PROJECT_ID>`
+- Após remover a função legada, revisar e excluir o secret `MAPBOX_ACCESS_TOKEN` se ele não for usado por mais nenhuma função.

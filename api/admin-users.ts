@@ -122,9 +122,18 @@ export default async function handler(req: any, res: any) {
 
   const allowedModuleKeys = (appModules || []).map((module) => module.module_key);
 
-  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
-
   try {
+    let body: Record<string, unknown> = {};
+    if (typeof req.body === 'string') {
+      try {
+        body = JSON.parse(req.body || '{}') as Record<string, unknown>;
+      } catch {
+        return jsonError(res, 400, 'validation_error', 'JSON inválido no corpo da requisição.');
+      }
+    } else if (req.body && typeof req.body === 'object') {
+      body = req.body as Record<string, unknown>;
+    }
+
     if (req.method === 'GET') {
       const { data: profiles, error: profileError } = await supabaseAdmin
         .from('profiles')
@@ -169,31 +178,34 @@ export default async function handler(req: any, res: any) {
 
     if (req.method === 'POST') {
       const { email, password, role, name, modules } = body || {};
-      const normalizedRole = normalizeRole(role);
+      const normalizedRole = normalizeRole(typeof role === 'string' ? role : null);
       const parsedModules = parseModules(modules, allowedModuleKeys);
+      const normalizedEmail = typeof email === 'string' ? email.trim() : '';
+      const normalizedPassword = typeof password === 'string' ? password : '';
+      const normalizedName = typeof name === 'string' ? name.trim() : '';
 
-      if (!email || !password || !name) {
+      if (!normalizedEmail || !normalizedPassword || !normalizedName) {
         return jsonError(res, 400, 'validation_error', 'Informe email, password, name e role.');
       }
       if (!normalizedRole) return jsonError(res, 400, 'validation_error', 'Role inválido.');
       if (parsedModules && 'error' in parsedModules) {
         return jsonError(res, 400, 'validation_error', String(parsedModules.error));
       }
-      if (String(password).length < 6) {
+      if (normalizedPassword.length < 6) {
         return jsonError(res, 400, 'validation_error', 'A senha deve ter ao menos 6 caracteres.');
       }
 
       const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
+        email: normalizedEmail,
+        password: normalizedPassword,
         email_confirm: true,
-        user_metadata: { full_name: name, name },
+        user_metadata: { full_name: normalizedName, name: normalizedName },
       });
       if (createError) throw createError;
 
       const { error: upsertError } = await supabaseAdmin.from('profiles').upsert({
         id: created.user.id,
-        email,
+        email: normalizedEmail,
         role: normalizedRole,
       });
       if (upsertError) throw upsertError;
@@ -222,12 +234,13 @@ export default async function handler(req: any, res: any) {
 
     if (req.method === 'PATCH') {
       const { userId, role, newPassword, setActive, name, modules } = body || {};
-      if (!userId) return jsonError(res, 400, 'validation_error', 'Informe userId.');
-      if (userId === currentUser.id && setActive === false) {
+      const normalizedUserId = typeof userId === 'string' ? userId : '';
+      if (!normalizedUserId) return jsonError(res, 400, 'validation_error', 'Informe userId.');
+      if (normalizedUserId === currentUser.id && setActive === false) {
         return jsonError(res, 400, 'validation_error', 'Você não pode desativar sua própria conta.');
       }
 
-      const normalizedRole = role === undefined ? undefined : normalizeRole(role);
+      const normalizedRole = role === undefined ? undefined : normalizeRole(typeof role === 'string' ? role : null);
       if (role !== undefined && !normalizedRole) return jsonError(res, 400, 'validation_error', 'Role inválido.');
       const parsedModules = parseModules(modules, allowedModuleKeys);
       if (parsedModules && 'error' in parsedModules) {
@@ -240,13 +253,13 @@ export default async function handler(req: any, res: any) {
       const { data: currentProfile, error: currentProfileError } = await supabaseAdmin
         .from('profiles')
         .select('id, role')
-        .eq('id', userId)
+        .eq('id', normalizedUserId)
         .single();
       if (currentProfileError) throw currentProfileError;
 
       const currentRoleNormalized = normalizeRole(currentProfile?.role ?? null);
 
-      if (userId === currentUser.id && parsedModules && 'value' in parsedModules) {
+      if (normalizedUserId === currentUser.id && parsedModules && 'value' in parsedModules) {
         if (!parsedModules.value.includes(CONFIG_MODULE_KEY)) {
           return jsonError(
             res,
@@ -264,7 +277,7 @@ export default async function handler(req: any, res: any) {
       if (managerError) throw managerError;
 
       const managerIds = new Set((managerProfiles || []).map((profile) => profile.id));
-      const isTargetManager = currentRoleNormalized === 'gerente' || managerIds.has(userId);
+      const isTargetManager = currentRoleNormalized === 'gerente' || managerIds.has(normalizedUserId);
       const nextRoleIsManager = normalizedRole === undefined ? isTargetManager : normalizedRole === 'gerente';
 
       if (isTargetManager && !nextRoleIsManager && managerIds.size <= 1) {
@@ -289,9 +302,9 @@ export default async function handler(req: any, res: any) {
         const nextHasConfig = nextModules.includes(CONFIG_MODULE_KEY);
 
         if (!nextHasConfig) {
-          managerWithConfig.delete(userId);
+          managerWithConfig.delete(normalizedUserId);
         } else {
-          managerWithConfig.add(userId);
+          managerWithConfig.add(normalizedUserId);
         }
 
         if (managerWithConfig.size === 0) {
@@ -310,7 +323,7 @@ export default async function handler(req: any, res: any) {
         const { data: existingModules, error: existingModulesError } = await supabaseAdmin
           .from('user_module_access')
           .select('module_key')
-          .eq('user_id', userId);
+          .eq('user_id', normalizedUserId);
         if (existingModulesError) throw existingModulesError;
 
         const currentModules = (existingModules || [])
@@ -328,7 +341,7 @@ export default async function handler(req: any, res: any) {
         const { error: profileUpdateError } = await supabaseAdmin
           .from('profiles')
           .update({ role: normalizedRole })
-          .eq('id', userId);
+          .eq('id', normalizedUserId);
         if (profileUpdateError) throw profileUpdateError;
       }
 
@@ -343,7 +356,7 @@ export default async function handler(req: any, res: any) {
           : parsedModules.value;
 
         const { error: moduleUpdateError } = await supabaseAdmin.rpc('set_user_modules', {
-          target_user_id: userId,
+          target_user_id: normalizedUserId,
           module_keys: nextModules,
         });
         if (moduleUpdateError) throw moduleUpdateError;
@@ -351,7 +364,7 @@ export default async function handler(req: any, res: any) {
 
       if (ensureManagerModules) {
         const { error: moduleUpdateError } = await supabaseAdmin.rpc('set_user_modules', {
-          target_user_id: userId,
+          target_user_id: normalizedUserId,
           module_keys: ensureManagerModules,
         });
         if (moduleUpdateError) throw moduleUpdateError;
@@ -364,7 +377,7 @@ export default async function handler(req: any, res: any) {
       if (setActive === true) authPayload.ban_duration = 'none';
 
       if (Object.keys(authPayload).length > 0) {
-        const { error: authUpdateError } = await supabaseAdmin.auth.admin.updateUserById(userId, authPayload);
+        const { error: authUpdateError } = await supabaseAdmin.auth.admin.updateUserById(normalizedUserId, authPayload);
         if (authUpdateError) throw authUpdateError;
       }
 
