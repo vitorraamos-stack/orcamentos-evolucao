@@ -1,4 +1,5 @@
 import { getHubPermissions, normalizeRole } from '@/lib/hubRoles';
+import type { AppModuleKey } from '@/constants/modules';
 
 export type AuthorizationSnapshot = {
   rawRole: string | null;
@@ -18,3 +19,20 @@ export const buildAuthorizationSnapshot = (role: string | null | undefined): Aut
     permissions,
   };
 };
+
+type RouteAccessContext = {
+  hasModuleAccess: (moduleKey: AppModuleKey) => boolean;
+  permissions: AuthorizationSnapshot['permissions'];
+};
+
+export const canAccessConfiguracoes = (context: RouteAccessContext) =>
+  context.hasModuleAccess('configuracoes') && context.permissions.canManageUsers;
+
+export const canAccessMateriais = (context: RouteAccessContext) =>
+  context.hasModuleAccess('materiais') && context.permissions.isManager;
+
+export const canAccessHubAudit = (context: RouteAccessContext) =>
+  context.hasModuleAccess('hub_os') && context.permissions.canViewAudit;
+
+export const canAccessHubFinanceiro = (context: RouteAccessContext) =>
+  context.hasModuleAccess('hub_os_financeiro');

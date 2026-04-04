@@ -4,7 +4,7 @@
 1. Pré-deploy:
    - Aplicar migrations pendentes (`supabase/migrations/`).
    - Validar variáveis obrigatórias (Vercel + Supabase + ORS + R2).
-   - Executar localmente `npm ci` e `npm run verify:prod`.
+   - Executar localmente `npm ci`, `npm run verify:prod` e `npm run verify:predeploy`.
 2. CI obrigatória:
    - Workflow `ci.yml` precisa estar verde antes do deploy.
    - O pipeline executa o mesmo caminho canônico de produção: `npm ci` + `npm run verify:prod`.
