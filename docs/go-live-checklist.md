@@ -11,6 +11,8 @@
 - Executar localmente:
   - `npm ci`
   - `npm run verify:prod`
+  - `npm run verify:predeploy`
+- O preflight valida variáveis obrigatórias por contexto (Vite, Vercel API, Edge Functions, agente Windows/SMB) sem imprimir valores sensíveis.
 - Garantir CI verde no branch de release.
 - Garantir paridade de deploy: Vercel e workflow de Edge Functions não podem usar caminho mais fraco que `npm ci` + `npm run verify:prod`.
 
