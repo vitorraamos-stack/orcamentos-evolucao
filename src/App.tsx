@@ -20,12 +20,19 @@ import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import {
+  canAccessConfiguracoes,
+  canAccessHubAudit,
+  canAccessHubFinanceiro,
+  canAccessMateriais,
+} from '@/lib/authz';
 import Layout from "./components/Layout";
 import HubOsAccessGuard from "./components/HubOsAccessGuard";
 import RequireModule from "./components/RequireModule";
 
 function Router() {
-  const { isAdmin, hubPermissions } = useAuth();
+  const { hasModuleAccess, hubPermissions } = useAuth();
+  const authzContext = { hasModuleAccess, permissions: hubPermissions };
 
   return (
     <Switch>
@@ -51,7 +58,11 @@ function Router() {
       <Route path="/hub-os/auditoria">
         <Layout>
           <RequireModule moduleKey="hub_os">
-            <HubOsAccessGuard scope="audit"><OsAuditPage /></HubOsAccessGuard>
+            {canAccessHubAudit(authzContext) ? (
+              <HubOsAccessGuard scope="audit"><OsAuditPage /></HubOsAccessGuard>
+            ) : (
+              <Redirect to="/" />
+            )}
           </RequireModule>
         </Layout>
       </Route>
@@ -68,7 +79,7 @@ function Router() {
       <Route path="/financeiro">
         <Layout>
           <RequireModule moduleKey="hub_os_financeiro">
-            <FinanceiroPortalPage />
+            {canAccessHubFinanceiro(authzContext) ? <FinanceiroPortalPage /> : <Redirect to="/" />}
           </RequireModule>
         </Layout>
       </Route>
@@ -76,7 +87,7 @@ function Router() {
       <Route path="/hub-os/financeiro">
         <Layout>
           <RequireModule moduleKey="hub_os_financeiro">
-            <FinanceiroPortalPage />
+            {canAccessHubFinanceiro(authzContext) ? <FinanceiroPortalPage /> : <Redirect to="/" />}
           </RequireModule>
         </Layout>
       </Route>
@@ -94,7 +105,7 @@ function Router() {
         <Layout>
           {/* Só permite acesso se for Admin, senão volta para a Home */}
           <RequireModule moduleKey="materiais">
-            {isAdmin ? <Materiais /> : <Redirect to="/" />}
+            {canAccessMateriais(authzContext) ? <Materiais /> : <Redirect to="/" />}
           </RequireModule>
         </Layout>
       </Route>
@@ -102,8 +113,7 @@ function Router() {
       <Route path="/configuracoes">
         <Layout>
           <RequireModule moduleKey="configuracoes">
-            {/* Se for Admin entra, se não for, é chutado para a Home */}
-            {hubPermissions.canManageUsers ? <Configuracoes /> : <Redirect to="/" />}
+            {canAccessConfiguracoes(authzContext) ? <Configuracoes /> : <Redirect to="/" />}
           </RequireModule>
         </Layout>
       </Route>

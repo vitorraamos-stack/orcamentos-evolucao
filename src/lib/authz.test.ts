@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildAuthorizationSnapshot } from '@/lib/authz';
+import {
+  buildAuthorizationSnapshot,
+  canAccessConfiguracoes,
+  canAccessHubAudit,
+  canAccessMateriais,
+} from '@/lib/authz';
 
 describe('buildAuthorizationSnapshot', () => {
   it('nunca promove admin por heurística de e-mail', () => {
@@ -11,5 +16,58 @@ describe('buildAuthorizationSnapshot', () => {
     expect(buildAuthorizationSnapshot('gerente').isAdmin).toBe(true);
     expect(buildAuthorizationSnapshot('admin').isAdmin).toBe(true);
     expect(buildAuthorizationSnapshot('instalador').isAdmin).toBe(false);
+  });
+});
+
+describe('route authorization helpers', () => {
+  const managerPermissions = buildAuthorizationSnapshot('gerente').permissions;
+  const consultantPermissions = buildAuthorizationSnapshot('consultor_vendas').permissions;
+
+  it('configurações exige módulo + permissão de gestão', () => {
+    expect(
+      canAccessConfiguracoes({
+        hasModuleAccess: (key) => key === 'configuracoes',
+        permissions: managerPermissions,
+      })
+    ).toBe(true);
+
+    expect(
+      canAccessConfiguracoes({
+        hasModuleAccess: () => true,
+        permissions: consultantPermissions,
+      })
+    ).toBe(false);
+  });
+
+  it('materiais exige módulo + perfil gerente', () => {
+    expect(
+      canAccessMateriais({
+        hasModuleAccess: (key) => key === 'materiais',
+        permissions: managerPermissions,
+      })
+    ).toBe(true);
+
+    expect(
+      canAccessMateriais({
+        hasModuleAccess: (key) => key === 'materiais',
+        permissions: consultantPermissions,
+      })
+    ).toBe(false);
+  });
+
+  it('auditoria exige módulo hub_os + permissão de auditoria', () => {
+    expect(
+      canAccessHubAudit({
+        hasModuleAccess: (key) => key === 'hub_os',
+        permissions: managerPermissions,
+      })
+    ).toBe(true);
+
+    expect(
+      canAccessHubAudit({
+        hasModuleAccess: (key) => key === 'hub_os',
+        permissions: consultantPermissions,
+      })
+    ).toBe(false);
   });
 });
