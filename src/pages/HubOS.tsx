@@ -72,6 +72,11 @@ const normalize = (value: string) => value.toLowerCase();
 
 const FINAL_PROD_STATUS = PROD_COLUMNS[PROD_COLUMNS.length - 1];
 const DONE_ASSET_STATUSES = new Set(["CLEANED", "DONE", "DONE_CLEANUP_FAILED"]);
+/**
+ * Espaço reservado para os elementos fixos acima do board dentro do layout da página
+ * (título, métricas, filtros, tabs e paddings). Mantido centralizado para facilitar ajuste.
+ */
+const HUB_OS_BOARD_VIEWPORT_OFFSET_REM = 22;
 type InboxKey =
   | "global"
   | "arte"
@@ -1480,8 +1485,13 @@ export default function HubOS() {
   ) => {
     return (
       <DndContext onDragEnd={onDragEnd}>
-        <div className="w-full overflow-x-auto">
-          <div className="flex w-max gap-4 pb-4 pr-4">
+        <div className="flex min-h-0 flex-1 overflow-x-auto pb-2">
+          <div
+            className="flex min-h-0 w-max gap-4 pb-2 pr-4"
+            style={{
+              height: `max(20rem, calc(100dvh - ${HUB_OS_BOARD_VIEWPORT_OFFSET_REM}rem))`,
+            }}
+          >
             {columns.map(status => {
               const items = ordersList.filter(order =>
                 columns === ART_COLUMNS
@@ -1582,7 +1592,7 @@ export default function HubOS() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex h-full min-h-0 flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">
@@ -1647,12 +1657,12 @@ export default function HubOS() {
       />
 
       {viewMode === "kanban" ? (
-        <>
+        <div className="flex min-h-0 flex-1 flex-col gap-4">
           <FiltersBar value={filters} onChange={setFilters} />
           <Tabs
             value={activeTab}
             onValueChange={value => setActiveTab(value as "arte" | "producao")}
-            className="space-y-4"
+            className="flex min-h-0 flex-1 flex-col gap-4"
           >
             <TabsList>
               {hubPermissions.canViewArteBoard && (
@@ -1669,12 +1679,15 @@ export default function HubOS() {
                 </p>
               )}
             {hubPermissions.canViewArteBoard && (
-              <TabsContent value="arte" className="space-y-4">
+              <TabsContent value="arte" className="mt-0 flex min-h-0 flex-1">
                 {renderBoard(arteOrders, ART_COLUMNS, handleDragEndArte)}
               </TabsContent>
             )}
             {hubPermissions.canViewProducaoBoard && (
-              <TabsContent value="producao" className="space-y-4">
+              <TabsContent
+                value="producao"
+                className="mt-0 flex min-h-0 flex-1"
+              >
                 {renderBoard(
                   producaoOrders,
                   PROD_COLUMNS,
@@ -1683,7 +1696,7 @@ export default function HubOS() {
               </TabsContent>
             )}
           </Tabs>
-        </>
+        </div>
       ) : (
         <InstallationsInbox
           orders={inboxOrders}
