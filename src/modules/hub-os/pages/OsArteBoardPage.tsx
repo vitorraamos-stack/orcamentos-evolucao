@@ -3,6 +3,7 @@ import { Link } from 'wouter';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -15,11 +16,17 @@ import { useLocation } from 'wouter';
 const formatDateTime = (value: string) =>
   new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
+const APPROVAL_STATUS = 'Aguardando Aprovação da Arte';
+
+const APPROVAL_COPY_TEXT =
+  'Olá! 👋 Sua arte está pronta para aprovação.\n\nPara garantirmos que o seu material fique perfeito, pedimos que você confira *COM MUITA ATENÇÃO* a imagem.\n\n\n*📌 Checklist de Conferência:*\n*• Textos e Números:* Verifique toda a ortografia, telefones e endereços.\n*• Medidas:* Confira se as dimensões informadas estão corretas.\n*• Links e QR Codes:* Se houver, teste a leitura e o direcionamento.\n*• Cores:* Lembre-se que pode haver uma variação de até 10% na tonalidade entre o que você vê na tela (celular/computador) e o material impresso.\n\n\n*⚠️ Importante:* A produção é iniciada exatamente com o arquivo aprovado nesta etapa. Após a sua aprovação, não conseguimos cobrir custos de reprodução por erros de grafia, medidas ou artes enviadas por você que estejam fora dos padrões.\n\n\nEstá tudo certinho? Se sim, é só responder com *"ARTE APROVADA"* para mandarmos para a produção! 🚀';
+
 export default function OsArteBoardPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [orders, setOrders] = useState<Os[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingMove, setPendingMove] = useState<{ order: Os; nextStatus: string } | null>(null);
 
   const loadData = async () => {
     try {
@@ -68,6 +75,24 @@ export default function OsArteBoardPage() {
     } catch (error) {
       console.error(error);
       toast.error('Falha ao mover a OS.');
+    }
+  };
+
+  const handleMoveRequest = (order: Os, nextStatus: string) => {
+    if (nextStatus === APPROVAL_STATUS && order.status_arte !== APPROVAL_STATUS) {
+      setPendingMove({ order, nextStatus });
+      return;
+    }
+    void handleMove(order, nextStatus);
+  };
+
+  const handleCopyApprovalText = async () => {
+    try {
+      await navigator.clipboard.writeText(APPROVAL_COPY_TEXT);
+      toast.success('Texto de aprovação copiado.');
+    } catch (error) {
+      console.error(error);
+      toast.error('Não foi possível copiar o texto de aprovação.');
     }
   };
 
@@ -159,7 +184,7 @@ export default function OsArteBoardPage() {
                           Enviar para Produção
                         </Button>
                       )}
-                      <Select value={order.status_arte ?? ARTE_STATUSES[0]} onValueChange={(value) => handleMove(order, value)}>
+                      <Select value={order.status_arte ?? ARTE_STATUSES[0]} onValueChange={(value) => handleMoveRequest(order, value)}>
                         <SelectTrigger className="h-9">
                           <SelectValue placeholder="Mover para..." />
                         </SelectTrigger>
@@ -179,6 +204,37 @@ export default function OsArteBoardPage() {
           );
         })}
       </div>
+
+      <Dialog open={pendingMove !== null} onOpenChange={(open) => !open && setPendingMove(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmação de envio para aprovação</DialogTitle>
+            <DialogDescription>
+              Você confirma que enviou o texto de aprovação de arte para o cliente?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" onClick={handleCopyApprovalText}>
+              Copiar texto de aprovação
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setPendingMove(null)}>
+              Não
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (!pendingMove) return;
+                void handleMove(pendingMove.order, pendingMove.nextStatus);
+                setPendingMove(null);
+              }}
+            >
+              Sim
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
