@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { InstallationFeedback, OsOrder, OsOrderEvent } from "./types";
+import { findForbiddenConsultorFields, toConsultorUpdatePayload } from './consultorUpdate';
 
 export type OptimizeInstallationRoutePayload = {
   dateFrom?: string | null;
@@ -165,7 +166,45 @@ export const createOrder = async (payload: Partial<OsOrder>) => {
   return data as OsOrder;
 };
 
+const loadCurrentUserRole = async () => {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    throw new Error('Usuário não autenticado.');
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', userData.user.id)
+    .single();
+
+  if (profileError) {
+    throw new Error(profileError.message);
+  }
+
+  return String(profile.role ?? '');
+};
+
 export const updateOrder = async (id: string, payload: Partial<OsOrder>) => {
+  const role = await loadCurrentUserRole();
+
+  if (role === 'consultor' || role === 'consultor_vendas') {
+    const forbiddenFields = findForbiddenConsultorFields(payload);
+    if (forbiddenFields.length > 0) {
+      throw new Error(
+        `Campos não permitidos para consultor: ${forbiddenFields.join(', ')}.`
+      );
+    }
+
+    const { data, error } = await supabase.rpc('update_os_order_consultor', {
+      p_os_id: id,
+      p_payload: toConsultorUpdatePayload(payload),
+    });
+
+    if (error) throw new Error(error.message);
+    return data as OsOrder;
+  }
+
   const { data, error } = await supabase
     .from("os_orders")
     .update(payload)

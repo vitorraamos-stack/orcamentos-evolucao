@@ -17,7 +17,8 @@
     "format": "prettier --write .",
     "check:dialog-imports": "node tools/check-dialog-imports.mjs",
     "test": "vitest run",
-    "verify:prod": "npm run build"
+    "verify:prod": "npm run build",
+    "verify:predeploy": "npm run verify:prod && node tools/preflight/check-production-readiness.mjs --check"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

@@ -68,6 +68,14 @@ npm run verify:prod
 O workflow de CI (`.github/workflows/ci.yml`) executa `npm ci` e `npm run verify:prod`.
 O contrato canônico é `npm run verify:prod` (que executa check + test + build).
 
+Validação pré-release ampliada:
+
+```bash
+npm run verify:predeploy
+```
+
+Esse comando executa `verify:prod` e o preflight local (`tools/preflight/check-production-readiness.mjs`) para falhar cedo em variáveis obrigatórias por contexto (Vite, Vercel API, Edge Functions e agente Windows/SMB), sem expor valores de secrets.
+
 ## Deploy (Vercel)
 
 1. Conecte seu repositório à Vercel.
