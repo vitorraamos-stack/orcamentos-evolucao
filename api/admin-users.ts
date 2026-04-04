@@ -1,11 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
-import {
-  APP_MODULES,
-  APP_MODULE_KEYS,
-  CONFIG_MODULE_KEY,
-  KIOSK_MODULE_KEY,
-  type AppModuleKey,
-} from '../shared/app-modules';
+const CONFIG_MODULE_KEY = 'configuracoes';
+const KIOSK_MODULE_KEY = 'hub_os_kiosk';
+type AppModuleKey = string;
 
 const ALLOWED_ROLES = [
   'consultor_vendas',
