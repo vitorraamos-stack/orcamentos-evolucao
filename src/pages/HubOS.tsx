@@ -72,6 +72,11 @@ const normalize = (value: string) => value.toLowerCase();
 
 const FINAL_PROD_STATUS = PROD_COLUMNS[PROD_COLUMNS.length - 1];
 const DONE_ASSET_STATUSES = new Set(["CLEANED", "DONE", "DONE_CLEANUP_FAILED"]);
+/**
+ * Espaço reservado para os elementos fixos acima do board dentro do layout da página
+ * (título, métricas, filtros, tabs e paddings). Mantido centralizado para facilitar ajuste.
+ */
+const HUB_OS_BOARD_VIEWPORT_OFFSET_REM = 22;
 type InboxKey =
   | "global"
   | "arte"
@@ -1481,7 +1486,12 @@ export default function HubOS() {
     return (
       <DndContext onDragEnd={onDragEnd}>
         <div className="flex min-h-0 flex-1 overflow-x-auto pb-2">
-          <div className="flex h-full min-h-0 w-max gap-4 pb-2 pr-4">
+          <div
+            className="flex min-h-0 w-max gap-4 pb-2 pr-4"
+            style={{
+              height: `max(20rem, calc(100dvh - ${HUB_OS_BOARD_VIEWPORT_OFFSET_REM}rem))`,
+            }}
+          >
             {columns.map(status => {
               const items = ordersList.filter(order =>
                 columns === ART_COLUMNS
