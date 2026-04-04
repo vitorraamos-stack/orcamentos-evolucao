@@ -3,6 +3,14 @@ import { DndContext, DragEndEvent } from "@dnd-kit/core";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
@@ -122,6 +130,21 @@ const playInsumosAlertSound = () => {
 const getDisplayArtStatus = (status: ArtStatus): ArtStatus =>
   status === "Ajustes" ? "Para Aprovação" : status;
 
+const APPROVAL_ART_STATUS: ArtStatus = "Para Aprovação";
+const APPROVAL_COPY_TEXT = `Olá! 👋 Sua arte está pronta para aprovação.
+
+Para garantirmos que o seu material fique perfeito, pedimos que você confira *COM MUITA ATENÇÃO* a imagem.
+
+*📌 Checklist de Conferência:*
+*• Textos e Números:* Verifique toda a ortografia, telefones e endereços.
+*• Medidas:* Confira se as dimensões informadas estão corretas.
+*• Links e QR Codes:* Se houver, teste a leitura e o direcionamento.
+*• Cores:* Lembre-se que pode haver uma variação de até 10% na tonalidade entre o que você vê na tela (celular/computador) e o material impresso.
+
+*⚠️ Importante:* A produção é iniciada exatamente com o arquivo aprovado nesta etapa. Após a sua aprovação, não conseguimos cobrir custos de reprodução por erros de grafia, medidas ou artes enviadas por você que estejam fora dos padrões.
+
+Está tudo certinho? Se sim, é só responder com *"ARTE APROVADA"* para mandarmos para a produção! 🚀`;
+
 export default function HubOS() {
   const { user, isAdmin, hubPermissions, hasModuleAccess } = useAuth();
   const [, setLocation] = useLocation();
@@ -133,6 +156,10 @@ export default function HubOS() {
   const [activeTab, setActiveTab] = useState<"arte" | "producao">("arte");
   const [selectedOrder, setSelectedOrder] = useState<OsOrder | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [pendingApprovalMove, setPendingApprovalMove] = useState<{
+    order: OsOrder;
+    nextStatus: ArtStatus;
+  } | null>(null);
   const [artDirectionPopupOpen, setArtDirectionPopupOpen] = useState(false);
   const [artDirectionPopupTag, setArtDirectionPopupTag] =
     useState<ArtDirectionTag | null>(null);
@@ -910,17 +937,7 @@ export default function HubOS() {
     }
   };
 
-  const handleDragEndArte = async ({ active, over }: DragEndEvent) => {
-    if (!over) return;
-    if (!hubPermissions.canMoveArteBoard) {
-      toast.error("Você não tem permissão para mover cards de Arte.");
-      return;
-    }
-    const order = orders.find(item => item.id === active.id);
-    if (!order) return;
-    const nextStatus = over.id as ArtStatus;
-    if (getDisplayArtStatus(order.art_status) === nextStatus) return;
-
+  const moveOrderToArtStatus = async (order: OsOrder, nextStatus: ArtStatus) => {
     const inboxStatus = ART_COLUMNS[0];
     const inCreationStatus = ART_COLUMNS[1];
     const previous = order;
@@ -993,6 +1010,36 @@ export default function HubOS() {
       console.error(error);
       toast.error("Erro ao mover card.");
       updateLocalOrder(previous);
+    }
+  };
+
+  const handleDragEndArte = async ({ active, over }: DragEndEvent) => {
+    if (!over) return;
+    if (!hubPermissions.canMoveArteBoard) {
+      toast.error("Você não tem permissão para mover cards de Arte.");
+      return;
+    }
+    const order = orders.find(item => item.id === active.id);
+    if (!order) return;
+    const nextStatus = over.id as ArtStatus;
+    if (getDisplayArtStatus(order.art_status) === nextStatus) return;
+    if (
+      nextStatus === APPROVAL_ART_STATUS &&
+      getDisplayArtStatus(order.art_status) !== APPROVAL_ART_STATUS
+    ) {
+      setPendingApprovalMove({ order, nextStatus });
+      return;
+    }
+    await moveOrderToArtStatus(order, nextStatus);
+  };
+
+  const handleCopyApprovalText = async () => {
+    try {
+      await navigator.clipboard.writeText(APPROVAL_COPY_TEXT);
+      toast.success("Texto de aprovação copiado.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Não foi possível copiar o texto de aprovação.");
     }
   };
 
@@ -1847,6 +1894,52 @@ export default function HubOS() {
         onConfirmMove={handleConfirmAcabamentoMove}
         onPrintLabel={handlePrintAcabamentoLabel}
       />
+
+      <Dialog
+        open={pendingApprovalMove !== null}
+        onOpenChange={open => {
+          if (!open) {
+            setPendingApprovalMove(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmação</DialogTitle>
+            <DialogDescription>
+              Você confirma que enviou o texto de aprovação de arte para o
+              cliente?
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <Button variant="outline" onClick={handleCopyApprovalText}>
+              Copiar texto de aprovação
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPendingApprovalMove(null);
+              }}
+            >
+              Não
+            </Button>
+            <Button
+              onClick={() => {
+                if (!pendingApprovalMove) return;
+                void moveOrderToArtStatus(
+                  pendingApprovalMove.order,
+                  pendingApprovalMove.nextStatus
+                );
+                setPendingApprovalMove(null);
+              }}
+            >
+              Sim
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
