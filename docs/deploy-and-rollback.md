@@ -4,7 +4,8 @@
 1. Pré-deploy:
    - Aplicar migrations pendentes (`supabase/migrations/`).
    - Validar variáveis obrigatórias (Vercel + Supabase + ORS + R2).
-   - Executar localmente `npm ci`, `npm run verify:prod` e `npm run verify:predeploy`.
+   - Executar localmente `npm ci`, `npm run verify:prod` e `npm run verify:predeploy` (completo).
+   - Em pipelines contextuais, executar também o preflight compatível com o ambiente (`npm run verify:predeploy:api` ou `npm run verify:predeploy:edge`).
 2. CI obrigatória:
    - Workflow `ci.yml` precisa estar verde antes do deploy.
    - O pipeline executa o mesmo caminho canônico de produção: `npm ci` + `npm run verify:prod`.
@@ -12,7 +13,7 @@
    - `vercel.json` usa `installCommand: npm ci`.
    - `vercel.json` usa `buildCommand: npm run build` (que já executa check + test + build).
 4. Deploy das Edge Functions Supabase:
-   - Workflow `deploy-supabase-functions.yml` executa `npm ci` + `npm run verify:prod` antes do deploy.
+   - Workflow `deploy-supabase-functions.yml` executa `npm ci` + `npm run verify:prod` + `npm run verify:predeploy:edge` antes do deploy.
    - O deploy é feito por allowlist explícita (`r2-presign-upload`, `r2-presign-download`, `r2-delete-objects`, `r2-health`) para evitar republicação acidental de função legada.
    - `optimize-installation-route` não é rota canônica e não deve ser publicada.
 5. Pós-deploy (smoke test obrigatório):
@@ -26,6 +27,8 @@
 Workflow `ci.yml` executa:
 - `npm ci`
 - `npm run verify:prod`
+
+> O CI genérico não roda preflight completo para evitar falha estrutural por secrets ausentes fora de contexto. Preflight contextual é obrigatório nos pipelines de deploy correspondentes.
 
 ## Critério de alinhamento CI x Deploy
 - Não aprovar fluxo de deploy que use `npm install` no lugar de `npm ci`.

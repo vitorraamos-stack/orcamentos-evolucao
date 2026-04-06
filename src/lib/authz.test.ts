@@ -4,6 +4,7 @@ import {
   canAccessConfiguracoes,
   canAccessHubAudit,
   canAccessMateriais,
+  canAccessHubFinanceiro,
 } from '@/lib/authz';
 
 describe('buildAuthorizationSnapshot', () => {
@@ -51,6 +52,23 @@ describe('route authorization helpers', () => {
       canAccessMateriais({
         hasModuleAccess: (key) => key === 'materiais',
         permissions: consultantPermissions,
+      })
+    ).toBe(false);
+  });
+
+
+  it('financeiro exige módulo hub_os_financeiro', () => {
+    expect(
+      canAccessHubFinanceiro({
+        hasModuleAccess: (key) => key === 'hub_os_financeiro',
+        permissions: managerPermissions,
+      })
+    ).toBe(true);
+
+    expect(
+      canAccessHubFinanceiro({
+        hasModuleAccess: () => false,
+        permissions: managerPermissions,
       })
     ).toBe(false);
   });
