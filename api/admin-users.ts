@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { APP_MODULE_KEYS, CONFIG_MODULE_KEY, KIOSK_MODULE_KEY, type AppModuleKey } from '../shared/app-modules';
+import { APP_MODULE_KEYS, CONFIG_MODULE_KEY, KIOSK_MODULE_KEY, type AppModuleKey } from '../shared/app-modules.ts';
 
 const ALLOWED_ROLES = [
   'consultor_vendas',
