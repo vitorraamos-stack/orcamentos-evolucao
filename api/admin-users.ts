@@ -1,10 +1,23 @@
 import { createClient } from '@supabase/supabase-js';
-import {
-  APP_MODULE_KEYS,
-  CONFIG_MODULE_KEY,
-  KIOSK_MODULE_KEY,
-  type AppModuleKey,
-} from '../shared/app-modules';
+
+// Mantido localmente para garantir resolução estável no runtime serverless da Vercel.
+// Fonte canônica permanece em shared/app-modules.ts; alterações aqui devem seguir o mesmo catálogo.
+const APP_MODULE_KEYS = [
+  'hub_os',
+  'hub_os_financeiro',
+  'hub_os_insumos',
+  'hub_os_producao_externa',
+  'hub_os_kiosk',
+  'galeria',
+  'calculadora',
+  'materiais',
+  'configuracoes',
+] as const;
+
+type AppModuleKey = (typeof APP_MODULE_KEYS)[number];
+
+const CONFIG_MODULE_KEY: AppModuleKey = 'configuracoes';
+const KIOSK_MODULE_KEY: AppModuleKey = 'hub_os_kiosk';
 
 const ALLOWED_ROLES = [
   'consultor_vendas',
