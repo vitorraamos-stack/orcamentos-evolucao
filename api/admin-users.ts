@@ -1,7 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
-const CONFIG_MODULE_KEY = 'configuracoes';
-const KIOSK_MODULE_KEY = 'hub_os_kiosk';
-type AppModuleKey = string;
+
+const APP_MODULE_KEYS = [
+  'hub_os',
+  'hub_os_financeiro',
+  'hub_os_insumos',
+  'hub_os_producao_externa',
+  'hub_os_kiosk',
+  'galeria',
+  'calculadora',
+  'materiais',
+  'configuracoes',
+] as const;
+
+type AppModuleKey = (typeof APP_MODULE_KEYS)[number];
+
+const CONFIG_MODULE_KEY: AppModuleKey = 'configuracoes';
+const KIOSK_MODULE_KEY: AppModuleKey = 'hub_os_kiosk';
 
 const ALLOWED_ROLES = [
   'consultor_vendas',
@@ -35,11 +49,13 @@ function jsonError(res: any, status: number, code: string, message: string) {
   return json(res, status, { ok: false, error: { code, message } });
 }
 
-const parseModules = (modules: unknown, allowedModuleKeys: readonly string[]) => {
+const parseModules = (modules: unknown, allowedModuleKeys: readonly AppModuleKey[]) => {
   if (modules === undefined) return undefined;
   if (!Array.isArray(modules)) return { error: 'Modules deve ser um array.' } as const;
   const normalized = modules.map((module) => String(module).trim());
-  const invalid = normalized.filter((module) => !allowedModuleKeys.includes(module));
+  const invalid = normalized.filter(
+    (module) => !allowedModuleKeys.includes(module as AppModuleKey)
+  );
   if (invalid.length > 0) {
     return { error: `Módulos inválidos: ${invalid.join(', ')}.` } as const;
   }
@@ -106,7 +122,9 @@ export default async function handler(req: any, res: any) {
     return jsonError(res, 500, 'module_list_error', 'Não foi possível carregar módulos permitidos.');
   }
 
-  const allowedModuleKeys = (appModules || []).map((module) => module.module_key);
+  const allowedModuleKeys = (appModules || [])
+    .map((module) => module.module_key)
+    .filter((moduleKey): moduleKey is AppModuleKey => APP_MODULE_KEYS.includes(moduleKey as AppModuleKey));
 
   try {
     let body: Record<string, unknown> = {};

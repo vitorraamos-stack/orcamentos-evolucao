@@ -11,8 +11,9 @@
 - Executar localmente:
   - `npm ci`
   - `npm run verify:prod`
-  - `npm run verify:predeploy`
-- O preflight valida variáveis obrigatórias por contexto (Vite, Vercel API, Edge Functions, agente Windows/SMB) sem imprimir valores sensíveis.
+  - `npm run verify:predeploy` (todos os contextos)
+  - `npm run verify:predeploy:api` e/ou `npm run verify:predeploy:edge` quando validar contexto específico
+- O preflight valida variáveis obrigatórias por contexto (Vite, Vercel API, Edge Functions, agente Windows/SMB) sem imprimir valores sensíveis e falha com status != 0 quando faltar variável do contexto selecionado.
 - Garantir CI verde no branch de release.
 - Garantir paridade de deploy: Vercel e workflow de Edge Functions não podem usar caminho mais fraco que `npm ci` + `npm run verify:prod`.
 
@@ -38,7 +39,7 @@
 
 ## 6) Deploy operacional
 - Vercel é o alvo canônico do front-end/serverless.
-- Publicar Edge Functions somente após CI + verify:prod.
+- Publicar Edge Functions somente após CI + verify:prod + preflight contextual de Edge Functions (`npm run verify:predeploy:edge`).
 - Publicar Edge Functions apenas pela allowlist canônica (`r2-presign-upload`, `r2-presign-download`, `r2-delete-objects`, `r2-health`).
 - Não usar deploy manual com variáveis ausentes.
 

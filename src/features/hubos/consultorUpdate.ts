@@ -19,8 +19,6 @@ export const CONSULTOR_ALLOWED_UPDATE_FIELDS = [
   'insumos_requested_at',
   'insumos_resolved_at',
   'insumos_resolved_by',
-  'updated_at',
-  'updated_by',
 ] as const satisfies ReadonlyArray<keyof OsOrder>;
 
 export type ConsultorAllowedUpdateField = (typeof CONSULTOR_ALLOWED_UPDATE_FIELDS)[number];

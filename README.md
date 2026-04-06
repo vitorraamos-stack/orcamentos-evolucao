@@ -71,10 +71,19 @@ O contrato canônico é `npm run verify:prod` (que executa check + test + build)
 Validação pré-release ampliada:
 
 ```bash
+# completo (todos os contextos)
 npm run verify:predeploy
+
+# por contexto (para pipelines/ambientes específicos)
+npm run verify:predeploy:frontend
+npm run verify:predeploy:api
+npm run verify:predeploy:edge
+node tools/preflight/check-production-readiness.mjs --check --context windowsSmbAgent
 ```
 
-Esse comando executa `verify:prod` e o preflight local (`tools/preflight/check-production-readiness.mjs`) para falhar cedo em variáveis obrigatórias por contexto (Vite, Vercel API, Edge Functions e agente Windows/SMB), sem expor valores de secrets.
+`verify:prod` valida build/check/test e é o contrato mínimo de CI.
+`verify:predeploy` executa `verify:prod` + preflight completo de variáveis de ambiente (todos os contextos).
+Os comandos por contexto validam apenas o ambiente compatível com o job (sem expor valores de secrets), evitando falso-negativo por falta estrutural de variáveis que não pertencem àquele pipeline.
 
 ## Deploy (Vercel)
 
