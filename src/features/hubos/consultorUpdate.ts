@@ -27,7 +27,7 @@ export const toConsultorUpdatePayload = (payload: Partial<OsOrder>) => {
   const sanitized: Partial<Record<ConsultorAllowedUpdateField, OsOrder[ConsultorAllowedUpdateField]>> = {};
 
   for (const field of CONSULTOR_ALLOWED_UPDATE_FIELDS) {
-    if (field in payload) {
+    if (Object.prototype.hasOwnProperty.call(payload, field)) {
       sanitized[field] = payload[field] as OsOrder[ConsultorAllowedUpdateField];
     }
   }

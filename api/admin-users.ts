@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
+// Mantido localmente para garantir resolução estável no runtime serverless da Vercel.
+// Fonte canônica permanece em shared/app-modules.ts; alterações aqui devem seguir o mesmo catálogo.
 const APP_MODULE_KEYS = [
   'hub_os',
   'hub_os_financeiro',
