@@ -78,3 +78,17 @@ export type OsEvent = {
   created_by: string | null;
   created_at: string;
 };
+
+export type OsLayoutAsset = {
+  id: string;
+  os_id: string;
+  asset_type: "LAYOUT";
+  object_path: string;
+  original_name: string | null;
+  mime_type: string | null;
+  size_bytes: number | null;
+  storage_provider: string | null;
+  storage_bucket: string | null;
+  bucket: string | null;
+  uploaded_at: string;
+};
