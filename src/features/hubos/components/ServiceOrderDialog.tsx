@@ -19,6 +19,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ArrowLeft } from "lucide-react";
 import {
+  fetchLatestOrderLayout,
+  fetchOrderAssetDownloadUrl,
   fetchUserDisplayNameById,
   updateOrder,
 } from "../api";
@@ -32,6 +34,7 @@ import type {
   DeliveryDeadlinePreset,
   LogisticType,
   OsOrder,
+  OsOrderLayoutAsset,
   ProductionTag,
 } from "../types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -96,6 +99,11 @@ export default function ServiceOrderDialog({
   const [updatingProductionTag, setUpdatingProductionTag] = useState(false);
   const [createdByName, setCreatedByName] = useState<string | null>(null);
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  const [layoutAsset, setLayoutAsset] = useState<OsOrderLayoutAsset | null>(
+    null
+  );
+  const [loadingLayout, setLoadingLayout] = useState(false);
+  const [openingLayout, setOpeningLayout] = useState(false);
 
   useEffect(() => {
     if (!order) return;
@@ -142,6 +150,38 @@ export default function ServiceOrderDialog({
       active = false;
     };
   }, [order?.created_by]);
+
+  useEffect(() => {
+    let active = true;
+    const loadLayout = async () => {
+      if (!open || !order?.id) {
+        if (active) {
+          setLayoutAsset(null);
+          setLoadingLayout(false);
+        }
+        return;
+      }
+
+      try {
+        if (active) setLoadingLayout(true);
+        const latestLayout = await fetchLatestOrderLayout(order.id);
+        if (active) setLayoutAsset(latestLayout);
+      } catch (error) {
+        console.error(error);
+        if (active) {
+          setLayoutAsset(null);
+        }
+      } finally {
+        if (active) setLoadingLayout(false);
+      }
+    };
+
+    void loadLayout();
+
+    return () => {
+      active = false;
+    };
+  }, [open, order?.id]);
 
   const defaultTitle = useMemo(
     () => [saleNumber, clientName].filter(Boolean).join(" - ").trim(),
@@ -365,6 +405,27 @@ export default function ServiceOrderDialog({
     onOpenChange(false);
   };
 
+  const handleOpenLayout = async () => {
+    if (!layoutAsset?.object_path) {
+      toast.error("Layout indisponível.");
+      return;
+    }
+    try {
+      setOpeningLayout(true);
+      const downloadUrl = await fetchOrderAssetDownloadUrl(
+        layoutAsset.object_path,
+        layoutAsset.original_name ?? undefined
+      );
+      window.open(downloadUrl, "_blank", "noreferrer");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Falha ao abrir layout."
+      );
+    } finally {
+      setOpeningLayout(false);
+    }
+  };
+
   return (
     <>
       <DialogUi.Dialog open={open} onOpenChange={handleOpenChange}>
@@ -584,6 +645,17 @@ export default function ServiceOrderDialog({
 
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => void handleOpenLayout()}
+                disabled={loadingLayout || openingLayout || !layoutAsset}
+              >
+                {openingLayout
+                  ? "Abrindo layout..."
+                  : loadingLayout
+                    ? "Carregando layout..."
+                    : "Ver layout"}
+              </Button>
               {!order?.prod_status && (
                 <Button
                   variant="secondary"
