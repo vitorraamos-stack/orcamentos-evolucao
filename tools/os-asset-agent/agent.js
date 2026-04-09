@@ -475,6 +475,8 @@ const processJob = async job => {
     const subdir =
       assetType === "PAYMENT_PROOF"
         ? path.join("Financeiro", "Comprovantes")
+        : assetType === "LAYOUT"
+          ? path.join("Arte", "Layout")
         : assetType === "PURCHASE_ORDER"
           ? path.join("Financeiro", "OrdensCompra")
           : "";

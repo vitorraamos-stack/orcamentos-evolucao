@@ -1,5 +1,11 @@
 import { supabase } from "@/lib/supabase";
-import type { InstallationFeedback, OsOrder, OsOrderEvent } from "./types";
+import { invokeEdgeFunction } from "@/lib/supabase/invokeEdgeFunction";
+import type {
+  InstallationFeedback,
+  OsOrder,
+  OsOrderEvent,
+  OsOrderLayoutAsset,
+} from "./types";
 import { findForbiddenConsultorFields, toConsultorUpdatePayload } from './consultorUpdate';
 
 export type OptimizeInstallationRoutePayload = {
@@ -201,6 +207,43 @@ export const fetchOrderById = async (id: string) => {
 
   if (error) throw new Error(error.message);
   return data as OsOrder;
+};
+
+export const fetchLatestOrderLayout = async (orderId: string) => {
+  const { data, error } = await supabase
+    .from("os_order_assets")
+    .select(
+      "id, os_id, asset_type, object_path, original_name, mime_type, size_bytes, storage_provider, storage_bucket, bucket, uploaded_at"
+    )
+    .eq("os_id", orderId)
+    .eq("asset_type", "LAYOUT")
+    .is("deleted_from_storage_at", null)
+    .order("uploaded_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return (data as OsOrderLayoutAsset | null) ?? null;
+};
+
+export const fetchOrderAssetDownloadUrl = async (
+  objectPath: string,
+  filename?: string
+) => {
+  const data = await invokeEdgeFunction<{ downloadUrl: string }>(
+    supabase,
+    "r2-presign-download",
+    {
+      key: objectPath,
+      filename,
+    }
+  );
+
+  if (!data?.downloadUrl) {
+    throw new Error("Falha ao gerar URL de download.");
+  }
+
+  return data.downloadUrl;
 };
 
 export const createOrder = async (payload: Partial<OsOrder>) => {
