@@ -19,7 +19,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ArrowLeft } from "lucide-react";
 import {
-  createOrderEvent,
   fetchUserDisplayNameById,
   updateOrder,
 } from "../api";
@@ -49,7 +48,7 @@ export default function OrderDetailsDialog({
   onUpdated,
   onDelete,
 }: OrderDetailsDialogProps) {
-  const { user, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
   const [saleNumber, setSaleNumber] = useState("");
   const [clientName, setClientName] = useState("");
   const [title, setTitle] = useState("");
@@ -164,8 +163,6 @@ export default function OrderDetailsDialog({
         logistic_type: logisticType,
         address: logisticType === "retirada" ? null : address.trim() || null,
         production_tag: productionTag || null,
-        updated_at: new Date().toISOString(),
-        updated_by: user?.id ?? null,
       };
 
       if (order.prod_status === "Produção") {
@@ -210,37 +207,14 @@ export default function OrderDetailsDialog({
       const updated = await updateOrder(order.id, {
         art_status: "Produzir",
         prod_status: PROD_COLUMNS[0],
-        updated_at: new Date().toISOString(),
-        updated_by: user?.id ?? null,
+      }, {
+        type: "status_change",
+        payload: {
+          board: "producao",
+          from: order.prod_status,
+          to: PROD_COLUMNS[0],
+        },
       });
-      try {
-        await createOrderEvent({
-          os_id: order.id,
-          type: "status_change",
-          payload: {
-            board: "arte",
-            from: order.art_status,
-            to: "Produzir",
-            actor_name:
-              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
-          },
-          created_by: user?.id ?? null,
-        });
-        await createOrderEvent({
-          os_id: order.id,
-          type: "status_change",
-          payload: {
-            board: "producao",
-            from: order.prod_status,
-            to: PROD_COLUMNS[0],
-            actor_name:
-              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
-          },
-          created_by: user?.id ?? null,
-        });
-      } catch (eventError) {
-        console.error("Erro ao registrar auditoria de status.", eventError);
-      }
       onUpdated(updated);
       toast.success("Card enviado para Produção.");
       onOpenChange(false);
@@ -259,25 +233,14 @@ export default function OrderDetailsDialog({
       const updated = await updateOrder(order.id, {
         art_status: ART_COLUMNS[0],
         prod_status: null,
-        updated_at: new Date().toISOString(),
-        updated_by: user?.id ?? null,
+      }, {
+        type: "status_change",
+        payload: {
+          board: "arte",
+          from: order.art_status,
+          to: ART_COLUMNS[0],
+        },
       });
-      try {
-        await createOrderEvent({
-          os_id: order.id,
-          type: "status_change",
-          payload: {
-            board: "arte",
-            from: order.art_status,
-            to: ART_COLUMNS[0],
-            actor_name:
-              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
-          },
-          created_by: user?.id ?? null,
-        });
-      } catch (eventError) {
-        console.error("Erro ao registrar auditoria de status.", eventError);
-      }
       onUpdated(updated);
       toast.success("Card movido para Arte.");
       onOpenChange(false);
