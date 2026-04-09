@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -12,6 +13,7 @@ import type { Os } from '../types';
 import { ARTE_STATUSES, PRODUCAO_STATUSES } from '../statuses';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'wouter';
+import { uploadLayoutForOrder, validateFiles } from '@/features/hubos/assets';
 
 const formatDateTime = (value: string) =>
   new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
@@ -26,7 +28,13 @@ export default function OsArteBoardPage() {
   const [, setLocation] = useLocation();
   const [orders, setOrders] = useState<Os[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pendingMove, setPendingMove] = useState<{ order: Os; nextStatus: string } | null>(null);
+  const [pendingApprovalMove, setPendingApprovalMove] = useState<{ order: Os; nextStatus: string } | null>(null);
+  const [pendingLayoutMove, setPendingLayoutMove] = useState<{ order: Os; nextStatus: string } | null>(null);
+  const [selectedLayoutFile, setSelectedLayoutFile] = useState<File | null>(null);
+  const [isDraggingLayoutFile, setIsDraggingLayoutFile] = useState(false);
+  const [isMovingWithoutLayout, setIsMovingWithoutLayout] = useState(false);
+  const [isSendingLayoutAndMoving, setIsSendingLayoutAndMoving] = useState(false);
+  const layoutInputRef = useRef<HTMLInputElement | null>(null);
 
   const loadData = async () => {
     try {
@@ -72,18 +80,116 @@ export default function OsArteBoardPage() {
       });
       setOrders((prev) => prev.map((item) => (item.id === order.id ? updated : item)));
       toast.success('Status atualizado.');
+      return true;
     } catch (error) {
       console.error(error);
       toast.error('Falha ao mover a OS.');
+      return false;
     }
   };
 
   const handleMoveRequest = (order: Os, nextStatus: string) => {
     if (nextStatus === APPROVAL_STATUS && order.status_arte !== APPROVAL_STATUS) {
-      setPendingMove({ order, nextStatus });
+      setPendingApprovalMove({ order, nextStatus });
+      return;
+    }
+    if (nextStatus === 'Produzir' && order.status_arte !== 'Produzir') {
+      setPendingLayoutMove({ order, nextStatus });
       return;
     }
     void handleMove(order, nextStatus);
+  };
+
+  const resetLayoutModalState = () => {
+    setPendingLayoutMove(null);
+    setSelectedLayoutFile(null);
+    setIsDraggingLayoutFile(false);
+    setIsMovingWithoutLayout(false);
+    setIsSendingLayoutAndMoving(false);
+    if (layoutInputRef.current) {
+      layoutInputRef.current.value = '';
+    }
+  };
+
+  const handleLayoutModalOpenChange = (open: boolean) => {
+    if (!open && !isMovingWithoutLayout && !isSendingLayoutAndMoving) {
+      resetLayoutModalState();
+    }
+  };
+
+  const selectLayoutFile = (incomingFiles: File[]) => {
+    if (incomingFiles.length === 0) return;
+    if (incomingFiles.length > 1) {
+      toast.warning('Apenas 1 arquivo é permitido. Usando o primeiro arquivo enviado.');
+    }
+    const [candidate] = incomingFiles;
+    if (!candidate) return;
+
+    const validation = validateFiles([candidate]);
+    if (!validation.ok) {
+      toast.error(validation.error ?? 'Arquivo inválido.');
+      return;
+    }
+
+    setSelectedLayoutFile(candidate);
+  };
+
+  const handleLayoutInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    selectLayoutFile(files);
+  };
+
+  const handleMoveWithoutLayout = async () => {
+    if (!pendingLayoutMove || isMovingWithoutLayout || isSendingLayoutAndMoving) return;
+    try {
+      setIsMovingWithoutLayout(true);
+      const moved = await handleMove(pendingLayoutMove.order, pendingLayoutMove.nextStatus);
+      if (moved) {
+        resetLayoutModalState();
+      }
+    } finally {
+      setIsMovingWithoutLayout(false);
+    }
+  };
+
+  const handleUploadLayoutAndMove = async () => {
+    if (!pendingLayoutMove || isMovingWithoutLayout || isSendingLayoutAndMoving) return;
+    if (!selectedLayoutFile) {
+      toast.error('Selecione um layout para continuar.');
+      return;
+    }
+
+    try {
+      setIsSendingLayoutAndMoving(true);
+      const fromStatus = pendingLayoutMove.order.status_arte;
+      const layoutAsset = await uploadLayoutForOrder({
+        osId: pendingLayoutMove.order.id,
+        file: selectedLayoutFile,
+        userId: user?.id ?? null,
+      });
+      await createOsEvent({
+        os_id: pendingLayoutMove.order.id,
+        type: 'layout_uploaded',
+        payload: {
+          asset_id: layoutAsset.id,
+          filename: layoutAsset.filename,
+          from_status: fromStatus,
+          to_status: pendingLayoutMove.nextStatus,
+        },
+        created_by: user?.id ?? null,
+      });
+      const moved = await handleMove(pendingLayoutMove.order, pendingLayoutMove.nextStatus);
+      if (!moved) {
+        return;
+      }
+      toast.success('Layout enviado e OS movida para Produzir.');
+      resetLayoutModalState();
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : 'Falha ao enviar layout. A OS não foi movida.');
+    } finally {
+      setIsSendingLayoutAndMoving(false);
+    }
   };
 
   const handleCopyApprovalText = async () => {
@@ -205,7 +311,7 @@ export default function OsArteBoardPage() {
         })}
       </div>
 
-      <Dialog open={pendingMove !== null} onOpenChange={(open) => !open && setPendingMove(null)}>
+      <Dialog open={pendingApprovalMove !== null} onOpenChange={(open) => !open && setPendingApprovalMove(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Confirmação de envio para aprovação</DialogTitle>
@@ -219,18 +325,121 @@ export default function OsArteBoardPage() {
             </Button>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setPendingMove(null)}>
+            <Button type="button" variant="outline" onClick={() => setPendingApprovalMove(null)}>
               Não
             </Button>
             <Button
               type="button"
               onClick={() => {
-                if (!pendingMove) return;
-                void handleMove(pendingMove.order, pendingMove.nextStatus);
-                setPendingMove(null);
+                if (!pendingApprovalMove) return;
+                void handleMove(pendingApprovalMove.order, pendingApprovalMove.nextStatus);
+                setPendingApprovalMove(null);
               }}
             >
               Sim
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={pendingLayoutMove !== null} onOpenChange={handleLayoutModalOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enviar layout para Produzir</DialogTitle>
+            <DialogDescription>Envie o layout completo com descrição</DialogDescription>
+          </DialogHeader>
+          <div
+            className={`rounded-md border-2 border-dashed p-4 transition-colors ${
+              isDraggingLayoutFile ? 'border-primary bg-primary/5' : 'border-border'
+            }`}
+            onClick={() => layoutInputRef.current?.click()}
+            onDragEnter={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setIsDraggingLayoutFile(true);
+            }}
+            onDragOver={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setIsDraggingLayoutFile(true);
+            }}
+            onDragLeave={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setIsDraggingLayoutFile(false);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setIsDraggingLayoutFile(false);
+              const files = Array.from(event.dataTransfer.files ?? []);
+              selectLayoutFile(files);
+            }}
+            onPaste={(event) => {
+              const files = Array.from(event.clipboardData.files ?? []);
+              if (files.length === 0) return;
+              event.preventDefault();
+              selectLayoutFile(files);
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                layoutInputRef.current?.click();
+              }
+            }}
+          >
+            <Input
+              ref={layoutInputRef}
+              type="file"
+              className="hidden"
+              accept=".pdf,.ai,.eps,.cdr,.png,.jpg,.jpeg,.webp"
+              onChange={handleLayoutInputChange}
+            />
+            <p className="text-sm font-medium">Clique, arraste e solte ou cole o arquivo aqui.</p>
+            <p className="text-xs text-muted-foreground">Formatos aceitos: PDF, AI, EPS, CDR, PNG, JPG e WEBP.</p>
+            {selectedLayoutFile ? (
+              <div className="mt-3 rounded-md border bg-muted/40 p-3 text-sm">
+                <p className="font-medium">{selectedLayoutFile.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {(selectedLayoutFile.size / (1024 * 1024)).toFixed(2)} MB
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setSelectedLayoutFile(null);
+                    if (layoutInputRef.current) {
+                      layoutInputRef.current.value = '';
+                    }
+                  }}
+                >
+                  Remover arquivo
+                </Button>
+              </div>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleMoveWithoutLayout()}
+              disabled={isMovingWithoutLayout || isSendingLayoutAndMoving}
+            >
+              {isMovingWithoutLayout ? 'Movendo...' : 'Sem layout'}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleUploadLayoutAndMove()}
+              disabled={isMovingWithoutLayout || isSendingLayoutAndMoving}
+            >
+              {isSendingLayoutAndMoving
+                ? 'Enviando layout...'
+                : 'Layout enviado - Mover para a próxima etapa'}
             </Button>
           </DialogFooter>
         </DialogContent>

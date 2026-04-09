@@ -1,5 +1,13 @@
 import { supabase } from '@/lib/supabase';
-import type { Os, OsEvent, OsPaymentProof, OsStatus, PaymentStatus } from './types';
+import { invokeEdgeFunction } from '@/lib/supabase/invokeEdgeFunction';
+import type {
+  Os,
+  OsEvent,
+  OsLayoutAsset,
+  OsPaymentProof,
+  OsStatus,
+  PaymentStatus,
+} from './types';
 import { lookupOrderForKiosk } from './orderRepository';
 
 export type KioskLookupResult = {
@@ -63,6 +71,43 @@ export const fetchOsPayments = async (osId: string) => {
 
   if (error) throw error;
   return data as OsPaymentProof[];
+};
+
+export const fetchLatestOsLayout = async (osId: string) => {
+  const { data, error } = await supabase
+    .from('os_order_assets')
+    .select(
+      'id, os_id, asset_type, object_path, original_name, mime_type, size_bytes, storage_provider, storage_bucket, bucket, uploaded_at'
+    )
+    .eq('os_id', osId)
+    .eq('asset_type', 'LAYOUT')
+    .is('deleted_from_storage_at', null)
+    .order('uploaded_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as OsLayoutAsset | null) ?? null;
+};
+
+export const fetchOsAssetDownloadUrl = async (
+  objectPath: string,
+  filename?: string
+) => {
+  const data = await invokeEdgeFunction<{ downloadUrl: string }>(
+    supabase,
+    'r2-presign-download',
+    {
+      key: objectPath,
+      filename,
+    }
+  );
+
+  if (!data?.downloadUrl) {
+    throw new Error('Falha ao gerar URL de download.');
+  }
+
+  return data.downloadUrl;
 };
 
 export const createOs = async (payload: Partial<Os>) => {
