@@ -217,13 +217,55 @@ export const fetchLatestOrderLayout = async (orderId: string) => {
     )
     .eq("os_id", orderId)
     .eq("asset_type", "LAYOUT")
-    .is("deleted_from_storage_at", null)
     .order("uploaded_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (error) throw new Error(error.message);
-  return (data as OsOrderLayoutAsset | null) ?? null;
+  if (!error && data) {
+    return data as OsOrderLayoutAsset;
+  }
+
+  const { data: latestLayoutEvent, error: layoutEventError } = await supabase
+    .from("os_orders_event")
+    .select("payload, created_at")
+    .eq("os_id", orderId)
+    .eq("type", "layout_uploaded")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (layoutEventError) {
+    if (error) throw new Error(error.message);
+    throw new Error(layoutEventError.message);
+  }
+
+  if (!latestLayoutEvent?.payload || typeof latestLayoutEvent.payload !== "object") {
+    if (error) throw new Error(error.message);
+    return null;
+  }
+
+  const payload = latestLayoutEvent.payload as Record<string, unknown>;
+  const objectPath =
+    typeof payload.object_path === "string" ? payload.object_path : null;
+  if (!objectPath) {
+    if (error) throw new Error(error.message);
+    return null;
+  }
+
+  return {
+    id: typeof payload.asset_id === "string" ? payload.asset_id : `${orderId}-layout-event`,
+    os_id: orderId,
+    asset_type: "LAYOUT",
+    object_path: objectPath,
+    original_name:
+      typeof payload.filename === "string" ? payload.filename : null,
+    mime_type: null,
+    size_bytes: null,
+    storage_provider: "r2",
+    storage_bucket: null,
+    bucket: null,
+    uploaded_at: latestLayoutEvent.created_at,
+  } satisfies OsOrderLayoutAsset;
 };
 
 export const fetchOrderAssetDownloadUrl = async (

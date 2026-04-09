@@ -182,6 +182,7 @@ export default function OsArteBoardPage() {
         payload: {
           asset_id: layoutAsset.id,
           filename: layoutAsset.filename,
+          object_path: layoutAsset.objectPath,
           from_status: fromStatus,
           to_status: pendingLayoutMove.nextStatus,
         },
