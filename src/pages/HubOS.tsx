@@ -29,7 +29,7 @@ import {
   createOrderEvent,
   deleteOrder,
   fetchInstallationFeedbacks,
-  fetchOrders,
+  fetchOrdersPage,
   fetchUserDisplayNameById,
   updateOrder,
 } from "@/features/hubos/api";
@@ -282,7 +282,19 @@ export default function HubOS() {
         setLoading(true);
       }
 
-      const data = await fetchOrders();
+      const pageSize = 200;
+      let page = 1;
+      let total = 0;
+      let aggregated: OsOrder[] = [];
+
+      do {
+        const pageResult = await fetchOrdersPage({ page, pageSize });
+        aggregated = [...aggregated, ...pageResult.data];
+        total = pageResult.count;
+        page += 1;
+      } while (aggregated.length < total && page <= 20);
+
+      const data = aggregated;
 
       if (
         !isMountedRef.current ||
@@ -874,24 +886,10 @@ export default function HubOS() {
     setOrders(prev => prev.filter(item => item.id !== order.id));
 
     try {
-      await archiveOrder(order.id, user?.id ?? null);
-      try {
-        await createOrderEvent({
-          os_id: order.id,
-          type: "archive",
-          payload: {
-            archived: true,
-            actor_name:
-              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
-          },
-          created_by: user?.id ?? null,
-        });
-      } catch (eventError) {
-        console.error(
-          "Erro ao registrar auditoria de arquivamento.",
-          eventError
-        );
-      }
+      await archiveOrder(
+        order.id,
+        user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null
+      );
       toast.success("Card arquivado.");
     } catch (error) {
       console.error(error);
@@ -911,29 +909,10 @@ export default function HubOS() {
     setOrders(prev => prev.filter(item => item.id !== order.id));
 
     try {
-      await deleteOrder(order.id);
-      try {
-        await createOrderEvent({
-          os_id: order.id,
-          type: "delete",
-          payload: {
-            previous: {
-              id: order.id,
-              sale_number: order.sale_number,
-              client_name: order.client_name,
-              title: order.title,
-              art_status: order.art_status,
-              prod_status: order.prod_status,
-            },
-            reason: "manual_delete",
-            actor_name:
-              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
-          },
-          created_by: user?.id ?? null,
-        });
-      } catch (eventError) {
-        console.error("Erro ao registrar auditoria de exclusão.", eventError);
-      }
+      await deleteOrder(
+        order.id,
+        user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null
+      );
       toast.success("Card excluído.");
     } catch (error) {
       console.error(error);
@@ -983,8 +962,13 @@ export default function HubOS() {
             : nextStatus === "Produzir"
               ? resolvedDeliveryDate
               : order.delivery_date,
-        updated_at: new Date().toISOString(),
-        updated_by: user?.id ?? null,
+      }, {
+        type: "status_change",
+        payload: {
+          board: "arte",
+          from: order.art_status,
+          to: nextStatus,
+        },
       });
       updateLocalOrder(updated);
       if (
@@ -994,22 +978,6 @@ export default function HubOS() {
       ) {
         setArtDirectionPopupTag(updated.art_direction_tag);
         setArtDirectionPopupOpen(true);
-      }
-      try {
-        await createOrderEvent({
-          os_id: order.id,
-          type: "status_change",
-          payload: {
-            board: "arte",
-            from: order.art_status,
-            to: nextStatus,
-            actor_name:
-              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
-          },
-          created_by: user?.id ?? null,
-        });
-      } catch (eventError) {
-        console.error("Erro ao registrar auditoria de status.", eventError);
       }
     } catch (error) {
       console.error(error);
@@ -1081,26 +1049,15 @@ export default function HubOS() {
       const updated = await updateOrder(order.id, {
         prod_status: nextStatus,
         production_tag: nextProductionTag,
-        updated_at: new Date().toISOString(),
-        updated_by: user?.id ?? null,
+      }, {
+        type: "status_change",
+        payload: {
+          board: "producao",
+          from: order.prod_status,
+          to: nextStatus,
+        },
       });
       updateLocalOrder(updated);
-      try {
-        await createOrderEvent({
-          os_id: order.id,
-          type: "status_change",
-          payload: {
-            board: "producao",
-            from: order.prod_status,
-            to: nextStatus,
-            actor_name:
-              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
-          },
-          created_by: user?.id ?? null,
-        });
-      } catch (eventError) {
-        console.error("Erro ao registrar auditoria de status.", eventError);
-      }
     } catch (error) {
       console.error(error);
       toast.error("Erro ao mover card.");
@@ -1255,29 +1212,17 @@ export default function HubOS() {
     try {
       const updated = await updateOrder(order.id, {
         prod_status: "Em Acabamento",
-        updated_at: new Date().toISOString(),
-        updated_by: user?.id ?? null,
+      }, {
+        type: "prod_status_changed",
+        payload: {
+          board: "producao",
+          from: order.prod_status,
+          to: "Em Acabamento",
+          source: "kanban_lightbox",
+          printed_label: printedAcabamentoLabel,
+        },
       });
       updateLocalOrder(updated);
-
-      try {
-        await createOrderEvent({
-          os_id: order.id,
-          type: "prod_status_changed",
-          payload: {
-            board: "producao",
-            from: order.prod_status,
-            to: "Em Acabamento",
-            source: "kanban_lightbox",
-            printed_label: printedAcabamentoLabel,
-            actor_name:
-              user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
-          },
-          created_by: user?.id ?? null,
-        });
-      } catch (eventError) {
-        console.error("Erro ao registrar auditoria de status.", eventError);
-      }
 
       toast.success("OS movida para Em Acabamento.");
       handleAcabamentoDialogOpenChange(false);
@@ -1313,8 +1258,6 @@ export default function HubOS() {
         insumos_return_notes: insumosReturnNotesDraft.trim(),
         insumos_resolved_at: resolvedAt,
         insumos_resolved_by: user?.id ?? null,
-        updated_at: resolvedAt,
-        updated_by: user?.id ?? null,
       });
       updateLocalOrder(updated);
       setInsumosReturnNotesDraft("");
@@ -1357,8 +1300,6 @@ export default function HubOS() {
         insumos_return_notes: null,
         insumos_resolved_at: null,
         insumos_resolved_by: null,
-        updated_at: new Date().toISOString(),
-        updated_by: user?.id ?? null,
       });
       updateLocalOrder(updated);
       toast.success("OS enviada para Aguardando Insumos.");
@@ -1379,26 +1320,13 @@ export default function HubOS() {
       const updated = await updateOrder(order.id, {
         production_tag: "EM_PRODUCAO",
         insumos_return_notes: null,
-        updated_at: new Date().toISOString(),
-        updated_by: user?.id ?? null,
+      }, {
+        type: "insumos_acknowledged",
+        payload: {
+          previous_production_tag: order.production_tag,
+          next_production_tag: "EM_PRODUCAO",
+        },
       });
-
-      try {
-        await createOrderEvent({
-          os_id: order.id,
-          type: "insumos_acknowledged",
-          payload: {
-            previous_production_tag: order.production_tag,
-            next_production_tag: "EM_PRODUCAO",
-          },
-          created_by: user?.id ?? null,
-        });
-      } catch (eventError) {
-        console.error(
-          "Erro ao registrar auditoria de confirmação de insumos.",
-          eventError
-        );
-      }
 
       updateLocalOrder(updated);
       toast.success("Badge atualizada para Em Produção.");

@@ -19,7 +19,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ArrowLeft } from "lucide-react";
 import {
-  createOrderEvent,
   fetchUserDisplayNameById,
   updateOrder,
 } from "../api";
@@ -75,7 +74,7 @@ export default function ServiceOrderDialog({
   onUpdated,
   onDelete,
 }: ServiceOrderDialogProps) {
-  const { user, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
   const initialFocusRef = useRef<HTMLInputElement | null>(null);
 
   const [saleNumber, setSaleNumber] = useState("");
@@ -241,8 +240,6 @@ export default function ServiceOrderDialog({
         address: logisticType === "retirada" ? null : address.trim() || null,
         art_direction_tag: artDirectionTag,
         production_tag: productionTag || null,
-        updated_at: new Date().toISOString(),
-        updated_by: user?.id ?? null,
       };
 
       if (order.prod_status === "Produção") {
@@ -292,8 +289,6 @@ export default function ServiceOrderDialog({
       setUpdatingProductionTag(true);
       const payload: Partial<OsOrder> = {
         production_tag: nextTag,
-        updated_at: new Date().toISOString(),
-        updated_by: user?.id ?? null,
       };
 
       if (nextTag === "AGUARDANDO_INSUMOS") {
@@ -336,14 +331,9 @@ export default function ServiceOrderDialog({
           order.delivery_deadline_preset === "CUSTOM"
             ? order.delivery_date
             : resolvedDeliveryDate,
-        updated_at: nowIso,
-        updated_by: user?.id ?? null,
-      });
-      await createOrderEvent({
-        os_id: order.id,
+      }, {
         type: "status_change",
         payload: { board: "producao" },
-        created_by: user?.id ?? null,
       });
       onUpdated(updated);
       toast.success("Card enviado para Produção.");
@@ -360,8 +350,6 @@ export default function ServiceOrderDialog({
       const updated = await updateOrder(order.id, {
         art_status: ART_COLUMNS[0],
         prod_status: null,
-        updated_at: new Date().toISOString(),
-        updated_by: user?.id ?? null,
       });
       onUpdated(updated);
       toast.success("Card movido para Arte.");

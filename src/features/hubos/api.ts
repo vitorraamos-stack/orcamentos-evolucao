@@ -105,10 +105,58 @@ export const fetchOrders = async () => {
     .from("os_orders")
     .select("*")
     .eq("archived", false)
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .limit(200);
 
   if (error) throw error;
   return data as OsOrder[];
+};
+
+type FetchOrdersPageParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  artStatus?: string;
+  prodStatus?: string;
+};
+
+export const fetchOrdersPage = async ({
+  page = 1,
+  pageSize = 50,
+  search,
+  artStatus,
+  prodStatus,
+}: FetchOrdersPageParams = {}) => {
+  const safePage = Math.max(1, page);
+  const safePageSize = Math.min(Math.max(pageSize, 1), 200);
+  const from = (safePage - 1) * safePageSize;
+  const to = from + safePageSize - 1;
+
+  let query = supabase
+    .from("os_orders")
+    .select("*", { count: "exact" })
+    .eq("archived", false)
+    .order("updated_at", { ascending: false })
+    .range(from, to);
+
+  if (search?.trim()) {
+    const term = search.trim();
+    query = query.or(
+      `sale_number.ilike.%${term}%,client_name.ilike.%${term}%,title.ilike.%${term}%`
+    );
+  }
+  if (artStatus) query = query.eq("art_status", artStatus);
+  if (prodStatus) query = query.eq("prod_status", prodStatus);
+
+  const { data, error, count } = await query;
+  if (error) throw new Error(error.message);
+
+  return {
+    data: (data ?? []) as OsOrder[],
+    count: count ?? 0,
+    page: safePage,
+    pageSize: safePageSize,
+  };
 };
 
 export const fetchAvisadoOrderIds = async (orderIds: string[]) => {
@@ -156,11 +204,9 @@ export const fetchOrderById = async (id: string) => {
 };
 
 export const createOrder = async (payload: Partial<OsOrder>) => {
-  const { data, error } = await supabase
-    .from("os_orders")
-    .insert(payload)
-    .select("*")
-    .single();
+  const { data, error } = await supabase.rpc("hub_os_create_order_secure", {
+    p_payload: payload,
+  });
 
   if (error) throw new Error(error.message);
   return data as OsOrder;
@@ -185,7 +231,16 @@ const loadCurrentUserRole = async () => {
   return String(profile.role ?? '');
 };
 
-export const updateOrder = async (id: string, payload: Partial<OsOrder>) => {
+type OrderEventInput = {
+  type: string;
+  payload?: Record<string, unknown> | null;
+};
+
+export const updateOrder = async (
+  id: string,
+  payload: Partial<OsOrder>,
+  event?: OrderEventInput
+) => {
   const role = await loadCurrentUserRole();
 
   if (role === 'consultor' || role === 'consultor_vendas') {
@@ -205,37 +260,34 @@ export const updateOrder = async (id: string, payload: Partial<OsOrder>) => {
     return data as OsOrder;
   }
 
-  const { data, error } = await supabase
-    .from("os_orders")
-    .update(payload)
-    .eq("id", id)
-    .select("*")
-    .single();
+  const { data, error } = await supabase.rpc("hub_os_update_order_secure", {
+    p_os_id: id,
+    p_patch: payload,
+    p_event_type: event?.type ?? null,
+    p_event_payload: event?.payload ?? null,
+  });
 
   if (error) throw new Error(error.message);
   return data as OsOrder;
 };
 
-export const archiveOrder = async (id: string, archivedBy: string | null) => {
-  const { data, error } = await supabase
-    .from("os_orders")
-    .update({
-      archived: true,
-      archived_at: new Date().toISOString(),
-      archived_by: archivedBy,
-      updated_at: new Date().toISOString(),
-      updated_by: archivedBy,
-    })
-    .eq("id", id)
-    .select("*")
-    .single();
+export const archiveOrder = async (id: string, actorName?: string | null) => {
+  const { data, error } = await supabase.rpc("hub_os_archive_order_secure", {
+    p_os_id: id,
+    p_reason: "manual_archive",
+    p_payload: actorName ? { actor_name: actorName } : {},
+  });
 
   if (error) throw new Error(error.message);
   return data as OsOrder;
 };
 
-export const deleteOrder = async (id: string) => {
-  const { error } = await supabase.from("os_orders").delete().eq("id", id);
+export const deleteOrder = async (id: string, actorName?: string | null) => {
+  const { error } = await supabase.rpc("hub_os_delete_order_secure", {
+    p_os_id: id,
+    p_reason: "manual_delete",
+    p_payload: actorName ? { actor_name: actorName } : {},
+  });
 
   if (error) throw new Error(error.message);
 };

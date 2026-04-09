@@ -51,6 +51,23 @@ function jsonError(res: any, status: number, code: string, message: string) {
   return json(res, status, { ok: false, error: { code, message } });
 }
 
+const logAdminUsers = (
+  level: 'info' | 'warn' | 'error',
+  event: string,
+  details: Record<string, unknown>
+) => {
+  const payload = { scope: 'admin-users', event, ...details };
+  if (level === 'error') {
+    console.error(JSON.stringify(payload));
+    return;
+  }
+  if (level === 'warn') {
+    console.warn(JSON.stringify(payload));
+    return;
+  }
+  console.log(JSON.stringify(payload));
+};
+
 const parseModules = (modules: unknown, allowedModuleKeys: readonly AppModuleKey[]) => {
   if (modules === undefined) return undefined;
   if (!Array.isArray(modules)) return { error: 'Modules deve ser um array.' } as const;
@@ -209,30 +226,54 @@ export default async function handler(req: any, res: any) {
       });
       if (createError) throw createError;
 
-      const { error: upsertError } = await supabaseAdmin.from('profiles').upsert({
-        id: created.user.id,
-        email: normalizedEmail,
-        role: normalizedRole,
-      });
-      if (upsertError) throw upsertError;
+      try {
+        const { error: upsertError } = await supabaseAdmin.from('profiles').upsert({
+          id: created.user.id,
+          email: normalizedEmail,
+          role: normalizedRole,
+        });
+        if (upsertError) throw upsertError;
 
-      const moduleList = parsedModules && 'value' in parsedModules ? parsedModules.value : [];
-      const requiredManagerModules: AppModuleKey[] = [CONFIG_MODULE_KEY, KIOSK_MODULE_KEY];
-      const nextModules = normalizedRole === 'gerente'
-        ? requiredManagerModules.reduce(
-            (acc, moduleKey) => (acc.includes(moduleKey) ? acc : [...acc, moduleKey]),
-            moduleList
-          )
-        : moduleList;
+        const moduleList = parsedModules && 'value' in parsedModules ? parsedModules.value : [];
+        const requiredManagerModules: AppModuleKey[] = [CONFIG_MODULE_KEY, KIOSK_MODULE_KEY];
+        const nextModules = normalizedRole === 'gerente'
+          ? requiredManagerModules.reduce(
+              (acc, moduleKey) => (acc.includes(moduleKey) ? acc : [...acc, moduleKey]),
+              moduleList
+            )
+          : moduleList;
 
-      if (nextModules.length > 0) {
-        const { error: moduleInsertError } = await supabaseAdmin.from('user_module_access').insert(
-          nextModules.map((moduleKey) => ({
-            user_id: created.user.id,
-            module_key: moduleKey,
-          }))
+        if (nextModules.length > 0) {
+          const { error: moduleInsertError } = await supabaseAdmin.from('user_module_access').insert(
+            nextModules.map((moduleKey) => ({
+              user_id: created.user.id,
+              module_key: moduleKey,
+            }))
+          );
+          if (moduleInsertError) throw moduleInsertError;
+        }
+      } catch (writeError: any) {
+        logAdminUsers('error', 'create_user_partial_failure', {
+          actorId: currentUser.id,
+          targetUserId: created.user.id,
+          message: writeError?.message || 'unknown',
+        });
+        const { error: rollbackError } = await supabaseAdmin.auth.admin.deleteUser(created.user.id);
+        if (rollbackError) {
+          logAdminUsers('error', 'create_user_rollback_failed', {
+            actorId: currentUser.id,
+            targetUserId: created.user.id,
+            message: rollbackError.message,
+          });
+          throw new Error(
+            `${writeError?.message || 'Falha ao persistir perfil/módulos.'} ` +
+            `Compensação falhou ao remover usuário no Auth: ${rollbackError.message}.`
+          );
+        }
+        throw new Error(
+          `${writeError?.message || 'Falha ao persistir perfil/módulos.'} ` +
+          'Usuário de Auth removido com sucesso na compensação.'
         );
-        if (moduleInsertError) throw moduleInsertError;
       }
 
       return jsonOk(res, 200, { message: 'Usuário criado com sucesso.' });
@@ -343,6 +384,16 @@ export default async function handler(req: any, res: any) {
         );
       }
 
+      const previousRole = currentRoleNormalized;
+      const { data: existingModulesBefore, error: existingModulesBeforeError } = await supabaseAdmin
+        .from('user_module_access')
+        .select('module_key')
+        .eq('user_id', normalizedUserId);
+      if (existingModulesBeforeError) throw existingModulesBeforeError;
+      const previousModules = (existingModulesBefore || [])
+        .map((module) => module.module_key)
+        .filter((moduleKey): moduleKey is AppModuleKey => allowedModuleKeys.includes(moduleKey));
+
       if (normalizedRole) {
         const { error: profileUpdateError } = await supabaseAdmin
           .from('profiles')
@@ -351,6 +402,7 @@ export default async function handler(req: any, res: any) {
         if (profileUpdateError) throw profileUpdateError;
       }
 
+      let modulesChanged = false;
       if (parsedModules && 'value' in parsedModules) {
         const requiredManagerModules: AppModuleKey[] = [CONFIG_MODULE_KEY, KIOSK_MODULE_KEY];
         const shouldForceManagerModules = normalizedRole === 'gerente' || (normalizedRole === undefined && isTargetManager);
@@ -366,6 +418,7 @@ export default async function handler(req: any, res: any) {
           module_keys: nextModules,
         });
         if (moduleUpdateError) throw moduleUpdateError;
+        modulesChanged = true;
       }
 
       if (ensureManagerModules) {
@@ -374,6 +427,7 @@ export default async function handler(req: any, res: any) {
           module_keys: ensureManagerModules,
         });
         if (moduleUpdateError) throw moduleUpdateError;
+        modulesChanged = true;
       }
 
       const authPayload: Record<string, unknown> = {};
@@ -384,7 +438,37 @@ export default async function handler(req: any, res: any) {
 
       if (Object.keys(authPayload).length > 0) {
         const { error: authUpdateError } = await supabaseAdmin.auth.admin.updateUserById(normalizedUserId, authPayload);
-        if (authUpdateError) throw authUpdateError;
+        if (authUpdateError) {
+          logAdminUsers('error', 'update_user_auth_failure', {
+            actorId: currentUser.id,
+            targetUserId: normalizedUserId,
+            message: authUpdateError.message,
+          });
+          const compensationErrors: string[] = [];
+          if (normalizedRole && previousRole) {
+            const { error: roleRollbackError } = await supabaseAdmin
+              .from('profiles')
+              .update({ role: previousRole })
+              .eq('id', normalizedUserId);
+            if (roleRollbackError) {
+              compensationErrors.push(`role rollback: ${roleRollbackError.message}`);
+            }
+          }
+          if (modulesChanged) {
+            const { error: modulesRollbackError } = await supabaseAdmin.rpc('set_user_modules', {
+              target_user_id: normalizedUserId,
+              module_keys: previousModules,
+            });
+            if (modulesRollbackError) {
+              compensationErrors.push(`modules rollback: ${modulesRollbackError.message}`);
+            }
+          }
+          const compensationMessage =
+            compensationErrors.length > 0
+              ? ` Falha na compensação: ${compensationErrors.join('; ')}.`
+              : ' Compensação de role/módulos aplicada.';
+          throw new Error(`${authUpdateError.message}.${compensationMessage}`);
+        }
       }
 
       return jsonOk(res, 200, { message: 'Usuário atualizado com sucesso.' });
