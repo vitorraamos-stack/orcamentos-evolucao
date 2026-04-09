@@ -1,5 +1,11 @@
 import { supabase } from "@/lib/supabase";
-import type { InstallationFeedback, OsOrder, OsOrderEvent } from "./types";
+import { invokeEdgeFunction } from "@/lib/supabase/invokeEdgeFunction";
+import type {
+  InstallationFeedback,
+  OsOrder,
+  OsOrderEvent,
+  OsOrderLayoutAsset,
+} from "./types";
 import { findForbiddenConsultorFields, toConsultorUpdatePayload } from './consultorUpdate';
 
 export type OptimizeInstallationRoutePayload = {
@@ -201,6 +207,86 @@ export const fetchOrderById = async (id: string) => {
 
   if (error) throw new Error(error.message);
   return data as OsOrder;
+};
+
+export const fetchLatestOrderLayout = async (orderId: string) => {
+  const { data, error } = await supabase
+    .from("os_order_assets")
+    .select(
+      "id, os_id, asset_type, object_path, original_name, mime_type, size_bytes, storage_provider, storage_bucket, bucket, uploaded_at"
+    )
+    .eq("os_id", orderId)
+    .eq("asset_type", "LAYOUT")
+    .is("deleted_from_storage_at", null)
+    .order("uploaded_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!error && data) {
+    return data as OsOrderLayoutAsset;
+  }
+
+  const { data: latestLayoutEvent, error: layoutEventError } = await supabase
+    .from("os_orders_event")
+    .select("payload, created_at")
+    .eq("os_id", orderId)
+    .eq("type", "layout_uploaded")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (layoutEventError) {
+    if (error) throw new Error(error.message);
+    throw new Error(layoutEventError.message);
+  }
+
+  if (!latestLayoutEvent?.payload || typeof latestLayoutEvent.payload !== "object") {
+    if (error) throw new Error(error.message);
+    return null;
+  }
+
+  const payload = latestLayoutEvent.payload as Record<string, unknown>;
+  const objectPath =
+    typeof payload.object_path === "string" ? payload.object_path : null;
+  if (!objectPath) {
+    if (error) throw new Error(error.message);
+    return null;
+  }
+
+  return {
+    id: typeof payload.asset_id === "string" ? payload.asset_id : `${orderId}-layout-event`,
+    os_id: orderId,
+    asset_type: "LAYOUT",
+    object_path: objectPath,
+    original_name:
+      typeof payload.filename === "string" ? payload.filename : null,
+    mime_type: null,
+    size_bytes: null,
+    storage_provider: "r2",
+    storage_bucket: null,
+    bucket: null,
+    uploaded_at: latestLayoutEvent.created_at,
+  } satisfies OsOrderLayoutAsset;
+};
+
+export const fetchOrderAssetDownloadUrl = async (
+  objectPath: string,
+  filename?: string
+) => {
+  const data = await invokeEdgeFunction<{ downloadUrl: string }>(
+    supabase,
+    "r2-presign-download",
+    {
+      key: objectPath,
+      filename,
+    }
+  );
+
+  if (!data?.downloadUrl) {
+    throw new Error("Falha ao gerar URL de download.");
+  }
+
+  return data.downloadUrl;
 };
 
 export const createOrder = async (payload: Partial<OsOrder>) => {
