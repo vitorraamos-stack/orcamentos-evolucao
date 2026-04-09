@@ -19,6 +19,12 @@ const formatDateTime = (value: string) =>
   new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
 const APPROVAL_STATUS = 'Aguardando Aprovação da Arte';
+const normalizeStatus = (status?: string | null) =>
+  (status ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
 
 const APPROVAL_COPY_TEXT =
   'Olá! 👋 Sua arte está pronta para aprovação.\n\nPara garantirmos que o seu material fique perfeito, pedimos que você confira *COM MUITA ATENÇÃO* a imagem.\n\n\n*📌 Checklist de Conferência:*\n*• Textos e Números:* Verifique toda a ortografia, telefones e endereços.\n*• Medidas:* Confira se as dimensões informadas estão corretas.\n*• Links e QR Codes:* Se houver, teste a leitura e o direcionamento.\n*• Cores:* Lembre-se que pode haver uma variação de até 10% na tonalidade entre o que você vê na tela (celular/computador) e o material impresso.\n\n\n*⚠️ Importante:* A produção é iniciada exatamente com o arquivo aprovado nesta etapa. Após a sua aprovação, não conseguimos cobrir custos de reprodução por erros de grafia, medidas ou artes enviadas por você que estejam fora dos padrões.\n\n\nEstá tudo certinho? Se sim, é só responder com *"ARTE APROVADA"* para mandarmos para a produção! 🚀';
@@ -93,7 +99,10 @@ export default function OsArteBoardPage() {
       setPendingApprovalMove({ order, nextStatus });
       return;
     }
-    if (nextStatus === 'Produzir' && order.status_arte !== 'Produzir') {
+    if (
+      normalizeStatus(nextStatus) === 'produzir' &&
+      normalizeStatus(order.status_arte) !== 'produzir'
+    ) {
       setPendingLayoutMove({ order, nextStatus });
       return;
     }
