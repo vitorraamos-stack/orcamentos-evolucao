@@ -217,6 +217,7 @@ export const fetchLatestOrderLayout = async (orderId: string) => {
     )
     .eq("os_id", orderId)
     .eq("asset_type", "LAYOUT")
+    .is("deleted_from_storage_at", null)
     .order("uploaded_at", { ascending: false })
     .limit(1)
     .maybeSingle();
