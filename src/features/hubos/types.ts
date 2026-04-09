@@ -86,6 +86,20 @@ export type OsOrderEvent = {
   } | null;
 };
 
+export type OsOrderLayoutAsset = {
+  id: string;
+  os_id: string;
+  asset_type: "LAYOUT";
+  object_path: string;
+  original_name: string | null;
+  mime_type: string | null;
+  size_bytes: number | null;
+  storage_provider: string | null;
+  storage_bucket: string | null;
+  bucket: string | null;
+  uploaded_at: string;
+};
+
 export type HubOsFilters = {
   search: string;
   reproducao: boolean;
