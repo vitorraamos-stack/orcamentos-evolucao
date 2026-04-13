@@ -1,4 +1,4 @@
-import { GetObjectCommand, S3Client } from 'npm:@aws-sdk/client-s3';
+import { GetObjectCommand, HeadObjectCommand, S3Client } from 'npm:@aws-sdk/client-s3';
 import { getSignedUrl } from 'npm:@aws-sdk/s3-request-presigner';
 import {
   authorizeR2OrderScope,
@@ -113,6 +113,26 @@ Deno.serve(async (request) => {
 
     const responseContentType = inferContentType(keyValidation.value, payload.filename);
     const safeFilename = (payload.filename || keyValidation.value.split('/').pop() || 'arquivo').replace(/[\r\n"]/g, '').trim();
+
+    try {
+      await client.send(
+        new HeadObjectCommand({
+          Bucket: bucket,
+          Key: keyValidation.value,
+        }),
+      );
+    } catch (error) {
+      const maybeAwsError = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+      if (maybeAwsError.name === 'NotFound' || maybeAwsError.$metadata?.httpStatusCode === 404) {
+        infoLog(SCOPE, 'object_not_found', {
+          userId: auth.user?.id,
+          orderId,
+          key: keyValidation.value,
+        });
+        return errorResponse(404, 'object_not_found', 'O arquivo solicitado não existe mais no armazenamento.');
+      }
+      throw error;
+    }
 
     const command = new GetObjectCommand({
       Bucket: bucket,

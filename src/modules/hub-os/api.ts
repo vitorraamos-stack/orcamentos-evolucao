@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { invokeEdgeFunction } from '@/lib/supabase/invokeEdgeFunction';
+import { EdgeFunctionInvokeError, invokeEdgeFunction } from '@/lib/supabase/invokeEdgeFunction';
 import type {
   Os,
   OsEvent,
@@ -13,6 +13,28 @@ import { lookupOrderForKiosk } from './orderRepository';
 export type KioskLookupResult = {
   id: string;
   source: 'os' | 'os_orders';
+};
+
+export class OsAssetDownloadError extends Error {
+  code?: string;
+  status?: number;
+}
+
+type OsLayoutAssetRow = OsLayoutAsset & {
+  os_order_asset_jobs?: { status?: string | null } | { status?: string | null }[] | null;
+};
+
+const isValidLayoutCandidate = (asset: OsLayoutAssetRow) => {
+  const job = Array.isArray(asset.os_order_asset_jobs) ? asset.os_order_asset_jobs[0] : asset.os_order_asset_jobs;
+
+  return (
+    asset.asset_type === 'LAYOUT' &&
+    asset.deleted_from_storage_at == null &&
+    asset.error == null &&
+    asset.storage_provider === 'r2' &&
+    asset.r2_etag != null &&
+    job?.status !== 'ERROR'
+  );
 };
 
 
@@ -73,35 +95,48 @@ export const fetchOsPayments = async (osId: string) => {
   return data as OsPaymentProof[];
 };
 
-export const fetchLatestOsLayout = async (osId: string) => {
+export const fetchOsLayouts = async (osId: string, limit = 10): Promise<OsLayoutAsset[]> => {
   const { data, error } = await supabase
     .from('os_order_assets')
     .select(
-      'id, os_id, asset_type, object_path, original_name, mime_type, size_bytes, storage_provider, storage_bucket, bucket, uploaded_at'
+      'id, os_id, asset_type, object_path, original_name, mime_type, size_bytes, storage_provider, storage_bucket, bucket, r2_etag, error, deleted_from_storage_at, uploaded_at, os_order_asset_jobs(status)'
     )
     .eq('os_id', osId)
     .eq('asset_type', 'LAYOUT')
-    .is('deleted_from_storage_at', null)
     .order('uploaded_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(limit);
 
   if (error) throw error;
-  return (data as OsLayoutAsset | null) ?? null;
+  return ((data as OsLayoutAssetRow[] | null) ?? [])
+    .filter(isValidLayoutCandidate)
+    .map(({ os_order_asset_jobs: _ignored, ...asset }) => asset);
+};
+
+export const fetchLatestOsLayout = async (osId: string) => {
+  const layouts = await fetchOsLayouts(osId, 1);
+  return layouts[0] ?? null;
 };
 
 export const fetchOsAssetDownloadUrl = async (
   objectPath: string,
   filename?: string
 ) => {
-  const data = await invokeEdgeFunction<{ downloadUrl: string }>(
-    supabase,
-    'r2-presign-download',
-    {
+  let data: { downloadUrl: string } | null = null;
+
+  try {
+    data = await invokeEdgeFunction<{ downloadUrl: string }>(supabase, 'r2-presign-download', {
       key: objectPath,
       filename,
+    });
+  } catch (error) {
+    if (error instanceof EdgeFunctionInvokeError) {
+      const normalized = new OsAssetDownloadError(error.message);
+      normalized.status = error.status;
+      normalized.code = error.status === 404 ? 'object_not_found' : undefined;
+      throw normalized;
     }
-  );
+    throw error;
+  }
 
   if (!data?.downloadUrl) {
     throw new Error('Falha ao gerar URL de download.');
