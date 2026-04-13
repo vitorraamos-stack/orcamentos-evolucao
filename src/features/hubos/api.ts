@@ -226,6 +226,10 @@ export const fetchLatestOrderLayout = async (orderId: string) => {
     return data as OsOrderLayoutAsset;
   }
 
+  if (!error && !data) {
+    return null;
+  }
+
   const { data: latestLayoutEvent, error: layoutEventError } = await supabase
     .from("os_orders_event")
     .select("payload, created_at")
