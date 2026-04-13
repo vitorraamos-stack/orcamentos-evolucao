@@ -12,12 +12,19 @@ import {
 } from "@/components/ui/dialog";
 import { fetchOsAssetBlobUrl, fetchOsAssetDownloadUrl } from "../api";
 import { resolveLayoutPreviewKind } from "../layoutPreview";
-import type { OsLayoutAsset } from "../types";
+
+export type LayoutPreviewAsset = {
+  id: string;
+  object_path: string;
+  original_name: string | null;
+  mime_type: string | null;
+  uploaded_at?: string;
+};
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  layoutAsset: OsLayoutAsset | null;
+  layoutAsset: LayoutPreviewAsset | null;
 };
 
 type PreviewState = "idle" | "loading" | "loaded" | "unsupported" | "error";
