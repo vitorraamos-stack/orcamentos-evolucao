@@ -16,6 +16,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import {
+  fetchLatestOrderLayout,
+  fetchOrderAssetDownloadUrl,
+} from "@/features/hubos/api";
+import {
   fetchKioskBoard,
   completeKioskInstallation,
   moveKioskOrder,
@@ -48,6 +52,7 @@ import type {
   KioskHealthState,
   KioskMoveAction,
 } from "../kiosk/types";
+import type { OsOrderLayoutAsset } from "@/features/hubos/types";
 import { useGlobalOrderFlowState } from "../order-flow-state";
 import { filterKioskActiveCards } from "../order-flow-selectors";
 
@@ -83,6 +88,10 @@ export default function OsKioskPage() {
   const [selectedOrder, setSelectedOrder] = useState<KioskBoardCard | null>(
     null
   );
+  const [selectedOrderLayout, setSelectedOrderLayout] =
+    useState<OsOrderLayoutAsset | null>(null);
+  const [loadingSelectedLayout, setLoadingSelectedLayout] = useState(false);
+  const [openingSelectedLayout, setOpeningSelectedLayout] = useState(false);
   const [fullscreenBlocked, setFullscreenBlocked] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
@@ -96,6 +105,10 @@ export default function OsKioskPage() {
   const [summarySelectedKey, setSummarySelectedKey] = useState<string | null>(
     null
   );
+  const [summarySelectedLayout, setSummarySelectedLayout] =
+    useState<OsOrderLayoutAsset | null>(null);
+  const [loadingSummaryLayout, setLoadingSummaryLayout] = useState(false);
+  const [openingSummaryLayout, setOpeningSummaryLayout] = useState(false);
   const [cards, setCards] = useState<KioskBoardCard[]>([]);
   const { isRetirado } = useGlobalOrderFlowState();
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -500,6 +513,97 @@ export default function OsKioskPage() {
   );
 
   useEffect(() => {
+    let active = true;
+    const loadSelectedOrderLayout = async () => {
+      if (
+        !detailsOpen ||
+        !selectedOrder ||
+        selectedOrder.source_type !== "os_orders"
+      ) {
+        if (active) {
+          setSelectedOrderLayout(null);
+          setLoadingSelectedLayout(false);
+        }
+        return;
+      }
+
+      try {
+        if (active) setLoadingSelectedLayout(true);
+        const layout = await fetchLatestOrderLayout(selectedOrder.source_id);
+        if (active) setSelectedOrderLayout(layout);
+      } catch (error) {
+        console.error(error);
+        if (active) setSelectedOrderLayout(null);
+      } finally {
+        if (active) setLoadingSelectedLayout(false);
+      }
+    };
+
+    void loadSelectedOrderLayout();
+    return () => {
+      active = false;
+    };
+  }, [detailsOpen, selectedOrder]);
+
+  useEffect(() => {
+    let active = true;
+    const loadSummaryLayout = async () => {
+      if (
+        !summaryModalData ||
+        !summarySelectedOrder ||
+        summarySelectedOrder.source_type !== "os_orders"
+      ) {
+        if (active) {
+          setSummarySelectedLayout(null);
+          setLoadingSummaryLayout(false);
+        }
+        return;
+      }
+
+      try {
+        if (active) setLoadingSummaryLayout(true);
+        const layout = await fetchLatestOrderLayout(summarySelectedOrder.source_id);
+        if (active) setSummarySelectedLayout(layout);
+      } catch (error) {
+        console.error(error);
+        if (active) setSummarySelectedLayout(null);
+      } finally {
+        if (active) setLoadingSummaryLayout(false);
+      }
+    };
+
+    void loadSummaryLayout();
+    return () => {
+      active = false;
+    };
+  }, [summaryModalData, summarySelectedOrder]);
+
+  const openLayout = async (
+    layout: OsOrderLayoutAsset | null,
+    setOpening: (value: boolean) => void
+  ) => {
+    if (!layout?.object_path) {
+      toast.error("Layout indisponível.");
+      return;
+    }
+    try {
+      setOpening(true);
+      const downloadUrl = await fetchOrderAssetDownloadUrl(
+        layout.object_path,
+        layout.original_name ?? undefined
+      );
+      window.open(downloadUrl, "_blank", "noreferrer");
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error ? error.message : "Falha ao abrir layout."
+      );
+    } finally {
+      setOpening(false);
+    }
+  };
+
+  useEffect(() => {
     setSummarySearch("");
     setSummarySelectedKey(null);
   }, [summaryModalCategory]);
@@ -839,6 +943,25 @@ export default function OsKioskPage() {
                         <strong>Endereço:</strong>{" "}
                         {summarySelectedOrder.address ?? "—"}
                       </p>
+                      <div>
+                        <Button
+                          variant="outline"
+                          onClick={() =>
+                            void openLayout(summarySelectedLayout, setOpeningSummaryLayout)
+                          }
+                          disabled={
+                            loadingSummaryLayout ||
+                            openingSummaryLayout ||
+                            !summarySelectedLayout
+                          }
+                        >
+                          {openingSummaryLayout
+                            ? "Abrindo layout..."
+                            : loadingSummaryLayout
+                              ? "Carregando layout..."
+                              : "Abrir layout"}
+                        </Button>
+                      </div>
                       {renderInstallationFinalizeButton(summarySelectedOrder)}
                     </div>
                   ) : (
@@ -932,6 +1055,25 @@ export default function OsKioskPage() {
                 <strong>Etapa:</strong>{" "}
                 {KIOSK_STAGE_LABELS[selectedOrder.current_stage]}
               </p>
+              <div>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    void openLayout(selectedOrderLayout, setOpeningSelectedLayout)
+                  }
+                  disabled={
+                    loadingSelectedLayout ||
+                    openingSelectedLayout ||
+                    !selectedOrderLayout
+                  }
+                >
+                  {openingSelectedLayout
+                    ? "Abrindo layout..."
+                    : loadingSelectedLayout
+                      ? "Carregando layout..."
+                      : "Abrir layout"}
+                </Button>
+              </div>
             </div>
           ) : null}
         </DialogContent>

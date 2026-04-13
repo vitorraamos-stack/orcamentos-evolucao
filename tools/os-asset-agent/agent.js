@@ -180,10 +180,11 @@ const fileExistsWithSize = async (filePath, expectedSize) => {
   }
 };
 
-const isProtectedPaymentProofAsset = asset => {
+const isRetentionProtectedAsset = asset => {
   const objectPath = asset.object_path || "";
   return (
     asset.asset_type === "PAYMENT_PROOF" ||
+    asset.asset_type === "LAYOUT" ||
     objectPath.includes("/Financeiro/Comprovante/") ||
     objectPath.includes("/payment_proofs/")
   );
@@ -328,9 +329,9 @@ const cleanupJob = async job => {
     return;
   }
 
-  const protectedAssets = pendingAssets.filter(isProtectedPaymentProofAsset);
+  const protectedAssets = pendingAssets.filter(isRetentionProtectedAsset);
   const cleanupCandidates = pendingAssets.filter(
-    asset => !isProtectedPaymentProofAsset(asset)
+    asset => !isRetentionProtectedAsset(asset)
   );
 
   const r2Assets = cleanupCandidates.filter(
@@ -409,7 +410,7 @@ const cleanupJob = async job => {
 
   if (protectedAssets.length > 0) {
     console.log(
-      `[cleanup] preservando ${protectedAssets.length} comprovante(s) no R2 (retenção ativa)`
+      `[cleanup] preservando ${protectedAssets.length} asset(s) com retenção ativa no R2`
     );
   }
   await supabase
@@ -475,6 +476,8 @@ const processJob = async job => {
     const subdir =
       assetType === "PAYMENT_PROOF"
         ? path.join("Financeiro", "Comprovantes")
+        : assetType === "LAYOUT"
+          ? path.join("Arte", "Layout")
         : assetType === "PURCHASE_ORDER"
           ? path.join("Financeiro", "OrdensCompra")
           : "";

@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ChangeEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { DndContext, DragEndEvent } from "@dnd-kit/core";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -34,6 +41,7 @@ import {
   updateOrder,
 } from "@/features/hubos/api";
 import { getLatestAssetJobsByOsId } from "@/features/hubos/assetJobs";
+import { uploadLayoutForOrder, validateFiles } from "@/features/hubos/assets";
 import KanbanColumn from "@/features/hubos/components/KanbanColumn";
 import KanbanCard from "@/features/hubos/components/KanbanCard";
 import ServiceOrderDialog from "@/features/hubos/components/ServiceOrderDialog";
@@ -136,6 +144,12 @@ const getDisplayArtStatus = (status: ArtStatus): ArtStatus =>
   status === "Ajustes" ? "Para Aprovação" : status;
 
 const APPROVAL_ART_STATUS: ArtStatus = "Para Aprovação";
+const normalizeStatus = (status?: string | null) =>
+  (status ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
 const APPROVAL_COPY_TEXT = `Olá! 👋 Sua arte está pronta para aprovação.
 
 Para garantirmos que o seu material fique perfeito, pedimos que você confira *COM MUITA ATENÇÃO* a imagem.
@@ -165,6 +179,18 @@ export default function HubOS() {
     order: OsOrder;
     nextStatus: ArtStatus;
   } | null>(null);
+  const [pendingLayoutMove, setPendingLayoutMove] = useState<{
+    order: OsOrder;
+    nextStatus: ArtStatus;
+  } | null>(null);
+  const [selectedLayoutFile, setSelectedLayoutFile] = useState<File | null>(
+    null
+  );
+  const [isDraggingLayoutFile, setIsDraggingLayoutFile] = useState(false);
+  const [isMovingWithoutLayout, setIsMovingWithoutLayout] = useState(false);
+  const [isSendingLayoutAndMoving, setIsSendingLayoutAndMoving] =
+    useState(false);
+  const layoutInputRef = useRef<HTMLInputElement | null>(null);
   const [artDirectionPopupOpen, setArtDirectionPopupOpen] = useState(false);
   const [artDirectionPopupTag, setArtDirectionPopupTag] =
     useState<ArtDirectionTag | null>(null);
@@ -979,10 +1005,12 @@ export default function HubOS() {
         setArtDirectionPopupTag(updated.art_direction_tag);
         setArtDirectionPopupOpen(true);
       }
+      return true;
     } catch (error) {
       console.error(error);
       toast.error("Erro ao mover card.");
       updateLocalOrder(previous);
+      return false;
     }
   };
 
@@ -1003,7 +1031,121 @@ export default function HubOS() {
       setPendingApprovalMove({ order, nextStatus });
       return;
     }
+    if (
+      normalizeStatus(nextStatus) === "produzir" &&
+      normalizeStatus(getDisplayArtStatus(order.art_status)) !== "produzir"
+    ) {
+      setPendingLayoutMove({ order, nextStatus });
+      return;
+    }
     await moveOrderToArtStatus(order, nextStatus);
+  };
+
+  const resetLayoutModalState = () => {
+    setPendingLayoutMove(null);
+    setSelectedLayoutFile(null);
+    setIsDraggingLayoutFile(false);
+    setIsMovingWithoutLayout(false);
+    setIsSendingLayoutAndMoving(false);
+    if (layoutInputRef.current) {
+      layoutInputRef.current.value = "";
+    }
+  };
+
+  const handleLayoutModalOpenChange = (open: boolean) => {
+    if (!open && !isMovingWithoutLayout && !isSendingLayoutAndMoving) {
+      resetLayoutModalState();
+    }
+  };
+
+  const selectLayoutFile = (incomingFiles: File[]) => {
+    if (incomingFiles.length === 0) return;
+    if (incomingFiles.length > 1) {
+      toast.warning(
+        "Apenas 1 arquivo é permitido. Usando o primeiro arquivo enviado."
+      );
+    }
+    const [candidate] = incomingFiles;
+    if (!candidate) return;
+
+    const validation = validateFiles([candidate]);
+    if (!validation.ok) {
+      toast.error(validation.error ?? "Arquivo inválido.");
+      return;
+    }
+
+    setSelectedLayoutFile(candidate);
+  };
+
+  const handleLayoutInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    selectLayoutFile(files);
+  };
+
+  const handleMoveWithoutLayout = async () => {
+    if (!pendingLayoutMove || isMovingWithoutLayout || isSendingLayoutAndMoving)
+      return;
+    try {
+      setIsMovingWithoutLayout(true);
+      const moved = await moveOrderToArtStatus(
+        pendingLayoutMove.order,
+        pendingLayoutMove.nextStatus
+      );
+      if (moved) {
+        resetLayoutModalState();
+      }
+    } finally {
+      setIsMovingWithoutLayout(false);
+    }
+  };
+
+  const handleUploadLayoutAndMove = async () => {
+    if (!pendingLayoutMove || isMovingWithoutLayout || isSendingLayoutAndMoving)
+      return;
+    if (!selectedLayoutFile) {
+      toast.error("Selecione um layout para continuar.");
+      return;
+    }
+
+    try {
+      setIsSendingLayoutAndMoving(true);
+      const fromStatus = pendingLayoutMove.order.art_status;
+      const layoutAsset = await uploadLayoutForOrder({
+        osId: pendingLayoutMove.order.id,
+        file: selectedLayoutFile,
+        userId: user?.id ?? null,
+      });
+      await createOrderEvent({
+        os_id: pendingLayoutMove.order.id,
+        type: "layout_uploaded",
+        payload: {
+          asset_id: layoutAsset.id,
+          filename: layoutAsset.filename,
+          object_path: layoutAsset.objectPath,
+          from_status: fromStatus,
+          to_status: pendingLayoutMove.nextStatus,
+        },
+        created_by: user?.id ?? null,
+      });
+      const moved = await moveOrderToArtStatus(
+        pendingLayoutMove.order,
+        pendingLayoutMove.nextStatus
+      );
+      if (!moved) {
+        return;
+      }
+      toast.success("Layout enviado e card movido para Produzir.");
+      resetLayoutModalState();
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Falha ao enviar layout. O card não foi movido."
+      );
+    } finally {
+      setIsSendingLayoutAndMoving(false);
+    }
   };
 
   const handleCopyApprovalText = async () => {
@@ -1877,6 +2019,120 @@ export default function HubOS() {
               }}
             >
               Sim
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={pendingLayoutMove !== null}
+        onOpenChange={handleLayoutModalOpenChange}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enviar layout para Produzir</DialogTitle>
+            <DialogDescription>
+              Envie o layout completo com descrição
+            </DialogDescription>
+          </DialogHeader>
+          <div
+            className={`rounded-md border-2 border-dashed p-4 transition-colors ${
+              isDraggingLayoutFile
+                ? "border-primary bg-primary/5"
+                : "border-border"
+            }`}
+            onClick={() => layoutInputRef.current?.click()}
+            onDragEnter={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              setIsDraggingLayoutFile(true);
+            }}
+            onDragOver={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              setIsDraggingLayoutFile(true);
+            }}
+            onDragLeave={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              setIsDraggingLayoutFile(false);
+            }}
+            onDrop={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              setIsDraggingLayoutFile(false);
+              const files = Array.from(event.dataTransfer.files ?? []);
+              selectLayoutFile(files);
+            }}
+            onPaste={event => {
+              const files = Array.from(event.clipboardData.files ?? []);
+              if (files.length === 0) return;
+              event.preventDefault();
+              selectLayoutFile(files);
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={event => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                layoutInputRef.current?.click();
+              }
+            }}
+          >
+            <input
+              ref={layoutInputRef}
+              type="file"
+              className="hidden"
+              accept=".pdf,.ai,.eps,.cdr,.png,.jpg,.jpeg,.webp"
+              onChange={handleLayoutInputChange}
+            />
+            <p className="text-sm font-medium">
+              Clique, arraste e solte ou cole o arquivo aqui.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Formatos aceitos: PDF, AI, EPS, CDR, PNG, JPG e WEBP.
+            </p>
+            {selectedLayoutFile ? (
+              <div className="mt-3 rounded-md border bg-muted/40 p-3 text-sm">
+                <p className="font-medium">{selectedLayoutFile.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {(selectedLayoutFile.size / (1024 * 1024)).toFixed(2)} MB
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2"
+                  onClick={event => {
+                    event.stopPropagation();
+                    setSelectedLayoutFile(null);
+                    if (layoutInputRef.current) {
+                      layoutInputRef.current.value = "";
+                    }
+                  }}
+                >
+                  Remover arquivo
+                </Button>
+              </div>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleMoveWithoutLayout()}
+              disabled={isMovingWithoutLayout || isSendingLayoutAndMoving}
+            >
+              {isMovingWithoutLayout ? "Movendo..." : "Sem layout"}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleUploadLayoutAndMove()}
+              disabled={isMovingWithoutLayout || isSendingLayoutAndMoving}
+            >
+              {isSendingLayoutAndMoving
+                ? "Enviando layout..."
+                : "Layout enviado - Mover para a próxima etapa"}
             </Button>
           </DialogFooter>
         </DialogContent>
