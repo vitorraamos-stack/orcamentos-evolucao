@@ -19,6 +19,12 @@ type UploadAssetsParams = {
   userId: string | null;
 };
 
+type UploadLayoutParams = {
+  osId: string;
+  file: File;
+  userId: string | null;
+};
+
 export type FinancialDocType = "PAYMENT_PROOF" | "PURCHASE_ORDER";
 export type FinancialInstallmentLabel = "1/1" | "1/2" | "2/2";
 
@@ -124,6 +130,23 @@ const buildFinancialDocObjectPath = (
   return `os_orders/${osId}/financeiro/purchase_order/${jobId}/${timestamp}_${sanitizedName}`;
 };
 
+const buildLayoutObjectPath = (
+  osId: string,
+  filename: string,
+  now = new Date()
+) => {
+  const sanitizedName = sanitizeFilename(filename);
+  const timestamp = now.toISOString().replace(/[:.]/g, "-");
+  return `os_orders/${osId}/Arte/Layout/Financeiro/Comprovante/${timestamp}_${sanitizedName}`;
+};
+
+export type UploadedLayoutAsset = {
+  id: string;
+  objectPath: string;
+  filename: string;
+  uploadedAt: string;
+};
+
 type UploadReceiptParams = {
   osId: string;
   file: File;
@@ -144,6 +167,160 @@ export const uploadReceiptForOrder = async ({
     docs: [{ file, type: "PAYMENT_PROOF", installmentLabel, secondDueDate }],
     userId,
   });
+};
+
+export const uploadLayoutForOrder = async ({
+  osId,
+  file,
+  userId,
+}: UploadLayoutParams): Promise<UploadedLayoutAsset> => {
+  const validation = validateFiles([file]);
+  if (!validation.ok) {
+    throw new Error(validation.error ?? "Arquivo inválido.");
+  }
+
+  let jobId: string | null = null;
+  let uploadedPath: string | null = null;
+
+  try {
+    const { data: job, error: jobError } = await supabase
+      .from("os_order_asset_jobs")
+      .insert({
+        os_id: osId,
+        status: "UPLOADING",
+        created_by: userId,
+        attempt_count: 0,
+      })
+      .select("id")
+      .single();
+
+    if (jobError || !job) {
+      throw new Error(jobError?.message ?? "Erro ao criar o job de upload.");
+    }
+
+    jobId = job.id;
+    const objectPath = buildLayoutObjectPath(osId, file.name);
+    const contentType = resolveAssetContentType(file);
+    const sanitizedName = sanitizeFilename(file.name);
+
+    const { data: asset, error: assetError } = await supabase
+      .from("os_order_assets")
+      .insert({
+        os_id: osId,
+        job_id: jobId,
+        bucket: ASSET_BUCKET,
+        object_path: objectPath,
+        original_name: file.name,
+        mime_type: contentType || null,
+        size_bytes: file.size,
+        uploaded_by: userId,
+        asset_type: "LAYOUT",
+      })
+      .select("id, object_path, original_name, uploaded_at")
+      .single();
+
+    if (assetError || !asset) {
+      throw new Error(assetError?.message ?? "Erro ao registrar o layout.");
+    }
+
+    let presignData: { uploadUrl: string; bucket?: string } | null = null;
+    try {
+      presignData = await invokeEdgeFunction<{
+        uploadUrl: string;
+        bucket?: string;
+      }>(supabase, "r2-presign-upload", {
+        key: objectPath,
+        contentType,
+        sizeBytes: file.size,
+      });
+    } catch (presignError) {
+      throw await buildPresignInvokeError(presignError);
+    }
+
+    if (!presignData?.uploadUrl) {
+      throw await buildPresignInvokeError(null);
+    }
+
+    const uploadResponse = await fetch(presignData.uploadUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": contentType,
+      },
+      body: file,
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error(`Falha ao enviar o layout "${sanitizedName}".`);
+    }
+
+    const etag = uploadResponse.headers.get("etag")?.replace(/"/g, "") ?? null;
+    uploadedPath = objectPath;
+
+    const { error: updateAssetError } = await supabase
+      .from("os_order_assets")
+      .update({
+        storage_provider: "r2",
+        storage_bucket: presignData.bucket ?? ASSET_BUCKET,
+        r2_etag: etag,
+      })
+      .eq("id", asset.id);
+
+    if (updateAssetError) {
+      throw new Error(updateAssetError.message);
+    }
+
+    const { error: updateJobError } = await supabase
+      .from("os_order_asset_jobs")
+      .update({ status: "PENDING", updated_at: new Date().toISOString() })
+      .eq("id", jobId);
+
+    if (updateJobError) {
+      throw new Error(updateJobError.message);
+    }
+
+    return {
+      id: asset.id,
+      objectPath: asset.object_path,
+      filename: asset.original_name ?? file.name,
+      uploadedAt: asset.uploaded_at,
+    };
+  } catch (error) {
+    if (jobId) {
+      const message =
+        error instanceof Error ? error.message : "Erro ao enviar layout.";
+
+      try {
+        if (uploadedPath && !isProtectedPaymentProofKey(uploadedPath)) {
+          await invokeEdgeFunction<void>(supabase, "r2-delete-objects", {
+            keys: [uploadedPath],
+          });
+          await supabase
+            .from("os_order_assets")
+            .update({ deleted_from_storage_at: new Date().toISOString() })
+            .eq("job_id", jobId)
+            .eq("object_path", uploadedPath);
+        }
+      } catch (cleanupError) {
+        console.error("Falha ao limpar upload de layout no R2:", cleanupError);
+      }
+
+      await supabase
+        .from("os_order_asset_jobs")
+        .update({
+          status: "ERROR",
+          last_error: message,
+          attempt_count: 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", jobId);
+      await supabase
+        .from("os_order_assets")
+        .update({ error: message })
+        .eq("job_id", jobId);
+    }
+
+    throw error;
+  }
 };
 
 export const uploadAssetsForOrder = async ({

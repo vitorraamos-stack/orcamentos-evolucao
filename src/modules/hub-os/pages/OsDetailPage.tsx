@@ -15,6 +15,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Copy, FolderPlus } from 'lucide-react';
 import {
   createOsEvent,
+  fetchLatestOsLayout,
+  fetchOsAssetDownloadUrl,
   createPaymentProof,
   deletePaymentProof,
   fetchOsById,
@@ -24,7 +26,7 @@ import {
   updatePaymentProof,
 } from '../api';
 import { generateFolderPath, resolvePaymentStatus } from '../utils';
-import type { DeliveryType, Os, OsEvent, OsPaymentProof, PaymentMethod } from '../types';
+import type { DeliveryType, Os, OsEvent, OsLayoutAsset, OsPaymentProof, PaymentMethod } from '../types';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { ARTE_STATUSES, PRODUCAO_STATUSES } from '../statuses';
@@ -67,6 +69,8 @@ export default function OsDetailPage() {
   const [saving, setSaving] = useState(false);
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
   const [openingPaymentId, setOpeningPaymentId] = useState<string | null>(null);
+  const [layoutAsset, setLayoutAsset] = useState<OsLayoutAsset | null>(null);
+  const [openingLayout, setOpeningLayout] = useState(false);
 
   const [saleNumber, setSaleNumber] = useState('');
   const [clientName, setClientName] = useState('');
@@ -124,6 +128,24 @@ export default function OsDetailPage() {
     }
   };
 
+  const handleOpenLayout = async () => {
+    if (!layoutAsset?.object_path) {
+      toast.error('Layout indisponível para download.');
+      return;
+    }
+
+    try {
+      setOpeningLayout(true);
+      const downloadUrl = await fetchOsAssetDownloadUrl(layoutAsset.object_path, layoutAsset.original_name ?? undefined);
+      window.open(downloadUrl, '_blank', 'noreferrer');
+    } catch (downloadError) {
+      console.error(downloadError);
+      toast.error(downloadError instanceof Error ? downloadError.message : 'Falha ao abrir layout.');
+    } finally {
+      setOpeningLayout(false);
+    }
+  };
+
   const loadData = async () => {
     if (!osId) return;
     try {
@@ -151,12 +173,15 @@ export default function OsDetailPage() {
       setHasLetraCaixa(Boolean(osData.has_letra_caixa));
 
       if (isKioskMode) {
+        const latestLayout = await fetchLatestOsLayout(osId);
+        setLayoutAsset(latestLayout);
         setEvents([]);
         setPayments([]);
         return;
       }
 
       const [eventData, paymentData] = await Promise.all([fetchOsEvents(osId), fetchOsPayments(osId)]);
+      setLayoutAsset(null);
       setEvents(eventData);
       setPayments(paymentData);
     } catch (error) {
@@ -494,7 +519,26 @@ export default function OsDetailPage() {
           </Button>
         }
       >
-        <div className="grid w-full gap-4 xl:grid-cols-[1.1fr,1fr]">
+        <div className="w-full space-y-4">
+          {layoutAsset ? (
+            <Card className="border-primary/50">
+              <CardHeader>
+                <CardTitle>Layout de produção</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium">{layoutAsset.original_name || 'Layout enviado'}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Enviado em {formatDateTime(layoutAsset.uploaded_at)}
+                  </p>
+                </div>
+                <Button size="lg" onClick={() => void handleOpenLayout()} disabled={openingLayout}>
+                  {openingLayout ? 'Abrindo...' : 'Abrir layout'}
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
+          <div className="grid gap-4 xl:grid-cols-[1.1fr,1fr]">
           <Card>
             <CardHeader>
               <CardTitle>Dados rápidos</CardTitle>
@@ -601,6 +645,7 @@ export default function OsDetailPage() {
               ) : null}
             </CardContent>
           </Card>
+          </div>
         </div>
       </KioskShell>
     );
