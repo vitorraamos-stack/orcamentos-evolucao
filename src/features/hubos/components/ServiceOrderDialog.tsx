@@ -20,7 +20,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ArrowLeft } from "lucide-react";
 import {
   fetchLatestOrderLayout,
-  fetchOrderAssetDownloadUrl,
   fetchUserDisplayNameById,
   updateOrder,
 } from "../api";
@@ -48,6 +47,7 @@ import {
   DELIVERY_DEADLINE_PRESETS,
 } from "../deliveryDeadlineConfig";
 import { formatDatePtBr, resolveDeliveryDate } from "../deliveryDeadline";
+import { OsLayoutPreviewDialog } from "@/modules/hub-os/components/OsLayoutPreviewDialog";
 
 interface ServiceOrderDialogProps {
   order: OsOrder | null;
@@ -103,7 +103,7 @@ export default function ServiceOrderDialog({
     null
   );
   const [loadingLayout, setLoadingLayout] = useState(false);
-  const [openingLayout, setOpeningLayout] = useState(false);
+  const [isLayoutPreviewOpen, setIsLayoutPreviewOpen] = useState(false);
 
   useEffect(() => {
     if (!order) return;
@@ -362,19 +362,23 @@ export default function ServiceOrderDialog({
         manualDate: order.delivery_date,
       });
 
-      const updated = await updateOrder(order.id, {
-        art_status: "Produzir",
-        prod_status: PROD_COLUMNS[0],
-        delivery_deadline_started_at:
-          order.delivery_deadline_started_at ?? nowIso,
-        delivery_date:
-          order.delivery_deadline_preset === "CUSTOM"
-            ? order.delivery_date
-            : resolvedDeliveryDate,
-      }, {
-        type: "status_change",
-        payload: { board: "producao" },
-      });
+      const updated = await updateOrder(
+        order.id,
+        {
+          art_status: "Produzir",
+          prod_status: PROD_COLUMNS[0],
+          delivery_deadline_started_at:
+            order.delivery_deadline_started_at ?? nowIso,
+          delivery_date:
+            order.delivery_deadline_preset === "CUSTOM"
+              ? order.delivery_date
+              : resolvedDeliveryDate,
+        },
+        {
+          type: "status_change",
+          payload: { board: "producao" },
+        }
+      );
       onUpdated(updated);
       toast.success("Card enviado para Produção.");
       onOpenChange(false);
@@ -405,25 +409,12 @@ export default function ServiceOrderDialog({
     onOpenChange(false);
   };
 
-  const handleOpenLayout = async () => {
+  const handleOpenLayout = () => {
     if (!layoutAsset?.object_path) {
       toast.error("Layout indisponível.");
       return;
     }
-    try {
-      setOpeningLayout(true);
-      const downloadUrl = await fetchOrderAssetDownloadUrl(
-        layoutAsset.object_path,
-        layoutAsset.original_name ?? undefined
-      );
-      window.open(downloadUrl, "_blank", "noreferrer");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Falha ao abrir layout."
-      );
-    } finally {
-      setOpeningLayout(false);
-    }
+    setIsLayoutPreviewOpen(true);
   };
 
   return (
@@ -647,14 +638,10 @@ export default function ServiceOrderDialog({
             <div className="flex gap-2">
               <Button
                 variant="outline"
-                onClick={() => void handleOpenLayout()}
-                disabled={loadingLayout || openingLayout || !layoutAsset}
+                onClick={handleOpenLayout}
+                disabled={loadingLayout || !layoutAsset}
               >
-                {openingLayout
-                  ? "Abrindo layout..."
-                  : loadingLayout
-                    ? "Carregando layout..."
-                    : "Ver layout"}
+                {loadingLayout ? "Carregando layout..." : "Ver layout"}
               </Button>
               {!order?.prod_status && (
                 <Button
@@ -737,6 +724,11 @@ export default function ServiceOrderDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <OsLayoutPreviewDialog
+        open={isLayoutPreviewOpen}
+        onOpenChange={setIsLayoutPreviewOpen}
+        layoutAsset={layoutAsset}
+      />
     </>
   );
 }

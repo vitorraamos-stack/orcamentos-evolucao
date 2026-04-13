@@ -41,6 +41,7 @@ export function OsLayoutPreviewDialog({
 }: Props) {
   const [previewState, setPreviewState] = useState<PreviewState>("idle");
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const [openingExternal, setOpeningExternal] = useState(false);
@@ -63,6 +64,7 @@ export function OsLayoutPreviewDialog({
     if (!layoutAsset?.object_path) {
       setPreviewState("error");
       setBlobUrl(null);
+      setPreviewUrl(null);
       setDownloadUrl(null);
       return;
     }
@@ -70,6 +72,7 @@ export function OsLayoutPreviewDialog({
     if (kind === "unsupported") {
       setPreviewState("unsupported");
       setBlobUrl(null);
+      setPreviewUrl(null);
       setDownloadUrl(null);
       return;
     }
@@ -79,6 +82,7 @@ export function OsLayoutPreviewDialog({
 
     if (cached) {
       setBlobUrl(cached.blobUrl);
+      setPreviewUrl(cached.blobUrl);
       setDownloadUrl(cached.downloadUrl);
       setPreviewState("loaded");
       return;
@@ -89,6 +93,7 @@ export function OsLayoutPreviewDialog({
 
     setPreviewState("loading");
     setBlobUrl(null);
+    setPreviewUrl(null);
     setDownloadUrl(null);
 
     void (async () => {
@@ -110,6 +115,7 @@ export function OsLayoutPreviewDialog({
           downloadUrl: nextDownloadUrl,
         });
         setBlobUrl(nextBlobUrl);
+        setPreviewUrl(nextBlobUrl);
         setDownloadUrl(nextDownloadUrl);
         setPreviewState("loaded");
       } catch (error) {
@@ -118,13 +124,29 @@ export function OsLayoutPreviewDialog({
           (error instanceof Error && error.name === "AbortError")
         )
           return;
-        console.error(error);
-        setPreviewState("error");
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Falha ao carregar preview do layout."
-        );
+        try {
+          const fallbackDownloadUrl = await fetchOsAssetDownloadUrl(
+            layoutAsset.object_path,
+            layoutAsset.original_name ?? undefined
+          );
+          if (!isMounted) return;
+          setBlobUrl(null);
+          setPreviewUrl(fallbackDownloadUrl);
+          setDownloadUrl(fallbackDownloadUrl);
+          setPreviewState("loaded");
+          toast.warning(
+            "Preview carregado em modo compatível. A impressão pode variar conforme o navegador."
+          );
+        } catch (fallbackError) {
+          console.error(error);
+          console.error(fallbackError);
+          setPreviewState("error");
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : "Falha ao carregar preview do layout."
+          );
+        }
       }
     })();
 
@@ -163,7 +185,8 @@ export function OsLayoutPreviewDialog({
   };
 
   const handlePrint = () => {
-    if (!blobUrl || !isPrintable) return;
+    const printableUrl = blobUrl ?? previewUrl ?? downloadUrl;
+    if (!printableUrl || !isPrintable) return;
 
     const printWindow = window.open("", "_blank", "noopener,noreferrer");
     if (!printWindow) {
@@ -180,7 +203,7 @@ export function OsLayoutPreviewDialog({
         <html>
           <head><title>Imprimir layout</title><style>html,body,iframe{height:100%;margin:0}iframe{width:100%;border:0}</style></head>
           <body>
-            <iframe id="pdf-frame" src="${blobUrl}"></iframe>
+            <iframe id="pdf-frame" src="${printableUrl}"></iframe>
             <script>
               const frame = document.getElementById('pdf-frame');
               frame.addEventListener('load', () => {
@@ -209,7 +232,7 @@ export function OsLayoutPreviewDialog({
           </style>
         </head>
         <body>
-          <img id="layout-image" src="${blobUrl}" alt="Layout da OS" />
+          <img id="layout-image" src="${printableUrl}" alt="Layout da OS" />
           <script>
             const image = document.getElementById('layout-image');
             image.addEventListener('load', () => {
@@ -242,18 +265,18 @@ export function OsLayoutPreviewDialog({
             </div>
           ) : null}
 
-          {previewState === "loaded" && kind === "pdf" && blobUrl ? (
+          {previewState === "loaded" && kind === "pdf" && previewUrl ? (
             <iframe
               title="Preview do layout PDF"
-              src={blobUrl}
+              src={previewUrl}
               className="h-full min-h-[560px] w-full"
             />
           ) : null}
 
-          {previewState === "loaded" && kind === "image" && blobUrl ? (
+          {previewState === "loaded" && kind === "image" && previewUrl ? (
             <div className="flex h-full min-h-[560px] items-start justify-center overflow-auto p-4">
               <img
-                src={blobUrl}
+                src={previewUrl}
                 alt="Preview do layout da OS"
                 className="max-h-full max-w-full object-contain"
               />
