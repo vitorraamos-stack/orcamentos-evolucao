@@ -15,10 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
-import {
-  fetchLatestOrderLayout,
-  fetchOrderAssetDownloadUrl,
-} from "@/features/hubos/api";
+import { fetchLatestOrderLayout } from "@/features/hubos/api";
 import {
   fetchKioskBoard,
   completeKioskInstallation,
@@ -55,6 +52,7 @@ import type {
 import type { OsOrderLayoutAsset } from "@/features/hubos/types";
 import { useGlobalOrderFlowState } from "../order-flow-state";
 import { filterKioskActiveCards } from "../order-flow-selectors";
+import { OsLayoutPreviewDialog } from "../components/OsLayoutPreviewDialog";
 
 type KioskSummaryCategory = "instalacoes" | "pronto_avisar" | "logistica";
 
@@ -91,14 +89,17 @@ export default function OsKioskPage() {
   const [selectedOrderLayout, setSelectedOrderLayout] =
     useState<OsOrderLayoutAsset | null>(null);
   const [loadingSelectedLayout, setLoadingSelectedLayout] = useState(false);
-  const [openingSelectedLayout, setOpeningSelectedLayout] = useState(false);
+  const [isLayoutPreviewOpen, setIsLayoutPreviewOpen] = useState(false);
+  const [previewLayoutAsset, setPreviewLayoutAsset] =
+    useState<OsOrderLayoutAsset | null>(null);
   const [fullscreenBlocked, setFullscreenBlocked] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   const [installationDialogOrder, setInstallationDialogOrder] =
     useState<KioskBoardCard | null>(null);
   const [installationFeedback, setInstallationFeedback] = useState("");
-  const [isCompletingInstallation, setIsCompletingInstallation] = useState(false);
+  const [isCompletingInstallation, setIsCompletingInstallation] =
+    useState(false);
   const [summaryModalCategory, setSummaryModalCategory] =
     useState<KioskSummaryCategory | null>(null);
   const [summarySearch, setSummarySearch] = useState("");
@@ -108,7 +109,6 @@ export default function OsKioskPage() {
   const [summarySelectedLayout, setSummarySelectedLayout] =
     useState<OsOrderLayoutAsset | null>(null);
   const [loadingSummaryLayout, setLoadingSummaryLayout] = useState(false);
-  const [openingSummaryLayout, setOpeningSummaryLayout] = useState(false);
   const [cards, setCards] = useState<KioskBoardCard[]>([]);
   const { isRetirado } = useGlobalOrderFlowState();
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -382,7 +382,9 @@ export default function OsKioskPage() {
       setSyncError(null);
       setHealthErrorKind(null);
       closeInstallationDialog();
-      toast.success(result.result_message || "Instalação finalizada com sucesso.");
+      toast.success(
+        result.result_message || "Instalação finalizada com sucesso."
+      );
     } catch (error) {
       setHealthErrorKind(getKioskErrorKind(error));
       toast.error(parseKioskError(error));
@@ -562,7 +564,9 @@ export default function OsKioskPage() {
 
       try {
         if (active) setLoadingSummaryLayout(true);
-        const layout = await fetchLatestOrderLayout(summarySelectedOrder.source_id);
+        const layout = await fetchLatestOrderLayout(
+          summarySelectedOrder.source_id
+        );
         if (active) setSummarySelectedLayout(layout);
       } catch (error) {
         console.error(error);
@@ -578,29 +582,14 @@ export default function OsKioskPage() {
     };
   }, [summaryModalData, summarySelectedOrder]);
 
-  const openLayout = async (
-    layout: OsOrderLayoutAsset | null,
-    setOpening: (value: boolean) => void
-  ) => {
+  const openLayout = (layout: OsOrderLayoutAsset | null) => {
     if (!layout?.object_path) {
       toast.error("Layout indisponível.");
       return;
     }
-    try {
-      setOpening(true);
-      const downloadUrl = await fetchOrderAssetDownloadUrl(
-        layout.object_path,
-        layout.original_name ?? undefined
-      );
-      window.open(downloadUrl, "_blank", "noreferrer");
-    } catch (error) {
-      console.error(error);
-      toast.error(
-        error instanceof Error ? error.message : "Falha ao abrir layout."
-      );
-    } finally {
-      setOpening(false);
-    }
+
+    setPreviewLayoutAsset(layout);
+    setIsLayoutPreviewOpen(true);
   };
 
   useEffect(() => {
@@ -946,20 +935,14 @@ export default function OsKioskPage() {
                       <div>
                         <Button
                           variant="outline"
-                          onClick={() =>
-                            void openLayout(summarySelectedLayout, setOpeningSummaryLayout)
-                          }
+                          onClick={() => openLayout(summarySelectedLayout)}
                           disabled={
-                            loadingSummaryLayout ||
-                            openingSummaryLayout ||
-                            !summarySelectedLayout
+                            loadingSummaryLayout || !summarySelectedLayout
                           }
                         >
-                          {openingSummaryLayout
-                            ? "Abrindo layout..."
-                            : loadingSummaryLayout
-                              ? "Carregando layout..."
-                              : "Abrir layout"}
+                          {loadingSummaryLayout
+                            ? "Carregando layout..."
+                            : "Abrir layout"}
                         </Button>
                       </div>
                       {renderInstallationFinalizeButton(summarySelectedOrder)}
@@ -990,16 +973,22 @@ export default function OsKioskPage() {
                 </p>
               </div>
               <Card className="space-y-1 border-dashed p-3">
-                <p className="text-sm font-semibold">{getHeadline(installationDialogOrder)}</p>
+                <p className="text-sm font-semibold">
+                  {getHeadline(installationDialogOrder)}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   Cliente: {installationDialogOrder.client_name ?? "—"}
                 </p>
               </Card>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Feedback obrigatório</label>
+                <label className="text-sm font-medium">
+                  Feedback obrigatório
+                </label>
                 <Textarea
                   value={installationFeedback}
-                  onChange={event => setInstallationFeedback(event.target.value)}
+                  onChange={event =>
+                    setInstallationFeedback(event.target.value)
+                  }
                   placeholder="Descreva como a instalação foi concluída..."
                   rows={5}
                   disabled={isCompletingInstallation}
@@ -1025,7 +1014,9 @@ export default function OsKioskPage() {
                     isMutationBlocked
                   }
                 >
-                  {isCompletingInstallation ? "Finalizando..." : "Finalizar instalação"}
+                  {isCompletingInstallation
+                    ? "Finalizando..."
+                    : "Finalizar instalação"}
                 </Button>
               </div>
             </>
@@ -1058,26 +1049,24 @@ export default function OsKioskPage() {
               <div>
                 <Button
                   variant="outline"
-                  onClick={() =>
-                    void openLayout(selectedOrderLayout, setOpeningSelectedLayout)
-                  }
-                  disabled={
-                    loadingSelectedLayout ||
-                    openingSelectedLayout ||
-                    !selectedOrderLayout
-                  }
+                  onClick={() => openLayout(selectedOrderLayout)}
+                  disabled={loadingSelectedLayout || !selectedOrderLayout}
                 >
-                  {openingSelectedLayout
-                    ? "Abrindo layout..."
-                    : loadingSelectedLayout
-                      ? "Carregando layout..."
-                      : "Abrir layout"}
+                  {loadingSelectedLayout
+                    ? "Carregando layout..."
+                    : "Abrir layout"}
                 </Button>
               </div>
             </div>
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <OsLayoutPreviewDialog
+        open={isLayoutPreviewOpen}
+        onOpenChange={setIsLayoutPreviewOpen}
+        layoutAsset={previewLayoutAsset}
+      />
 
       <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
         <DialogContent className="h-[60vh] w-[70vw] min-w-[600px] max-w-[1000px] p-8">
