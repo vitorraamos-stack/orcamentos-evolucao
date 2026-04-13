@@ -137,7 +137,7 @@ const buildLayoutObjectPath = (
 ) => {
   const sanitizedName = sanitizeFilename(filename);
   const timestamp = now.toISOString().replace(/[:.]/g, "-");
-  return `os_orders/${osId}/Arte/Layout/${timestamp}_${sanitizedName}`;
+  return `os_orders/${osId}/Arte/Layout/Financeiro/Comprovante/${timestamp}_${sanitizedName}`;
 };
 
 export type UploadedLayoutAsset = {
