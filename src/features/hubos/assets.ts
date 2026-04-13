@@ -137,7 +137,7 @@ const buildLayoutObjectPath = (
 ) => {
   const sanitizedName = sanitizeFilename(filename);
   const timestamp = now.toISOString().replace(/[:.]/g, "-");
-  return `os_orders/${osId}/Arte/Layout/Financeiro/Comprovante/${timestamp}_${sanitizedName}`;
+  return `os_orders/${osId}/Arte/Layout/${timestamp}_${sanitizedName}`;
 };
 
 export type UploadedLayoutAsset = {
@@ -294,11 +294,6 @@ export const uploadLayoutForOrder = async ({
           await invokeEdgeFunction<void>(supabase, "r2-delete-objects", {
             keys: [uploadedPath],
           });
-          await supabase
-            .from("os_order_assets")
-            .update({ deleted_from_storage_at: new Date().toISOString() })
-            .eq("job_id", jobId)
-            .eq("object_path", uploadedPath);
         }
       } catch (cleanupError) {
         console.error("Falha ao limpar upload de layout no R2:", cleanupError);
@@ -315,7 +310,13 @@ export const uploadLayoutForOrder = async ({
         .eq("id", jobId);
       await supabase
         .from("os_order_assets")
-        .update({ error: message })
+        .update({
+          error: message,
+          deleted_from_storage_at: new Date().toISOString(),
+          storage_provider: null,
+          storage_bucket: null,
+          r2_etag: null,
+        })
         .eq("job_id", jobId);
     }
 

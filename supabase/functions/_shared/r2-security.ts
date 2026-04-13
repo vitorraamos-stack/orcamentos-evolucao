@@ -21,6 +21,7 @@ export type ApiErrorCode =
   | 'unauthorized'
   | 'forbidden'
   | 'invalid_input'
+  | 'object_not_found'
   | 'server_config'
   | 'unexpected_error';
 

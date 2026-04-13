@@ -15,8 +15,9 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Copy, FolderPlus } from 'lucide-react';
 import {
   createOsEvent,
-  fetchLatestOsLayout,
+  fetchOsLayouts,
   fetchOsAssetDownloadUrl,
+  OsAssetDownloadError,
   createPaymentProof,
   deletePaymentProof,
   fetchOsById,
@@ -70,6 +71,7 @@ export default function OsDetailPage() {
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
   const [openingPaymentId, setOpeningPaymentId] = useState<string | null>(null);
   const [layoutAsset, setLayoutAsset] = useState<OsLayoutAsset | null>(null);
+  const [layoutCandidates, setLayoutCandidates] = useState<OsLayoutAsset[]>([]);
   const [openingLayout, setOpeningLayout] = useState(false);
 
   const [saleNumber, setSaleNumber] = useState('');
@@ -129,15 +131,32 @@ export default function OsDetailPage() {
   };
 
   const handleOpenLayout = async () => {
-    if (!layoutAsset?.object_path) {
+    if (!layoutCandidates.length) {
       toast.error('Layout indisponível para download.');
       return;
     }
 
     try {
       setOpeningLayout(true);
-      const downloadUrl = await fetchOsAssetDownloadUrl(layoutAsset.object_path, layoutAsset.original_name ?? undefined);
-      window.open(downloadUrl, '_blank', 'noreferrer');
+      for (let index = 0; index < layoutCandidates.length; index += 1) {
+        const candidate = layoutCandidates[index];
+        try {
+          const downloadUrl = await fetchOsAssetDownloadUrl(candidate.object_path, candidate.original_name ?? undefined);
+          setLayoutAsset(candidate);
+          setLayoutCandidates(layoutCandidates.slice(index));
+          window.open(downloadUrl, '_blank', 'noreferrer');
+          return;
+        } catch (error) {
+          if (error instanceof OsAssetDownloadError && error.code === 'object_not_found') {
+            continue;
+          }
+          throw error;
+        }
+      }
+
+      setLayoutAsset(null);
+      setLayoutCandidates([]);
+      toast.error('O layout cadastrado não existe mais no armazenamento.');
     } catch (downloadError) {
       console.error(downloadError);
       toast.error(downloadError instanceof Error ? downloadError.message : 'Falha ao abrir layout.');
@@ -173,8 +192,9 @@ export default function OsDetailPage() {
       setHasLetraCaixa(Boolean(osData.has_letra_caixa));
 
       if (isKioskMode) {
-        const latestLayout = await fetchLatestOsLayout(osId);
-        setLayoutAsset(latestLayout);
+        const layouts = await fetchOsLayouts(osId, 5);
+        setLayoutCandidates(layouts);
+        setLayoutAsset(layouts[0] ?? null);
         setEvents([]);
         setPayments([]);
         return;
@@ -182,6 +202,7 @@ export default function OsDetailPage() {
 
       const [eventData, paymentData] = await Promise.all([fetchOsEvents(osId), fetchOsPayments(osId)]);
       setLayoutAsset(null);
+      setLayoutCandidates([]);
       setEvents(eventData);
       setPayments(paymentData);
     } catch (error) {

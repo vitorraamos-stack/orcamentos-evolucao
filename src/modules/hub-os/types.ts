@@ -90,5 +90,8 @@ export type OsLayoutAsset = {
   storage_provider: string | null;
   storage_bucket: string | null;
   bucket: string | null;
+  r2_etag?: string | null;
+  error?: string | null;
+  deleted_from_storage_at?: string | null;
   uploaded_at: string;
 };
