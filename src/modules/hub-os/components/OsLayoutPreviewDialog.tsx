@@ -188,7 +188,7 @@ export function OsLayoutPreviewDialog({
     const printableUrl = blobUrl ?? previewUrl ?? downloadUrl;
     if (!printableUrl || !isPrintable) return;
 
-    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+    const printWindow = window.open("", "_blank");
     if (!printWindow) {
       toast.error(
         "Não foi possível abrir a janela de impressão. Verifique o bloqueador de pop-up."
@@ -198,52 +198,46 @@ export function OsLayoutPreviewDialog({
 
     setIsPrinting(true);
 
+    const doc = printWindow.document;
+    doc.open();
+    doc.write(
+      "<!doctype html><html><head><title>Imprimir layout</title></head><body></body></html>"
+    );
+    doc.close();
+
     if (kind === "pdf") {
-      printWindow.document.write(`
-        <html>
-          <head><title>Imprimir layout</title><style>html,body,iframe{height:100%;margin:0}iframe{width:100%;border:0}</style></head>
-          <body>
-            <iframe id="pdf-frame" src="${printableUrl}"></iframe>
-            <script>
-              const frame = document.getElementById('pdf-frame');
-              frame.addEventListener('load', () => {
-                setTimeout(() => {
-                  window.focus();
-                  window.print();
-                }, 250);
-              });
-            </script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
+      const iframe = doc.createElement("iframe");
+      iframe.src = printableUrl;
+      iframe.style.border = "0";
+      iframe.style.width = "100%";
+      iframe.style.height = "100vh";
+      iframe.onload = () => {
+        window.setTimeout(() => {
+          printWindow.focus();
+          printWindow.print();
+        }, 300);
+      };
+      doc.body.style.margin = "0";
+      doc.body.appendChild(iframe);
       setIsPrinting(false);
       return;
     }
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Imprimir layout</title>
-          <style>
-            html, body { margin: 0; padding: 0; background: white; height: 100%; }
-            body { display: flex; align-items: center; justify-content: center; }
-            img { max-width: 100%; max-height: 100%; object-fit: contain; }
-          </style>
-        </head>
-        <body>
-          <img id="layout-image" src="${printableUrl}" alt="Layout da OS" />
-          <script>
-            const image = document.getElementById('layout-image');
-            image.addEventListener('load', () => {
-              window.focus();
-              window.print();
-            });
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    const image = doc.createElement("img");
+    image.src = printableUrl;
+    image.alt = "Layout da OS";
+    image.style.maxWidth = "100%";
+    image.style.maxHeight = "100vh";
+    image.style.objectFit = "contain";
+    image.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+    };
+    doc.body.style.margin = "0";
+    doc.body.style.display = "flex";
+    doc.body.style.alignItems = "center";
+    doc.body.style.justifyContent = "center";
+    doc.body.appendChild(image);
     setIsPrinting(false);
   };
 

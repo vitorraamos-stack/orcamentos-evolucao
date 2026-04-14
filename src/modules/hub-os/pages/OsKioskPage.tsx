@@ -17,7 +17,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { fetchLatestOrderLayout } from "@/features/hubos/api";
 import {
-  cleanupKioskOrphanOrders,
   fetchKioskBoard,
   completeKioskInstallation,
   moveKioskOrder,
