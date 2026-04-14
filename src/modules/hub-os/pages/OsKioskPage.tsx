@@ -17,6 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { fetchLatestOrderLayout } from "@/features/hubos/api";
 import {
+  cleanupKioskOrphanOrders,
   fetchKioskBoard,
   completeKioskInstallation,
   moveKioskOrder,
@@ -35,6 +36,7 @@ import {
   applyMoveResult,
   getOrCreateTerminalId,
   getKioskErrorKind,
+  isKioskUpstreamNotFoundError,
   isUpstreamFinalized,
   parseKioskError,
   resolveMoveAction,
@@ -114,6 +116,7 @@ export default function OsKioskPage() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isCleaningOrphans, setIsCleaningOrphans] = useState(false);
   const [terminalId, setTerminalId] = useState<string | null>(null);
   const [healthErrorKind, setHealthErrorKind] = useState<KioskErrorKind | null>(
     null
@@ -432,10 +435,87 @@ export default function OsKioskPage() {
       setHealthErrorKind(null);
       toast.success(result.result_message || "Movimentação concluída.");
     } catch (error) {
+      if (isKioskUpstreamNotFoundError(error)) {
+        try {
+          setIsCleaningOrphans(true);
+          const removed = await cleanupKioskOrphanOrders({
+            orderKey: order.order_key,
+          });
+          const wasRemoved = removed.some(
+            item => item.order_key === order.order_key && item.removed
+          );
+          if (wasRemoved) {
+            setCards(prev =>
+              prev.filter(card => card.order_key !== order.order_key)
+            );
+            setSelectedOrder(current =>
+              current?.order_key === order.order_key ? null : current
+            );
+            setDetailsOpen(false);
+            setLastSyncAt(new Date().toISOString());
+            setSyncError(null);
+            setHealthErrorKind(null);
+            toast.success(
+              "OS órfã removida do quiosque pois já não existe no upstream."
+            );
+            return;
+          }
+        } catch (cleanupError) {
+          setHealthErrorKind(getKioskErrorKind(cleanupError));
+          toast.error(parseKioskError(cleanupError));
+          return;
+        } finally {
+          setIsCleaningOrphans(false);
+        }
+      }
       setHealthErrorKind(getKioskErrorKind(error));
       toast.error(parseKioskError(error));
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  const handleCleanupOrphans = async () => {
+    if (isMutationBlocked) {
+      toast.error(
+        "Quiosque em estado inseguro. Atualize a sincronização antes de limpar OSs órfãs."
+      );
+      return;
+    }
+
+    try {
+      setIsCleaningOrphans(true);
+      const removed = await cleanupKioskOrphanOrders();
+      const removedKeys = removed
+        .filter(item => item.removed)
+        .map(item => item.order_key);
+      const removedCount = removedKeys.length;
+      const selectedWasRemoved = selectedOrder
+        ? removedKeys.includes(selectedOrder.order_key)
+        : false;
+
+      if (removedCount > 0) {
+        setCards(prev =>
+          prev.filter(card => !removedKeys.includes(card.order_key))
+        );
+        setSelectedOrder(current =>
+          current && removedKeys.includes(current.order_key) ? null : current
+        );
+        if (selectedWasRemoved) setDetailsOpen(false);
+        toast.success(`${removedCount} OS(s) órfã(s) removida(s) do quiosque.`);
+      } else {
+        toast.info("Nenhuma OS órfã encontrada para limpeza.");
+      }
+
+      setLastSyncAt(new Date().toISOString());
+      setSyncError(null);
+      setHealthErrorKind(null);
+      await syncBoard({ silent: true });
+    } catch (error) {
+      setHealthErrorKind(getKioskErrorKind(error));
+      toast.error(parseKioskError(error));
+    } finally {
+      setIsCleaningOrphans(false);
     }
   };
 
@@ -717,9 +797,19 @@ export default function OsKioskPage() {
               size="sm"
               variant="outline"
               onClick={() => void syncBoard()}
-              disabled={isSyncing}
+              disabled={isSyncing || isCleaningOrphans}
             >
               Atualizar
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void handleCleanupOrphans()}
+              disabled={isSyncing || isMutationBlocked || isCleaningOrphans}
+            >
+              {isCleaningOrphans
+                ? "Limpando OSs órfãs..."
+                : "Limpar OSs fora dos quadros"}
             </Button>
             <Badge variant="secondary">{totalCards} OS em exibição</Badge>
           </div>

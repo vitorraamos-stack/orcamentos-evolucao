@@ -83,6 +83,21 @@ export const parseKioskError = (error: unknown) => {
   return candidate?.message || "Falha inesperada ao sincronizar o quiosque.";
 };
 
+export const isKioskUpstreamNotFoundError = (error: unknown) => {
+  const candidate = error as {
+    message?: string;
+    details?: string;
+    cause?: { details?: string };
+  };
+  const normalized = String(candidate?.message ?? "").toLowerCase();
+  const details = String(candidate?.details ?? candidate?.cause?.details ?? "");
+  return (
+    details.includes("KIOSK_UPSTREAM_NOT_FOUND") ||
+    normalized.includes("os não encontrada") ||
+    normalized.includes("upstream não encontrada")
+  );
+};
+
 export const getKioskErrorKind = (error: unknown): KioskErrorKind => {
   const candidate = error as {
     message?: string;

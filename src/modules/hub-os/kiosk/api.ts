@@ -9,6 +9,7 @@ import type {
   KioskBoardCard,
   KioskBoardMoveResult,
   KioskMoveAction,
+  KioskOrphanCleanupResult,
   KioskSourceType,
 } from "./types";
 
@@ -227,4 +228,30 @@ export const completeKioskInstallation = async (params: {
   }
 
   return row as KioskBoardMoveResult;
+};
+
+export const cleanupKioskOrphanOrders = async (params?: { orderKey?: string }) => {
+  const secureResponse = await supabase.rpc("kiosk_board_cleanup_orphans_secure", {
+    p_order_key: params?.orderKey ?? null,
+  });
+
+  if (secureResponse.error) {
+    assertOfficialKioskRpc({
+      rpcName: "kiosk_board_cleanup_orphans_secure",
+      error: secureResponse.error,
+      allowFallback: ALLOW_DEV_FALLBACK,
+      normalizeError: toError,
+    });
+  }
+
+  let data = secureResponse.data;
+  if (secureResponse.error) {
+    const fallback = await supabase.rpc("kiosk_board_cleanup_orphans", {
+      p_order_key: params?.orderKey ?? null,
+    });
+    if (fallback.error) throw toError(fallback.error);
+    data = fallback.data;
+  }
+
+  return (data ?? []) as KioskOrphanCleanupResult[];
 };
