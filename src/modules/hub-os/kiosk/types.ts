@@ -45,6 +45,12 @@ export type KioskBoardMoveResult = {
   result_message: string;
 } & KioskBoardCard;
 
+export type KioskOrphanCleanupResult = {
+  order_key: string;
+  removed: boolean;
+  reason: string;
+};
+
 export type KioskHealthState =
   | "healthy"
   | "syncing"
