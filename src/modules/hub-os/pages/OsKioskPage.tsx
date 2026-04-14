@@ -17,6 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { fetchLatestOrderLayout } from "@/features/hubos/api";
 import {
+  cleanupKioskOrphanOrders,
   fetchKioskBoard,
   completeKioskInstallation,
   moveKioskOrder,
@@ -49,6 +50,7 @@ import type {
   KioskErrorKind,
   KioskHealthState,
   KioskMoveAction,
+  KioskOrphanCleanupResult,
 } from "../kiosk/types";
 import type { OsOrderLayoutAsset } from "@/features/hubos/types";
 import { useGlobalOrderFlowState } from "../order-flow-state";
@@ -437,9 +439,10 @@ export default function OsKioskPage() {
       if (isKioskUpstreamNotFoundError(error)) {
         try {
           setIsCleaningOrphans(true);
-          const removed = await cleanupKioskOrphanOrders({
-            orderKey: order.order_key,
-          });
+          const removed: KioskOrphanCleanupResult[] =
+            await cleanupKioskOrphanOrders({
+              orderKey: order.order_key,
+            });
           const wasRemoved = removed.some(
             item => item.order_key === order.order_key && item.removed
           );
@@ -484,7 +487,8 @@ export default function OsKioskPage() {
 
     try {
       setIsCleaningOrphans(true);
-      const removed = await cleanupKioskOrphanOrders();
+      const removed: KioskOrphanCleanupResult[] =
+        await cleanupKioskOrphanOrders();
       const removedKeys = removed
         .filter(item => item.removed)
         .map(item => item.order_key);
