@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { KIOSK_ALLOWED_MOVE_ACTIONS, KIOSK_MOVE_CTA_LABELS, KIOSK_TERMINAL_ID_KEY } from "./constants";
 import {
   getOrCreateTerminalId,
+  isKioskUpstreamNotFoundError,
   isUpstreamFinalized,
   parseKioskError,
   resolveKioskHealthState,
@@ -72,6 +73,12 @@ describe("kiosk helpers", () => {
         cause: { details: "KIOSK_DUPLICATE", code: "P0001" },
       })
     ).toContain("já está no quiosque");
+  });
+
+  it("detecta erro de upstream ausente para limpeza de órfãos", () => {
+    expect(isKioskUpstreamNotFoundError({ details: "KIOSK_UPSTREAM_NOT_FOUND" })).toBe(true);
+    expect(isKioskUpstreamNotFoundError({ message: "OS não encontrada na base." })).toBe(true);
+    expect(isKioskUpstreamNotFoundError({ details: "KIOSK_INVALID_ACTION" })).toBe(false);
   });
 
   it("gera e persiste terminal_id", () => {
