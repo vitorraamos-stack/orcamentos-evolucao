@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
@@ -187,6 +188,7 @@ export default function HubOS() {
     null
   );
   const [isDraggingLayoutFile, setIsDraggingLayoutFile] = useState(false);
+  const [isExternalProduction, setIsExternalProduction] = useState(false);
   const [isMovingWithoutLayout, setIsMovingWithoutLayout] = useState(false);
   const [isSendingLayoutAndMoving, setIsSendingLayoutAndMoving] =
     useState(false);
@@ -1035,6 +1037,7 @@ export default function HubOS() {
       normalizeStatus(nextStatus) === "produzir" &&
       normalizeStatus(getDisplayArtStatus(order.art_status)) !== "produzir"
     ) {
+      setIsExternalProduction(order.production_tag === "PRODUCAO_EXTERNA");
       setPendingLayoutMove({ order, nextStatus });
       return;
     }
@@ -1045,6 +1048,7 @@ export default function HubOS() {
     setPendingLayoutMove(null);
     setSelectedLayoutFile(null);
     setIsDraggingLayoutFile(false);
+    setIsExternalProduction(false);
     setIsMovingWithoutLayout(false);
     setIsSendingLayoutAndMoving(false);
     if (layoutInputRef.current) {
@@ -2115,6 +2119,26 @@ export default function HubOS() {
                 </Button>
               </div>
             ) : null}
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="hubos-is-external-production"
+                checked={isExternalProduction}
+                onCheckedChange={checked =>
+                  setIsExternalProduction(Boolean(checked))
+                }
+              />
+              <div className="space-y-1">
+                <Label htmlFor="hubos-is-external-production">
+                  Produção externa
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Ao marcar esta opção, a OS também será enviada
+                  automaticamente para o quadro de produção.
+                </p>
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button
