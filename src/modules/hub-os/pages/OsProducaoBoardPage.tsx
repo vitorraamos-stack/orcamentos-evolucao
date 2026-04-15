@@ -150,8 +150,13 @@ export default function OsProducaoBoardPage() {
                         </Link>
                         <p className="text-xs text-muted-foreground">{order.client_name}</p>
                       </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <Badge variant="outline">{order.payment_status}</Badge>
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline">{order.payment_status}</Badge>
+                          {order.is_producao_externa && (
+                            <Badge variant="secondary">Produção Externa</Badge>
+                          )}
+                        </div>
                         <span className="text-muted-foreground">{formatDateTime(order.updated_at)}</span>
                       </div>
                       <Select value={order.status_producao ?? PRODUCAO_STATUSES[0]} onValueChange={(value) => handleMove(order, value)}>

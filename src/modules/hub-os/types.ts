@@ -30,6 +30,7 @@ export type Os = {
   on_site_contact: string | null;
   status_arte: string | null;
   status_producao: string | null;
+  is_producao_externa: boolean | null;
   is_reproducao: boolean | null;
   repro_motivo: string | null;
   has_letra_caixa: boolean | null;

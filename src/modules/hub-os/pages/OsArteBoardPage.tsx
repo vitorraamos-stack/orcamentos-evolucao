@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { fetchOsList, updateOs, createOsEvent } from '../api';
 import type { Os } from '../types';
@@ -38,6 +40,7 @@ export default function OsArteBoardPage() {
   const [pendingLayoutMove, setPendingLayoutMove] = useState<{ order: Os; nextStatus: string } | null>(null);
   const [selectedLayoutFile, setSelectedLayoutFile] = useState<File | null>(null);
   const [isDraggingLayoutFile, setIsDraggingLayoutFile] = useState(false);
+  const [isExternalProduction, setIsExternalProduction] = useState(false);
   const [isMovingWithoutLayout, setIsMovingWithoutLayout] = useState(false);
   const [isSendingLayoutAndMoving, setIsSendingLayoutAndMoving] = useState(false);
   const layoutInputRef = useRef<HTMLInputElement | null>(null);
@@ -103,6 +106,7 @@ export default function OsArteBoardPage() {
       normalizeStatus(nextStatus) === 'produzir' &&
       normalizeStatus(order.status_arte) !== 'produzir'
     ) {
+      setIsExternalProduction(order.is_producao_externa ?? false);
       setPendingLayoutMove({ order, nextStatus });
       return;
     }
@@ -113,6 +117,7 @@ export default function OsArteBoardPage() {
     setPendingLayoutMove(null);
     setSelectedLayoutFile(null);
     setIsDraggingLayoutFile(false);
+    setIsExternalProduction(false);
     setIsMovingWithoutLayout(false);
     setIsSendingLayoutAndMoving(false);
     if (layoutInputRef.current) {
@@ -148,58 +153,108 @@ export default function OsArteBoardPage() {
     selectLayoutFile(files);
   };
 
-  const handleMoveWithoutLayout = async () => {
+  const completeProduzirTransition = async ({ withLayoutUpload }: { withLayoutUpload: boolean }) => {
     if (!pendingLayoutMove || isMovingWithoutLayout || isSendingLayoutAndMoving) return;
-    try {
-      setIsMovingWithoutLayout(true);
-      const moved = await handleMove(pendingLayoutMove.order, pendingLayoutMove.nextStatus);
-      if (moved) {
-        resetLayoutModalState();
-      }
-    } finally {
-      setIsMovingWithoutLayout(false);
-    }
-  };
-
-  const handleUploadLayoutAndMove = async () => {
-    if (!pendingLayoutMove || isMovingWithoutLayout || isSendingLayoutAndMoving) return;
-    if (!selectedLayoutFile) {
+    if (withLayoutUpload && !selectedLayoutFile) {
       toast.error('Selecione um layout para continuar.');
       return;
     }
 
+    const { order, nextStatus } = pendingLayoutMove;
+    const shouldAutoSendToProduction = isExternalProduction && !order.status_producao;
+    const nextProductionStatus = isExternalProduction
+      ? (order.status_producao ?? PRODUCAO_STATUSES[0])
+      : (order.status_producao ?? null);
+    const fromStatus = order.status_arte;
+
     try {
-      setIsSendingLayoutAndMoving(true);
-      const fromStatus = pendingLayoutMove.order.status_arte;
-      const layoutAsset = await uploadLayoutForOrder({
-        osId: pendingLayoutMove.order.id,
-        file: selectedLayoutFile,
-        userId: user?.id ?? null,
+      if (withLayoutUpload) {
+        setIsSendingLayoutAndMoving(true);
+      } else {
+        setIsMovingWithoutLayout(true);
+      }
+
+      let layoutAsset: Awaited<ReturnType<typeof uploadLayoutForOrder>> | null = null;
+      if (withLayoutUpload && selectedLayoutFile) {
+        layoutAsset = await uploadLayoutForOrder({
+          osId: order.id,
+          file: selectedLayoutFile,
+          userId: user?.id ?? null,
+        });
+      }
+
+      const updated = await updateOs(order.id, {
+        status_arte: nextStatus,
+        status_producao: nextProductionStatus,
+        is_producao_externa: isExternalProduction,
+        updated_at: new Date().toISOString(),
       });
+
       await createOsEvent({
-        os_id: pendingLayoutMove.order.id,
-        type: 'layout_uploaded',
-        payload: {
-          asset_id: layoutAsset.id,
-          filename: layoutAsset.filename,
-          object_path: layoutAsset.objectPath,
-          from_status: fromStatus,
-          to_status: pendingLayoutMove.nextStatus,
-        },
+        os_id: order.id,
+        type: 'status_arte_changed',
+        payload: { from: fromStatus, to: nextStatus },
         created_by: user?.id ?? null,
       });
-      const moved = await handleMove(pendingLayoutMove.order, pendingLayoutMove.nextStatus);
-      if (!moved) {
-        return;
+
+      if (layoutAsset) {
+        await createOsEvent({
+          os_id: order.id,
+          type: 'layout_uploaded',
+          payload: {
+            asset_id: layoutAsset.id,
+            filename: layoutAsset.filename,
+            object_path: layoutAsset.objectPath,
+            from_status: fromStatus,
+            to_status: nextStatus,
+          },
+          created_by: user?.id ?? null,
+        });
       }
-      toast.success('Layout enviado e OS movida para Produzir.');
+
+      if (shouldAutoSendToProduction) {
+        await createOsEvent({
+          os_id: order.id,
+          type: 'sent_to_production',
+          payload: {
+            status_producao: nextProductionStatus,
+            is_producao_externa: true,
+            source: 'arte_move_to_produzir_modal',
+          },
+          created_by: user?.id ?? null,
+        });
+      }
+
+      setOrders((prev) => prev.map((item) => (item.id === order.id ? updated : item)));
+      if (withLayoutUpload && isExternalProduction) {
+        toast.success('Layout enviado, OS movida para Produzir e enviada para Produção Externa.');
+      } else if (!withLayoutUpload && isExternalProduction) {
+        toast.success('OS movida para Produzir e enviada para Produção Externa.');
+      } else if (withLayoutUpload) {
+        toast.success('Layout enviado e OS movida para Produzir.');
+      } else {
+        toast.success('Status atualizado.');
+      }
       resetLayoutModalState();
     } catch (error) {
       console.error(error);
-      toast.error(error instanceof Error ? error.message : 'Falha ao enviar layout. A OS não foi movida.');
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Falha ao mover para Produzir. Nenhuma alteração foi aplicada.'
+      );
     } finally {
+      setIsMovingWithoutLayout(false);
       setIsSendingLayoutAndMoving(false);
     }
+  };
+
+  const handleMoveWithoutLayout = async () => {
+    await completeProduzirTransition({ withLayoutUpload: false });
+  };
+
+  const handleUploadLayoutAndMove = async () => {
+    await completeProduzirTransition({ withLayoutUpload: true });
   };
 
   const handleCopyApprovalText = async () => {
@@ -213,6 +268,10 @@ export default function OsArteBoardPage() {
   };
 
   const handleSendToProduction = async (order: Os) => {
+    if (order.status_producao) {
+      toast.info('Esta OS já está no quadro de produção.');
+      return;
+    }
     try {
       const updated = await updateOs(order.id, {
         status_producao: PRODUCAO_STATUSES[0],
@@ -295,10 +354,13 @@ export default function OsArteBoardPage() {
                         <Badge variant="outline">{order.payment_status}</Badge>
                         <span className="text-muted-foreground">{formatDateTime(order.updated_at)}</span>
                       </div>
-                      {status === 'Produzir' && (
+                      {status === 'Produzir' && !order.status_producao && (
                         <Button variant="secondary" size="sm" onClick={() => handleSendToProduction(order)}>
                           Enviar para Produção
                         </Button>
+                      )}
+                      {status === 'Produzir' && order.status_producao && (
+                        <Badge variant="secondary">Já no quadro de produção</Badge>
                       )}
                       <Select value={order.status_arte ?? ARTE_STATUSES[0]} onValueChange={(value) => handleMoveRequest(order, value)}>
                         <SelectTrigger className="h-9">
@@ -432,6 +494,21 @@ export default function OsArteBoardPage() {
                 </Button>
               </div>
             ) : null}
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="is-external-production"
+                checked={isExternalProduction}
+                onCheckedChange={(checked) => setIsExternalProduction(Boolean(checked))}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="is-external-production">Produção externa</Label>
+                <p className="text-xs text-muted-foreground">
+                  Ao marcar esta opção, a OS também será enviada automaticamente para o quadro de produção.
+                </p>
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button
