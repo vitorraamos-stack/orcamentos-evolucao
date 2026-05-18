@@ -79,6 +79,8 @@ export default function InstallationFeedbacksCard({ items, onReview }: Props) {
   );
 
   const count = items.length;
+  const pendingCount = items.filter(item => !item.reviewed).length;
+  const reviewedCount = count - pendingCount;
 
   const handleReview = async (feedbackId: string) => {
     if (!onReview || reviewingId) return;
