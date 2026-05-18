@@ -53,11 +53,11 @@ export default function InstallationFeedbacksCard({ items, onReview }: Props) {
   const [activeTab, setActiveTab] = useState<FeedbackTab>("pending");
   const [reviewingId, setReviewingId] = useState<string | null>(null);
 
-  const { pendingCount, reviewedCount } = useMemo(() => {
+  const feedbackCounts = useMemo(() => {
     const pending = items.filter(item => !item.reviewed).length;
     return {
-      pendingCount: pending,
-      reviewedCount: items.length - pending,
+      pending,
+      reviewed: items.length - pending,
     };
   }, [items]);
 
@@ -282,6 +282,71 @@ export default function InstallationFeedbacksCard({ items, onReview }: Props) {
     </div>
   );
 
+  const reviewSelectedFeedback = async (feedbackId: string) => {
+    if (!onReview || reviewingId) return;
+
+    setReviewingId(feedbackId);
+    try {
+      await onReview(feedbackId);
+      setActiveTab("reviewed");
+      setSelectedId(feedbackId);
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
+  const renderInstallationFeedbackList = (
+    list: InstallationFeedback[],
+    emptyMessage: string
+  ) => (
+    <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+      {list.map(item => {
+        const isSelected = selected?.id === item.id;
+        return (
+          <Card
+            key={item.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => setSelectedId(item.id)}
+            onKeyDown={event => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setSelectedId(item.id);
+              }
+            }}
+            className={cn(
+              "cursor-pointer space-y-2 p-3 transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+              isSelected && "border-primary bg-background shadow-sm"
+            )}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="min-w-0 break-words text-sm font-semibold leading-snug">
+                {getHeadline(item)}
+              </p>
+              <Badge
+                variant={item.reviewed ? "outline" : "secondary"}
+                className="shrink-0"
+              >
+                {item.reviewed ? "Revisado" : "Pendente"}
+              </Badge>
+            </div>
+            <p className="line-clamp-2 break-words text-xs text-muted-foreground">
+              {item.feedback}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              {formatFinalizedAt(item.finalized_at)}
+            </p>
+          </Card>
+        );
+      })}
+      {list.length === 0 ? (
+        <Card className="p-4 text-sm text-muted-foreground">
+          {emptyMessage}
+        </Card>
+      ) : null}
+    </div>
+  );
+
   return (
     <>
       <Card
@@ -296,7 +361,7 @@ export default function InstallationFeedbacksCard({ items, onReview }: Props) {
         }}
         className={cn(
           "relative flex min-w-[190px] cursor-pointer flex-col gap-1 p-3 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-          pendingCount > 0 &&
+          feedbackCounts.pending > 0 &&
             "border-orange-300 bg-orange-50 text-orange-950 animate-pulse [animation-duration:2.2s] motion-reduce:animate-none"
         )}
       >
@@ -306,7 +371,7 @@ export default function InstallationFeedbacksCard({ items, onReview }: Props) {
         <div className="flex items-center justify-between gap-3">
           <span className="text-xl font-semibold">{count}</span>
           <Badge variant="outline" className="shrink-0">
-            {pendingCount} pendentes
+            {feedbackCounts.pending} pendentes
           </Badge>
         </div>
       </Card>
@@ -325,10 +390,14 @@ export default function InstallationFeedbacksCard({ items, onReview }: Props) {
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
                   <Badge variant="secondary">{count} no total</Badge>
-                  <Badge variant={pendingCount > 0 ? "default" : "outline"}>
-                    {pendingCount} pendentes
+                  <Badge
+                    variant={feedbackCounts.pending > 0 ? "default" : "outline"}
+                  >
+                    {feedbackCounts.pending} pendentes
                   </Badge>
-                  <Badge variant="outline">{reviewedCount} revisados</Badge>
+                  <Badge variant="outline">
+                    {feedbackCounts.reviewed} revisados
+                  </Badge>
                 </div>
               </div>
             </DialogHeader>
@@ -363,7 +432,7 @@ export default function InstallationFeedbacksCard({ items, onReview }: Props) {
                     value="pending"
                     className="flex min-h-0 flex-col overflow-hidden"
                   >
-                    {renderFeedbackList(
+                    {renderInstallationFeedbackList(
                       filteredByTab.pending,
                       search.trim()
                         ? "Nenhum feedback pendente encontrado para a busca atual."
@@ -374,7 +443,7 @@ export default function InstallationFeedbacksCard({ items, onReview }: Props) {
                     value="reviewed"
                     className="flex min-h-0 flex-col overflow-hidden"
                   >
-                    {renderFeedbackList(
+                    {renderInstallationFeedbackList(
                       filteredByTab.reviewed,
                       search.trim()
                         ? "Nenhum feedback revisado encontrado para a busca atual."
@@ -404,7 +473,9 @@ export default function InstallationFeedbacksCard({ items, onReview }: Props) {
                         </h4>
                         {!selected.reviewed ? (
                           <Button
-                            onClick={() => void handleReview(selected.id)}
+                            onClick={() =>
+                              void reviewSelectedFeedback(selected.id)
+                            }
                             disabled={!onReview || reviewingId === selected.id}
                             className="shrink-0"
                           >

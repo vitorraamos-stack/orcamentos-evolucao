@@ -59,7 +59,7 @@ describe("InstallationFeedbacksCard", () => {
     expect(source).toContain('"Revisar"');
   });
 
-  it("não reintroduz declarações duplicadas que quebram o deploy", () => {
+  it("não reintroduz nomes de declarações que quebraram o deploy", () => {
     const source = readFileSync(
       "src/features/hubos/components/InstallationFeedbacksCard.tsx",
       "utf8"
@@ -67,14 +67,12 @@ describe("InstallationFeedbacksCard", () => {
     const countMatches = (pattern: RegExp) =>
       source.match(pattern)?.length ?? 0;
 
-    expect(
-      countMatches(
-        /const\s+\{[\s\S]*?pendingCount[\s\S]*?reviewedCount[\s\S]*?\}\s*=/g
-      )
-    ).toBe(1);
-    expect(countMatches(/const\s+pendingCount\s*=/g)).toBe(0);
-    expect(countMatches(/const\s+reviewedCount\s*=/g)).toBe(0);
-    expect(countMatches(/const\s+handleReview\s*=/g)).toBe(1);
-    expect(countMatches(/const\s+renderFeedbackList\s*=/g)).toBe(1);
+    expect(countMatches(/const\s+feedbackCounts\s*=/g)).toBe(1);
+    expect(countMatches(/const\s+reviewSelectedFeedback\s*=/g)).toBe(1);
+    expect(countMatches(/const\s+renderInstallationFeedbackList\s*=/g)).toBe(1);
+    expect(countMatches(/const\s+(pendingCount|reviewedCount)\s*=/g)).toBe(0);
+    expect(countMatches(/const\s+(handleReview|renderFeedbackList)\s*=/g)).toBe(
+      0
+    );
   });
 });
