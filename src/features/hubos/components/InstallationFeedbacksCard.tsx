@@ -33,6 +33,24 @@ const formatFinalizedAt = (value: string) => {
   return date.toLocaleString("pt-BR");
 };
 
+const SOURCE_TYPE_LABELS: Record<InstallationFeedback["source_type"], string> = {
+  os: "OS",
+  os_orders: "Ordem de Serviço",
+};
+
+const formatSourceType = (
+  sourceType: InstallationFeedback["source_type"] | string | null | undefined
+) => {
+  if (!sourceType) return "—";
+
+  return (
+    SOURCE_TYPE_LABELS[sourceType as InstallationFeedback["source_type"]] ??
+    sourceType
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, char => char.toUpperCase())
+  );
+};
+
 const matchesSearch = (item: InstallationFeedback, term: string) => {
   if (!term) return true;
 
@@ -182,7 +200,7 @@ export default function InstallationFeedbacksCard({ items, onReview }: Props) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="flex h-[min(85vh,760px)] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:h-[85vh] sm:max-h-[760px] sm:max-w-6xl">
           <div className="flex min-h-0 flex-1 flex-col">
-            <DialogHeader className="border-b px-4 py-4 pr-12 text-left sm:px-6">
+            <DialogHeader className="border-b px-4 py-4 pr-16 text-left sm:pl-6 sm:pr-20">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 space-y-1">
                   <DialogTitle>Feedbacks de instalações</DialogTitle>
@@ -191,7 +209,7 @@ export default function InstallationFeedbacksCard({ items, onReview }: Props) {
                     de feedbacks revisados.
                   </DialogDescription>
                 </div>
-                <div className="flex shrink-0 flex-wrap gap-2">
+                <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
                   <Badge variant="secondary">{count} no total</Badge>
                   <Badge
                     variant={feedbackCounts.pending > 0 ? "default" : "outline"}
@@ -267,7 +285,7 @@ export default function InstallationFeedbacksCard({ items, onReview }: Props) {
                           {selected.reviewed ? "Revisado" : "Revisão pendente"}
                         </Badge>
                         <Badge variant="outline">
-                          Origem: {selected.source_type}
+                          Origem: {formatSourceType(selected.source_type)}
                         </Badge>
                       </div>
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

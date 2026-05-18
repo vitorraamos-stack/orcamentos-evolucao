@@ -59,6 +59,21 @@ describe("InstallationFeedbacksCard", () => {
     expect(source).toContain('"Revisar"');
   });
 
+  it("formata a origem e preserva espaço para o botão de fechar", () => {
+    const source = readFileSync(
+      "src/features/hubos/components/InstallationFeedbacksCard.tsx",
+      "utf8"
+    );
+
+    expect(source).toContain("Ordem de Serviço");
+    expect(source).toContain('os: "OS"');
+    expect(source).toContain("Origem: {formatSourceType(selected.source_type)}");
+    expect(source).not.toContain("Origem: {selected.source_type}");
+    expect(source).toContain("sm:pr-20");
+    expect(source).toContain("flex shrink-0 flex-wrap gap-2 sm:justify-end");
+    expect(source).not.toContain("pr-12 text-left sm:px-6");
+  });
+
   it("não reintroduz nomes de declarações que quebraram o deploy", () => {
     const source = readFileSync(
       "src/features/hubos/components/InstallationFeedbacksCard.tsx",
