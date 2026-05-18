@@ -345,6 +345,23 @@ function Invoke-StorageDownload {
   throw ("Falha ao baixar objeto '{0}' do bucket '{1}'." -f $ObjectPath, $Bucket)
 }
 
+function Test-RetentionProtectedAsset {
+  param([object]$Asset)
+
+  $objectPath = [string]$Asset.object_path
+  $normalizedPath = $objectPath.ToLowerInvariant()
+  $assetType = [string]$Asset.asset_type
+
+  return (
+    $assetType -eq 'PAYMENT_PROOF' -or
+    $assetType -eq 'LAYOUT' -or
+    $normalizedPath.Contains('/arte/layout/') -or
+    $objectPath.Contains('/Financeiro/Comprovante/') -or
+    $normalizedPath.Contains('/financeiro/comprovante/') -or
+    $normalizedPath.Contains('/payment_proofs/')
+  )
+}
+
 function Invoke-StorageDelete {
   param(
     [Parameter(Mandatory = $true)][string]$Url,
@@ -474,6 +491,12 @@ try {
       $cleanupFailed = $false
       foreach ($asset in $assets) {
         $objectPath = ($asset.object_path).Trim()
+
+        if (Test-RetentionProtectedAsset -Asset $asset) {
+          Write-Log ("Preservando asset com retenção ativa no storage: {0}" -f $objectPath) 'INFO'
+          continue
+        }
+
         $deleteUrl = ("{0}/storage/v1/object/{1}/{2}" -f $supabaseUrl, $bucket, (Escape-StorageObjectPath $objectPath))
 
         try {

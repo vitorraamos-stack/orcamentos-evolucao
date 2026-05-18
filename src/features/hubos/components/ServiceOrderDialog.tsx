@@ -103,6 +103,7 @@ export default function ServiceOrderDialog({
     null
   );
   const [loadingLayout, setLoadingLayout] = useState(false);
+  const [layoutLoadError, setLayoutLoadError] = useState<string | null>(null);
   const [isLayoutPreviewOpen, setIsLayoutPreviewOpen] = useState(false);
 
   useEffect(() => {
@@ -157,19 +158,24 @@ export default function ServiceOrderDialog({
       if (!open || !order?.id) {
         if (active) {
           setLayoutAsset(null);
+          setLayoutLoadError(null);
           setLoadingLayout(false);
         }
         return;
       }
 
       try {
-        if (active) setLoadingLayout(true);
+        if (active) {
+          setLoadingLayout(true);
+          setLayoutLoadError(null);
+        }
         const latestLayout = await fetchLatestOrderLayout(order.id);
         if (active) setLayoutAsset(latestLayout);
       } catch (error) {
         console.error(error);
         if (active) {
           setLayoutAsset(null);
+          setLayoutLoadError("Não foi possível localizar o layout desta OS.");
         }
       } finally {
         if (active) setLoadingLayout(false);
@@ -417,6 +423,17 @@ export default function ServiceOrderDialog({
     setIsLayoutPreviewOpen(true);
   };
 
+  const layoutButtonLabel = loadingLayout
+    ? "Carregando layout..."
+    : layoutAsset
+      ? "Ver layout"
+      : "Layout indisponível";
+  const layoutButtonFeedback = layoutLoadError
+    ? layoutLoadError
+    : layoutAsset
+      ? "Abrir layout enviado com esta OS."
+      : "Nenhum layout disponível para esta OS.";
+
   return (
     <>
       <DialogUi.Dialog open={open} onOpenChange={handleOpenChange}>
@@ -636,13 +653,31 @@ export default function ServiceOrderDialog({
 
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={handleOpenLayout}
-                disabled={loadingLayout || !layoutAsset}
-              >
-                {loadingLayout ? "Carregando layout..." : "Ver layout"}
-              </Button>
+              <div className="space-y-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex">
+                      <Button
+                        variant="outline"
+                        onClick={handleOpenLayout}
+                        disabled={loadingLayout || !layoutAsset}
+                      >
+                        {layoutButtonLabel}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {loadingLayout
+                      ? "Carregando layout..."
+                      : layoutButtonFeedback}
+                  </TooltipContent>
+                </Tooltip>
+                {(layoutLoadError || (!loadingLayout && !layoutAsset)) && (
+                  <p className="text-xs text-muted-foreground">
+                    {layoutButtonFeedback}
+                  </p>
+                )}
+              </div>
               {!order?.prod_status && (
                 <Button
                   variant="secondary"

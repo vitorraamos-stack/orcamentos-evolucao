@@ -92,6 +92,9 @@ export default function OsKioskPage() {
   const [selectedOrderLayout, setSelectedOrderLayout] =
     useState<OsOrderLayoutAsset | null>(null);
   const [loadingSelectedLayout, setLoadingSelectedLayout] = useState(false);
+  const [selectedLayoutLoadError, setSelectedLayoutLoadError] = useState<
+    string | null
+  >(null);
   const [isLayoutPreviewOpen, setIsLayoutPreviewOpen] = useState(false);
   const [previewLayoutAsset, setPreviewLayoutAsset] =
     useState<OsOrderLayoutAsset | null>(null);
@@ -112,6 +115,9 @@ export default function OsKioskPage() {
   const [summarySelectedLayout, setSummarySelectedLayout] =
     useState<OsOrderLayoutAsset | null>(null);
   const [loadingSummaryLayout, setLoadingSummaryLayout] = useState(false);
+  const [summaryLayoutLoadError, setSummaryLayoutLoadError] = useState<
+    string | null
+  >(null);
   const [cards, setCards] = useState<KioskBoardCard[]>([]);
   const { isRetirado } = useGlobalOrderFlowState();
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -607,18 +613,27 @@ export default function OsKioskPage() {
       ) {
         if (active) {
           setSelectedOrderLayout(null);
+          setSelectedLayoutLoadError(null);
           setLoadingSelectedLayout(false);
         }
         return;
       }
 
       try {
-        if (active) setLoadingSelectedLayout(true);
+        if (active) {
+          setLoadingSelectedLayout(true);
+          setSelectedLayoutLoadError(null);
+        }
         const layout = await fetchLatestOrderLayout(selectedOrder.source_id);
         if (active) setSelectedOrderLayout(layout);
       } catch (error) {
         console.error(error);
-        if (active) setSelectedOrderLayout(null);
+        if (active) {
+          setSelectedOrderLayout(null);
+          setSelectedLayoutLoadError(
+            "Não foi possível localizar o layout desta OS."
+          );
+        }
       } finally {
         if (active) setLoadingSelectedLayout(false);
       }
@@ -640,20 +655,29 @@ export default function OsKioskPage() {
       ) {
         if (active) {
           setSummarySelectedLayout(null);
+          setSummaryLayoutLoadError(null);
           setLoadingSummaryLayout(false);
         }
         return;
       }
 
       try {
-        if (active) setLoadingSummaryLayout(true);
+        if (active) {
+          setLoadingSummaryLayout(true);
+          setSummaryLayoutLoadError(null);
+        }
         const layout = await fetchLatestOrderLayout(
           summarySelectedOrder.source_id
         );
         if (active) setSummarySelectedLayout(layout);
       } catch (error) {
         console.error(error);
-        if (active) setSummarySelectedLayout(null);
+        if (active) {
+          setSummarySelectedLayout(null);
+          setSummaryLayoutLoadError(
+            "Não foi possível localizar o layout desta OS."
+          );
+        }
       } finally {
         if (active) setLoadingSummaryLayout(false);
       }
@@ -673,6 +697,25 @@ export default function OsKioskPage() {
 
     setPreviewLayoutAsset(layout);
     setIsLayoutPreviewOpen(true);
+  };
+
+  const getLayoutButtonLabel = (
+    isLoading: boolean,
+    layout: OsOrderLayoutAsset | null
+  ) =>
+    isLoading
+      ? "Carregando layout..."
+      : layout
+        ? "Abrir layout"
+        : "Layout indisponível";
+
+  const getLayoutFeedback = (
+    isLoading: boolean,
+    layout: OsOrderLayoutAsset | null,
+    error: string | null
+  ) => {
+    if (isLoading || layout) return null;
+    return error ?? "Nenhum layout disponível para esta OS.";
   };
 
   useEffect(() => {
@@ -1025,7 +1068,7 @@ export default function OsKioskPage() {
                         <strong>Endereço:</strong>{" "}
                         {summarySelectedOrder.address ?? "—"}
                       </p>
-                      <div>
+                      <div className="space-y-1">
                         <Button
                           variant="outline"
                           onClick={() => openLayout(summarySelectedLayout)}
@@ -1033,10 +1076,24 @@ export default function OsKioskPage() {
                             loadingSummaryLayout || !summarySelectedLayout
                           }
                         >
-                          {loadingSummaryLayout
-                            ? "Carregando layout..."
-                            : "Abrir layout"}
+                          {getLayoutButtonLabel(
+                            loadingSummaryLayout,
+                            summarySelectedLayout
+                          )}
                         </Button>
+                        {getLayoutFeedback(
+                          loadingSummaryLayout,
+                          summarySelectedLayout,
+                          summaryLayoutLoadError
+                        ) && (
+                          <p className="text-xs text-muted-foreground">
+                            {getLayoutFeedback(
+                              loadingSummaryLayout,
+                              summarySelectedLayout,
+                              summaryLayoutLoadError
+                            )}
+                          </p>
+                        )}
                       </div>
                       {renderInstallationFinalizeButton(summarySelectedOrder)}
                     </div>
@@ -1139,16 +1196,30 @@ export default function OsKioskPage() {
                 <strong>Etapa:</strong>{" "}
                 {KIOSK_STAGE_LABELS[selectedOrder.current_stage]}
               </p>
-              <div>
+              <div className="space-y-1">
                 <Button
                   variant="outline"
                   onClick={() => openLayout(selectedOrderLayout)}
                   disabled={loadingSelectedLayout || !selectedOrderLayout}
                 >
-                  {loadingSelectedLayout
-                    ? "Carregando layout..."
-                    : "Abrir layout"}
+                  {getLayoutButtonLabel(
+                    loadingSelectedLayout,
+                    selectedOrderLayout
+                  )}
                 </Button>
+                {getLayoutFeedback(
+                  loadingSelectedLayout,
+                  selectedOrderLayout,
+                  selectedLayoutLoadError
+                ) && (
+                  <p className="text-xs text-muted-foreground">
+                    {getLayoutFeedback(
+                      loadingSelectedLayout,
+                      selectedOrderLayout,
+                      selectedLayoutLoadError
+                    )}
+                  </p>
+                )}
               </div>
             </div>
           ) : null}

@@ -6,7 +6,10 @@ import type {
   OsOrderEvent,
   OsOrderLayoutAsset,
 } from "./types";
-import { findForbiddenConsultorFields, toConsultorUpdatePayload } from './consultorUpdate';
+import {
+  findForbiddenConsultorFields,
+  toConsultorUpdatePayload,
+} from "./consultorUpdate";
 
 export type OptimizeInstallationRoutePayload = {
   dateFrom?: string | null;
@@ -209,24 +212,56 @@ export const fetchOrderById = async (id: string) => {
   return data as OsOrder;
 };
 
+const getIgnoredLayoutAssetReason = (
+  asset: Partial<OsOrderLayoutAsset> & {
+    deleted_from_storage_at?: string | null;
+    error?: string | null;
+  }
+) => {
+  if (asset.asset_type !== "LAYOUT") return "asset_type diferente de LAYOUT";
+  if (!asset.object_path) return "object_path vazio";
+  if (asset.deleted_from_storage_at)
+    return "deleted_from_storage_at preenchido";
+  if (asset.error) return "error preenchido";
+
+  const hasCompatibleStorage =
+    asset.storage_provider === "r2" ||
+    Boolean(asset.storage_bucket || asset.bucket);
+  if (!hasCompatibleStorage) return "storage_provider ausente";
+
+  return null;
+};
+
 export const fetchLatestOrderLayout = async (orderId: string) => {
   const { data, error } = await supabase
     .from("os_order_assets")
     .select(
-      "id, os_id, asset_type, object_path, original_name, mime_type, size_bytes, storage_provider, storage_bucket, bucket, uploaded_at"
+      "id, os_id, asset_type, object_path, original_name, mime_type, size_bytes, storage_provider, storage_bucket, bucket, uploaded_at, deleted_from_storage_at, r2_etag, error"
     )
     .eq("os_id", orderId)
     .eq("asset_type", "LAYOUT")
-    .is("deleted_from_storage_at", null)
     .order("uploaded_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(10);
 
-  if (!error && data) {
-    return data as OsOrderLayoutAsset;
-  }
+  if (!error) {
+    const layoutAssets = (data ?? []) as Array<
+      OsOrderLayoutAsset & { deleted_from_storage_at?: string | null }
+    >;
 
-  if (!error && !data) {
+    for (const asset of layoutAssets) {
+      const ignoredReason = getIgnoredLayoutAssetReason(asset);
+      if (!ignoredReason) {
+        return asset;
+      }
+
+      console.warn("Layout de OS ignorado ao buscar visualização.", {
+        orderId,
+        assetId: asset.id,
+        objectPath: asset.object_path,
+        reason: ignoredReason,
+      });
+    }
+
     return null;
   }
 
@@ -244,7 +279,10 @@ export const fetchLatestOrderLayout = async (orderId: string) => {
     throw new Error(layoutEventError.message);
   }
 
-  if (!latestLayoutEvent?.payload || typeof latestLayoutEvent.payload !== "object") {
+  if (
+    !latestLayoutEvent?.payload ||
+    typeof latestLayoutEvent.payload !== "object"
+  ) {
     if (error) throw new Error(error.message);
     return null;
   }
@@ -258,7 +296,10 @@ export const fetchLatestOrderLayout = async (orderId: string) => {
   }
 
   return {
-    id: typeof payload.asset_id === "string" ? payload.asset_id : `${orderId}-layout-event`,
+    id:
+      typeof payload.asset_id === "string"
+        ? payload.asset_id
+        : `${orderId}-layout-event`,
     os_id: orderId,
     asset_type: "LAYOUT",
     object_path: objectPath,
@@ -305,20 +346,20 @@ export const createOrder = async (payload: Partial<OsOrder>) => {
 const loadCurrentUserRole = async () => {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) {
-    throw new Error('Usuário não autenticado.');
+    throw new Error("Usuário não autenticado.");
   }
 
   const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', userData.user.id)
+    .from("profiles")
+    .select("role")
+    .eq("id", userData.user.id)
     .single();
 
   if (profileError) {
     throw new Error(profileError.message);
   }
 
-  return String(profile.role ?? '');
+  return String(profile.role ?? "");
 };
 
 type OrderEventInput = {
@@ -333,15 +374,15 @@ export const updateOrder = async (
 ) => {
   const role = await loadCurrentUserRole();
 
-  if (role === 'consultor' || role === 'consultor_vendas') {
+  if (role === "consultor" || role === "consultor_vendas") {
     const forbiddenFields = findForbiddenConsultorFields(payload);
     if (forbiddenFields.length > 0) {
       throw new Error(
-        `Campos não permitidos para consultor: ${forbiddenFields.join(', ')}.`
+        `Campos não permitidos para consultor: ${forbiddenFields.join(", ")}.`
       );
     }
 
-    const { data, error } = await supabase.rpc('update_os_order_consultor', {
+    const { data, error } = await supabase.rpc("update_os_order_consultor", {
       p_os_id: id,
       p_payload: toConsultorUpdatePayload(payload),
     });

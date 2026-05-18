@@ -1,0 +1,15 @@
+-- Manual recovery helper for LAYOUT assets that may have been marked as deleted
+-- by older os-asset-agent cleanup versions.
+--
+-- This migration intentionally performs no automatic UPDATE. The database alone
+-- cannot confirm that the object still exists in R2, so automatically clearing
+-- deleted_from_storage_at could reactivate broken layout records.
+--
+-- After confirming the referenced objects still exist in R2, an operator may run:
+--
+-- update public.os_order_assets
+-- set deleted_from_storage_at = null
+-- where asset_type = 'LAYOUT'
+--   and object_path ilike '%/Arte/Layout/%'
+--   and error is null
+--   and deleted_from_storage_at is not null;
