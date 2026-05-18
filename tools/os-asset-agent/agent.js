@@ -182,11 +182,15 @@ const fileExistsWithSize = async (filePath, expectedSize) => {
 
 const isRetentionProtectedAsset = asset => {
   const objectPath = asset.object_path || "";
+  const normalizedPath = objectPath.toLowerCase();
+
   return (
     asset.asset_type === "PAYMENT_PROOF" ||
     asset.asset_type === "LAYOUT" ||
+    normalizedPath.includes("/arte/layout/") ||
     objectPath.includes("/Financeiro/Comprovante/") ||
-    objectPath.includes("/payment_proofs/")
+    normalizedPath.includes("/financeiro/comprovante/") ||
+    normalizedPath.includes("/payment_proofs/")
   );
 };
 
@@ -308,7 +312,9 @@ const requeueStaleJobs = async () => {
 const cleanupJob = async job => {
   const { data: assets, error: assetsError } = await supabase
     .from("os_order_assets")
-    .select("id, object_path, storage_provider, storage_bucket, bucket")
+    .select(
+      "id, object_path, storage_provider, storage_bucket, bucket, asset_type"
+    )
     .eq("job_id", job.id)
     .is("deleted_from_storage_at", null);
 
@@ -478,9 +484,9 @@ const processJob = async job => {
         ? path.join("Financeiro", "Comprovantes")
         : assetType === "LAYOUT"
           ? path.join("Arte", "Layout")
-        : assetType === "PURCHASE_ORDER"
-          ? path.join("Financeiro", "OrdensCompra")
-          : "";
+          : assetType === "PURCHASE_ORDER"
+            ? path.join("Financeiro", "OrdensCompra")
+            : "";
     const targetDir = subdir
       ? path.join(destinationPath, subdir)
       : destinationPath;

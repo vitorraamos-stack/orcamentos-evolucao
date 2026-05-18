@@ -98,6 +98,9 @@ export type OsOrderLayoutAsset = {
   storage_bucket: string | null;
   bucket: string | null;
   uploaded_at: string;
+  deleted_from_storage_at?: string | null;
+  r2_etag?: string | null;
+  error?: string | null;
 };
 
 export type HubOsFilters = {
