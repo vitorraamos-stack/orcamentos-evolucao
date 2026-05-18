@@ -26,6 +26,9 @@ interface MetricsBarProps {
   extraCard?: ReactNode;
 }
 
+const SOFT_ORANGE_ATTENTION_CLASS =
+  "border-orange-300 bg-orange-50 text-orange-950 animate-pulse [animation-duration:2.8s] [animation-timing-function:ease-in-out] motion-reduce:animate-none";
+
 const MetricCard = ({
   label,
   value,
@@ -134,6 +137,7 @@ export default function MetricsBar({
         label="Pronto/Avisar"
         value={prontoAvisar}
         onClick={onProntoAvisarClick}
+        className={prontoAvisar > 0 ? SOFT_ORANGE_ATTENTION_CLASS : undefined}
       />
       <MetricCard
         label="Instalações"
@@ -145,9 +149,7 @@ export default function MetricsBar({
         value={pendentes}
         onClick={onPendentesClick}
         className={
-          pendentes > 0
-            ? "border-orange-300 bg-orange-50 text-orange-950 animate-pulse [animation-duration:2.8s] [animation-timing-function:ease-in-out] motion-reduce:animate-none"
-            : undefined
+          pendentes > 0 ? SOFT_ORANGE_ATTENTION_CLASS : undefined
         }
       />
       {extraCard}
