@@ -1688,9 +1688,6 @@ export default function HubOS() {
           <h1 className="text-2xl font-semibold">
             Hub OS Evolução - Ordens de Serviço
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Kanban integrado com tempo real e filtros avançados.
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {hubPermissions.canViewAudit && (
