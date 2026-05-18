@@ -36,4 +36,13 @@ describe("InstallationFeedbacksCard", () => {
 
     expect(html).not.toContain("animate-pulse");
   });
+
+  it("não pulsa quando todos os feedbacks já foram revisados", () => {
+    const html = renderToStaticMarkup(
+      <InstallationFeedbacksCard items={[{ ...baseItem, reviewed: true }]} />
+    );
+
+    expect(html).not.toContain("animate-pulse");
+    expect(html).toContain("0 pendentes");
+  });
 });
