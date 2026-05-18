@@ -10,11 +10,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { InstallationFeedback } from "@/features/hubos/types";
 import { cn } from "@/lib/utils";
 
+type FeedbackTab = "pending" | "reviewed";
+
 type Props = {
   items: InstallationFeedback[];
+  onReview?: (feedbackId: string) => Promise<void>;
 };
 
 const getHeadline = (item: InstallationFeedback) => {
@@ -29,35 +33,119 @@ const formatFinalizedAt = (value: string) => {
   return date.toLocaleString("pt-BR");
 };
 
-export default function InstallationFeedbacksCard({ items }: Props) {
+const matchesSearch = (item: InstallationFeedback, term: string) => {
+  if (!term) return true;
+
+  return (
+    String(item.os_number ?? item.sale_number ?? "")
+      .toLowerCase()
+      .includes(term) ||
+    (item.client_name ?? "").toLowerCase().includes(term) ||
+    (item.title ?? "").toLowerCase().includes(term) ||
+    item.feedback.toLowerCase().includes(term)
+  );
+};
+
+export default function InstallationFeedbacksCard({ items, onReview }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<FeedbackTab>("pending");
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
 
-  const filtered = useMemo(() => {
+  const pendingCount = items.filter(item => !item.reviewed).length;
+  const reviewedCount = items.length - pendingCount;
+
+  const filteredByTab = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return items;
-
-    return items.filter(item => {
-      return (
-        String(item.os_number ?? item.sale_number ?? "")
-          .toLowerCase()
-          .includes(term) ||
-        (item.client_name ?? "").toLowerCase().includes(term) ||
-        (item.title ?? "").toLowerCase().includes(term) ||
-        item.feedback.toLowerCase().includes(term)
-      );
-    });
+    return {
+      pending: items.filter(
+        item => !item.reviewed && matchesSearch(item, term)
+      ),
+      reviewed: items.filter(
+        item => item.reviewed && matchesSearch(item, term)
+      ),
+    };
   }, [items, search]);
 
+  const visibleItems = filteredByTab[activeTab];
+
   const selected = useMemo(
-    () => filtered.find(item => item.id === selectedId) ?? filtered[0] ?? null,
-    [filtered, selectedId]
+    () =>
+      visibleItems.find(item => item.id === selectedId) ??
+      visibleItems[0] ??
+      null,
+    [selectedId, visibleItems]
   );
 
   const count = items.length;
   const pendingCount = items.filter(item => !item.reviewed).length;
   const reviewedCount = count - pendingCount;
+
+  const handleReview = async (feedbackId: string) => {
+    if (!onReview || reviewingId) return;
+
+    setReviewingId(feedbackId);
+    try {
+      await onReview(feedbackId);
+      setActiveTab("reviewed");
+      setSelectedId(feedbackId);
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
+  const renderFeedbackList = (
+    list: InstallationFeedback[],
+    emptyMessage: string
+  ) => (
+    <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+      {list.map(item => {
+        const isSelected = selected?.id === item.id;
+        return (
+          <Card
+            key={item.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => setSelectedId(item.id)}
+            onKeyDown={event => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setSelectedId(item.id);
+              }
+            }}
+            className={cn(
+              "cursor-pointer space-y-2 p-3 transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+              isSelected && "border-primary bg-background shadow-sm"
+            )}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="min-w-0 break-words text-sm font-semibold leading-snug">
+                {getHeadline(item)}
+              </p>
+              <Badge
+                variant={item.reviewed ? "outline" : "secondary"}
+                className="shrink-0"
+              >
+                {item.reviewed ? "Revisado" : "Pendente"}
+              </Badge>
+            </div>
+            <p className="line-clamp-2 break-words text-xs text-muted-foreground">
+              {item.feedback}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              {formatFinalizedAt(item.finalized_at)}
+            </p>
+          </Card>
+        );
+      })}
+      {list.length === 0 ? (
+        <Card className="p-4 text-sm text-muted-foreground">
+          {emptyMessage}
+        </Card>
+      ) : null}
+    </div>
+  );
 
   return (
     <>
@@ -96,8 +184,8 @@ export default function InstallationFeedbacksCard({ items }: Props) {
                 <div className="min-w-0 space-y-1">
                   <DialogTitle>Feedbacks de instalações</DialogTitle>
                   <DialogDescription>
-                    Acompanhe os relatos finais enviados pelo quiosque de
-                    instalações.
+                    Revise os relatos pendentes e consulte a página permanente
+                    de feedbacks revisados.
                   </DialogDescription>
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
@@ -110,7 +198,7 @@ export default function InstallationFeedbacksCard({ items }: Props) {
               </div>
             </DialogHeader>
 
-            <div className="grid min-h-0 flex-1 grid-rows-[minmax(220px,0.95fr)_minmax(260px,1.05fr)] gap-0 md:grid-cols-[minmax(280px,380px)_minmax(0,1fr)] md:grid-rows-1">
+            <div className="grid min-h-0 flex-1 grid-rows-[minmax(260px,0.95fr)_minmax(260px,1.05fr)] gap-0 md:grid-cols-[minmax(280px,390px)_minmax(0,1fr)] md:grid-rows-1">
               <aside className="flex min-h-0 flex-col gap-3 border-b bg-muted/20 p-3 md:border-b-0 md:border-r sm:p-4">
                 <Input
                   value={search}
@@ -119,58 +207,52 @@ export default function InstallationFeedbacksCard({ items }: Props) {
                   aria-label="Buscar feedbacks de instalações"
                   className="bg-background"
                 />
-                <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-                  {filtered.map(item => {
-                    const isSelected = selected?.id === item.id;
-                    return (
-                      <Card
-                        key={item.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setSelectedId(item.id)}
-                        onKeyDown={event => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            setSelectedId(item.id);
-                          }
-                        }}
-                        className={cn(
-                          "cursor-pointer space-y-2 p-3 transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-                          isSelected && "border-primary bg-background shadow-sm"
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="min-w-0 break-words text-sm font-semibold leading-snug">
-                            {getHeadline(item)}
-                          </p>
-                          <Badge
-                            variant={item.reviewed ? "outline" : "secondary"}
-                            className="shrink-0"
-                          >
-                            {item.reviewed ? "Revisado" : "Pendente"}
-                          </Badge>
-                        </div>
-                        <p className="line-clamp-2 break-words text-xs text-muted-foreground">
-                          {item.feedback}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {formatFinalizedAt(item.finalized_at)}
-                        </p>
-                      </Card>
-                    );
-                  })}
-                  {filtered.length === 0 ? (
-                    <Card className="p-4 text-sm text-muted-foreground">
-                      Nenhum feedback encontrado para a busca atual.
-                    </Card>
-                  ) : null}
-                </div>
+
+                <Tabs
+                  value={activeTab}
+                  onValueChange={value => {
+                    setActiveTab(value as FeedbackTab);
+                    setSelectedId(null);
+                  }}
+                  className="min-h-0 flex-1 gap-3"
+                >
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="pending">
+                      Pendentes ({filteredByTab.pending.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="reviewed">
+                      Revisados ({filteredByTab.reviewed.length})
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent
+                    value="pending"
+                    className="flex min-h-0 flex-col overflow-hidden"
+                  >
+                    {renderFeedbackList(
+                      filteredByTab.pending,
+                      search.trim()
+                        ? "Nenhum feedback pendente encontrado para a busca atual."
+                        : "Nenhum feedback pendente."
+                    )}
+                  </TabsContent>
+                  <TabsContent
+                    value="reviewed"
+                    className="flex min-h-0 flex-col overflow-hidden"
+                  >
+                    {renderFeedbackList(
+                      filteredByTab.reviewed,
+                      search.trim()
+                        ? "Nenhum feedback revisado encontrado para a busca atual."
+                        : "Nenhum feedback revisado ainda."
+                    )}
+                  </TabsContent>
+                </Tabs>
               </aside>
 
               <section className="min-h-0 overflow-y-auto p-4 sm:p-6">
                 {selected ? (
                   <article className="mx-auto flex max-w-3xl flex-col gap-4">
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge
                           variant={selected.reviewed ? "outline" : "default"}
@@ -181,9 +263,22 @@ export default function InstallationFeedbacksCard({ items }: Props) {
                           Origem: {selected.source_type}
                         </Badge>
                       </div>
-                      <h4 className="break-words text-2xl font-semibold tracking-tight">
-                        {getHeadline(selected)}
-                      </h4>
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <h4 className="break-words text-2xl font-semibold tracking-tight">
+                          {getHeadline(selected)}
+                        </h4>
+                        {!selected.reviewed ? (
+                          <Button
+                            onClick={() => void handleReview(selected.id)}
+                            disabled={!onReview || reviewingId === selected.id}
+                            className="shrink-0"
+                          >
+                            {reviewingId === selected.id
+                              ? "Revisando..."
+                              : "Revisar"}
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
 
                     <dl className="grid gap-3 rounded-lg border bg-muted/10 p-4 text-sm sm:grid-cols-2">

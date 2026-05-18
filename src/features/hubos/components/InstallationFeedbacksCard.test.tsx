@@ -47,12 +47,15 @@ describe("InstallationFeedbacksCard", () => {
     expect(html).toContain("0 pendentes");
   });
 
-  it("sobrescreve a largura padrão pequena do DialogContent", () => {
+  it("mantém abas de pendentes/revisados e ação de revisão no modal", () => {
     const source = readFileSync(
       "src/features/hubos/components/InstallationFeedbacksCard.tsx",
       "utf8"
     );
 
     expect(source).toContain("sm:max-w-6xl");
+    expect(source).toContain('TabsTrigger value="pending"');
+    expect(source).toContain('TabsTrigger value="reviewed"');
+    expect(source).toContain('"Revisar"');
   });
 });
