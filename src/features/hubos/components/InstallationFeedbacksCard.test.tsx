@@ -58,4 +58,17 @@ describe("InstallationFeedbacksCard", () => {
     expect(source).toContain('TabsTrigger value="reviewed"');
     expect(source).toContain('"Revisar"');
   });
+
+  it("declara contadores de pendentes/revisados apenas uma vez", () => {
+    const source = readFileSync(
+      "src/features/hubos/components/InstallationFeedbacksCard.tsx",
+      "utf8"
+    );
+
+    expect(
+      source.match(/const\s+\{[\s\S]*?pendingCount[\s\S]*?reviewedCount[\s\S]*?\}\s*=/g)
+    ).toHaveLength(1);
+    expect(source).not.toMatch(/const\s+pendingCount\s*=/);
+    expect(source).not.toMatch(/const\s+reviewedCount\s*=/);
+  });
 });
