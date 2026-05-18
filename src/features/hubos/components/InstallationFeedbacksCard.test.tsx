@@ -59,16 +59,22 @@ describe("InstallationFeedbacksCard", () => {
     expect(source).toContain('"Revisar"');
   });
 
-  it("declara contadores de pendentes/revisados apenas uma vez", () => {
+  it("não reintroduz declarações duplicadas que quebram o deploy", () => {
     const source = readFileSync(
       "src/features/hubos/components/InstallationFeedbacksCard.tsx",
       "utf8"
     );
+    const countMatches = (pattern: RegExp) =>
+      source.match(pattern)?.length ?? 0;
 
     expect(
-      source.match(/const\s+\{[\s\S]*?pendingCount[\s\S]*?reviewedCount[\s\S]*?\}\s*=/g)
-    ).toHaveLength(1);
-    expect(source).not.toMatch(/const\s+pendingCount\s*=/);
-    expect(source).not.toMatch(/const\s+reviewedCount\s*=/);
+      countMatches(
+        /const\s+\{[\s\S]*?pendingCount[\s\S]*?reviewedCount[\s\S]*?\}\s*=/g
+      )
+    ).toBe(1);
+    expect(countMatches(/const\s+pendingCount\s*=/g)).toBe(0);
+    expect(countMatches(/const\s+reviewedCount\s*=/g)).toBe(0);
+    expect(countMatches(/const\s+handleReview\s*=/g)).toBe(1);
+    expect(countMatches(/const\s+renderFeedbackList\s*=/g)).toBe(1);
   });
 });
