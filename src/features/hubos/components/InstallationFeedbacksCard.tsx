@@ -89,7 +89,7 @@ export default function InstallationFeedbacksCard({ items }: Props) {
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="flex h-[min(85vh,760px)] w-[calc(100vw-2rem)] max-w-6xl flex-col overflow-hidden p-0 sm:h-[85vh] sm:max-h-[760px]">
+        <DialogContent className="flex h-[min(85vh,760px)] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:h-[85vh] sm:max-h-[760px] sm:max-w-6xl">
           <div className="flex min-h-0 flex-1 flex-col">
             <DialogHeader className="border-b px-4 py-4 pr-12 text-left sm:px-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -172,7 +172,9 @@ export default function InstallationFeedbacksCard({ items }: Props) {
                   <article className="mx-auto flex max-w-3xl flex-col gap-4">
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant={selected.reviewed ? "outline" : "default"}>
+                        <Badge
+                          variant={selected.reviewed ? "outline" : "default"}
+                        >
                           {selected.reviewed ? "Revisado" : "Revisão pendente"}
                         </Badge>
                         <Badge variant="outline">

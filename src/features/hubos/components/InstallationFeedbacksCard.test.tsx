@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import InstallationFeedbacksCard from "./InstallationFeedbacksCard";
@@ -44,5 +45,14 @@ describe("InstallationFeedbacksCard", () => {
 
     expect(html).not.toContain("animate-pulse");
     expect(html).toContain("0 pendentes");
+  });
+
+  it("sobrescreve a largura padrão pequena do DialogContent", () => {
+    const source = readFileSync(
+      "src/features/hubos/components/InstallationFeedbacksCard.tsx",
+      "utf8"
+    );
+
+    expect(source).toContain("sm:max-w-6xl");
   });
 });
