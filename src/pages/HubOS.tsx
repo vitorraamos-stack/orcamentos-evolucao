@@ -38,6 +38,7 @@ import {
   deleteOrder,
   fetchInstallationFeedbacks,
   fetchOrdersPage,
+  markInstallationFeedbackReviewed,
   fetchUserDisplayNameById,
   updateOrder,
 } from "@/features/hubos/api";
@@ -301,6 +302,21 @@ export default function HubOS() {
       console.error("Erro ao carregar feedbacks de instalações", error);
     }
   }, [canViewInstallationFeedbacks]);
+
+  const handleReviewInstallationFeedback = useCallback(
+    async (feedbackId: string) => {
+      try {
+        await markInstallationFeedbackReviewed(feedbackId);
+        toast.success("Feedback de instalação enviado para Revisados.");
+        await loadInstallationFeedbacks();
+      } catch (error) {
+        console.error("Erro ao revisar feedback de instalação", error);
+        toast.error("Não foi possível revisar o feedback de instalação.");
+        throw error;
+      }
+    },
+    [loadInstallationFeedbacks]
+  );
 
   const loadOrders = useCallback(async () => {
     const requestId = ++loadOrdersSeqRef.current;
@@ -1725,7 +1741,10 @@ export default function HubOS() {
         onPendentesClick={() => setLocation("/hub-os/pendentes")}
         extraCard={
           canViewInstallationFeedbacks ? (
-            <InstallationFeedbacksCard items={installationFeedbacks} />
+            <InstallationFeedbacksCard
+              items={installationFeedbacks}
+              onReview={handleReviewInstallationFeedback}
+            />
           ) : undefined
         }
       />

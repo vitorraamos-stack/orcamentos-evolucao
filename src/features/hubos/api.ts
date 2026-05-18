@@ -592,10 +592,22 @@ export const fetchAuditUsers = async () => {
     );
 };
 
-
 export const fetchInstallationFeedbacks = async () => {
-  const { data, error } = await supabase.rpc("installation_feedbacks_list_secure");
+  const { data, error } = await supabase.rpc(
+    "installation_feedbacks_list_secure"
+  );
 
   if (error) throw new Error(error.message);
   return (data ?? []) as InstallationFeedback[];
+};
+
+export const markInstallationFeedbackReviewed = async (feedbackId: string) => {
+  const { error } = await supabase.rpc(
+    "installation_feedback_mark_reviewed_secure",
+    {
+      p_feedback_id: feedbackId,
+    }
+  );
+
+  if (error) throw new Error(error.message);
 };

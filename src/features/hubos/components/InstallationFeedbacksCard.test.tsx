@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import InstallationFeedbacksCard from "./InstallationFeedbacksCard";
@@ -35,5 +36,39 @@ describe("InstallationFeedbacksCard", () => {
     const html = renderToStaticMarkup(<InstallationFeedbacksCard items={[]} />);
 
     expect(html).not.toContain("animate-pulse");
+  });
+
+  it("não pulsa quando todos os feedbacks já foram revisados", () => {
+    const html = renderToStaticMarkup(
+      <InstallationFeedbacksCard items={[{ ...baseItem, reviewed: true }]} />
+    );
+
+    expect(html).not.toContain("animate-pulse");
+    expect(html).toContain("0 pendentes");
+  });
+
+  it("mantém abas de pendentes/revisados e ação de revisão no modal", () => {
+    const source = readFileSync(
+      "src/features/hubos/components/InstallationFeedbacksCard.tsx",
+      "utf8"
+    );
+
+    expect(source).toContain("sm:max-w-6xl");
+    expect(source).toContain('TabsTrigger value="pending"');
+    expect(source).toContain('TabsTrigger value="reviewed"');
+    expect(source).toContain('"Revisar"');
+  });
+
+  it("declara contadores de pendentes/revisados apenas uma vez", () => {
+    const source = readFileSync(
+      "src/features/hubos/components/InstallationFeedbacksCard.tsx",
+      "utf8"
+    );
+
+    expect(
+      source.match(/const\s+\{[\s\S]*?pendingCount[\s\S]*?reviewedCount[\s\S]*?\}\s*=/g)
+    ).toHaveLength(1);
+    expect(source).not.toMatch(/const\s+pendingCount\s*=/);
+    expect(source).not.toMatch(/const\s+reviewedCount\s*=/);
   });
 });
