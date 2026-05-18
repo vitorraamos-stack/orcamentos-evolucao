@@ -84,6 +84,73 @@ export default function InstallationFeedbacksCard({ items, onReview }: Props) {
   );
 
   const count = items.length;
+  const pendingCount = items.filter(item => !item.reviewed).length;
+  const reviewedCount = count - pendingCount;
+
+  const handleReview = async (feedbackId: string) => {
+    if (!onReview || reviewingId) return;
+
+    setReviewingId(feedbackId);
+    try {
+      await onReview(feedbackId);
+      setActiveTab("reviewed");
+      setSelectedId(feedbackId);
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
+  const renderFeedbackList = (
+    list: InstallationFeedback[],
+    emptyMessage: string
+  ) => (
+    <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+      {list.map(item => {
+        const isSelected = selected?.id === item.id;
+        return (
+          <Card
+            key={item.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => setSelectedId(item.id)}
+            onKeyDown={event => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setSelectedId(item.id);
+              }
+            }}
+            className={cn(
+              "cursor-pointer space-y-2 p-3 transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+              isSelected && "border-primary bg-background shadow-sm"
+            )}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="min-w-0 break-words text-sm font-semibold leading-snug">
+                {getHeadline(item)}
+              </p>
+              <Badge
+                variant={item.reviewed ? "outline" : "secondary"}
+                className="shrink-0"
+              >
+                {item.reviewed ? "Revisado" : "Pendente"}
+              </Badge>
+            </div>
+            <p className="line-clamp-2 break-words text-xs text-muted-foreground">
+              {item.feedback}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              {formatFinalizedAt(item.finalized_at)}
+            </p>
+          </Card>
+        );
+      })}
+      {list.length === 0 ? (
+        <Card className="p-4 text-sm text-muted-foreground">
+          {emptyMessage}
+        </Card>
+      ) : null}
+    </div>
+  );
 
   const handleReview = async (feedbackId: string) => {
     if (!onReview || reviewingId) return;
