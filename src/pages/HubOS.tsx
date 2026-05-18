@@ -87,6 +87,10 @@ const DONE_ASSET_STATUSES = new Set(["CLEANED", "DONE", "DONE_CLEANUP_FAILED"]);
  * (título, métricas, filtros, tabs e paddings). Mantido centralizado para facilitar ajuste.
  */
 const HUB_OS_BOARD_VIEWPORT_OFFSET_REM = 22;
+type MoveOrderToArtStatusOptions = {
+  productionTag?: OsOrder["production_tag"];
+};
+
 type InboxKey =
   | "global"
   | "arte"
@@ -965,10 +969,18 @@ export default function HubOS() {
     }
   };
 
-  const moveOrderToArtStatus = async (order: OsOrder, nextStatus: ArtStatus) => {
+  const moveOrderToArtStatus = async (
+    order: OsOrder,
+    nextStatus: ArtStatus,
+    options: MoveOrderToArtStatusOptions = {}
+  ) => {
     const inboxStatus = ART_COLUMNS[0];
     const inCreationStatus = ART_COLUMNS[1];
     const previous = order;
+    const nextProductionTag =
+      options.productionTag !== undefined
+        ? options.productionTag
+        : order.production_tag;
     const shouldInitProd = nextStatus === "Produzir" && !order.prod_status;
     const shouldStartDeliveryDeadline =
       nextStatus === "Produzir" && !order.delivery_deadline_started_at;
@@ -984,6 +996,7 @@ export default function HubOS() {
       ...order,
       art_status: nextStatus,
       prod_status: shouldInitProd ? "Produção" : order.prod_status,
+      production_tag: nextProductionTag,
       delivery_deadline_started_at: startAt,
       delivery_date:
         order.delivery_deadline_preset === "CUSTOM"
@@ -994,26 +1007,33 @@ export default function HubOS() {
     updateLocalOrder(optimistic);
 
     try {
-      const updated = await updateOrder(order.id, {
-        art_status: nextStatus,
-        prod_status: shouldInitProd ? "Produção" : order.prod_status,
-        delivery_deadline_started_at: shouldStartDeliveryDeadline
-          ? startAt
-          : order.delivery_deadline_started_at,
-        delivery_date:
-          order.delivery_deadline_preset === "CUSTOM"
-            ? order.delivery_date
-            : nextStatus === "Produzir"
-              ? resolvedDeliveryDate
-              : order.delivery_date,
-      }, {
-        type: "status_change",
-        payload: {
-          board: "arte",
-          from: order.art_status,
-          to: nextStatus,
+      const updated = await updateOrder(
+        order.id,
+        {
+          art_status: nextStatus,
+          prod_status: shouldInitProd ? "Produção" : order.prod_status,
+          production_tag: nextProductionTag,
+          delivery_deadline_started_at: shouldStartDeliveryDeadline
+            ? startAt
+            : order.delivery_deadline_started_at,
+          delivery_date:
+            order.delivery_deadline_preset === "CUSTOM"
+              ? order.delivery_date
+              : nextStatus === "Produzir"
+                ? resolvedDeliveryDate
+                : order.delivery_date,
         },
-      });
+        {
+          type: "status_change",
+          payload: {
+            board: "arte",
+            from: order.art_status,
+            to: nextStatus,
+            production_tag: nextProductionTag,
+            is_external_production: nextProductionTag === "PRODUCAO_EXTERNA",
+          },
+        }
+      );
       updateLocalOrder(updated);
       if (
         order.art_status === inboxStatus &&
@@ -1102,6 +1122,10 @@ export default function HubOS() {
     selectLayoutFile(files);
   };
 
+  const getProduzirMoveOptions = (): MoveOrderToArtStatusOptions => ({
+    productionTag: isExternalProduction ? "PRODUCAO_EXTERNA" : undefined,
+  });
+
   const handleMoveWithoutLayout = async () => {
     if (!pendingLayoutMove || isMovingWithoutLayout || isSendingLayoutAndMoving)
       return;
@@ -1109,9 +1133,15 @@ export default function HubOS() {
       setIsMovingWithoutLayout(true);
       const moved = await moveOrderToArtStatus(
         pendingLayoutMove.order,
-        pendingLayoutMove.nextStatus
+        pendingLayoutMove.nextStatus,
+        getProduzirMoveOptions()
       );
       if (moved) {
+        toast.success(
+          isExternalProduction
+            ? "OS movida para Produzir e marcada como Produção Externa."
+            : "Status atualizado."
+        );
         resetLayoutModalState();
       }
     } finally {
@@ -1149,12 +1179,17 @@ export default function HubOS() {
       });
       const moved = await moveOrderToArtStatus(
         pendingLayoutMove.order,
-        pendingLayoutMove.nextStatus
+        pendingLayoutMove.nextStatus,
+        getProduzirMoveOptions()
       );
       if (!moved) {
         return;
       }
-      toast.success("Layout enviado e card movido para Produzir.");
+      toast.success(
+        isExternalProduction
+          ? "Layout enviado, OS movida para Produzir e marcada como Produção Externa."
+          : "Layout enviado e card movido para Produzir."
+      );
       resetLayoutModalState();
     } catch (error) {
       console.error(error);
@@ -1208,17 +1243,21 @@ export default function HubOS() {
     updateLocalOrder(optimistic);
 
     try {
-      const updated = await updateOrder(order.id, {
-        prod_status: nextStatus,
-        production_tag: nextProductionTag,
-      }, {
-        type: "status_change",
-        payload: {
-          board: "producao",
-          from: order.prod_status,
-          to: nextStatus,
+      const updated = await updateOrder(
+        order.id,
+        {
+          prod_status: nextStatus,
+          production_tag: nextProductionTag,
         },
-      });
+        {
+          type: "status_change",
+          payload: {
+            board: "producao",
+            from: order.prod_status,
+            to: nextStatus,
+          },
+        }
+      );
       updateLocalOrder(updated);
     } catch (error) {
       console.error(error);
@@ -1372,18 +1411,22 @@ export default function HubOS() {
     const order = acabamentoLabelOrder;
 
     try {
-      const updated = await updateOrder(order.id, {
-        prod_status: "Em Acabamento",
-      }, {
-        type: "prod_status_changed",
-        payload: {
-          board: "producao",
-          from: order.prod_status,
-          to: "Em Acabamento",
-          source: "kanban_lightbox",
-          printed_label: printedAcabamentoLabel,
+      const updated = await updateOrder(
+        order.id,
+        {
+          prod_status: "Em Acabamento",
         },
-      });
+        {
+          type: "prod_status_changed",
+          payload: {
+            board: "producao",
+            from: order.prod_status,
+            to: "Em Acabamento",
+            source: "kanban_lightbox",
+            printed_label: printedAcabamentoLabel,
+          },
+        }
+      );
       updateLocalOrder(updated);
 
       toast.success("OS movida para Em Acabamento.");
@@ -1479,16 +1522,20 @@ export default function HubOS() {
 
     try {
       setMarkingInsumosReadyOrderId(order.id);
-      const updated = await updateOrder(order.id, {
-        production_tag: "EM_PRODUCAO",
-        insumos_return_notes: null,
-      }, {
-        type: "insumos_acknowledged",
-        payload: {
-          previous_production_tag: order.production_tag,
-          next_production_tag: "EM_PRODUCAO",
+      const updated = await updateOrder(
+        order.id,
+        {
+          production_tag: "EM_PRODUCAO",
+          insumos_return_notes: null,
         },
-      });
+        {
+          type: "insumos_acknowledged",
+          payload: {
+            previous_production_tag: order.production_tag,
+            next_production_tag: "EM_PRODUCAO",
+          },
+        }
+      );
 
       updateLocalOrder(updated);
       toast.success("Badge atualizada para Em Produção.");
@@ -2150,8 +2197,8 @@ export default function HubOS() {
                   Produção externa
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  Ao marcar esta opção, a OS também será enviada
-                  automaticamente para o quadro de produção.
+                  Ao marcar esta opção, a OS também será enviada automaticamente
+                  para o quadro de produção.
                 </p>
               </div>
             </div>
