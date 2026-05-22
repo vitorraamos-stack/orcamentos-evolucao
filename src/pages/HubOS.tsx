@@ -1275,7 +1275,7 @@ export default function HubOS() {
     }
   };
 
-  const handlePrintAcabamentoLabel = () => {
+  const handlePrintAcabamentoLabel = async () => {
     if (!acabamentoLabelOrder) return;
 
     const escapeHtml = (value: string) =>
@@ -1289,13 +1289,15 @@ export default function HubOS() {
     const orderNumber =
       acabamentoLabelOrder.os_number?.toString() ||
       acabamentoLabelOrder.sale_number;
+
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+      orderNumber
+    )}`;
+
     const clientName = escapeHtml(acabamentoLabelOrder.client_name || "-");
     const title = acabamentoLabelOrder.title
       ? escapeHtml(acabamentoLabelOrder.title)
       : "";
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-      orderNumber
-    )}`;
 
     const printMarkup = `<!doctype html>
 <html>
@@ -1379,21 +1381,32 @@ export default function HubOS() {
       frame.style.bottom = "0";
 
       const cleanup = () => {
-        window.setTimeout(() => {
-          frame.remove();
-        }, 300);
+        frame.remove();
       };
+
+      const fallbackCleanupTimer = window.setTimeout(cleanup, 30_000);
 
       frame.onload = () => {
         const targetWindow = frame.contentWindow;
         if (!targetWindow) {
+          window.clearTimeout(fallbackCleanupTimer);
           cleanup();
           toast.error("Não foi possível preparar a impressão da etiqueta.");
           return;
         }
+
+        const handleAfterPrint = () => {
+          window.clearTimeout(fallbackCleanupTimer);
+          targetWindow.removeEventListener("afterprint", handleAfterPrint);
+          cleanup();
+        };
+
+        targetWindow.addEventListener("afterprint", handleAfterPrint, {
+          once: true,
+        });
+
         targetWindow.focus();
         targetWindow.print();
-        cleanup();
       };
 
       document.body.appendChild(frame);
