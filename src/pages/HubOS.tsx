@@ -1275,7 +1275,7 @@ export default function HubOS() {
     }
   };
 
-  const handlePrintAcabamentoLabel = () => {
+  const handlePrintAcabamentoLabel = async () => {
     if (!acabamentoLabelOrder) return;
 
     const escapeHtml = (value: string) =>
@@ -1289,13 +1289,50 @@ export default function HubOS() {
     const orderNumber =
       acabamentoLabelOrder.os_number?.toString() ||
       acabamentoLabelOrder.sale_number;
+
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+      orderNumber
+    )}`;
+
+    const getQrCodeDataUrl = async () => {
+      const qrImage = new Image();
+      qrImage.decoding = "async";
+      qrImage.referrerPolicy = "no-referrer";
+
+      const loaded = new Promise<void>((resolve, reject) => {
+        qrImage.onload = () => resolve();
+        qrImage.onerror = () => reject(new Error("QR image load failed"));
+      });
+
+      qrImage.src = qrCodeUrl;
+      await loaded;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = qrImage.naturalWidth || 180;
+      canvas.height = qrImage.naturalHeight || 180;
+
+      const context = canvas.getContext("2d");
+      if (!context) {
+        throw new Error("Canvas context unavailable");
+      }
+
+      context.drawImage(qrImage, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL("image/png");
+    };
+
+    let qrCodeDataUrl = "";
+    try {
+      qrCodeDataUrl = await getQrCodeDataUrl();
+    } catch (error) {
+      console.error(error);
+      toast.error("Não foi possível preparar o QR Code para impressão.");
+      return;
+    }
+
     const clientName = escapeHtml(acabamentoLabelOrder.client_name || "-");
     const title = acabamentoLabelOrder.title
       ? escapeHtml(acabamentoLabelOrder.title)
       : "";
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-      orderNumber
-    )}`;
 
     const printMarkup = `<!doctype html>
 <html>
@@ -1361,7 +1398,7 @@ export default function HubOS() {
     <div class="label">
       <div class="tag">OS</div>
       <div class="order">${escapeHtml(orderNumber)}</div>
-      <img class="qr" src="${qrCodeUrl}" alt="QR Code" />
+      <img class="qr" src="${qrCodeDataUrl}" alt="QR Code" />
       <div class="meta"><strong>Cliente:</strong> ${clientName}</div>
       ${title ? `<div class="meta"><strong>Título:</strong> ${title}</div>` : ""}
     </div>
@@ -1379,21 +1416,32 @@ export default function HubOS() {
       frame.style.bottom = "0";
 
       const cleanup = () => {
-        window.setTimeout(() => {
-          frame.remove();
-        }, 300);
+        frame.remove();
       };
+
+      const fallbackCleanupTimer = window.setTimeout(cleanup, 30_000);
 
       frame.onload = () => {
         const targetWindow = frame.contentWindow;
         if (!targetWindow) {
+          window.clearTimeout(fallbackCleanupTimer);
           cleanup();
           toast.error("Não foi possível preparar a impressão da etiqueta.");
           return;
         }
+
+        const handleAfterPrint = () => {
+          window.clearTimeout(fallbackCleanupTimer);
+          targetWindow.removeEventListener("afterprint", handleAfterPrint);
+          cleanup();
+        };
+
+        targetWindow.addEventListener("afterprint", handleAfterPrint, {
+          once: true,
+        });
+
         targetWindow.focus();
         targetWindow.print();
-        cleanup();
       };
 
       document.body.appendChild(frame);
