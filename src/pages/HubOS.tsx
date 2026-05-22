@@ -50,6 +50,7 @@ import ServiceOrderDialog from "@/features/hubos/components/ServiceOrderDialog";
 import CreateOSDialog from "@/features/hubos/components/CreateOSDialog";
 import ArtDirectionTagPopup from "@/features/hubos/components/ArtDirectionTagPopup";
 import AcabamentoLabelDialog from "@/features/hubos/components/AcabamentoLabelDialog";
+import QRCode from "qrcode";
 import FiltersBar from "@/features/hubos/components/FiltersBar";
 import InstallationsInbox from "@/features/hubos/components/InstallationsInbox";
 import MetricsBar from "@/features/hubos/components/MetricsBar";
@@ -1275,7 +1276,7 @@ export default function HubOS() {
     }
   };
 
-  const handlePrintAcabamentoLabel = () => {
+  const handlePrintAcabamentoLabel = async () => {
     if (!acabamentoLabelOrder) return;
 
     const escapeHtml = (value: string) =>
@@ -1289,13 +1290,24 @@ export default function HubOS() {
     const orderNumber =
       acabamentoLabelOrder.os_number?.toString() ||
       acabamentoLabelOrder.sale_number;
+
+    let qrCodeDataUrl = "";
+    try {
+      qrCodeDataUrl = await QRCode.toDataURL(orderNumber, {
+        width: 180,
+        margin: 0,
+        errorCorrectionLevel: "M",
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error("Não foi possível gerar o QR Code da etiqueta.");
+      return;
+    }
+
     const clientName = escapeHtml(acabamentoLabelOrder.client_name || "-");
     const title = acabamentoLabelOrder.title
       ? escapeHtml(acabamentoLabelOrder.title)
       : "";
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-      orderNumber
-    )}`;
 
     const printMarkup = `<!doctype html>
 <html>
@@ -1361,7 +1373,7 @@ export default function HubOS() {
     <div class="label">
       <div class="tag">OS</div>
       <div class="order">${escapeHtml(orderNumber)}</div>
-      <img class="qr" src="${qrCodeUrl}" alt="QR Code" />
+      <img class="qr" src="${qrCodeDataUrl}" alt="QR Code" />
       <div class="meta"><strong>Cliente:</strong> ${clientName}</div>
       ${title ? `<div class="meta"><strong>Título:</strong> ${title}</div>` : ""}
     </div>
@@ -1379,21 +1391,32 @@ export default function HubOS() {
       frame.style.bottom = "0";
 
       const cleanup = () => {
-        window.setTimeout(() => {
-          frame.remove();
-        }, 300);
+        frame.remove();
       };
+
+      const fallbackCleanupTimer = window.setTimeout(cleanup, 30_000);
 
       frame.onload = () => {
         const targetWindow = frame.contentWindow;
         if (!targetWindow) {
+          window.clearTimeout(fallbackCleanupTimer);
           cleanup();
           toast.error("Não foi possível preparar a impressão da etiqueta.");
           return;
         }
+
+        const handleAfterPrint = () => {
+          window.clearTimeout(fallbackCleanupTimer);
+          targetWindow.removeEventListener("afterprint", handleAfterPrint);
+          cleanup();
+        };
+
+        targetWindow.addEventListener("afterprint", handleAfterPrint, {
+          once: true,
+        });
+
         targetWindow.focus();
         targetWindow.print();
-        cleanup();
       };
 
       document.body.appendChild(frame);
