@@ -50,6 +50,7 @@ import ServiceOrderDialog from "@/features/hubos/components/ServiceOrderDialog";
 import CreateOSDialog from "@/features/hubos/components/CreateOSDialog";
 import ArtDirectionTagPopup from "@/features/hubos/components/ArtDirectionTagPopup";
 import AcabamentoLabelDialog from "@/features/hubos/components/AcabamentoLabelDialog";
+import QRCode from "qrcode";
 import FiltersBar from "@/features/hubos/components/FiltersBar";
 import InstallationsInbox from "@/features/hubos/components/InstallationsInbox";
 import MetricsBar from "@/features/hubos/components/MetricsBar";
@@ -1363,7 +1364,7 @@ export default function HubOS() {
     <div class="label">
       <div class="tag">OS</div>
       <div class="order">${escapeHtml(orderNumber)}</div>
-      <img class="qr" src="${qrCodeUrl}" alt="QR Code" />
+      <img class="qr" src="${qrCodeDataUrl}" alt="QR Code" />
       <div class="meta"><strong>Cliente:</strong> ${clientName}</div>
       ${title ? `<div class="meta"><strong>Título:</strong> ${title}</div>` : ""}
     </div>
