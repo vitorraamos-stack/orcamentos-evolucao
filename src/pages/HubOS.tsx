@@ -1295,6 +1295,41 @@ export default function HubOS() {
       orderNumber
     )}`;
 
+    const getQrCodeDataUrl = async () => {
+      const qrImage = new Image();
+      qrImage.decoding = "async";
+      qrImage.referrerPolicy = "no-referrer";
+
+      const loaded = new Promise<void>((resolve, reject) => {
+        qrImage.onload = () => resolve();
+        qrImage.onerror = () => reject(new Error("QR image load failed"));
+      });
+
+      qrImage.src = qrCodeUrl;
+      await loaded;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = qrImage.naturalWidth || 180;
+      canvas.height = qrImage.naturalHeight || 180;
+
+      const context = canvas.getContext("2d");
+      if (!context) {
+        throw new Error("Canvas context unavailable");
+      }
+
+      context.drawImage(qrImage, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL("image/png");
+    };
+
+    let qrCodeDataUrl = "";
+    try {
+      qrCodeDataUrl = await getQrCodeDataUrl();
+    } catch (error) {
+      console.error(error);
+      toast.error("Não foi possível preparar o QR Code para impressão.");
+      return;
+    }
+
     const clientName = escapeHtml(acabamentoLabelOrder.client_name || "-");
     const title = acabamentoLabelOrder.title
       ? escapeHtml(acabamentoLabelOrder.title)
