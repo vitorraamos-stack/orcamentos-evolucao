@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import QRCode from "qrcode";
 import * as DialogUi from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { OsOrder } from "@/features/hubos/types";

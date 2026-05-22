@@ -50,6 +50,7 @@ import ServiceOrderDialog from "@/features/hubos/components/ServiceOrderDialog";
 import CreateOSDialog from "@/features/hubos/components/CreateOSDialog";
 import ArtDirectionTagPopup from "@/features/hubos/components/ArtDirectionTagPopup";
 import AcabamentoLabelDialog from "@/features/hubos/components/AcabamentoLabelDialog";
+import QRCode from "qrcode";
 import FiltersBar from "@/features/hubos/components/FiltersBar";
 import InstallationsInbox from "@/features/hubos/components/InstallationsInbox";
 import MetricsBar from "@/features/hubos/components/MetricsBar";
