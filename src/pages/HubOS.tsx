@@ -1291,18 +1291,9 @@ export default function HubOS() {
       acabamentoLabelOrder.os_number?.toString() ||
       acabamentoLabelOrder.sale_number;
 
-    let qrCodeDataUrl = "";
-    try {
-      qrCodeDataUrl = await QRCode.toDataURL(orderNumber, {
-        width: 180,
-        margin: 0,
-        errorCorrectionLevel: "M",
-      });
-    } catch (error) {
-      console.error(error);
-      toast.error("Não foi possível gerar o QR Code da etiqueta.");
-      return;
-    }
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+      orderNumber
+    )}`;
 
     const clientName = escapeHtml(acabamentoLabelOrder.client_name || "-");
     const title = acabamentoLabelOrder.title

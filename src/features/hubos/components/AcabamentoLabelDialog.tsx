@@ -27,40 +27,11 @@ export default function AcabamentoLabelDialog({
   onPrintLabel,
 }: AcabamentoLabelDialogProps) {
   const orderNumber = useMemo(() => getOrderNumber(order), [order]);
-  const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
-
-  useEffect(() => {
-    let disposed = false;
-
-    const generateQrCode = async () => {
-      if (!orderNumber) {
-        setQrCodeDataUrl("");
-        return;
-      }
-
-      try {
-        const generatedQrCode = await QRCode.toDataURL(orderNumber, {
-          width: 180,
-          margin: 0,
-          errorCorrectionLevel: "M",
-        });
-
-        if (!disposed) {
-          setQrCodeDataUrl(generatedQrCode);
-        }
-      } catch {
-        if (!disposed) {
-          setQrCodeDataUrl("");
-        }
-      }
-    };
-
-    void generateQrCode();
-
-    return () => {
-      disposed = true;
-    };
-  }, [orderNumber]);
+  const qrCodeUrl = useMemo(
+    () =>
+      `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(orderNumber)}`,
+    [orderNumber]
+  );
 
   return (
     <DialogUi.Dialog open={open} onOpenChange={onOpenChange}>
@@ -78,31 +49,19 @@ export default function AcabamentoLabelDialog({
               id="print-label-area"
               className="thermal-print-label rounded-md border bg-white p-3 text-black"
             >
-              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-600">
-                OS
-              </p>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-600">OS</p>
               <div className="mt-1 flex items-start justify-between gap-2">
-                <p className="font-mono text-2xl font-bold leading-none">
-                  {orderNumber}
-                </p>
-                {qrCodeDataUrl ? (
-                  <img
-                    src={qrCodeDataUrl}
-                    alt={`QR Code da OS ${orderNumber}`}
-                    className="size-20 shrink-0"
-                  />
-                ) : (
-                  <div className="size-20 shrink-0 rounded border border-dashed border-slate-300" />
-                )}
+                <p className="font-mono text-2xl font-bold leading-none">{orderNumber}</p>
+                <img
+                  src={qrCodeUrl}
+                  alt={`QR Code da OS ${orderNumber}`}
+                  className="size-20 shrink-0"
+                />
               </div>
               <div className="mt-2 space-y-0.5 text-[11px] leading-tight">
-                <p className="truncate">
-                  <strong>Cliente:</strong> {order.client_name}
-                </p>
+                <p className="truncate"><strong>Cliente:</strong> {order.client_name}</p>
                 {order.title ? (
-                  <p className="line-clamp-1">
-                    <strong>Título:</strong> {order.title}
-                  </p>
+                  <p className="line-clamp-1"><strong>Título:</strong> {order.title}</p>
                 ) : null}
               </div>
             </div>
@@ -112,19 +71,10 @@ export default function AcabamentoLabelDialog({
                 Imprimir etiqueta
               </Button>
               <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                  disabled={saving}
-                >
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
                   Cancelar
                 </Button>
-                <Button
-                  type="button"
-                  onClick={() => void onConfirmMove()}
-                  disabled={saving}
-                >
+                <Button type="button" onClick={() => void onConfirmMove()} disabled={saving}>
                   {saving ? "Movendo..." : "Confirmar e mover"}
                 </Button>
               </div>
