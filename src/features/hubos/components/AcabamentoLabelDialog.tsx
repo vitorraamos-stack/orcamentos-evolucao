@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import QRCode from "qrcode";
 import * as DialogUi from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { OsOrder } from "@/features/hubos/types";
@@ -26,13 +27,40 @@ export default function AcabamentoLabelDialog({
   onPrintLabel,
 }: AcabamentoLabelDialogProps) {
   const orderNumber = useMemo(() => getOrderNumber(order), [order]);
-  const qrCodeUrl = useMemo(
-    () =>
-      `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-        orderNumber
-      )}`,
-    [orderNumber]
-  );
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
+
+  useEffect(() => {
+    let disposed = false;
+
+    const generateQrCode = async () => {
+      if (!orderNumber) {
+        setQrCodeDataUrl("");
+        return;
+      }
+
+      try {
+        const generatedQrCode = await QRCode.toDataURL(orderNumber, {
+          width: 180,
+          margin: 0,
+          errorCorrectionLevel: "M",
+        });
+
+        if (!disposed) {
+          setQrCodeDataUrl(generatedQrCode);
+        }
+      } catch {
+        if (!disposed) {
+          setQrCodeDataUrl("");
+        }
+      }
+    };
+
+    void generateQrCode();
+
+    return () => {
+      disposed = true;
+    };
+  }, [orderNumber]);
 
   return (
     <DialogUi.Dialog open={open} onOpenChange={onOpenChange}>
@@ -57,11 +85,15 @@ export default function AcabamentoLabelDialog({
                 <p className="font-mono text-2xl font-bold leading-none">
                   {orderNumber}
                 </p>
-                <img
-                  src={qrCodeUrl}
-                  alt={`QR Code da OS ${orderNumber}`}
-                  className="size-20 shrink-0"
-                />
+                {qrCodeDataUrl ? (
+                  <img
+                    src={qrCodeDataUrl}
+                    alt={`QR Code da OS ${orderNumber}`}
+                    className="size-20 shrink-0"
+                  />
+                ) : (
+                  <div className="size-20 shrink-0 rounded border border-dashed border-slate-300" />
+                )}
               </div>
               <div className="mt-2 space-y-0.5 text-[11px] leading-tight">
                 <p className="truncate">
