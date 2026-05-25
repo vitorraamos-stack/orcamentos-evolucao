@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
-const read = (path: string) => readFileSync(path, "utf8");
+const read = (path: string) =>
+  readFileSync(path, "utf8").replaceAll("\r\n", "\n");
 
 describe("Hub OS layout availability safeguards", () => {
   it("fetchLatestOrderLayout filtra e rejeita layouts inválidos", () => {

@@ -50,7 +50,7 @@ import ServiceOrderDialog from "@/features/hubos/components/ServiceOrderDialog";
 import CreateOSDialog from "@/features/hubos/components/CreateOSDialog";
 import ArtDirectionTagPopup from "@/features/hubos/components/ArtDirectionTagPopup";
 import AcabamentoLabelDialog from "@/features/hubos/components/AcabamentoLabelDialog";
-import QRCode from "qrcode";
+import { generateQrCodeDataUrl } from "@/features/hubos/utils/qrCode";
 import FiltersBar from "@/features/hubos/components/FiltersBar";
 import InstallationsInbox from "@/features/hubos/components/InstallationsInbox";
 import MetricsBar from "@/features/hubos/components/MetricsBar";
@@ -1291,11 +1291,14 @@ export default function HubOS() {
       acabamentoLabelOrder.os_number?.toString() ||
       acabamentoLabelOrder.sale_number;
 
-    const qrCodeDataUrl = await QRCode.toDataURL(orderNumber, {
-      errorCorrectionLevel: "M",
-      margin: 1,
-      width: 180,
-    });
+    let qrCodeDataUrl: string;
+    try {
+      qrCodeDataUrl = await generateQrCodeDataUrl(orderNumber);
+    } catch (error) {
+      console.error("Falha ao gerar QR Code da etiqueta de acabamento", error);
+      toast.error("Não foi possível preparar o QR Code para impressão.");
+      return;
+    }
 
     const clientName = escapeHtml(acabamentoLabelOrder.client_name || "-");
     const title = acabamentoLabelOrder.title
@@ -1373,72 +1376,90 @@ export default function HubOS() {
   </body>
 </html>`;
 
-    const printWithIframe = () => {
-      const frame = document.createElement("iframe");
-      frame.setAttribute("aria-hidden", "true");
-      frame.style.position = "fixed";
-      frame.style.width = "0";
-      frame.style.height = "0";
-      frame.style.border = "0";
-      frame.style.right = "0";
-      frame.style.bottom = "0";
+    const printWithIframe = () =>
+      new Promise<void>((resolve, reject) => {
+        const frame = document.createElement("iframe");
+        frame.setAttribute("aria-hidden", "true");
+        frame.style.position = "fixed";
+        frame.style.width = "50mm";
+        frame.style.height = "30mm";
+        frame.style.left = "-10000px";
+        frame.style.top = "0";
+        frame.style.border = "0";
+        frame.style.overflow = "hidden";
 
-      const cleanup = () => {
-        frame.remove();
-      };
-
-      const fallbackCleanupTimer = window.setTimeout(cleanup, 30_000);
-
-      frame.onload = () => {
-        const targetWindow = frame.contentWindow;
-        if (!targetWindow) {
-          window.clearTimeout(fallbackCleanupTimer);
-          cleanup();
-          toast.error("Não foi possível preparar a impressão da etiqueta.");
-          return;
-        }
-
-        const handleAfterPrint = () => {
-          window.clearTimeout(fallbackCleanupTimer);
-          targetWindow.removeEventListener("afterprint", handleAfterPrint);
-          cleanup();
+        const cleanup = () => {
+          frame.remove();
         };
 
-        const printNow = () => {
-          targetWindow.addEventListener("afterprint", handleAfterPrint, {
-            once: true,
-          });
-          targetWindow.focus();
-          targetWindow.print();
+        const fallbackCleanupTimer = window.setTimeout(cleanup, 30_000);
+
+        frame.onload = () => {
+          const targetWindow = frame.contentWindow;
+          if (!targetWindow) {
+            window.clearTimeout(fallbackCleanupTimer);
+            cleanup();
+            reject(
+              new Error("Não foi possível preparar a impressão da etiqueta.")
+            );
+            return;
+          }
+
+          const handleAfterPrint = () => {
+            window.clearTimeout(fallbackCleanupTimer);
+            targetWindow.removeEventListener("afterprint", handleAfterPrint);
+            cleanup();
+          };
+
+          const printNow = () => {
+            targetWindow.addEventListener("afterprint", handleAfterPrint, {
+              once: true,
+            });
+            try {
+              targetWindow.focus();
+              targetWindow.print();
+              resolve();
+            } catch (error) {
+              window.clearTimeout(fallbackCleanupTimer);
+              targetWindow.removeEventListener("afterprint", handleAfterPrint);
+              cleanup();
+              reject(error);
+            }
+          };
+
+          const qrImage =
+            frame.contentDocument?.querySelector<HTMLImageElement>("img.qr");
+          if (!qrImage) {
+            printNow();
+            return;
+          }
+
+          if (qrImage.complete) {
+            printNow();
+            return;
+          }
+
+          const onLoadOrError = () => {
+            qrImage.removeEventListener("load", onLoadOrError);
+            qrImage.removeEventListener("error", onLoadOrError);
+            printNow();
+          };
+
+          qrImage.addEventListener("load", onLoadOrError, { once: true });
+          qrImage.addEventListener("error", onLoadOrError, { once: true });
         };
 
-        const qrImage = frame.contentDocument?.querySelector<HTMLImageElement>("img.qr");
-        if (!qrImage) {
-          printNow();
-          return;
-        }
+        document.body.appendChild(frame);
+        frame.srcdoc = printMarkup;
+      });
 
-        if (qrImage.complete) {
-          printNow();
-          return;
-        }
-
-        const onLoadOrError = () => {
-          qrImage.removeEventListener("load", onLoadOrError);
-          qrImage.removeEventListener("error", onLoadOrError);
-          printNow();
-        };
-
-        qrImage.addEventListener("load", onLoadOrError, { once: true });
-        qrImage.addEventListener("error", onLoadOrError, { once: true });
-      };
-
-      document.body.appendChild(frame);
-      frame.srcdoc = printMarkup;
-    };
-
-    printWithIframe();
-    setPrintedAcabamentoLabel(true);
+    try {
+      await printWithIframe();
+      setPrintedAcabamentoLabel(true);
+    } catch (error) {
+      console.error(error);
+      toast.error("Não foi possível preparar a impressão da etiqueta.");
+    }
   };
 
   const handleConfirmAcabamentoMove = async () => {

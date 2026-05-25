@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import QRCode from "qrcode";
 import * as DialogUi from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { OsOrder } from "@/features/hubos/types";
+import { generateQrCodeDataUrl } from "@/features/hubos/utils/qrCode";
 
 type AcabamentoLabelDialogProps = {
   open: boolean;
@@ -27,22 +27,37 @@ export default function AcabamentoLabelDialog({
   onPrintLabel,
 }: AcabamentoLabelDialogProps) {
   const orderNumber = useMemo(() => getOrderNumber(order), [order]);
-  const [qrCodeUrl, setQrCodeUrl] = useState("");
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+  const [qrCodeError, setQrCodeError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!orderNumber) {
-      setQrCodeUrl("");
+    if (!open || !orderNumber) {
+      setQrCodeDataUrl(null);
+      setQrCodeError(null);
       return;
     }
 
-    void QRCode.toDataURL(orderNumber, {
-      errorCorrectionLevel: "M",
-      margin: 1,
-      width: 180,
-    })
-      .then(setQrCodeUrl)
-      .catch(() => setQrCodeUrl(""));
-  }, [orderNumber]);
+    let cancelled = false;
+    setQrCodeDataUrl(null);
+    setQrCodeError(null);
+
+    void generateQrCodeDataUrl(orderNumber)
+      .then((dataUrl) => {
+        if (cancelled) return;
+        setQrCodeDataUrl(dataUrl);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        console.error("Falha ao gerar QR Code da etiqueta de acabamento", error);
+        setQrCodeError("QR Code indisponível. Tente reabrir a etiqueta.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, orderNumber]);
+
+  const canPrint = Boolean(qrCodeDataUrl) && !qrCodeError;
 
   return (
     <DialogUi.Dialog open={open} onOpenChange={onOpenChange}>
@@ -63,11 +78,17 @@ export default function AcabamentoLabelDialog({
               <p className="text-[10px] uppercase tracking-[0.18em] text-slate-600">OS</p>
               <div className="mt-1 flex items-start justify-between gap-2">
                 <p className="font-mono text-2xl font-bold leading-none">{orderNumber}</p>
-                <img
-                  src={qrCodeUrl}
-                  alt={`QR Code da OS ${orderNumber}`}
-                  className="size-20 shrink-0"
-                />
+                {qrCodeDataUrl ? (
+                  <img
+                    src={qrCodeDataUrl}
+                    alt={`QR Code da OS ${orderNumber}`}
+                    className="size-20 shrink-0"
+                  />
+                ) : (
+                  <div className="flex size-20 shrink-0 items-center justify-center rounded border border-slate-300 text-[10px] text-slate-500">
+                    Gerando QR...
+                  </div>
+                )}
               </div>
               <div className="mt-2 space-y-0.5 text-[11px] leading-tight">
                 <p className="truncate"><strong>Cliente:</strong> {order.client_name}</p>
@@ -75,10 +96,11 @@ export default function AcabamentoLabelDialog({
                   <p className="line-clamp-1"><strong>Título:</strong> {order.title}</p>
                 ) : null}
               </div>
+              {qrCodeError ? <p className="mt-1 text-[10px] text-red-600">{qrCodeError}</p> : null}
             </div>
 
             <DialogUi.DialogFooter className="no-print gap-2 sm:justify-between">
-              <Button type="button" variant="secondary" onClick={onPrintLabel}>
+              <Button type="button" variant="secondary" onClick={onPrintLabel} disabled={!canPrint || saving}>
                 Imprimir etiqueta
               </Button>
               <div className="flex gap-2">
