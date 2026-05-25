@@ -98,6 +98,10 @@ export default function AcabamentoLabelDialog({
               </div>
               {qrCodeError ? <p className="mt-1 text-[10px] text-red-600">{qrCodeError}</p> : null}
             </div>
+            <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] leading-tight text-amber-900">
+              Na tela de impressão, desative Cabeçalhos e rodapés, use Margens:
+              nenhuma e Escala: 100%.
+            </p>
 
             <DialogUi.DialogFooter className="no-print gap-2 sm:justify-between">
               <Button type="button" variant="secondary" onClick={onPrintLabel} disabled={!canPrint || saving}>
