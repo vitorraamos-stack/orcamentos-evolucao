@@ -50,7 +50,7 @@ import ServiceOrderDialog from "@/features/hubos/components/ServiceOrderDialog";
 import CreateOSDialog from "@/features/hubos/components/CreateOSDialog";
 import ArtDirectionTagPopup from "@/features/hubos/components/ArtDirectionTagPopup";
 import AcabamentoLabelDialog from "@/features/hubos/components/AcabamentoLabelDialog";
-import QRCode from "qrcode";
+import { generateQrCodeDataUrl } from "@/features/hubos/utils/qrCode";
 import FiltersBar from "@/features/hubos/components/FiltersBar";
 import InstallationsInbox from "@/features/hubos/components/InstallationsInbox";
 import MetricsBar from "@/features/hubos/components/MetricsBar";
@@ -1291,9 +1291,14 @@ export default function HubOS() {
       acabamentoLabelOrder.os_number?.toString() ||
       acabamentoLabelOrder.sale_number;
 
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-      orderNumber
-    )}`;
+    let qrCodeDataUrl: string;
+    try {
+      qrCodeDataUrl = await generateQrCodeDataUrl(orderNumber);
+    } catch (error) {
+      console.error("Falha ao gerar QR Code da etiqueta de acabamento", error);
+      toast.error("Não foi possível preparar o QR Code para impressão.");
+      return;
+    }
 
     const clientName = escapeHtml(acabamentoLabelOrder.client_name || "-");
     const title = acabamentoLabelOrder.title
