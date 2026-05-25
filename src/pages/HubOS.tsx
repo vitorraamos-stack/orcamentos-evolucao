@@ -1376,85 +1376,91 @@ export default function HubOS() {
   </body>
 </html>`;
 
-    const printWithIframe = () =>
+    const printWithNewWindow = () =>
       new Promise<void>((resolve, reject) => {
-        const frame = document.createElement("iframe");
-        frame.setAttribute("aria-hidden", "true");
-        frame.style.position = "fixed";
-        frame.style.width = "50mm";
-        frame.style.height = "30mm";
-        frame.style.left = "-10000px";
-        frame.style.top = "0";
-        frame.style.border = "0";
-        frame.style.overflow = "hidden";
+        const printWindow = window.open("", "_blank", "width=420,height=320");
+        if (!printWindow) {
+          toast.error(
+            "O navegador bloqueou a janela de impressão. Permita pop-ups para este site."
+          );
+          reject(new Error("Janela de impressão bloqueada."));
+          return;
+        }
 
-        const cleanup = () => {
-          frame.remove();
-        };
+        printWindow.document.open();
+        printWindow.document.write(printMarkup);
+        printWindow.document.close();
 
-        const fallbackCleanupTimer = window.setTimeout(cleanup, 30_000);
-
-        frame.onload = () => {
-          const targetWindow = frame.contentWindow;
-          if (!targetWindow) {
-            window.clearTimeout(fallbackCleanupTimer);
-            cleanup();
-            reject(
-              new Error("Não foi possível preparar a impressão da etiqueta.")
-            );
-            return;
-          }
-
-          const handleAfterPrint = () => {
-            window.clearTimeout(fallbackCleanupTimer);
-            targetWindow.removeEventListener("afterprint", handleAfterPrint);
-            cleanup();
-          };
-
-          const printNow = () => {
-            targetWindow.addEventListener("afterprint", handleAfterPrint, {
-              once: true,
-            });
-            try {
-              targetWindow.focus();
-              targetWindow.print();
-              resolve();
-            } catch (error) {
-              window.clearTimeout(fallbackCleanupTimer);
-              targetWindow.removeEventListener("afterprint", handleAfterPrint);
-              cleanup();
-              reject(error);
+        const waitForReady = async () => {
+          const startAt = Date.now();
+          while (printWindow.document.readyState !== "complete") {
+            if (Date.now() - startAt > 10_000) {
+              throw new Error("Tempo excedido ao preparar impressão.");
             }
-          };
-
-          const qrImage =
-            frame.contentDocument?.querySelector<HTMLImageElement>("img.qr");
-          if (!qrImage) {
-            printNow();
-            return;
+            await new Promise((r) => window.setTimeout(r, 20));
           }
-
-          if (qrImage.complete) {
-            printNow();
-            return;
-          }
-
-          const onLoadOrError = () => {
-            qrImage.removeEventListener("load", onLoadOrError);
-            qrImage.removeEventListener("error", onLoadOrError);
-            printNow();
-          };
-
-          qrImage.addEventListener("load", onLoadOrError, { once: true });
-          qrImage.addEventListener("error", onLoadOrError, { once: true });
         };
 
-        document.body.appendChild(frame);
-        frame.srcdoc = printMarkup;
+        const waitForQrImage = async () => {
+          const qrImage =
+            printWindow.document.querySelector<HTMLImageElement>("img.qr");
+          if (!qrImage || qrImage.complete) return;
+
+          await new Promise<void>((resolveImage) => {
+            const onLoadOrError = () => {
+              qrImage.removeEventListener("load", onLoadOrError);
+              qrImage.removeEventListener("error", onLoadOrError);
+              resolveImage();
+            };
+            qrImage.addEventListener("load", onLoadOrError, { once: true });
+            qrImage.addEventListener("error", onLoadOrError, { once: true });
+          });
+        };
+
+        const waitForAnimationFrames = async () => {
+          await new Promise<void>((next) =>
+            printWindow.requestAnimationFrame(() => next())
+          );
+          await new Promise<void>((next) =>
+            printWindow.requestAnimationFrame(() => next())
+          );
+        };
+
+        void (async () => {
+          try {
+            await waitForReady();
+            await waitForQrImage();
+            await waitForAnimationFrames();
+            await new Promise((r) => window.setTimeout(r, 150));
+
+            printWindow.addEventListener(
+              "afterprint",
+              () => {
+                try {
+                  printWindow.close();
+                } catch {
+                  // noop: alguns navegadores podem bloquear close automático
+                }
+              },
+              { once: true }
+            );
+
+            printWindow.focus();
+            printWindow.print();
+            resolve();
+          } catch (error) {
+            try {
+              printWindow.close();
+            } catch {
+              // noop
+            }
+            reject(error);
+          }
+        })();
       });
 
     try {
-      await printWithIframe();
+      await printWithNewWindow();
       setPrintedAcabamentoLabel(true);
     } catch (error) {
       console.error(error);
