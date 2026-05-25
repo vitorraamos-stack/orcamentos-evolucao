@@ -27,11 +27,22 @@ export default function AcabamentoLabelDialog({
   onPrintLabel,
 }: AcabamentoLabelDialogProps) {
   const orderNumber = useMemo(() => getOrderNumber(order), [order]);
-  const qrCodeUrl = useMemo(
-    () =>
-      `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(orderNumber)}`,
-    [orderNumber]
-  );
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
+
+  useEffect(() => {
+    if (!orderNumber) {
+      setQrCodeUrl("");
+      return;
+    }
+
+    void QRCode.toDataURL(orderNumber, {
+      errorCorrectionLevel: "M",
+      margin: 1,
+      width: 180,
+    })
+      .then(setQrCodeUrl)
+      .catch(() => setQrCodeUrl(""));
+  }, [orderNumber]);
 
   return (
     <DialogUi.Dialog open={open} onOpenChange={onOpenChange}>
