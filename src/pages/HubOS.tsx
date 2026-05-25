@@ -1291,9 +1291,11 @@ export default function HubOS() {
       acabamentoLabelOrder.os_number?.toString() ||
       acabamentoLabelOrder.sale_number;
 
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-      orderNumber
-    )}`;
+    const qrCodeDataUrl = await QRCode.toDataURL(orderNumber, {
+      errorCorrectionLevel: "M",
+      margin: 1,
+      width: 180,
+    });
 
     const clientName = escapeHtml(acabamentoLabelOrder.client_name || "-");
     const title = acabamentoLabelOrder.title
