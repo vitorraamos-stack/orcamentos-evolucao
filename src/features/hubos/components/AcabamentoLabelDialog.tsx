@@ -98,7 +98,6 @@ export default function AcabamentoLabelDialog({
               </div>
               {qrCodeError ? <p className="mt-1 text-[10px] text-red-600">{qrCodeError}</p> : null}
             </div>
-
             <DialogUi.DialogFooter className="no-print gap-2 sm:justify-between">
               <Button type="button" variant="secondary" onClick={onPrintLabel} disabled={!canPrint || saving}>
                 Imprimir etiqueta
