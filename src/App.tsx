@@ -6,7 +6,7 @@ import Home from "@/pages/Home";
 import HubOS from "@/pages/HubOS";
 import Galeria from "@/pages/Galeria";
 // IMPORTANTE: Agora estamos importando o componente real!
-import Materiais from "@/pages/Materiais"; 
+import Materiais from "@/pages/Materiais";
 import Configuracoes from "@/pages/Configuracoes";
 import OsArteBoardPage from "@/modules/hub-os/pages/OsArteBoardPage";
 import OsProducaoBoardPage from "@/modules/hub-os/pages/OsProducaoBoardPage";
@@ -16,6 +16,9 @@ import OsCreatePage from "@/modules/hub-os/pages/OsCreatePage";
 import OsAuditPage from "@/modules/hub-os/pages/OsAuditPage";
 import OsPendentesPage from "@/modules/hub-os/pages/OsPendentesPage";
 import FinanceiroPortalPage from "@/modules/hub-os/pages/FinanceiroPortalPage";
+import OperationalDashboardPage from "@/modules/dashboard/OperationalDashboardPage";
+import OrdersCentralPage from "@/modules/orders/pages/OrdersCentralPage";
+import ModulePlaceholderPage from "@/shared/components/ModulePlaceholderPage";
 import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -25,7 +28,7 @@ import {
   canAccessHubAudit,
   canAccessHubFinanceiro,
   canAccessMateriais,
-} from '@/lib/authz';
+} from "@/lib/authz";
 import Layout from "./components/Layout";
 import HubOsAccessGuard from "./components/HubOsAccessGuard";
 import RequireModule from "./components/RequireModule";
@@ -37,7 +40,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
-      
+
       {/* Rota Principal */}
       <Route path="/">
         <Layout>
@@ -50,6 +53,14 @@ function Router() {
       <Route path="/hub-os">
         <Layout>
           <RequireModule moduleKey="hub_os">
+            <OperationalDashboardPage />
+          </RequireModule>
+        </Layout>
+      </Route>
+
+      <Route path="/hub-os/kanban">
+        <Layout>
+          <RequireModule moduleKey="hub_os">
             <HubOS />
           </RequireModule>
         </Layout>
@@ -59,14 +70,15 @@ function Router() {
         <Layout>
           <RequireModule moduleKey="hub_os">
             {canAccessHubAudit(authzContext) ? (
-              <HubOsAccessGuard scope="audit"><OsAuditPage /></HubOsAccessGuard>
+              <HubOsAccessGuard scope="audit">
+                <OsAuditPage />
+              </HubOsAccessGuard>
             ) : (
               <Redirect to="/" />
             )}
           </RequireModule>
         </Layout>
       </Route>
-
 
       <Route path="/hub-os/pendentes">
         <Layout>
@@ -79,7 +91,11 @@ function Router() {
       <Route path="/financeiro">
         <Layout>
           <RequireModule moduleKey="hub_os_financeiro">
-            {canAccessHubFinanceiro(authzContext) ? <FinanceiroPortalPage /> : <Redirect to="/" />}
+            {canAccessHubFinanceiro(authzContext) ? (
+              <FinanceiroPortalPage />
+            ) : (
+              <Redirect to="/" />
+            )}
           </RequireModule>
         </Layout>
       </Route>
@@ -87,7 +103,11 @@ function Router() {
       <Route path="/hub-os/financeiro">
         <Layout>
           <RequireModule moduleKey="hub_os_financeiro">
-            {canAccessHubFinanceiro(authzContext) ? <FinanceiroPortalPage /> : <Redirect to="/" />}
+            {canAccessHubFinanceiro(authzContext) ? (
+              <FinanceiroPortalPage />
+            ) : (
+              <Redirect to="/" />
+            )}
           </RequireModule>
         </Layout>
       </Route>
@@ -99,33 +119,59 @@ function Router() {
           </RequireModule>
         </Layout>
       </Route>
-      
+
       {/* Rota de Materiais Corrigida */}
       <Route path="/materiais">
         <Layout>
           {/* Só permite acesso se for Admin, senão volta para a Home */}
           <RequireModule moduleKey="materiais">
-            {canAccessMateriais(authzContext) ? <Materiais /> : <Redirect to="/" />}
+            {canAccessMateriais(authzContext) ? (
+              <Materiais />
+            ) : (
+              <Redirect to="/" />
+            )}
           </RequireModule>
         </Layout>
       </Route>
-      
+
       <Route path="/configuracoes">
         <Layout>
           <RequireModule moduleKey="configuracoes">
-            {canAccessConfiguracoes(authzContext) ? <Configuracoes /> : <Redirect to="/" />}
+            {canAccessConfiguracoes(authzContext) ? (
+              <Configuracoes />
+            ) : (
+              <Redirect to="/" />
+            )}
           </RequireModule>
         </Layout>
       </Route>
 
       <Route path="/os">
-        <Redirect to="/os/arte" />
+        <Layout>
+          <RequireModule moduleKey="hub_os">
+            <OrdersCentralPage />
+          </RequireModule>
+        </Layout>
       </Route>
+
+      {["instalacoes", "entregas", "arquivos", "relatorios"].map(module => (
+        <Route key={module} path={`/${module}`}>
+          <Layout>
+            <RequireModule moduleKey="hub_os">
+              <ModulePlaceholderPage
+                title={module.charAt(0).toUpperCase() + module.slice(1)}
+              />
+            </RequireModule>
+          </Layout>
+        </Route>
+      ))}
 
       <Route path="/os/arte">
         <Layout>
           <RequireModule moduleKey="hub_os">
-            <HubOsAccessGuard scope="arte"><OsArteBoardPage /></HubOsAccessGuard>
+            <HubOsAccessGuard scope="arte">
+              <OsArteBoardPage />
+            </HubOsAccessGuard>
           </RequireModule>
         </Layout>
       </Route>
@@ -133,7 +179,9 @@ function Router() {
       <Route path="/os/producao">
         <Layout>
           <RequireModule moduleKey="hub_os">
-            <HubOsAccessGuard scope="producao"><OsProducaoBoardPage /></HubOsAccessGuard>
+            <HubOsAccessGuard scope="producao">
+              <OsProducaoBoardPage />
+            </HubOsAccessGuard>
           </RequireModule>
         </Layout>
       </Route>
@@ -141,7 +189,9 @@ function Router() {
       <Route path="/os/kiosk">
         <RequireModule moduleKey="hub_os">
           <RequireModule moduleKey="hub_os_kiosk">
-            <HubOsAccessGuard scope="producao"><OsKioskPage /></HubOsAccessGuard>
+            <HubOsAccessGuard scope="producao">
+              <OsKioskPage />
+            </HubOsAccessGuard>
           </RequireModule>
         </RequireModule>
       </Route>
@@ -149,16 +199,20 @@ function Router() {
       <Route path="/os/novo">
         <Layout>
           <RequireModule moduleKey="hub_os">
-            <HubOsAccessGuard scope="create"><OsCreatePage /></HubOsAccessGuard>
+            <HubOsAccessGuard scope="create">
+              <OsCreatePage />
+            </HubOsAccessGuard>
           </RequireModule>
         </Layout>
       </Route>
 
       <Route path="/os/:id">
-        {new URLSearchParams(window.location.search).get('kiosk') === '1' ? (
+        {new URLSearchParams(window.location.search).get("kiosk") === "1" ? (
           <RequireModule moduleKey="hub_os">
             <RequireModule moduleKey="hub_os_kiosk">
-              <HubOsAccessGuard scope="producao"><OsDetailPage /></HubOsAccessGuard>
+              <HubOsAccessGuard scope="producao">
+                <OsDetailPage />
+              </HubOsAccessGuard>
             </RequireModule>
           </RequireModule>
         ) : (

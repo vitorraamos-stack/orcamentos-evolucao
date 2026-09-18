@@ -1,32 +1,47 @@
-import React, { useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useLocation, Link } from 'wouter';
-import { Button } from '@/components/ui/button';
-import { 
-  Calculator, 
+import React, { useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useLocation, Link } from "wouter";
+import { Button } from "@/components/ui/button";
+import {
+  Calculator,
+  LayoutDashboard,
   ClipboardList,
   Image,
-  Package, 
-  LogOut, 
+  Palette,
+  Factory,
+  CalendarDays,
+  Truck,
+  FolderOpen,
+  ChartNoAxesColumn,
+  Package,
+  LogOut,
   Menu,
   Settings,
-  BadgeDollarSign
-} from 'lucide-react';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { cn } from '@/lib/utils';
-import { getRoleLabel } from '@/lib/hubRoles';
+  BadgeDollarSign,
+} from "lucide-react";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
+import { getRoleLabel } from "@/lib/hubRoles";
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const { user, loading, signOut, isAdmin, role, hubPermissions, hasModuleAccess } = useAuth();
+  const {
+    user,
+    loading,
+    signOut,
+    isAdmin,
+    role,
+    hubPermissions,
+    hasModuleAccess,
+  } = useAuth();
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
     if (!loading && !user) {
-      setLocation('/login');
+      setLocation("/login");
     }
   }, [user, loading, setLocation]);
 
@@ -41,36 +56,66 @@ export default function Layout({ children }: LayoutProps) {
   if (!user) return null;
 
   // Componente de navegação interno com tipos corretos
-  const canViewHubOs = hubPermissions.canViewHubOS && hasModuleAccess('hub_os');
-  const canViewGaleria = hasModuleAccess('galeria');
-  const canViewCalculadora = hasModuleAccess('calculadora');
-  const canViewMateriais = isAdmin && hasModuleAccess('materiais');
-  const canViewConfiguracoes = hubPermissions.canManageUsers && hasModuleAccess('configuracoes');
-  const canViewFinanceiro = hasModuleAccess('hub_os_financeiro');
+  const canViewHubOs = hubPermissions.canViewHubOS && hasModuleAccess("hub_os");
+  const canViewGaleria = hasModuleAccess("galeria");
+  const canViewCalculadora = hasModuleAccess("calculadora");
+  const canViewMateriais = isAdmin && hasModuleAccess("materiais");
+  const canViewConfiguracoes =
+    hubPermissions.canManageUsers && hasModuleAccess("configuracoes");
+  const canViewFinanceiro = hasModuleAccess("hub_os_financeiro");
 
   const NavItems = () => (
     <div className="space-y-1">
       {canViewHubOs && (
-        <Link href="/hub-os">
-          <Button
-            variant={location.startsWith('/hub-os') ? 'secondary' : 'ghost'}
-            className={cn(
-              "w-full justify-start",
-              location.startsWith('/hub-os') && "bg-sidebar-accent text-sidebar-accent-foreground"
-            )}
-          >
-            <ClipboardList className="mr-2 h-4 w-4" />
-            Hub OS
-          </Button>
-        </Link>
+        <>
+          {[
+            ["/hub-os", "Dashboard", LayoutDashboard],
+            ["/os", "Ordens de Serviço", ClipboardList],
+            ["/os/arte", "Arte", Palette],
+            ["/os/producao", "Produção", Factory],
+            ["/instalacoes", "Instalações", CalendarDays],
+            ["/entregas", "Entregas", Truck],
+            ["/arquivos", "Arquivos", FolderOpen],
+            ["/relatorios", "Relatórios", ChartNoAxesColumn],
+          ].map(([href, label, Icon]) => (
+            <Link href={href as string} key={href as string}>
+              <Button
+                variant={
+                  (
+                    href === "/hub-os"
+                      ? location === href
+                      : location.startsWith(href as string)
+                  )
+                    ? "secondary"
+                    : "ghost"
+                }
+                className={cn(
+                  "w-full justify-start",
+                  (href === "/hub-os"
+                    ? location === href
+                    : location.startsWith(href as string)) &&
+                    "bg-sidebar-accent text-sidebar-accent-foreground"
+                )}
+              >
+                <Icon className="mr-2 h-4 w-4" />
+                {label as string}
+              </Button>
+            </Link>
+          ))}
+        </>
       )}
-
 
       {canViewFinanceiro && (
         <Link href="/hub-os/financeiro">
           <Button
-            variant={location.startsWith('/hub-os/financeiro') ? 'secondary' : 'ghost'}
-            className={cn("w-full justify-start", location.startsWith('/hub-os/financeiro') && "bg-sidebar-accent text-sidebar-accent-foreground")}
+            variant={
+              location.startsWith("/hub-os/financeiro") ? "secondary" : "ghost"
+            }
+            className={cn(
+              "w-full justify-start",
+              location.startsWith("/hub-os/financeiro") &&
+                "bg-sidebar-accent text-sidebar-accent-foreground"
+            )}
           >
             <BadgeDollarSign className="mr-2 h-4 w-4" />
             Financeiro
@@ -81,10 +126,11 @@ export default function Layout({ children }: LayoutProps) {
       {canViewGaleria && (
         <Link href="/galeria">
           <Button
-            variant={location === '/galeria' ? 'secondary' : 'ghost'}
+            variant={location === "/galeria" ? "secondary" : "ghost"}
             className={cn(
               "w-full justify-start",
-              location === '/galeria' && "bg-sidebar-accent text-sidebar-accent-foreground"
+              location === "/galeria" &&
+                "bg-sidebar-accent text-sidebar-accent-foreground"
             )}
           >
             <Image className="mr-2 h-4 w-4" />
@@ -95,9 +141,13 @@ export default function Layout({ children }: LayoutProps) {
 
       {canViewCalculadora && (
         <Link href="/">
-          <Button 
-            variant={location === '/' ? 'secondary' : 'ghost'} 
-            className={cn("w-full justify-start", location === '/' && "bg-sidebar-accent text-sidebar-accent-foreground")}
+          <Button
+            variant={location === "/" ? "secondary" : "ghost"}
+            className={cn(
+              "w-full justify-start",
+              location === "/" &&
+                "bg-sidebar-accent text-sidebar-accent-foreground"
+            )}
           >
             <Calculator className="mr-2 h-4 w-4" />
             Calculadora
@@ -108,9 +158,13 @@ export default function Layout({ children }: LayoutProps) {
       {canViewMateriais && (
         <>
           <Link href="/materiais">
-            <Button 
-              variant={location === '/materiais' ? 'secondary' : 'ghost'} 
-              className={cn("w-full justify-start", location === '/materiais' && "bg-sidebar-accent text-sidebar-accent-foreground")}
+            <Button
+              variant={location === "/materiais" ? "secondary" : "ghost"}
+              className={cn(
+                "w-full justify-start",
+                location === "/materiais" &&
+                  "bg-sidebar-accent text-sidebar-accent-foreground"
+              )}
             >
               <Package className="mr-2 h-4 w-4" />
               Materiais
@@ -122,8 +176,12 @@ export default function Layout({ children }: LayoutProps) {
       {canViewConfiguracoes && (
         <Link href="/configuracoes">
           <Button
-            variant={location === '/configuracoes' ? 'secondary' : 'ghost'}
-            className={cn("w-full justify-start", location === '/configuracoes' && "bg-sidebar-accent text-sidebar-accent-foreground")}
+            variant={location === "/configuracoes" ? "secondary" : "ghost"}
+            className={cn(
+              "w-full justify-start",
+              location === "/configuracoes" &&
+                "bg-sidebar-accent text-sidebar-accent-foreground"
+            )}
           >
             <Settings className="mr-2 h-4 w-4" />
             Configurações
@@ -138,13 +196,13 @@ export default function Layout({ children }: LayoutProps) {
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-64 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
         <div className="p-6 flex items-center justify-center border-b border-sidebar-border/50">
-          <img 
-            src="/logo-branca.png" 
-            alt="Evolução Comunicação Visual" 
-            className="h-16 w-auto object-contain" 
+          <img
+            src="/logo-branca.png"
+            alt="Evolução Comunicação Visual"
+            className="h-16 w-auto object-contain"
           />
         </div>
-        
+
         <div className="flex-1 p-4">
           <NavItems />
         </div>
@@ -156,10 +214,16 @@ export default function Layout({ children }: LayoutProps) {
             </div>
             <div className="overflow-hidden">
               <p className="text-sm font-medium truncate">{user.email}</p>
-              <p className="text-xs text-muted-foreground truncate">{getRoleLabel(role)}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {getRoleLabel(role)}
+              </p>
             </div>
           </div>
-          <Button variant="outline" className="w-full justify-start border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" onClick={() => signOut()}>
+          <Button
+            variant="outline"
+            className="w-full justify-start border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            onClick={() => signOut()}
+          >
             <LogOut className="mr-2 h-4 w-4" />
             Sair
           </Button>
@@ -170,23 +234,42 @@ export default function Layout({ children }: LayoutProps) {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="md:hidden flex items-center justify-between p-4 border-b bg-card">
           <div className="flex items-center justify-center flex-1">
-            <img src="/logo-branca.png" alt="Evolução" className="h-12 w-auto object-contain" />
+            <img
+              src="/logo-branca.png"
+              alt="Evolução"
+              className="h-12 w-auto object-contain"
+            />
           </div>
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="absolute right-4 text-foreground">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-4 text-foreground"
+              >
                 <Menu className="h-6 w-6" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-64 bg-sidebar text-sidebar-foreground p-0">
+            <SheetContent
+              side="left"
+              className="w-64 bg-sidebar text-sidebar-foreground p-0"
+            >
               <div className="p-6 flex items-center justify-center border-b border-sidebar-border/50">
-                <img src="/logo-branca.png" alt="Evolução" className="h-14 w-auto object-contain" />
+                <img
+                  src="/logo-branca.png"
+                  alt="Evolução"
+                  className="h-14 w-auto object-contain"
+                />
               </div>
               <div className="p-4">
                 <NavItems />
               </div>
               <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-sidebar-border/50">
-                <Button variant="outline" className="w-full justify-start" onClick={() => signOut()}>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => signOut()}
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   Sair
                 </Button>
