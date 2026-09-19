@@ -51,7 +51,7 @@ src/features/hubos/           implementação existente preservada
 src/modules/hub-os/           detalhe, boards, kiosk e compatibilidade
 ```
 
-`orderRepository` concentra consultas Supabase novas. A Central usa paginação server-side, busca server-side e filtros de etapa server-side. Filtros rápidos são aplicados sobre a página atual nesta fundação; a evolução recomendada é levá-los a uma RPC/query tipada para totais globais. `calculateOrderRisk` é uma função pura e testada, sem persistência ou lógica duplicada na UI.
+`orderRepository` concentra consultas Supabase novas. Desde a Fase 1.1, a Central aplica paginação, busca, etapas e filtros rápidos no servidor, com totais globais. `calculateOrderRisk` é uma função pura e testada, sem persistência ou lógica duplicada na UI.
 
 ## Regras iniciais de risco
 
@@ -65,9 +65,9 @@ As regras usam data local operacional e não alteram o banco. Uma fase posterior
 
 1. Dois modelos (`os` e `os_orders`) ainda coexistem; escritas legadas devem ser inventariadas antes do cutover.
 2. O status é texto livre com vocabulários parcialmente divergentes, sem máquina de transição central.
-3. `os_orders` ainda não possui responsáveis por setor nem prioridade canônica; a Fase 1 usa a tag `URGENTE` e sinaliza ausência de responsável.
-4. O dashboard lê no máximo as 200 OS ativas mais recentemente atualizadas; para escala, criar RPC agregada protegida por RLS.
-5. Filtros rápidos da Central operam sobre a página carregada. Filtros avançados globais requerem expansão segura do repositório/RPC.
+3. `os_orders` ainda não possui responsáveis por setor nem prioridade canônica; urgência continua representada pela tag `URGENTE`, sem inferir responsabilidade a partir da autoria.
+4. O Dashboard agregado depende da migration da Fase 1.1 estar aplicada em cada ambiente.
+5. Filtros avançados além do vocabulário atual exigirão expansão segura do repositório/RPC.
 6. O antigo `HubOS.tsx` é grande e mistura UI, DnD, áudio, realtime e acesso a dados.
 7. Existem arquivos SQL de raiz além da cadeia oficial de migrations, aumentando risco de drift de ambientes.
 8. Não há estrutura adequada para responsáveis por etapa, itens, checklists genéricos, comentários e prazos por etapa; devem ser migrations pequenas nas Fases 2/3, nunca tabelas concorrentes de OS.
@@ -81,7 +81,7 @@ Evoluir por domínio sem movimentação em massa: `app/routes|layout|permissions
 
 1. Fase 2: cabeçalho e abas do detalhe; responsáveis tipados; comentários; prazos por etapa; itens após confirmar o modelo necessário.
 2. Criar máquina de transições `canTransitionOrderStatus` antes de ampliar mutações.
-3. Criar RPC agregada do dashboard e filtros globais da Central, com testes de repositório/RLS.
+3. Validar a RPC agregada e os filtros globais da Central com testes de integração RLS em ambiente Supabase efêmero.
 4. Fase 3: alinhar vocabulário dos boards, checklists configuráveis e aprovação interna.
 5. Fase 4: instalações/entregas e mobile, preservando otimização de rota.
 6. Fase 5: relatórios e calendário sobre eventos/auditoria, sem introduzir BI ou CRM.
@@ -89,3 +89,39 @@ Evoluir por domínio sem movimentação em massa: `app/routes|layout|permissions
 ## Migrations da Fase 1
 
 Nenhuma. A implementação usa exclusivamente `os_orders` e seus índices/RLS existentes, evitando alteração prematura de dados.
+
+# Fase 1.1
+
+## Navegação e modelo canônico
+
+A sidebar agora identifica o produto como **Evolução OS 2.0** e separa visualmente **Operação** (Dashboard, Central, quadros e destinos futuros) de **Outros módulos** (Calculadora, Galeria, Financeiro e Materiais). A renderização continua condicionada às permissões existentes, Configurações permanece isolada ao final e nenhuma rota legada foi removida. Os destinos ainda não entregues exibem explicitamente “Módulo em desenvolvimento”.
+
+`public.os_orders` continua sendo a única tabela canônica desta evolução. A Fase 1.1 não altera registros, políticas RLS, quadros de Arte/Produção nem o adapter legado de `public.os`.
+
+## Filtros globais da Central
+
+`OrderListQuery.quickFilter` traduz cada filtro rápido em cláusulas PostgREST antes de `range`, portanto busca, etapas, filtro rápido, `count` e paginação operam sobre o mesmo conjunto completo. As regras centralizadas são:
+
+- **Em andamento:** `archived = false` e `prod_status` nulo ou sem marcador de finalização;
+- **Finalizadas:** `archived = true` ou `prod_status` contendo “finaliz”, mantendo compatibilidade com os dados atuais;
+- **Hoje/Amanhã:** igualdade de `delivery_date` com a data operacional brasileira;
+- **Esta semana:** intervalo inclusivo entre hoje e os próximos sete dias;
+- **Atrasadas:** OS não finalizada, com `delivery_date` anterior a hoje;
+- **Urgentes:** `art_direction_tag = URGENTE`;
+- **Pendentes:** `production_tag = AGUARDANDO_INSUMOS` ou `art_status = Ajustes`.
+
+`isOrderOverdue` representa atraso independentemente da classificação de risco. Datas compartilhadas usam `America/Sao_Paulo`, evitando derivar o dia operacional por `toISOString()`.
+
+## Dashboard agregado e períodos
+
+A migration `20260919120000_operational_dashboard_metrics.sql` cria `get_operational_dashboard_metrics`. A função é `SECURITY INVOKER`, valida acesso a `hub_os`, lê somente as linhas de `os_orders` visíveis pelas RLS e devolve um único JSON agregado. Assim, as métricas deixam de depender das 200 atualizações mais recentes e não expõem linhas individuais.
+
+O **estoque atual** (ativas, Arte, aprovação, Produção, Acabamento, material pronto, Letra Caixa, Produção Externa e carga de instalação) sempre considera todas as OS atualmente acessíveis e não é reduzido pelo período. Os **eventos do período** (instalações e atrasos) exigem `delivery_date` dentro do intervalo. Prazo hoje e amanhã também exigem data estruturada e são zerados quando essas datas ficam fora do período escolhido. “Esta semana” significa hoje mais sete dias; “Este mês” é o mês-calendário atual; o intervalo personalizado é inclusivo.
+
+Como `os_orders` ainda não tem data de instalação dedicada, instalações do período usam `delivery_date`; essa limitação é apresentada na interface. A seção Atenção usa uma consulta própria, ordenada e limitada a oito OS, em vez de carregar a base para filtrar no navegador. A regra incorreta que tratava `created_by` como responsável foi removida: autoria não representa responsabilidade operacional.
+
+## Limitações restantes
+
+- O vocabulário textual de finalização ainda precisa ser substituído por um estado canônico em evolução futura, sem migração destrutiva.
+- Instalações precisam de data própria antes de ganhar planejamento avançado.
+- Responsáveis por setor, comentários, itens, checklists e prazos por etapa permanecem deliberadamente fora da Fase 1.1.

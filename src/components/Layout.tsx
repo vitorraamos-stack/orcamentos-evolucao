@@ -63,11 +63,23 @@ export default function Layout({ children }: LayoutProps) {
   const canViewConfiguracoes =
     hubPermissions.canManageUsers && hasModuleAccess("configuracoes");
   const canViewFinanceiro = hasModuleAccess("hub_os_financeiro");
+  const hasOtherModules =
+    canViewFinanceiro ||
+    canViewGaleria ||
+    canViewCalculadora ||
+    canViewMateriais;
+
+  const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+    <p className="px-3 pb-2 pt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/55">
+      {children}
+    </p>
+  );
 
   const NavItems = () => (
     <div className="space-y-1">
       {canViewHubOs && (
         <>
+          <SectionLabel>Operação</SectionLabel>
           {[
             ["/hub-os", "Dashboard", LayoutDashboard],
             ["/os", "Ordens de Serviço", ClipboardList],
@@ -104,6 +116,8 @@ export default function Layout({ children }: LayoutProps) {
           ))}
         </>
       )}
+
+      {hasOtherModules && <SectionLabel>Outros módulos</SectionLabel>}
 
       {canViewFinanceiro && (
         <Link href="/hub-os/financeiro">
@@ -174,19 +188,21 @@ export default function Layout({ children }: LayoutProps) {
       )}
 
       {canViewConfiguracoes && (
-        <Link href="/configuracoes">
-          <Button
-            variant={location === "/configuracoes" ? "secondary" : "ghost"}
-            className={cn(
-              "w-full justify-start",
-              location === "/configuracoes" &&
-                "bg-sidebar-accent text-sidebar-accent-foreground"
-            )}
-          >
-            <Settings className="mr-2 h-4 w-4" />
-            Configurações
-          </Button>
-        </Link>
+        <div className="mt-3 border-t border-sidebar-border/50 pt-3">
+          <Link href="/configuracoes">
+            <Button
+              variant={location === "/configuracoes" ? "secondary" : "ghost"}
+              className={cn(
+                "w-full justify-start",
+                location === "/configuracoes" &&
+                  "bg-sidebar-accent text-sidebar-accent-foreground"
+              )}
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              Configurações
+            </Button>
+          </Link>
+        </div>
       )}
     </div>
   );
@@ -195,12 +211,15 @@ export default function Layout({ children }: LayoutProps) {
     <div className="min-h-screen flex bg-background">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-64 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
-        <div className="p-6 flex items-center justify-center border-b border-sidebar-border/50">
+        <div className="p-5 flex flex-col items-center justify-center border-b border-sidebar-border/50">
           <img
             src="/logo-branca.png"
             alt="Evolução Comunicação Visual"
             className="h-16 w-auto object-contain"
           />
+          <span className="mt-1 text-xs font-semibold uppercase tracking-[0.2em] text-sidebar-foreground/75">
+            Evolução OS 2.0
+          </span>
         </div>
 
         <div className="flex-1 p-4">
@@ -254,12 +273,15 @@ export default function Layout({ children }: LayoutProps) {
               side="left"
               className="w-64 bg-sidebar text-sidebar-foreground p-0"
             >
-              <div className="p-6 flex items-center justify-center border-b border-sidebar-border/50">
+              <div className="p-5 flex flex-col items-center justify-center border-b border-sidebar-border/50">
                 <img
                   src="/logo-branca.png"
                   alt="Evolução"
                   className="h-14 w-auto object-contain"
                 />
+                <span className="mt-1 text-xs font-semibold uppercase tracking-[0.2em] text-sidebar-foreground/75">
+                  Evolução OS 2.0
+                </span>
               </div>
               <div className="p-4">
                 <NavItems />
