@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -10,7 +10,7 @@ import {
 import { ART_COLUMNS, PROD_COLUMNS } from "@/features/hubos/constants";
 import type { OsOrder } from "@/features/hubos/types";
 import { listOperationalOrders } from "../orderRepository";
-import { matchesQuickFilter, type QuickOrderFilter } from "../orderFilters";
+import type { QuickOrderFilter } from "../orderFilters";
 import { OrderSearch } from "../components/OrderSearch";
 import { OrderTable } from "../components/OrderTable";
 import {
@@ -51,6 +51,7 @@ export default function OrdersCentralPage() {
       search: query,
       artStatus: artStatus === "all" ? undefined : artStatus,
       prodStatus: prodStatus === "all" ? undefined : prodStatus,
+      quickFilter: quick,
     })
       .then(result => {
         setOrders(result.orders);
@@ -63,7 +64,7 @@ export default function OrdersCentralPage() {
       )
       .finally(() => setLoading(false));
   };
-  useEffect(load, [page, query, artStatus, prodStatus]);
+  useEffect(load, [page, query, artStatus, prodStatus, quick]);
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setPage(1);
@@ -71,10 +72,6 @@ export default function OrdersCentralPage() {
     }, 350);
     return () => window.clearTimeout(timer);
   }, [search]);
-  const visible = useMemo(
-    () => orders.filter(order => matchesQuickFilter(order, quick)),
-    [orders, quick]
-  );
   return (
     <div className="pb-10">
       <PageHeader
@@ -89,7 +86,10 @@ export default function OrdersCentralPage() {
               key={value}
               size="sm"
               variant={quick === value ? "default" : "outline"}
-              onClick={() => setQuick(value)}
+              onClick={() => {
+                setPage(1);
+                setQuick(value);
+              }}
             >
               {label}
             </Button>
@@ -141,7 +141,7 @@ export default function OrdersCentralPage() {
       ) : error ? (
         <ErrorState message={error} retry={load} />
       ) : (
-        <OrderTable orders={visible} />
+        <OrderTable orders={orders} />
       )}
       <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
         <span>

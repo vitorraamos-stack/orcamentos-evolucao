@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateOrderRisk } from "./risk";
+import { calculateOrderRisk, isOrderOverdue } from "./risk";
 
 const now = new Date("2026-09-18T10:00:00Z");
 
@@ -17,6 +17,19 @@ describe("calculateOrderRisk", () => {
     expect(
       calculateOrderRisk(
         { delivery_date: "2026-09-18", prod_status: "Produção" },
+        now
+      )
+    ).toBe("CRITICO");
+  });
+
+  it("marks a near installation without ready material as critical", () => {
+    expect(
+      calculateOrderRisk(
+        {
+          delivery_date: "2026-09-19",
+          logistic_type: "instalacao",
+          prod_status: "Produção",
+        },
         now
       )
     ).toBe("CRITICO");
@@ -50,5 +63,20 @@ describe("calculateOrderRisk", () => {
         now
       )
     ).toBe("NORMAL");
+  });
+
+  it("keeps overdue separate from general risk and excludes finished orders", () => {
+    expect(
+      isOrderOverdue(
+        { delivery_date: "2026-09-17", prod_status: "Produção" },
+        now
+      )
+    ).toBe(true);
+    expect(
+      isOrderOverdue(
+        { delivery_date: "2026-09-17", prod_status: "Finalizados" },
+        now
+      )
+    ).toBe(false);
   });
 });

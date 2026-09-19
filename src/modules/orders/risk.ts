@@ -1,3 +1,9 @@
+import {
+  addLocalDays,
+  formatLocalDate,
+  startOfLocalDay,
+} from "@/shared/lib/date";
+
 export type OrderRisk = "NORMAL" | "ATENCAO" | "CRITICO";
 
 export type RiskOrder = {
@@ -8,13 +14,16 @@ export type RiskOrder = {
   archived?: boolean;
 };
 
-const dayStart = (value: Date) =>
-  new Date(value.getFullYear(), value.getMonth(), value.getDate());
 const normalize = (value?: string | null) =>
   (value ?? "").toLocaleLowerCase("pt-BR");
 
 export const isOrderFinished = (order: RiskOrder) =>
   Boolean(order.archived) || normalize(order.prod_status).includes("finaliz");
+
+export const isOrderOverdue = (order: RiskOrder, now = new Date()) =>
+  !isOrderFinished(order) &&
+  Boolean(order.delivery_date) &&
+  order.delivery_date! < formatLocalDate(now);
 
 export function calculateOrderRisk(
   order: RiskOrder,
@@ -22,12 +31,15 @@ export function calculateOrderRisk(
 ): OrderRisk {
   if (isOrderFinished(order)) return "NORMAL";
 
-  const today = dayStart(now);
+  const today = startOfLocalDay(now);
   const deadline = order.delivery_date
-    ? dayStart(new Date(`${order.delivery_date}T12:00:00`))
+    ? startOfLocalDay(new Date(`${order.delivery_date}T15:00:00Z`))
     : null;
   const daysToDeadline = deadline
-    ? Math.ceil((deadline.getTime() - today.getTime()) / 86_400_000)
+    ? (Array.from({ length: 32 }, (_, days) => days).find(
+        days =>
+          formatLocalDate(addLocalDays(today, days)) === order.delivery_date
+      ) ?? (isOrderOverdue(order, now) ? -1 : 32))
     : null;
   const productionReady = /pronto|logística|logistica|instalação agendada/.test(
     normalize(order.prod_status)

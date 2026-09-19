@@ -1,5 +1,6 @@
 import type { OsOrder } from "@/features/hubos/types";
-import { calculateOrderRisk, isOrderFinished } from "./risk";
+import { addLocalDays, formatLocalDate } from "@/shared/lib/date";
+import { isOrderFinished, isOrderOverdue } from "./risk";
 
 export type QuickOrderFilter =
   | "all"
@@ -12,38 +13,30 @@ export type QuickOrderFilter =
   | "pending"
   | "finished";
 
-const iso = (date: Date) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-
 export function matchesQuickFilter(
   order: OsOrder,
   filter: QuickOrderFilter,
   now = new Date()
 ) {
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-  const weekEnd = new Date(today);
-  weekEnd.setDate(today.getDate() + 7);
+  const today = formatLocalDate(now);
+  const tomorrow = formatLocalDate(addLocalDays(now, 1));
+  const weekEnd = formatLocalDate(addLocalDays(now, 7));
   const finished = isOrderFinished(order);
   switch (filter) {
     case "active":
       return !finished;
     case "today":
-      return order.delivery_date === iso(today);
+      return order.delivery_date === today;
     case "tomorrow":
-      return order.delivery_date === iso(tomorrow);
+      return order.delivery_date === tomorrow;
     case "week":
       return Boolean(
         order.delivery_date &&
-        order.delivery_date >= iso(today) &&
-        order.delivery_date <= iso(weekEnd)
+        order.delivery_date >= today &&
+        order.delivery_date <= weekEnd
       );
     case "overdue":
-      return (
-        calculateOrderRisk(order, now) === "CRITICO" &&
-        Boolean(order.delivery_date && order.delivery_date < iso(today))
-      );
+      return isOrderOverdue(order, now);
     case "urgent":
       return order.art_direction_tag === "URGENTE";
     case "pending":
