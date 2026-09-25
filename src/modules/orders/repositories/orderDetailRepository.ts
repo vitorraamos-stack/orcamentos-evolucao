@@ -21,15 +21,19 @@ export const ORDER_ASSET_SELECT =
 
 const uuid = z.string().uuid();
 const assigneeInput = z.object({ orderId: uuid, userId: uuid, scope: z.enum(["GENERAL", "ART", "PRODUCTION", "FINISHING", "INSTALLATION"]) });
+const assigneeScopeSchema = z.enum(["GENERAL", "ART", "PRODUCTION", "FINISHING", "INSTALLATION"]);
+const deadlineScopeSchema = z.enum(["ART", "APPROVAL", "PRODUCTION", "FINISHING", "INSTALLATION"]);
 const deadlineInput = z.object({ orderId: uuid, scope: z.enum(["ART", "APPROVAL", "PRODUCTION", "FINISHING", "INSTALLATION"]), dueDate: z.iso.date(), completedAt: z.string().nullable().optional() });
+const optionalText = (max: number) => z.preprocess(value => value === "" ? null : value, z.string().trim().max(max).nullable().optional());
+const optionalPositiveNumber = z.preprocess(value => value === "" || value == null ? null : value, z.coerce.number().positive().max(100000).nullable().optional());
 export const itemInputSchema = z.object({
   name: z.string().trim().min(1).max(160),
-  description: z.string().trim().max(4000).nullable().optional(),
+  description: optionalText(4000),
   quantity: z.coerce.number().positive().max(100000),
-  width_cm: z.coerce.number().positive().max(100000).nullable().optional(),
-  height_cm: z.coerce.number().positive().max(100000).nullable().optional(),
+  width_cm: optionalPositiveNumber,
+  height_cm: optionalPositiveNumber,
   unit: z.string().trim().min(1).max(30),
-  notes: z.string().trim().max(4000).nullable().optional(),
+  notes: optionalText(4000),
   status: z.enum(["PENDING", "IN_PROGRESS", "READY", "CANCELLED"]),
   sort_order: z.coerce.number().int().min(0),
 });
@@ -68,11 +72,28 @@ export async function setOrderAssignee(orderId: string, scope: AssigneeScope, us
   const { data, error } = await supabase.from("os_order_assignees").upsert({ order_id: input.orderId, scope: input.scope, user_id: input.userId }, { onConflict: "order_id,scope" }).select("id,order_id,user_id,scope,created_at,created_by,updated_at").single();
   throwIfError(error); return data as OrderAssignee;
 }
+export async function removeOrderAssignee(orderId: string, scope: AssigneeScope) {
+  uuid.parse(orderId); assigneeScopeSchema.parse(scope);
+  const { error } = await supabase.from("os_order_assignees").delete().eq("order_id", orderId).eq("scope", scope);
+  throwIfError(error);
+}
 
 export async function upsertOrderDeadline(orderId: string, scope: DeadlineScope, dueDate: string, completedAt?: string | null) {
   const input = deadlineInput.parse({ orderId, scope, dueDate, completedAt });
   const { data, error } = await supabase.from("os_order_deadlines").upsert({ order_id: input.orderId, scope: input.scope, due_date: input.dueDate, completed_at: input.completedAt ?? null }, { onConflict: "order_id,scope" }).select().single();
   throwIfError(error); return data as OrderDeadline;
+}
+async function setDeadlineCompletion(orderId: string, scope: DeadlineScope, completedAt: string | null) {
+  uuid.parse(orderId); deadlineScopeSchema.parse(scope);
+  const { data, error } = await supabase.from("os_order_deadlines").update({ completed_at: completedAt }).eq("order_id", orderId).eq("scope", scope).select().single();
+  throwIfError(error); return data as OrderDeadline;
+}
+export const completeOrderDeadline = (orderId: string, scope: DeadlineScope) => setDeadlineCompletion(orderId, scope, new Date().toISOString());
+export const reopenOrderDeadline = (orderId: string, scope: DeadlineScope) => setDeadlineCompletion(orderId, scope, null);
+export async function removeOrderDeadline(orderId: string, scope: DeadlineScope) {
+  uuid.parse(orderId); deadlineScopeSchema.parse(scope);
+  const { error } = await supabase.from("os_order_deadlines").delete().eq("order_id", orderId).eq("scope", scope);
+  throwIfError(error);
 }
 
 export async function listOrderItems(orderId: string) {
@@ -142,5 +163,6 @@ export async function listOrderFiles(orderId: string) {
 }
 export async function updateOrderOperationalFields(orderId: string, input: { title?: string | null; description?: string | null; delivery_date?: string | null; logistic_type?: OsOrder["logistic_type"]; address?: string | null; art_direction_tag?: OsOrder["art_direction_tag"] }) {
   uuid.parse(orderId);
-  const { data, error } = await supabase.from("os_orders").update(input).eq("id", orderId).select(ORDER_DETAIL_SELECT).single(); throwIfError(error); return data as unknown as OsOrder;
+  const { data, error } = await supabase.rpc("hub_os_update_order_secure", { p_os_id: orderId, p_patch: input, p_event_type: "details_updated", p_event_payload: { fields: Object.keys(input) } });
+  throwIfError(error); return data as unknown as OsOrder;
 }
