@@ -369,6 +369,8 @@ type OrderEventInput = {
   payload?: Record<string, unknown> | null;
 };
 
+// Generic order editing is a managerial contract (apart from the pre-existing,
+// field-limited consultant contract handled immediately below).
 export const updateOrder = async (
   id: string,
   payload: Partial<OsOrder>,
@@ -398,6 +400,84 @@ export const updateOrder = async (
     p_patch: payload,
     p_event_type: event?.type ?? null,
     p_event_payload: event?.payload ?? null,
+  });
+
+  if (error) throw new Error(error.message);
+  return data as OsOrder;
+};
+
+// This is intentionally separate from updateOrder: operational handoff data and
+// both statuses are committed by one server-authorized transaction.
+export const sendOrderToProduction = async ({
+  orderId,
+  deadlineStartedAt,
+  deliveryDate,
+  eventPayload = {},
+}: {
+  orderId: string;
+  deadlineStartedAt: string;
+  deliveryDate: string;
+  eventPayload?: Record<string, unknown>;
+}) => {
+  const { data, error } = await supabase.rpc(
+    "hub_os_send_to_production_secure",
+    {
+      p_os_id: orderId,
+      p_delivery_deadline_started_at: deadlineStartedAt,
+      p_delivery_date: deliveryDate,
+      p_event_payload: eventPayload,
+    }
+  );
+
+  if (error) throw new Error(error.message);
+  return data as OsOrder;
+};
+
+export const returnOrderToArt = async (
+  orderId: string,
+  reason?: string | null,
+  eventPayload: Record<string, unknown> = {}
+) => {
+  const { data, error } = await supabase.rpc(
+    "hub_os_return_order_to_art_secure",
+    {
+      p_os_id: orderId,
+      p_reason: reason?.trim() || null,
+      p_event_payload: eventPayload,
+    }
+  );
+
+  if (error) throw new Error(error.message);
+  return data as OsOrder;
+};
+
+export const setProductionTag = async (
+  orderId: string,
+  productionTag: Exclude<OsOrder["production_tag"], null>,
+  insumosDetails?: string | null
+) => {
+  const { data, error } = await supabase.rpc(
+    "hub_os_set_production_tag_secure",
+    {
+      p_os_id: orderId,
+      p_production_tag: productionTag,
+      p_insumos_details: insumosDetails?.trim() || null,
+    }
+  );
+
+  if (error) throw new Error(error.message);
+  return data as OsOrder;
+};
+
+export const updateOrderInsumos = async (
+  orderId: string,
+  action: "REQUEST" | "RESOLVE" | "ACKNOWLEDGE",
+  notes?: string | null
+) => {
+  const { data, error } = await supabase.rpc("hub_os_update_insumos_secure", {
+    p_os_id: orderId,
+    p_action: action,
+    p_notes: notes?.trim() || null,
   });
 
   if (error) throw new Error(error.message);

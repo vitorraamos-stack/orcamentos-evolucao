@@ -21,10 +21,11 @@ import { ArrowLeft } from "lucide-react";
 import {
   fetchLatestOrderLayout,
   fetchUserDisplayNameById,
-  moveOrder,
+  returnOrderToArt,
+  sendOrderToProduction,
+  setProductionTag as setProductionTagSecure,
   updateOrder,
 } from "../api";
-import { ART_COLUMNS, PROD_COLUMNS } from "../constants";
 import {
   ART_DIRECTION_TAG_CONFIG,
   ART_DIRECTION_TAGS,
@@ -78,7 +79,7 @@ export default function ServiceOrderDialog({
   onUpdated,
   onDelete,
 }: ServiceOrderDialogProps) {
-  const { isAdmin } = useAuth();
+  const { isAdmin, hubPermissions } = useAuth();
   const initialFocusRef = useRef<HTMLInputElement | null>(null);
 
   const [saleNumber, setSaleNumber] = useState("");
@@ -334,15 +335,11 @@ export default function ServiceOrderDialog({
 
     try {
       setUpdatingProductionTag(true);
-      const payload: Partial<OsOrder> = {
-        production_tag: nextTag,
-      };
-
-      if (nextTag === "AGUARDANDO_INSUMOS") {
-        payload.insumos_details = insumosDetails.trim();
-      }
-
-      const updated = await updateOrder(order.id, payload);
+      const updated = await setProductionTagSecure(
+        order.id,
+        nextTag,
+        nextTag === "AGUARDANDO_INSUMOS" ? insumosDetails : undefined
+      );
       onUpdated(updated);
       toast.success("Tag de produção atualizada.");
     } catch (error) {
@@ -369,15 +366,20 @@ export default function ServiceOrderDialog({
         manualDate: order.delivery_date,
       });
 
-      const updated = await moveOrder(order.id, "art", "Produzir", {
-        board: "arte",
-        from: order.art_status,
-        to: "Produzir",
-        delivery_deadline_started_at: startedAt,
-        delivery_date:
-          order.delivery_deadline_preset === "CUSTOM"
-            ? order.delivery_date
-            : resolvedDeliveryDate,
+      const deliveryDate =
+        order.delivery_deadline_preset === "CUSTOM"
+          ? order.delivery_date
+          : resolvedDeliveryDate;
+      if (!deliveryDate) {
+        throw new Error(
+          "Defina o prazo de entrega antes de iniciar a produção."
+        );
+      }
+
+      const updated = await sendOrderToProduction({
+        orderId: order.id,
+        deadlineStartedAt: startedAt,
+        deliveryDate,
       });
       onUpdated(updated);
       toast.success("Card enviado para Produção.");
@@ -391,10 +393,7 @@ export default function ServiceOrderDialog({
     if (!order) return;
     setMoving(true);
     try {
-      const updated = await updateOrder(order.id, {
-        art_status: ART_COLUMNS[0],
-        prod_status: null,
-      });
+      const updated = await returnOrderToArt(order.id);
       onUpdated(updated);
       toast.success("Card movido para Arte.");
       onOpenChange(false);
@@ -672,7 +671,7 @@ export default function ServiceOrderDialog({
                   </p>
                 )}
               </div>
-              {!order?.prod_status && (
+              {!order?.prod_status && hubPermissions.canMoveArteBoard && (
                 <Button
                   variant="secondary"
                   onClick={moveToProduction}
@@ -681,15 +680,32 @@ export default function ServiceOrderDialog({
                   Enviar para Produção
                 </Button>
               )}
-              {order?.prod_status && isAdmin && (
-                <Button
-                  variant="outline"
-                  onClick={moveBackToArt}
-                  disabled={moving}
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Voltar para Arte
-                </Button>
+              {order?.prod_status && hubPermissions.isManager && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" disabled={moving}>
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Voltar para Arte
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        Voltar esta OS para Arte?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        A OS sairá do fluxo de Produção e retornará para Caixa
+                        de Entrada.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={moveBackToArt}>
+                        Voltar para Arte
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )}
             </div>
             <div className="flex gap-2">
