@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import type { BoardCardModel, BoardKind, BoardStatus } from "./types";
 import { formatDatePtBr } from "@/features/hubos/deliveryDeadline";
+import { isOrderOverdue } from "@/modules/orders/risk";
 
 const TAGS: Record<string, string> = {
   URGENTE: "Urgente",
@@ -70,7 +71,13 @@ export function BoardCard({
       : ["PRODUCTION", "FINISHING"].includes(item.scope)
   );
   const badges = [
-    card.risk === "CRITICO" ? "Atrasado" : null,
+    isOrderOverdue(card.order)
+      ? "Atrasado"
+      : card.risk === "CRITICO"
+        ? "Crítico"
+        : card.risk === "ATENCAO"
+          ? "Atenção"
+          : null,
     TAGS[
       board === "art"
         ? (card.order.art_direction_tag ?? "")

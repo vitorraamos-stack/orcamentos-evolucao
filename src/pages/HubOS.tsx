@@ -1024,6 +1024,7 @@ export default function HubOS() {
         nextStatus === "Produzir"
           ? await sendOrderToProduction({
               orderId: order.id,
+              deadlinePreset: order.delivery_deadline_preset!,
               deadlineStartedAt: startAt!,
               deliveryDate: finalDeliveryDate!,
               eventPayload: {
@@ -1403,7 +1404,7 @@ export default function HubOS() {
             if (Date.now() - startAt > 10_000) {
               throw new Error("Tempo excedido ao preparar impressão.");
             }
-            await new Promise((r) => window.setTimeout(r, 20));
+            await new Promise(r => window.setTimeout(r, 20));
           }
         };
 
@@ -1412,7 +1413,7 @@ export default function HubOS() {
             printWindow.document.querySelector<HTMLImageElement>("img.qr");
           if (!qrImage || qrImage.complete) return;
 
-          await new Promise<void>((resolveImage) => {
+          await new Promise<void>(resolveImage => {
             const onLoadOrError = () => {
               qrImage.removeEventListener("load", onLoadOrError);
               qrImage.removeEventListener("error", onLoadOrError);
@@ -1424,10 +1425,10 @@ export default function HubOS() {
         };
 
         const waitForAnimationFrames = async () => {
-          await new Promise<void>((next) =>
+          await new Promise<void>(next =>
             printWindow.requestAnimationFrame(() => next())
           );
-          await new Promise<void>((next) =>
+          await new Promise<void>(next =>
             printWindow.requestAnimationFrame(() => next())
           );
         };
@@ -1437,7 +1438,7 @@ export default function HubOS() {
             await waitForReady();
             await waitForQrImage();
             await waitForAnimationFrames();
-            await new Promise((r) => window.setTimeout(r, 150));
+            await new Promise(r => window.setTimeout(r, 150));
 
             printWindow.addEventListener(
               "afterprint",
