@@ -20,12 +20,13 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ArrowLeft } from "lucide-react";
 import {
   fetchUserDisplayNameById,
-  moveOrder,
+  returnOrderToArt,
+  sendOrderToProduction,
   updateOrder,
 } from "../api";
-import { ART_COLUMNS, PROD_COLUMNS } from "../constants";
 import type { LogisticType, OsOrder, ProductionTag } from "../types";
 import { useAuth } from "@/contexts/AuthContext";
+import { resolveDeliveryDate } from "../deliveryDeadline";
 
 interface OrderDetailsDialogProps {
   order: OsOrder | null;
@@ -49,7 +50,7 @@ export default function OrderDetailsDialog({
   onUpdated,
   onDelete,
 }: OrderDetailsDialogProps) {
-  const { isAdmin } = useAuth();
+  const { isAdmin, hubPermissions } = useAuth();
   const [saleNumber, setSaleNumber] = useState("");
   const [clientName, setClientName] = useState("");
   const [title, setTitle] = useState("");
@@ -147,7 +148,11 @@ export default function OrderDetailsDialog({
       return;
     }
 
-    if (order.prod_status === "Produção" && productionTag === "AGUARDANDO_INSUMOS" && !insumosDetails.trim()) {
+    if (
+      order.prod_status === "Produção" &&
+      productionTag === "AGUARDANDO_INSUMOS" &&
+      !insumosDetails.trim()
+    ) {
       toast.error("Informe os detalhes do material necessário.");
       return;
     }
@@ -168,7 +173,10 @@ export default function OrderDetailsDialog({
 
       if (order.prod_status === "Produção") {
         payload.production_tag = productionTag || null;
-        payload.insumos_details = productionTag === "AGUARDANDO_INSUMOS" ? insumosDetails.trim() : order.insumos_details;
+        payload.insumos_details =
+          productionTag === "AGUARDANDO_INSUMOS"
+            ? insumosDetails.trim()
+            : order.insumos_details;
 
         if (productionTag === "EM_PRODUCAO") {
           payload.insumos_return_notes = null;
@@ -176,7 +184,10 @@ export default function OrderDetailsDialog({
           payload.insumos_resolved_by = null;
         }
 
-        if (productionTag === "AGUARDANDO_INSUMOS" && !order.insumos_requested_at) {
+        if (
+          productionTag === "AGUARDANDO_INSUMOS" &&
+          !order.insumos_requested_at
+        ) {
           payload.insumos_requested_at = new Date().toISOString();
         }
       }
@@ -205,10 +216,21 @@ export default function OrderDetailsDialog({
     if (!order) return;
     try {
       setMoving(true);
-      const updated = await moveOrder(order.id, "art", "Produzir", {
-        board: "arte",
-        from: order.art_status,
-        to: "Produzir",
+      const startedAt =
+        order.delivery_deadline_started_at ?? new Date().toISOString();
+      const deliveryDate = resolveDeliveryDate({
+        preset: order.delivery_deadline_preset,
+        startedAt,
+        manualDate: order.delivery_date,
+      });
+      if (!deliveryDate)
+        throw new Error(
+          "Defina o prazo de entrega antes de iniciar a produção."
+        );
+      const updated = await sendOrderToProduction({
+        orderId: order.id,
+        deadlineStartedAt: startedAt,
+        deliveryDate,
       });
       onUpdated(updated);
       toast.success("Card enviado para Produção.");
@@ -225,17 +247,7 @@ export default function OrderDetailsDialog({
     if (!order) return;
     try {
       setMoving(true);
-      const updated = await updateOrder(order.id, {
-        art_status: ART_COLUMNS[0],
-        prod_status: null,
-      }, {
-        type: "status_change",
-        payload: {
-          board: "arte",
-          from: order.art_status,
-          to: ART_COLUMNS[0],
-        },
-      });
+      const updated = await returnOrderToArt(order.id);
       onUpdated(updated);
       toast.success("Card movido para Arte.");
       onOpenChange(false);
@@ -261,7 +273,9 @@ export default function OrderDetailsDialog({
     <DialogUi.Dialog open={open} onOpenChange={onOpenChange}>
       <DialogUi.DialogContent className="max-w-2xl">
         <DialogUi.DialogHeader>
-          <DialogUi.DialogTitle>{title || defaultTitle || "Detalhes da OS"}</DialogUi.DialogTitle>
+          <DialogUi.DialogTitle>
+            {title || defaultTitle || "Detalhes da OS"}
+          </DialogUi.DialogTitle>
           <DialogUi.DialogDescription className="text-sm text-muted-foreground">
             Status atual: {formatStatus(order)}
             <br />
@@ -393,21 +407,22 @@ export default function OrderDetailsDialog({
             </div>
           )}
 
-          {order?.prod_status === "Produção" && productionTag === "AGUARDANDO_INSUMOS" && (
-            <div className="space-y-1">
-              <Label>Detalhes do material necessário</Label>
-              <Textarea
-                value={insumosDetails}
-                onChange={event => setInsumosDetails(event.target.value)}
-                placeholder="Ex: chapa ACM 3mm, fita dupla face VHB, tinta..."
-                rows={4}
-                disabled={!editing}
-              />
-            </div>
-          )}
+          {order?.prod_status === "Produção" &&
+            productionTag === "AGUARDANDO_INSUMOS" && (
+              <div className="space-y-1">
+                <Label>Detalhes do material necessário</Label>
+                <Textarea
+                  value={insumosDetails}
+                  onChange={event => setInsumosDetails(event.target.value)}
+                  placeholder="Ex: chapa ACM 3mm, fita dupla face VHB, tinta..."
+                  rows={4}
+                  disabled={!editing}
+                />
+              </div>
+            )}
 
           <div className="flex flex-wrap gap-2">
-            {!order?.prod_status && (
+            {!order?.prod_status && hubPermissions.canMoveArteBoard && (
               <Button
                 variant="secondary"
                 onClick={handleSendToProduction}
@@ -416,16 +431,31 @@ export default function OrderDetailsDialog({
                 Enviar para Produção
               </Button>
             )}
-            {order?.prod_status && isAdmin && (
-              <Button
-                variant="outline"
-                onClick={handleBackToArte}
-                disabled={moving}
-                className="gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Voltar para Arte
-              </Button>
+            {order?.prod_status && hubPermissions.isManager && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" disabled={moving} className="gap-2">
+                    <ArrowLeft className="h-4 w-4" /> Voltar para Arte
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      Voltar esta OS para Arte?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      A OS sairá do fluxo de Produção e retornará para Caixa de
+                      Entrada.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleBackToArte}>
+                      Voltar para Arte
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
           </div>
 

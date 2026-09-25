@@ -31,17 +31,14 @@ describe("HubOS Produção Externa flow contract", () => {
     expect(withLayoutMatch?.[0]).toContain("moveOrderToArtStatus(");
   });
 
-  it("sends production_tag in the updateOrder payload for Arte status changes", () => {
+  it("persists the production tag through its dedicated operational contract", () => {
     const moveFunctionMatch = hubOsSource.match(
       /const moveOrderToArtStatus = async \([\s\S]*?const handleDragEndArte = async/
     );
 
-    expect(moveFunctionMatch?.[0]).toContain(
-      "production_tag: nextProductionTag"
-    );
-    expect(moveFunctionMatch?.[0]).toContain(
-      'is_external_production: nextProductionTag === "PRODUCAO_EXTERNA"'
-    );
+    expect(moveFunctionMatch?.[0]).toContain("await setProductionTag(");
+    expect(moveFunctionMatch?.[0]).toContain("nextProductionTag,");
+    expect(moveFunctionMatch?.[0]).toContain('source: "kanban"');
   });
 
   it("does not use legacy fields from the other Hub OS module", () => {

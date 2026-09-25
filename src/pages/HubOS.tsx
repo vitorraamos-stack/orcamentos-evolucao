@@ -41,7 +41,9 @@ import {
   markInstallationFeedbackReviewed,
   fetchUserDisplayNameById,
   moveOrder,
-  updateOrder,
+  sendOrderToProduction,
+  setProductionTag,
+  updateOrderInsumos,
 } from "@/features/hubos/api";
 import { getLatestAssetJobsByOsId } from "@/features/hubos/assetJobs";
 import { uploadLayoutForOrder, validateFiles } from "@/features/hubos/assets";
@@ -1009,13 +1011,45 @@ export default function HubOS() {
     updateLocalOrder(optimistic);
 
     try {
-      const updated = await moveOrder(order.id, "art", nextStatus, {
-        board: "arte",
-        from: order.art_status,
-        to: nextStatus,
-        production_tag: nextProductionTag,
-        is_external_production: nextProductionTag === "PRODUCAO_EXTERNA",
-      });
+      const finalDeliveryDate =
+        order.delivery_deadline_preset === "CUSTOM"
+          ? order.delivery_date
+          : resolvedDeliveryDate;
+      if (nextStatus === "Produzir" && (!startAt || !finalDeliveryDate)) {
+        throw new Error(
+          "Defina o prazo de entrega antes de iniciar a produção."
+        );
+      }
+      let updated =
+        nextStatus === "Produzir"
+          ? await sendOrderToProduction({
+              orderId: order.id,
+              deadlineStartedAt: startAt!,
+              deliveryDate: finalDeliveryDate!,
+              eventPayload: {
+                source: "kanban",
+                is_external_production:
+                  nextProductionTag === "PRODUCAO_EXTERNA",
+              },
+            })
+          : await moveOrder(order.id, "art", nextStatus, {
+              board: "arte",
+              from: order.art_status,
+              to: nextStatus,
+            });
+      if (
+        nextStatus === "Produzir" &&
+        nextProductionTag &&
+        nextProductionTag !== updated.production_tag
+      ) {
+        updated = await setProductionTag(
+          order.id,
+          nextProductionTag,
+          nextProductionTag === "AGUARDANDO_INSUMOS"
+            ? order.insumos_details
+            : undefined
+        );
+      }
       updateLocalOrder(updated);
       if (
         order.art_status === inboxStatus &&
@@ -1485,12 +1519,11 @@ export default function HubOS() {
 
     try {
       setUpdatingInsumosTransition(true);
-      const updated = await updateOrder(order.id, {
-        production_tag: "EM_PRODUCAO",
-        insumos_return_notes: insumosReturnNotesDraft.trim(),
-        insumos_resolved_at: resolvedAt,
-        insumos_resolved_by: user?.id ?? null,
-      });
+      const updated = await updateOrderInsumos(
+        order.id,
+        "RESOLVE",
+        insumosReturnNotesDraft
+      );
       updateLocalOrder(updated);
       setInsumosReturnNotesDraft("");
       toast.success("OS retornada para Produção com observações.");
@@ -1525,14 +1558,11 @@ export default function HubOS() {
 
     try {
       setUpdatingInsumosTransition(true);
-      const updated = await updateOrder(order.id, {
-        production_tag: "AGUARDANDO_INSUMOS",
-        insumos_details: insumosRequestDetailsDraft.trim(),
-        insumos_requested_at: requestedAt,
-        insumos_return_notes: null,
-        insumos_resolved_at: null,
-        insumos_resolved_by: null,
-      });
+      const updated = await updateOrderInsumos(
+        order.id,
+        "REQUEST",
+        insumosRequestDetailsDraft
+      );
       updateLocalOrder(updated);
       toast.success("OS enviada para Aguardando Insumos.");
     } catch (error) {
@@ -1549,20 +1579,7 @@ export default function HubOS() {
 
     try {
       setMarkingInsumosReadyOrderId(order.id);
-      const updated = await updateOrder(
-        order.id,
-        {
-          production_tag: "EM_PRODUCAO",
-          insumos_return_notes: null,
-        },
-        {
-          type: "insumos_acknowledged",
-          payload: {
-            previous_production_tag: order.production_tag,
-            next_production_tag: "EM_PRODUCAO",
-          },
-        }
-      );
+      const updated = await updateOrderInsumos(order.id, "ACKNOWLEDGE");
 
       updateLocalOrder(updated);
       toast.success("Badge atualizada para Em Produção.");
