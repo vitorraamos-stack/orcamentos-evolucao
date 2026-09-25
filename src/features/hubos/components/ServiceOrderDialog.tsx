@@ -733,16 +733,20 @@ export default function ServiceOrderDialog({
               <Button variant="outline" onClick={() => handleOpenChange(false)}>
                 Fechar
               </Button>
-              <Button
-                variant="secondary"
-                onClick={() => setEditing(true)}
-                disabled={editing}
-              >
-                Editar
-              </Button>
-              <Button onClick={handleSave} disabled={!editing || saving}>
-                {saving ? "Salvando..." : "Salvar alterações"}
-              </Button>
+              {hubPermissions.isManager && (
+                <>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setEditing(true)}
+                    disabled={editing}
+                  >
+                    Editar
+                  </Button>
+                  <Button onClick={handleSave} disabled={!editing || saving}>
+                    {saving ? "Salvando..." : "Salvar alterações"}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </DialogUi.DialogContent>

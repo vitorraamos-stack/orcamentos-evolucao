@@ -203,3 +203,29 @@ A página operacional já usa `hub_os_move_order_secure` e mantém sua assinatur
 `supabase/tests/hub_os_order_mutations_phase_2_2.sql` cobre as arestas positivas/negativas dos dois boards e grants essenciais. Os testes TypeScript cobrem feedback antecipado, isolamento de papéis, handoff e montagem do contrato RPC. Testes integrados com identidades reais devem ainda validar, no ambiente Supabase, os quatro papéis, status real versus payload falso, bloqueio de finalizada e rollback sem evento.
 
 Os Security e Performance Advisors precisam ser executados novamente depois da aplicação remota da migration. O resultado esperado é a ausência de `anon_security_definer_function_executable` para as seis RPCs acima, especialmente move/update, sem regressão de performance. Findings de outras funções `SECURITY DEFINER` e as RLS permissivas preexistentes de `profiles` permanecem fora do escopo e devem ser inventariados numa auditoria futura.
+
+# Fase 3 — Arte e Produção
+
+## Arquitetura e rotas
+
+Os ambientes operacionais foram separados em `modules/artwork` e `modules/production`, com projeção compartilhada e pequena em `shared/kanban`. `/os/arte`, `/os/arte/aprovacoes` e `/os/arte/revisoes` renderizam o mesmo board de Arte com presets; `/os/producao`, `/impressao`, `/acabamento`, `/letra-caixa`, `/externa` e `/pronto` fazem o equivalente para Produção. `/hub-os/kanban` continua apontando explicitamente para `HubOS.tsx`; erros dos boards novos não acionam fallback automático.
+
+Os repositories fazem uma consulta limitada de OS relevantes e consultas em lote para responsável do escopo, itens, comentários e prazos. Não há consulta por cartão, cópia materializada nem nova tabela. As métricas usam o conjunto completo retornado pelo board antes dos filtros/presets visuais, e não uma página de 25 cartões. O limite defensivo atual é 500 OS operacionais; a Central permanece a fonte do histórico completo. Finalizados antigos não devem evoluir para histórico infinito no Kanban; uma RPC agregada/paginada será indicada se o volume operacional se aproximar desse limite.
+
+## Fluxo, DnD e contratos
+
+As colunas preservam exatamente os textos persistidos. Arte expõe `Ajustes` separadamente. DnD com `@dnd-kit` e o seletor móvel validam a mesma máquina TypeScript antes da chamada, aplicam estado otimista e restauram o snapshot se o banco rejeitar. Movimentos normais usam `hub_os_move_order_secure`. O handoff `Para Aprovação → Produzir` usa exclusivamente `hub_os_send_to_production_secure`; quando falta configuração suficiente, o diálogo coleta o preset/data custom e reutiliza `resolveDeliveryDate`.
+
+Produção mantém **status** (etapa) separado de **tag** (condição). Tags usam `hub_os_set_production_tag_secure`; `AGUARDANDO_INSUMOS` exige material e usa também `hub_os_update_insumos_secure`. O retorno à Arte é menu explícito gerencial via `hub_os_return_order_to_art_secure`, nunca drag reverso.
+
+## Filtros, cards e permissões
+
+Busca cobre OS, venda, cliente e título. Arte oferece Minhas OS, urgentes, atrasadas, responsável e tipo; Produção oferece Minhas OS, atrasadas, responsável, insumos, externa, reprodução e letra-caixa. `Minhas OS` compara o usuário com `os_order_assignees` no escopo correto, nunca com `created_by`. Cards mostram identificação, prazo de etapa preferencial, risco global, responsável, até quatro badges, progresso de itens e comentários; o clique abre `/os/:id`.
+
+`arte_finalista` movimenta somente Arte; `producao`, somente Produção; gerente/admin opera ambos e pode devolver Produção para Arte. Autoatribuição não foi exposta: a RLS da Fase 2 reserva responsáveis a gerente, e o board não a contorna. A edição genérica do diálogo legado agora também fica oculta de papéis operacionais.
+
+## Realtime, migrations e dívida
+
+Um hook pequeno escuta `os_orders`, `os_order_assignees` e `os_order_items`, com debounce. Realtime não é autoridade nem fonte única: há refresh manual, reload após mutação e recovery ao retornar à aba. Esta fase não cria migrations, RPCs de leitura nem afrouxa RLS.
+
+Dívida deliberada: **itens independentes da mesma OS em etapas produtivas diferentes** ainda não possuem máquina própria. O board somente resume `PENDING`, `IN_PROGRESS`, `READY` e `CANCELLED`; essa evolução de modelo deve ser uma fase específica, transacional e não uma extensão improvisada do status da OS.

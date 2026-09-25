@@ -8,8 +8,8 @@ import Galeria from "@/pages/Galeria";
 // IMPORTANTE: Agora estamos importando o componente real!
 import Materiais from "@/pages/Materiais";
 import Configuracoes from "@/pages/Configuracoes";
-import OsArteBoardPage from "@/modules/hub-os/pages/OsArteBoardPage";
-import OsProducaoBoardPage from "@/modules/hub-os/pages/OsProducaoBoardPage";
+import ArtworkBoardPage from "@/modules/artwork/pages/ArtworkBoardPage";
+import ProductionBoardPage from "@/modules/production/pages/ProductionBoardPage";
 import OsDetailPage from "@/modules/hub-os/pages/OsDetailPage";
 import OrderDetailPage from "@/modules/orders/pages/OrderDetailPage";
 import OsKioskPage from "@/modules/hub-os/pages/OsKioskPage";
@@ -167,21 +167,58 @@ function Router() {
         </Route>
       ))}
 
+      <Route path="/os/arte/aprovacoes">
+        <Layout>
+          <RequireModule moduleKey="hub_os">
+            <HubOsAccessGuard scope="arte">
+              <ArtworkBoardPage preset="approvals" />
+            </HubOsAccessGuard>
+          </RequireModule>
+        </Layout>
+      </Route>
+      <Route path="/os/arte/revisoes">
+        <Layout>
+          <RequireModule moduleKey="hub_os">
+            <HubOsAccessGuard scope="arte">
+              <ArtworkBoardPage preset="revisions" />
+            </HubOsAccessGuard>
+          </RequireModule>
+        </Layout>
+      </Route>
       <Route path="/os/arte">
         <Layout>
           <RequireModule moduleKey="hub_os">
             <HubOsAccessGuard scope="arte">
-              <OsArteBoardPage />
+              <ArtworkBoardPage />
             </HubOsAccessGuard>
           </RequireModule>
         </Layout>
       </Route>
 
+      {(
+        [
+          ["/os/producao/impressao", "printing"],
+          ["/os/producao/acabamento", "finishing"],
+          ["/os/producao/letra-caixa", "lettering"],
+          ["/os/producao/externa", "external"],
+          ["/os/producao/pronto", "ready"],
+        ] as const
+      ).map(([path, preset]) => (
+        <Route key={path} path={path}>
+          <Layout>
+            <RequireModule moduleKey="hub_os">
+              <HubOsAccessGuard scope="producao">
+                <ProductionBoardPage preset={preset} />
+              </HubOsAccessGuard>
+            </RequireModule>
+          </Layout>
+        </Route>
+      ))}
       <Route path="/os/producao">
         <Layout>
           <RequireModule moduleKey="hub_os">
             <HubOsAccessGuard scope="producao">
-              <OsProducaoBoardPage />
+              <ProductionBoardPage />
             </HubOsAccessGuard>
           </RequireModule>
         </Layout>
