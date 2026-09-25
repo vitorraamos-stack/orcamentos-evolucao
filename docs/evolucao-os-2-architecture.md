@@ -229,3 +229,29 @@ Busca cobre OS, venda, cliente e título. Arte oferece Minhas OS, urgentes, atra
 Um hook pequeno escuta `os_orders`, `os_order_assignees` e `os_order_items`, com debounce. Realtime não é autoridade nem fonte única: há refresh manual, reload após mutação e recovery ao retornar à aba. Esta fase não cria migrations, RPCs de leitura nem afrouxa RLS.
 
 Dívida deliberada: **itens independentes da mesma OS em etapas produtivas diferentes** ainda não possuem máquina própria. O board somente resume `PENDING`, `IN_PROGRESS`, `READY` e `CANCELLED`; essa evolução de modelo deve ser uma fase específica, transacional e não uma extensão improvisada do status da OS.
+
+# Fase 3.1 — Estabilização dos Boards
+
+## Escala, Finalizados e métricas
+
+As OS ativas deixaram de ser uma amostra limitada a 500 registros. O repository compartilhado pagina `os_orders` em faixas inclusivas de 500 até receber uma página parcial. O teto técnico de 10.000 ativas é uma barreira explícita: ao atingi-lo, o carregamento falha com erro em vez de produzir um quadro silenciosamente truncado. Arte carrega `archived = false AND prod_status IS NULL`; Produção carrega ativas com `prod_status IS NOT NULL AND prod_status != 'Finalizados'`.
+
+Finalizados de Produção são consultados separadamente, preservando a coluna sem consumir páginas do fluxo ativo. A janela documentada é de 30 dias por `updated_at`, com no máximo 100 registros, ordenados do mais recente. Busca, filtros e presets continuam locais sobre todo o resultado carregado. O preset **Impressão** preserva a regra `prod_status = Produção AND reproducao = true`.
+
+As quatro relações visíveis no card continuam em consultas em lote. Sua montagem agora cria mapas por `order_id` para responsáveis, itens, comentários e prazos, evitando `find`/`filter` repetidos por OS. As métricas foram extraídas para `boardMetrics.ts` e calculadas antes de filtros e presets, sobre o resultado global do repository. `Atrasadas` usa exclusivamente `isOrderOverdue`; `CRITICO` permanece a classificação de risco de `calculateOrderRisk`. Assim, prazo hoje com material ainda não pronto pode ser crítico sem ser rotulado ou contado como atrasado.
+
+## Sincronização e handoff
+
+A migration `20260925150000_stabilize_operational_boards.sql` adiciona idempotentemente à publication `supabase_realtime`: `os_orders`, `os_order_assignees`, `os_order_items`, `os_order_deadlines` e `os_order_comments`. Nenhuma policy foi criada ou relaxada; Realtime continua sujeito às RLS existentes. O hook assina as cinco tabelas, agrupa rajadas em 350 ms, registra `CHANNEL_ERROR`/`TIMED_OUT`, mantém recuperação por `visibilitychange` e não remove o botão Atualizar.
+
+A mesma migration substitui sem overload ambíguo `hub_os_send_to_production_secure`. O novo contrato recebe e valida `p_delivery_deadline_preset` contra `FAST_5_8`, `STANDARD_8_12`, `STRUCTURE_INSTALL_15_25` e `CUSTOM`; `CUSTOM` exige data. Preset, início, data, ambos os estados, autoria, timestamp e evento são persistidos na mesma transação e sob o mesmo `FOR UPDATE`. A função permanece `SECURITY DEFINER SET search_path = public`, chama o helper de acesso, valida papel/estado e concede execução somente a `authenticated`; `PUBLIC` e `anon` são revogados.
+
+## Separação de responsabilidades
+
+`OperationalBoard.tsx` preserva uma única infraestrutura de DnD e o shell compartilhado, mas deixou de definir métricas e de renderizar os formulários específicos. A coleta de prazo do handoff vive em `modules/artwork/components/ArtworkHandoffDialog.tsx`; tags/insumos vivem em `modules/production/components/ProductionTagDialog.tsx`; os repositories dos módulos selecionam a configuração de seu board. Essa extração é incremental e evita um rewrite do fluxo estabilizado.
+
+## Migration, validação e débitos
+
+A migration precisa ser aplicada pelo pipeline Supabase antes do frontend que envia o novo parâmetro. `supabase/tests/operational_boards_phase_3_1.sql` protege publication e grants; os testes TypeScript cobrem paginação além de 500, teto explícito, semântica crítico/atrasado, contrato do preset e lista de tabelas Realtime. Security e Performance Advisors devem ser executados no projeto remoto depois da aplicação, pois o ambiente local não representa findings do projeto hospedado.
+
+Débitos deliberados: as relações em lote poderão ganhar paginação própria se o limite de URL do PostgREST se tornar relevante em massa extrema; nomes amigáveis ainda dependem do e-mail disponível; e o **fluxo independente por item da OS** permanece evolução futura. Instalações e Entregas não foram implementadas nesta fase.
