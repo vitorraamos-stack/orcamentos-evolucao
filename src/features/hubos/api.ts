@@ -1,10 +1,12 @@
 import { supabase } from "@/lib/supabase";
 import { invokeEdgeFunction } from "@/lib/supabase/invokeEdgeFunction";
 import type {
+  ArtStatus,
   InstallationFeedback,
   OsOrder,
   OsOrderEvent,
   OsOrderLayoutAsset,
+  ProdStatus,
 } from "./types";
 import {
   findForbiddenConsultorFields,
@@ -396,6 +398,28 @@ export const updateOrder = async (
     p_patch: payload,
     p_event_type: event?.type ?? null,
     p_event_payload: event?.payload ?? null,
+  });
+
+  if (error) throw new Error(error.message);
+  return data as OsOrder;
+};
+
+export const moveOrder = async (
+  id: string,
+  board: "art" | "production",
+  nextStatus: ArtStatus | ProdStatus,
+  eventPayload: Record<string, unknown> = {}
+) => {
+  const { data, error } = await supabase.rpc("hub_os_move_order_secure", {
+    p_os_id: id,
+    p_next_art_status: board === "art" ? nextStatus : null,
+    p_next_prod_status:
+      board === "production"
+        ? nextStatus
+        : nextStatus === "Produzir"
+          ? "Produção"
+          : null,
+    p_event_payload: eventPayload,
   });
 
   if (error) throw new Error(error.message);

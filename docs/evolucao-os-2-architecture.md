@@ -177,3 +177,29 @@ A página de detalhe deriva permissões independentes para edição gerencial, r
 A migration `20260925120000_restrict_get_user_display_names.sql` revoga `PUBLIC`/`anon`, concede apenas a `authenticated` e acrescenta `has_module_access(auth.uid(), 'hub_os')` à leitura de `auth.users`. As demais funções `SECURITY DEFINER` antigas e as políticas permissivas legadas de `profiles` não foram alteradas e devem ser auditadas separadamente. A migration inclui consultas de validação dos grants. Security/Performance Advisors devem ser executados no projeto após a aplicação; findings anteriores devem ser inventariados sem ampliar o escopo desta fase.
 
 Não houve alteração nos boards, kiosk, R2, SMB, `public.os` legado ou no prazo final canônico `os_orders.delivery_date`.
+
+# Fase 2.2 — hardening das mutações da OS
+
+## Banco como autoridade
+
+A máquina TypeScript continua oferecendo feedback imediato e ocultando ações incompatíveis com o papel do usuário, mas não constitui autorização. A migration `20260925130000_harden_hub_os_order_mutations.sql` replica o vocabulário no PostgreSQL; qualquer alteração futura do fluxo deve atualizar conjuntamente `orderTransitions.ts`, os helpers SQL e seus testes. A RPC lê a linha real com `FOR UPDATE`, portanto ignora qualquer `from`, papel ou ator alegado no payload.
+
+Arte permite somente `Caixa de Entrada → Em Criação`, `Em Criação → Para Aprovação`, `Para Aprovação → Ajustes|Produzir` e `Ajustes → Em Criação|Para Aprovação`. Produção permite `Produção → Em Acabamento`, `Em Acabamento → Pronto / Avisar Cliente`, `Pronto / Avisar Cliente → Logística (Entrega/Transportadora)|Instalação Agendada|Finalizados`, `Logística (Entrega/Transportadora) → Instalação Agendada|Finalizados` e `Instalação Agendada → Finalizados`. O handoff `Para Aprovação → Produzir` também inicializa `prod_status = Produção` no servidor.
+
+`arte_finalista` movimenta apenas Arte; `producao`, apenas Produção; `gerente` e o alias legado `admin` movimentam ambos. Todos ainda precisam de sessão e acesso ao módulo `hub_os`. Outros papéis recebem `42501`. OS arquivada ou com produção em `Finalizados` não pode ser movimentada pela ação normal, inclusive por gerente.
+
+## Contratos e atomicidade
+
+`hub_os_move_order_secure` preserva a assinatura da Fase 2.1, aceita exatamente um board (mais o par especial `Produzir`/`Produção`), bloqueia combinações arbitrárias, valida a aresta e grava `status_change`. Campos `board`, `from`, `to` e `actor` são sempre sobrescritos com valores server-side; outros metadados de auditoria podem ser mantidos. Lock, validações, update e evento pertencem à mesma transação PL/pgSQL: qualquer exceção desfaz todos os efeitos.
+
+`hub_os_update_order_secure` agora é exclusivamente gerencial (`gerente`/`admin`). `art_status`, `prod_status`, `archived`, `archived_at` e `archived_by` foram removidos da allowlist; estados passam somente pela RPC de movimento e arquivamento passa por `hub_os_archive_order_secure`, que também exige gerente/admin. Edição e seu evento opcional continuam atômicos.
+
+O grant implícito de funções novas para `PUBLIC` é revogado. `PUBLIC` e `anon` não executam `hub_os_assert_orders_access`, `hub_os_create_order_secure`, `hub_os_update_order_secure`, `hub_os_archive_order_secure`, `hub_os_move_order_secure` nem `hub_os_delete_order_secure`; somente `authenticated` recebe o grant explícito. Os helpers puros da máquina não são expostos nem a `authenticated`. Todas as funções `SECURITY DEFINER` alteradas mantêm `search_path = public` e a autenticação é revalidada por `hub_os_assert_orders_access`.
+
+## Compatibilidade, testes e dívida delimitada
+
+A página operacional já usa `hub_os_move_order_secure` e mantém sua assinatura. A API legada ganhou um adapter para a mesma RPC, sem alterar criação, arquivo, kiosk ou R2. A busca de compatibilidade confirmou que o board legado ainda possui chamadas de status por `updateOrder` e updates diretos/otimistas locais em `HubOS.tsx` e diálogos; elas não são uma autoridade de segurança e as tentativas via update genérico passam a ser rejeitadas. O cutover integral dessas telas para o adapter seguro, incluindo a separação das edições auxiliares de tags/prazos, permanece para a Fase 3 para evitar uma refatoração ampla nesta etapa.
+
+`supabase/tests/hub_os_order_mutations_phase_2_2.sql` cobre as arestas positivas/negativas dos dois boards e grants essenciais. Os testes TypeScript cobrem feedback antecipado, isolamento de papéis, handoff e montagem do contrato RPC. Testes integrados com identidades reais devem ainda validar, no ambiente Supabase, os quatro papéis, status real versus payload falso, bloqueio de finalizada e rollback sem evento.
+
+Os Security e Performance Advisors precisam ser executados novamente depois da aplicação remota da migration. O resultado esperado é a ausência de `anon_security_definer_function_executable` para as seis RPCs acima, especialmente move/update, sem regressão de performance. Findings de outras funções `SECURITY DEFINER` e as RLS permissivas preexistentes de `profiles` permanecem fora do escopo e devem ser inventariados numa auditoria futura.

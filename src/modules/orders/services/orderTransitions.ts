@@ -5,6 +5,9 @@ import type { OperationalStage } from "../types/orderDetail";
 const normalize = (value?: string | null) =>
   (value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
+// UX mirror only: PostgreSQL is the security authority. Any flow change here must
+// also update the corresponding hub_os_can_transition_* server-side contract.
+
 export function getOrderOperationalStage(
   order: Pick<OsOrder, "art_status" | "prod_status" | "archived">
 ): OperationalStage {
