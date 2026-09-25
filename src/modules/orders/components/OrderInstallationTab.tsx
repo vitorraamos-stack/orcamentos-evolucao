@@ -1,0 +1,4 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { OsOrder } from "@/features/hubos/types";
+export function OrderInstallationTab({ order }: { order: OsOrder }) { return <Card><CardHeader><CardTitle>Instalação / Entrega</CardTitle></CardHeader><CardContent><dl className="grid gap-4 sm:grid-cols-2"><div><dt className="text-xs text-muted-foreground">Tipo logístico</dt><dd>{order.logistic_type}</dd></div><div><dt className="text-xs text-muted-foreground">Data operacional disponível</dt><dd>{order.delivery_date ?? "Não definida"}</dd></div><div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Endereço</dt><dd>{order.address ?? "Não aplicável / não informado"}</dd></div></dl><p className="mt-5 text-xs text-muted-foreground">Agenda avançada, rotas e estrutura dedicada de instalação permanecem fora desta fase.</p></CardContent></Card>; }
+

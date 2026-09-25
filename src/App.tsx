@@ -11,6 +11,7 @@ import Configuracoes from "@/pages/Configuracoes";
 import OsArteBoardPage from "@/modules/hub-os/pages/OsArteBoardPage";
 import OsProducaoBoardPage from "@/modules/hub-os/pages/OsProducaoBoardPage";
 import OsDetailPage from "@/modules/hub-os/pages/OsDetailPage";
+import OrderDetailPage from "@/modules/orders/pages/OrderDetailPage";
 import OsKioskPage from "@/modules/hub-os/pages/OsKioskPage";
 import OsCreatePage from "@/modules/hub-os/pages/OsCreatePage";
 import OsAuditPage from "@/modules/hub-os/pages/OsAuditPage";
@@ -218,7 +219,7 @@ function Router() {
         ) : (
           <Layout>
             <RequireModule moduleKey="hub_os">
-              <OsDetailPage />
+              <OrderDetailPage />
             </RequireModule>
           </Layout>
         )}

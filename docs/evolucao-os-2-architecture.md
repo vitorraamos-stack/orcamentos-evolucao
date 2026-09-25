@@ -125,3 +125,45 @@ Como `os_orders` ainda não tem data de instalação dedicada, instalações do 
 - O vocabulário textual de finalização ainda precisa ser substituído por um estado canônico em evolução futura, sem migração destrutiva.
 - Instalações precisam de data própria antes de ganhar planejamento avançado.
 - Responsáveis por setor, comentários, itens, checklists e prazos por etapa permanecem deliberadamente fora da Fase 1.1.
+
+# Fase 2 — detalhe operacional da Ordem de Serviço
+
+## Auditoria e decisões
+
+A auditoria confirmou que `public.os_orders` já contém a identificação da venda/OS, cliente, título/descrição, prazo final (`delivery_date`), logística/endereço, estados textuais de Arte e Produção, urgência em `art_direction_tag`, tags/pendências de produção, flags de reprodução e letra-caixa, autoria, arquivamento e timestamps. Esses campos continuam canônicos e não foram copiados para outra tabela. `production_tag = PRODUCAO_EXTERNA` é o marcador canônico disponível para produção externa; a estrutura de fornecedor/previsão continua deliberadamente fora do escopo.
+
+`public.os` e seu detalhe anterior são legados: o componente foi preservado no fluxo `?kiosk=1`, junto com comprovantes, impressão operacional, preview de layout e eventos legados. A navegação normal de `/os/:id`, usada pela Central e pelo Dashboard, agora abre o detalhe de `os_orders`. `os_order_assets` continua sendo a fonte de arquivos R2 e nenhuma chave, bucket, upload, download ou fluxo SMB foi alterado. `os_orders_event` continua sendo a única timeline de auditoria canônica; a Fase 2 apenas amplia sua leitura para usuários com `hub_os` e centraliza novos inserts no repository.
+
+Não foi localizada estrutura canônica existente adequada para responsáveis por etapa, prazos por etapa, linhas operacionais ou comentários internos. O legado possui `os.assigned_to`, mas ele pertence à tabela concorrente antiga e não representa os cinco escopos necessários. Também não há JSON reutilizável de serviços/materiais em `os_orders`; por isso foram criadas quatro relações pequenas, sem preços ou custos.
+
+## Modelo relacional e RLS
+
+- `os_order_assignees`: referência obrigatória a `os_orders` e `profiles`, escopos `GENERAL`, `ART`, `PRODUCTION`, `FINISHING` e `INSTALLATION`, com unicidade por OS/escopo. Há somente um responsável principal por etapa nesta fase.
+- `os_order_deadlines`: prazos `ART`, `APPROVAL`, `PRODUCTION`, `FINISHING` e `INSTALLATION`, conclusão opcional e unicidade por OS/escopo. `os_orders.delivery_date` permanece o prazo final e não é duplicado.
+- `os_order_items`: serviço operacional, quantidade, medidas opcionais, unidade, notas, status simples, ordenação e `deleted_at`. Não contém valores comerciais. OS antigas permanecem válidas sem itens.
+- `os_order_comments`: autor obrigatório em `profiles`, mensagem e exclusão lógica. Não há comentário anônimo, chat, menções, reações ou realtime novo.
+
+Todas as relações usam FK com cascade somente a partir da OS, índices nas consultas operacionais e RLS. A leitura requer `has_module_access(auth.uid(), 'hub_os')`. Responsáveis, prazos e itens só podem ser alterados por `is_manager`; comentários podem ser criados por usuário do Hub e alterados logicamente pelo próprio autor ou gerente. A interface replica essa autorização para UX, mas o banco é a barreira efetiva. Não foi adicionada função `SECURITY DEFINER`.
+
+## Domínio, carregamento e auditoria
+
+`OperationalStage` traduz os vocabulários legados em `ENTRY`, `ART`, `APPROVAL`, `PRODUCTION`, `FINISHING`, `READY`, `LOGISTICS` e `FINISHED`. A máquina central permite o caminho de Arte Caixa de Entrada → Em Criação → Para Aprovação → Produzir, incluindo Para Aprovação → Ajustes e o retorno de Ajustes; Produção segue Produção → Em Acabamento → Pronto/Avisar → Logística/Instalação → Finalizados. Saltos não mapeados e usuários sem permissão do quadro são rejeitados pelas funções puras. Os valores persistidos não foram renomeados.
+
+O risco permanece calculado principalmente pelo prazo final, como na Fase 1.1. Prazos de etapa recebem estado normal, vence hoje, atrasado ou concluído usando o dia operacional `America/Sao_Paulo`; eles não promovem automaticamente uma OS a crítica.
+
+O detalhe inicial busca OS, responsáveis e prazos em paralelo. Itens, comentários, arquivos e histórico são carregados apenas ao abrir a respectiva aba. Consultas usam listas explícitas de colunas e estados de loading, erro e vazio independentes. Mutações chamam repositories validados com Zod; eventos `assignee_changed`, `deadline_changed`, `item_created`, `item_updated`, `item_removed`, `comment_created`, `comment_removed` e `details_updated` são registrados por `recordOrderEvent`, sem inserts espalhados nos componentes. Eventos de status já produzidos pelos quadros/RPCs existentes continuam na mesma timeline e recebem formatação legível.
+
+## Compatibilidade e débitos restantes
+
+A página normal preserva links da Central/Dashboard, dados legados de status, tags, logística, produção externa e assets. Arte, Produção, financeiro, kiosk, R2 e SMB não foram reimplementados. O kiosk mantém o detalhe legado integral para evitar mudança operacional. OS canônicas antigas sem relações Fase 2 exibem empty states e não exigem backfill.
+
+Débitos relevantes: o detalhe legado de `public.os` ainda existe exclusivamente para compatibilidade; nomes amigáveis dos usuários continuam limitados ao e-mail disponível em `profiles`; a edição textual completa de itens pode ganhar um diálogo mais rico; alteração de status permanece nos quadros existentes embora a máquina de domínio já esteja pronta; data/rota/feedback estruturados de instalação ainda pertencem à fase futura; e eventos registrados pelo cliente ainda podem evoluir para uma RPC transacional `SECURITY INVOKER`.
+
+## Migrations da Fase 2
+
+Estas migrations precisam ser aplicadas manualmente no Supabase, na ordem, pois o deploy da aplicação não executa SQL:
+
+1. `20260925100000_os_order_assignees.sql` — responsáveis, helper de timestamp e leitura operacional do histórico.
+2. `20260925101000_os_order_deadlines.sql` — prazos por etapa.
+3. `20260925102000_os_order_items.sql` — itens operacionais com soft delete.
+4. `20260925103000_os_order_comments.sql` — comentários internos com autoria e soft delete.
