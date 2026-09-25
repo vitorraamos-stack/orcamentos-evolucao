@@ -36,6 +36,10 @@ const PROD_TRANSITIONS: Record<string, string[]> = {
   Finalizados: [],
 };
 
+export const getValidOrderTransitions = (input: TransitionContext & { board: "art" | "production"; from: ArtStatus | ProdStatus }) =>
+  ((input.board === "art" ? ART_TRANSITIONS[input.from] : PROD_TRANSITIONS[input.from]) ?? [])
+    .filter(to => canTransitionOrderStatus({ ...input, to: to as ArtStatus | ProdStatus })) as (ArtStatus | ProdStatus)[];
+
 type TransitionContext = { role: HubRole | null; isManager?: boolean };
 const canOperate = (context: TransitionContext, board: "art" | "production") =>
   context.isManager || context.role === (board === "art" ? "arte_finalista" : "producao");
@@ -61,4 +65,3 @@ export function canTransitionOrderStatus(input: TransitionContext & {
     ? canTransitionArtStatus(input.from as ArtStatus, input.to as ArtStatus, input)
     : canTransitionProductionStatus(input.from as ProdStatus, input.to as ProdStatus, input);
 }
-

@@ -167,3 +167,13 @@ Estas migrations precisam ser aplicadas manualmente no Supabase, na ordem, pois 
 2. `20260925101000_os_order_deadlines.sql` — prazos por etapa.
 3. `20260925102000_os_order_items.sql` — itens operacionais com soft delete.
 4. `20260925103000_os_order_comments.sql` — comentários internos com autoria e soft delete.
+
+# Fase 2.1 — fechamento operacional
+
+Itens agora usam um único formulário completo para criação e edição (descrição, quantidade, unidade, medidas, observações e status), validação Zod, confirmação antes do soft delete e auditoria com diferenças dos campos operacionais mais relevantes. Responsáveis aceitam **Sem responsável**, traduzido em `DELETE` — nunca em UUID sentinela. Prazos podem ser concluídos, reabertos e removidos; `completed_at` prevalece sobre atraso e datas de leitura são exibidas em `dd/mm/yyyy`.
+
+A página de detalhe deriva permissões independentes para edição gerencial, responsáveis, prazos, itens, comentários e movimentos de Arte/Produção. A ação **Alterar etapa** lista apenas arestas válidas da máquina e o serviço de transição usa `hub_os_move_order_secure`; mudança e evento `status_change` são, portanto, atômicos. Edições dos campos principais usam `hub_os_update_order_secure` com `details_updated`, também atomicamente. Mutações das quatro tabelas da Fase 2 ainda registram o evento em uma segunda chamada; isso permanece dívida explícita, sem esconder falhas de mutação.
+
+A migration `20260925120000_restrict_get_user_display_names.sql` revoga `PUBLIC`/`anon`, concede apenas a `authenticated` e acrescenta `has_module_access(auth.uid(), 'hub_os')` à leitura de `auth.users`. As demais funções `SECURITY DEFINER` antigas e as políticas permissivas legadas de `profiles` não foram alteradas e devem ser auditadas separadamente. A migration inclui consultas de validação dos grants. Security/Performance Advisors devem ser executados no projeto após a aplicação; findings anteriores devem ser inventariados sem ampliar o escopo desta fase.
+
+Não houve alteração nos boards, kiosk, R2, SMB, `public.os` legado ou no prazo final canônico `os_orders.delivery_date`.
