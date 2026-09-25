@@ -25,6 +25,11 @@ describe("order operational flow", () => {
     expect(canTransitionProductionStatus("Produção", "Finalizados", context)).toBe(false);
     expect(canTransitionProductionStatus("Produção", "Em Acabamento", { role: "instalador" })).toBe(false);
   });
+  it("rejects the documented invalid cross-board jumps", () => {
+    expect(canTransitionArtStatus("Em Criação", "Finalizados" as never, context)).toBe(false);
+    expect(canTransitionProductionStatus("Produção", "Finalizados", context)).toBe(false);
+    expect(canTransitionProductionStatus("Em Criação" as never, "Para Aprovação" as never, context)).toBe(false);
+  });
   it("separates manager and operational permissions", () => {
     expect(canTransitionArtStatus("Em Criação", "Para Aprovação", { role: "arte_finalista" })).toBe(true);
     expect(canTransitionArtStatus("Em Criação", "Para Aprovação", { role: "producao" })).toBe(false);

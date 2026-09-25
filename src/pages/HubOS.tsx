@@ -40,6 +40,7 @@ import {
   fetchOrdersPage,
   markInstallationFeedbackReviewed,
   fetchUserDisplayNameById,
+  moveOrder,
   updateOrder,
 } from "@/features/hubos/api";
 import { getLatestAssetJobsByOsId } from "@/features/hubos/assetJobs";
@@ -1008,33 +1009,13 @@ export default function HubOS() {
     updateLocalOrder(optimistic);
 
     try {
-      const updated = await updateOrder(
-        order.id,
-        {
-          art_status: nextStatus,
-          prod_status: shouldInitProd ? "Produção" : order.prod_status,
-          production_tag: nextProductionTag,
-          delivery_deadline_started_at: shouldStartDeliveryDeadline
-            ? startAt
-            : order.delivery_deadline_started_at,
-          delivery_date:
-            order.delivery_deadline_preset === "CUSTOM"
-              ? order.delivery_date
-              : nextStatus === "Produzir"
-                ? resolvedDeliveryDate
-                : order.delivery_date,
-        },
-        {
-          type: "status_change",
-          payload: {
-            board: "arte",
-            from: order.art_status,
-            to: nextStatus,
-            production_tag: nextProductionTag,
-            is_external_production: nextProductionTag === "PRODUCAO_EXTERNA",
-          },
-        }
-      );
+      const updated = await moveOrder(order.id, "art", nextStatus, {
+        board: "arte",
+        from: order.art_status,
+        to: nextStatus,
+        production_tag: nextProductionTag,
+        is_external_production: nextProductionTag === "PRODUCAO_EXTERNA",
+      });
       updateLocalOrder(updated);
       if (
         order.art_status === inboxStatus &&
@@ -1244,21 +1225,12 @@ export default function HubOS() {
     updateLocalOrder(optimistic);
 
     try {
-      const updated = await updateOrder(
-        order.id,
-        {
-          prod_status: nextStatus,
-          production_tag: nextProductionTag,
-        },
-        {
-          type: "status_change",
-          payload: {
-            board: "producao",
-            from: order.prod_status,
-            to: nextStatus,
-          },
-        }
-      );
+      const updated = await moveOrder(order.id, "production", nextStatus, {
+        board: "producao",
+        from: order.prod_status,
+        to: nextStatus,
+        production_tag: nextProductionTag,
+      });
       updateLocalOrder(updated);
     } catch (error) {
       console.error(error);
@@ -1475,22 +1447,13 @@ export default function HubOS() {
     const order = acabamentoLabelOrder;
 
     try {
-      const updated = await updateOrder(
-        order.id,
-        {
-          prod_status: "Em Acabamento",
-        },
-        {
-          type: "prod_status_changed",
-          payload: {
-            board: "producao",
-            from: order.prod_status,
-            to: "Em Acabamento",
-            source: "kanban_lightbox",
-            printed_label: printedAcabamentoLabel,
-          },
-        }
-      );
+      const updated = await moveOrder(order.id, "production", "Em Acabamento", {
+        board: "producao",
+        from: order.prod_status,
+        to: "Em Acabamento",
+        source: "kanban_lightbox",
+        printed_label: printedAcabamentoLabel,
+      });
       updateLocalOrder(updated);
 
       toast.success("OS movida para Em Acabamento.");

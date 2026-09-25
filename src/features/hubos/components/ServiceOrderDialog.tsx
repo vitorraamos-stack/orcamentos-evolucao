@@ -21,6 +21,7 @@ import { ArrowLeft } from "lucide-react";
 import {
   fetchLatestOrderLayout,
   fetchUserDisplayNameById,
+  moveOrder,
   updateOrder,
 } from "../api";
 import { ART_COLUMNS, PROD_COLUMNS } from "../constants";
@@ -368,23 +369,16 @@ export default function ServiceOrderDialog({
         manualDate: order.delivery_date,
       });
 
-      const updated = await updateOrder(
-        order.id,
-        {
-          art_status: "Produzir",
-          prod_status: PROD_COLUMNS[0],
-          delivery_deadline_started_at:
-            order.delivery_deadline_started_at ?? nowIso,
-          delivery_date:
-            order.delivery_deadline_preset === "CUSTOM"
-              ? order.delivery_date
-              : resolvedDeliveryDate,
-        },
-        {
-          type: "status_change",
-          payload: { board: "producao" },
-        }
-      );
+      const updated = await moveOrder(order.id, "art", "Produzir", {
+        board: "arte",
+        from: order.art_status,
+        to: "Produzir",
+        delivery_deadline_started_at: startedAt,
+        delivery_date:
+          order.delivery_deadline_preset === "CUSTOM"
+            ? order.delivery_date
+            : resolvedDeliveryDate,
+      });
       onUpdated(updated);
       toast.success("Card enviado para Produção.");
       onOpenChange(false);

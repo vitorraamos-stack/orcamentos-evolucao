@@ -20,6 +20,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ArrowLeft } from "lucide-react";
 import {
   fetchUserDisplayNameById,
+  moveOrder,
   updateOrder,
 } from "../api";
 import { ART_COLUMNS, PROD_COLUMNS } from "../constants";
@@ -204,16 +205,10 @@ export default function OrderDetailsDialog({
     if (!order) return;
     try {
       setMoving(true);
-      const updated = await updateOrder(order.id, {
-        art_status: "Produzir",
-        prod_status: PROD_COLUMNS[0],
-      }, {
-        type: "status_change",
-        payload: {
-          board: "producao",
-          from: order.prod_status,
-          to: PROD_COLUMNS[0],
-        },
+      const updated = await moveOrder(order.id, "art", "Produzir", {
+        board: "arte",
+        from: order.art_status,
+        to: "Produzir",
       });
       onUpdated(updated);
       toast.success("Card enviado para Produção.");
