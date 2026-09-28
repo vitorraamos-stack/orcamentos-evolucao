@@ -81,6 +81,9 @@ export function filterBoardCards(
       (!filters.external || order.production_tag === "PRODUCAO_EXTERNA") &&
       (!filters.reproducao || order.reproducao) &&
       (!filters.letraCaixa || order.letra_caixa)
+      && (filters.workCenter === "all" || card.operationWorkCenters?.includes(filters.workCenter))
+      && (!filters.blockedOperations || (card.productionOperationsBlocked ?? 0) > 0)
+      && (!filters.myOperations || Boolean(userId && card.operationAssigneeIds?.includes(userId)))
     );
   });
 }

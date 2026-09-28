@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { BoardAssignee, BoardFiltersState, BoardKind } from "./types";
+import { WORK_CENTERS, WORK_CENTER_LABELS, type WorkCenter } from "@/modules/production/operations";
 
 export function BoardFilters({
   board,
@@ -40,6 +41,8 @@ export function BoardFilters({
           ["external", "Produção externa"],
           ["reproducao", "Reprodução"],
           ["letraCaixa", "Letra Caixa"],
+          ["blockedOperations", "Bloqueados"],
+          ["myOperations", "Minhas operações"],
         ];
   return (
     <details className="rounded-lg border bg-card p-3" open>
@@ -88,6 +91,7 @@ export function BoardFilters({
             </SelectContent>
           </Select>
         )}
+        {board === "production" && <Select value={value.workCenter} onValueChange={next => set("workCenter", next as "all" | WorkCenter)}><SelectTrigger className="w-[210px]"><SelectValue placeholder="Setor" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os setores</SelectItem>{WORK_CENTERS.map(center => <SelectItem key={center} value={center}>{WORK_CENTER_LABELS[center]}</SelectItem>)}</SelectContent></Select>}
         {checks.map(([key, label]) => (
           <label
             key={key}
@@ -116,6 +120,9 @@ export function BoardFilters({
               external: false,
               reproducao: false,
               letraCaixa: false,
+              workCenter: "all",
+              blockedOperations: false,
+              myOperations: false,
             })
           }
         >

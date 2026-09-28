@@ -94,7 +94,9 @@ export default function Layout({ children }: LayoutProps) {
                   (
                     href === "/hub-os"
                       ? location === href
-                      : location.startsWith(href as string)
+                      : href === "/os"
+                        ? location === "/os" || /^\/os\/[^/]+$/.test(location)
+                        : location.startsWith(href as string)
                   )
                     ? "secondary"
                     : "ghost"
@@ -103,7 +105,9 @@ export default function Layout({ children }: LayoutProps) {
                   "w-full justify-start",
                   (href === "/hub-os"
                     ? location === href
-                    : location.startsWith(href as string)) &&
+                    : href === "/os"
+                      ? location === "/os" || /^\/os\/[^/]+$/.test(location)
+                      : location.startsWith(href as string)) &&
                     "bg-sidebar-accent text-sidebar-accent-foreground"
                 )}
               >

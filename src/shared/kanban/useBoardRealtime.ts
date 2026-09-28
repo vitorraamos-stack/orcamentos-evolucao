@@ -5,6 +5,7 @@ export const BOARD_REALTIME_TABLES = [
   "os_orders",
   "os_order_assignees",
   "os_order_items",
+  "os_order_item_operations",
   "os_order_deadlines",
   "os_order_comments",
 ] as const;

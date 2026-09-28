@@ -1,0 +1,18 @@
+begin;
+select plan(15);
+select has_table('public','os_order_item_operations','operations table exists');
+select ok((select relrowsecurity from pg_class where oid='public.os_order_item_operations'::regclass),'RLS is active');
+select col_is_fk('public','os_order_item_operations','item_id','item FK exists');
+select col_is_fk('public','os_order_item_operations','assigned_to','assignee FK exists');
+select has_function('public','hub_os_create_item_operation_secure',array['uuid','text','uuid','boolean','text','integer'],'create RPC exists');
+select has_function('public','hub_os_set_item_operation_status_secure',array['uuid','text','text','text'],'status RPC exists');
+select has_function('public','hub_os_update_item_operation_secure',array['uuid','text','uuid','boolean','text','integer'],'update RPC exists');
+select has_function('public','hub_os_delete_item_operation_secure',array['uuid'],'delete RPC exists');
+select ok(not has_function_privilege('public','public.hub_os_create_item_operation_secure(uuid,text,uuid,boolean,text,integer)','EXECUTE'),'PUBLIC cannot create');
+select ok(not has_function_privilege('anon','public.hub_os_create_item_operation_secure(uuid,text,uuid,boolean,text,integer)','EXECUTE'),'anon cannot create');
+select ok(has_function_privilege('authenticated','public.hub_os_create_item_operation_secure(uuid,text,uuid,boolean,text,integer)','EXECUTE'),'authenticated can call validated RPC');
+select ok(not has_function_privilege('authenticated','public.hub_os_recompute_item_production_status(uuid)','EXECUTE'),'recompute is internal');
+select ok(not has_function_privilege('authenticated','public.hub_os_assert_operation_access(boolean)','EXECUTE'),'access assertion is internal');
+select ok(exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and tablename='os_order_item_operations'),'operations are realtime');
+select is((select count(*)::int from information_schema.columns where table_schema='public' and table_name='os_order_item_operations'),17,'operation contract has expected columns');
+select * from finish(); rollback;
