@@ -13,6 +13,7 @@ import type {
   OrderItemStatus,
   UserOption,
 } from "../types/orderDetail";
+import type { ItemOperation, OperationStatus, WorkCenter } from "@/modules/production/operations";
 
 export const ORDER_DETAIL_SELECT =
   "id,os_number,sale_number,client_name,title,description,delivery_date,delivery_deadline_preset,delivery_deadline_started_at,logistic_type,address,address_lat,address_lng,address_geocoded_at,address_geocode_provider,production_tag,insumos_details,insumos_return_notes,insumos_requested_at,insumos_resolved_at,insumos_resolved_by,art_direction_tag,art_status,prod_status,reproducao,letra_caixa,archived,archived_at,archived_by,folder_path,created_by,updated_by,created_at,updated_at";
@@ -101,6 +102,18 @@ export async function listOrderItems(orderId: string) {
   const { data, error } = await supabase.from("os_order_items").select("id,order_id,name,description,quantity,width_cm,height_cm,unit,notes,status,sort_order,created_at,updated_at,created_by,deleted_at").eq("order_id", orderId).is("deleted_at", null).order("sort_order");
   throwIfError(error); return (data ?? []) as OrderItem[];
 }
+export async function listItemOperations(orderId: string) {
+  uuid.parse(orderId);
+  const items = await listOrderItems(orderId); if (!items.length) return [];
+  const { data, error } = await supabase.from("os_order_item_operations").select("id,item_id,work_center,status,assigned_to,is_required,notes,blocked_reason,sort_order,started_at,completed_at,created_at,updated_at").in("item_id", items.map(item => item.id)).is("deleted_at", null).order("sort_order");
+  throwIfError(error); return (data ?? []) as ItemOperation[];
+}
+export async function createItemOperation(input:{itemId:string;workCenter:WorkCenter;assignedTo?:string|null;isRequired:boolean;notes?:string|null;sortOrder?:number}) {
+ const {data,error}=await supabase.rpc("hub_os_create_item_operation_secure",{p_item_id:input.itemId,p_work_center:input.workCenter,p_assigned_to:input.assignedTo??null,p_is_required:input.isRequired,p_notes:input.notes??null,p_sort_order:input.sortOrder??0}); throwIfError(error); return data as ItemOperation;
+}
+export async function setItemOperationStatus(id:string,status:OperationStatus,blockedReason?:string|null) { uuid.parse(id); const {data,error}=await supabase.rpc("hub_os_set_item_operation_status_secure",{p_operation_id:id,p_status:status,p_blocked_reason:blockedReason??null,p_notes:null}); throwIfError(error); return data as ItemOperation; }
+export async function updateItemOperation(id:string,input:{workCenter:WorkCenter;assignedTo?:string|null;isRequired:boolean;notes?:string|null;sortOrder:number}) { uuid.parse(id); const {data,error}=await supabase.rpc("hub_os_update_item_operation_secure",{p_operation_id:id,p_work_center:input.workCenter,p_assigned_to:input.assignedTo??null,p_is_required:input.isRequired,p_notes:input.notes??null,p_sort_order:input.sortOrder}); throwIfError(error); return data as ItemOperation; }
+export async function deleteItemOperation(id:string) { uuid.parse(id); const {data,error}=await supabase.rpc("hub_os_delete_item_operation_secure",{p_operation_id:id}); throwIfError(error); return data as ItemOperation; }
 export async function createOrderItem(orderId: string, input: z.input<typeof itemInputSchema>) {
   uuid.parse(orderId); const value = itemInputSchema.parse(input);
   const { data, error } = await supabase.from("os_order_items").insert({ order_id: orderId, ...value }).select().single();

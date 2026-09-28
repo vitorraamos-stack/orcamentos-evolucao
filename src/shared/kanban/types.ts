@@ -1,6 +1,7 @@
 import type { ArtStatus, OsOrder, ProdStatus } from "@/features/hubos/types";
 import type { OrderRisk } from "@/modules/orders/risk";
 import type { DeadlineScope } from "@/modules/orders/types/orderDetail";
+import type { WorkCenter } from "@/modules/production/operations";
 
 export type BoardKind = "art" | "production";
 export type BoardStatus = ArtStatus | ProdStatus;
@@ -22,6 +23,12 @@ export type BoardCardModel = {
   itemsReady: number;
   commentsTotal: number;
   risk: OrderRisk;
+  productionOperationsTotal?: number;
+  productionOperationsCompleted?: number;
+  productionOperationsBlocked?: number;
+  activeWorkCenters?: WorkCenter[];
+  operationWorkCenters?: WorkCenter[];
+  operationAssigneeIds?: string[];
 };
 
 export type BoardFiltersState = {
@@ -35,6 +42,9 @@ export type BoardFiltersState = {
   external: boolean;
   reproducao: boolean;
   letraCaixa: boolean;
+  workCenter: "all" | WorkCenter;
+  blockedOperations: boolean;
+  myOperations: boolean;
 };
 
 export const EMPTY_BOARD_FILTERS: BoardFiltersState = {
@@ -48,4 +58,7 @@ export const EMPTY_BOARD_FILTERS: BoardFiltersState = {
   external: false,
   reproducao: false,
   letraCaixa: false,
+  workCenter: "all",
+  blockedOperations: false,
+  myOperations: false,
 };

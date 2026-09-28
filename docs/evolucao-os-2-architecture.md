@@ -281,3 +281,13 @@ Entrada → Em Criação` para o Hub legado (`/hub-os/kanban`), embora o board n
 não ofereça essa aresta. Esse desvio é dívida técnica a remover quando o Hub
 legado for desligado. As antigas subrotas especializadas redirecionam para
 `/os/arte` ou `/os/producao`, e a navegação apresenta apenas esses dois destinos.
+
+## Fase 3.2.1 — Operações Internas de Produção por Item
+
+O status macro da OS continua deliberadamente simples (`Produção`, `Em Acabamento` e `Pronto / Avisar Cliente`). Serralheria, impressão, montagem, letra caixa, elétrica/iluminação, produção externa e acabamento/conferência são **work centers de operações vinculadas a cada item**, e não colunas ou novos quadros.
+
+Uma operação tem responsável próprio e pode estar pendente, em andamento, concluída ou bloqueada. Várias operações do mesmo item podem ficar em andamento simultaneamente; `sort_order` organiza a apresentação, sem impor dependências ou um DAG. O item deriva seu estado das operações obrigatórias: todas concluídas o tornam `READY`, reabertura o devolve a `IN_PROGRESS`, e `CANCELLED` é preservado. Operações opcionais não impedem a conclusão.
+
+No avanço para Acabamento, operações produtivas obrigatórias (exceto `FINISHING_QC`) precisam estar concluídas. Para Material Pronto, toda operação obrigatória ativa de item não cancelado precisa estar concluída. Esses guards são server-side. OS antigas sem nenhuma operação conservam o fluxo legado, permitindo implantação gradual.
+
+A modelagem por item explicita responsabilidade e progresso sem introduzir MRP, estoque, custos, capacidade ou templates automáticos. Ela deixa uma fronteira limpa para a Fase 4 consumir materiais prontos em instalação/entrega, sem antecipar agenda, equipes, rotas ou veículos.

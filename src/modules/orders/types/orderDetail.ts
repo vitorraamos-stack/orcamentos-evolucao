@@ -1,4 +1,5 @@
 import type { OsOrder, OsOrderLayoutAsset } from "@/features/hubos/types";
+export type { ItemOperation } from "@/modules/production/operations";
 
 export type OperationalStage =
   | "ENTRY"
@@ -81,4 +82,3 @@ export type OrderDetail = {
   deadlines: OrderDeadline[];
 };
 export type OrderFilesData = { assets: OsOrderLayoutAsset[] };
-

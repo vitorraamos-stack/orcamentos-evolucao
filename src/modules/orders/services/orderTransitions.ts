@@ -19,7 +19,7 @@ export function getOrderOperationalStage(
   if (prod.includes("acabamento") || prod.includes("qualidade")) return "FINISHING";
   if (prod || art === "produzir") return "PRODUCTION";
   if (art.includes("aprov") || art === "ajustes") return "APPROVAL";
-  if (art.includes("criacao") || art.includes("andamento")) return "ART";
+  if (art === "fila de arte" || art.includes("criacao") || art.includes("andamento")) return "ART";
   return "ENTRY";
 }
 
