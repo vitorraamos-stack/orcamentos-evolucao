@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { Bell, PackageCheck, Plus, RefreshCw, Truck } from "lucide-react";
 import { toast } from "sonner";
@@ -17,7 +17,9 @@ import {
   deliveryAction,
   loadDeliveryWorkspace,
   scheduleDelivery,
+  updateDelivery,
 } from "../repositories/deliveriesRepository";
+import { MutationInputDialog } from "@/shared/components/MutationInputDialog";
 import {
   DELIVERY_MODE_LABEL,
   DELIVERY_STATUS_LABEL,
@@ -38,9 +40,13 @@ export default function DeliveriesPage() {
     deliveries: Delivery[];
     orders: LogisticsOrder[];
     flow: any[];
-  }>({ deliveries: [], orders: [], flow: [] });
+    profiles: any[];
+  }>({ deliveries: [], orders: [], flow: [], profiles: [] });
   const [selected, setSelected] = useState<LogisticsOrder | null>(null);
   const [dialog, setDialog] = useState(false);
+  const [editing, setEditing] = useState<Delivery | null>(null);
+  const [mutation, setMutation] = useState<{ action: "cancel" | "complete"; delivery: Delivery } | null>(null);
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const load = useCallback(async () => {
     try {
       setData(await loadDeliveryWorkspace());
@@ -50,21 +56,23 @@ export default function DeliveriesPage() {
   }, []);
   useEffect(() => {
     void load();
+    const refresh = () => { if (refreshTimer.current) clearTimeout(refreshTimer.current); refreshTimer.current = setTimeout(() => void load(), 250); };
     const c = supabase
       .channel("phase4-deliveries")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "os_deliveries" },
-        () => setTimeout(load, 250)
+        refresh
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "hub_os_order_flow_state" },
-        () => setTimeout(load, 250)
+        refresh
       )
+      .on("postgres_changes", { event: "*", schema: "public", table: "os_orders" }, refresh)
       .subscribe();
     return () => {
-      void supabase.removeChannel(c);
+      if (refreshTimer.current) clearTimeout(refreshTimer.current); void supabase.removeChannel(c);
     };
   }, [load]);
   const active = new Set(
@@ -99,14 +107,7 @@ export default function DeliveriesPage() {
     toast.success("Retirada concluída e OS finalizada.");
     await load();
   };
-  const act = async (a: "start" | "complete" | "cancel", d: Delivery) => {
-    const extra =
-      a === "cancel"
-        ? (prompt("Motivo do cancelamento:") ?? "")
-        : a === "complete"
-          ? (prompt("Nome do recebedor (opcional):") ?? "")
-          : "";
-    if (a === "cancel" && !extra) return;
+  const act = async (a: "start" | "complete" | "cancel", d: Delivery, extra = "") => {
     await deliveryAction(a, d.id, extra);
     toast.success("Entrega atualizada.");
     await load();
@@ -160,6 +161,7 @@ export default function DeliveriesPage() {
                     <Button
                       onClick={() => {
                         setSelected(o);
+                        setEditing(null);
                         setDialog(true);
                       }}
                     >
@@ -253,6 +255,7 @@ export default function DeliveriesPage() {
                         Rastreio: {d.tracking_code || "—"}
                       </p>
                     )}
+                    {d.mode === "OWN_DELIVERY" && <p className="text-sm">Responsável: {data.profiles.find(p => p.id === d.assigned_to)?.name || "Não definido"} · Veículo: {d.vehicle_label || "Não definido"}</p>}
                     {hubPermissions.canManageDeliveries && (
                       <div className="flex flex-wrap gap-2">
                         {d.status === "SCHEDULED" && (
@@ -261,12 +264,13 @@ export default function DeliveriesPage() {
                             Despachar
                           </Button>
                         )}
-                        <Button onClick={() => act("complete", d)}>
+                        <Button variant="outline" onClick={() => { setEditing(d); setSelected(null); setDialog(true); }}>Editar detalhes</Button>
+                        <Button onClick={() => setMutation({ action: "complete", delivery: d })}>
                           Concluir
                         </Button>
                         <Button
                           variant="destructive"
-                          onClick={() => act("cancel", d)}
+                          onClick={() => setMutation({ action: "cancel", delivery: d })}
                         >
                           Cancelar
                         </Button>
@@ -311,14 +315,17 @@ export default function DeliveriesPage() {
       </Tabs>
       <DeliveryScheduleDialog
         order={selected}
+        delivery={editing}
+        profiles={data.profiles}
         open={dialog}
         onOpenChange={setDialog}
         onSave={async i => {
-          await scheduleDelivery(i);
+          if (editing) await updateDelivery(editing.id, i); else await scheduleDelivery(i);
           toast.success("Entrega agendada.");
           await load();
         }}
       />
+      <MutationInputDialog open={Boolean(mutation)} onOpenChange={v => { if (!v) setMutation(null); }} title={mutation?.action === "cancel" ? "Cancelar entrega" : "Concluir entrega"} label={mutation?.action === "cancel" ? "Motivo" : "Nome do recebedor (opcional)"} required={mutation?.action === "cancel"} confirmLabel={mutation?.action === "cancel" ? "Confirmar cancelamento" : "Concluir entrega"} onConfirm={async value => { if (mutation) await act(mutation.action, mutation.delivery, value); }} />
     </main>
   );
 }

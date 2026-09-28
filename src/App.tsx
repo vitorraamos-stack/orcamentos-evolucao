@@ -160,14 +160,14 @@ function Router() {
       <Route path="/instalacoes">
         <Layout>
           <RequireModule moduleKey="hub_os">
-            <InstallationsPage />
+            {hubPermissions.canViewInstallations ? <InstallationsPage /> : <Redirect to="/" />}
           </RequireModule>
         </Layout>
       </Route>
       <Route path="/entregas">
         <Layout>
           <RequireModule moduleKey="hub_os">
-            <DeliveriesPage />
+            {hubPermissions.canViewDeliveries ? <DeliveriesPage /> : <Redirect to="/" />}
           </RequireModule>
         </Layout>
       </Route>

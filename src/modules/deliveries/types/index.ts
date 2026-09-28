@@ -32,3 +32,4 @@ export type DeliveryInput = {
   trackingCode?: string | null;
   notes?: string | null;
 };
+export type DeliveryUpdateInput = Omit<DeliveryInput, "osId" | "mode">;

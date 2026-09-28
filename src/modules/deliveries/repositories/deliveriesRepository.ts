@@ -1,12 +1,12 @@
 import { supabase } from "@/lib/supabase";
 import { listOrderFlowState } from "@/modules/hub-os/order-flow-api";
 import type { LogisticsOrder } from "@/modules/installations/types";
-import type { Delivery, DeliveryInput } from "../types";
+import type { Delivery, DeliveryInput, DeliveryUpdateInput } from "../types";
 const fail = (e: { message: string } | null) => {
   if (e) throw new Error(e.message);
 };
 export async function loadDeliveryWorkspace() {
-  const [deliveries, orders, flow] = await Promise.all([
+  const [deliveries, orders, flow, profiles] = await Promise.all([
     supabase
       .from("os_deliveries")
       .select("*")
@@ -21,6 +21,7 @@ export async function loadDeliveryWorkspace() {
       .eq("archived", false)
       .limit(250),
     listOrderFlowState(),
+    supabase.from("profiles").select("id,name,email,role").in("role", ["gerente", "producao", "instalador"]),
   ]);
   fail(deliveries.error);
   fail(orders.error);
@@ -32,7 +33,17 @@ export async function loadDeliveryWorkspace() {
     })) as Delivery[],
     orders: (orders.data ?? []) as LogisticsOrder[],
     flow,
+    profiles: profiles.data ?? [],
   };
+}
+export async function updateDelivery(id: string, input: DeliveryUpdateInput) {
+  const { error } = await supabase.rpc("hub_os_update_delivery_secure", {
+    p_delivery_id: id, p_scheduled_at: input.scheduledAt ?? null,
+    p_assigned_to: input.assignedTo ?? null, p_vehicle_label: input.vehicleLabel ?? null,
+    p_carrier_name: input.carrierName ?? null, p_tracking_code: input.trackingCode ?? null,
+    p_notes: input.notes ?? null,
+  });
+  fail(error);
 }
 export async function scheduleDelivery(i: DeliveryInput) {
   const { error } = await supabase.rpc("hub_os_schedule_delivery_secure", {
