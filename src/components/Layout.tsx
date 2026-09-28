@@ -85,8 +85,8 @@ export default function Layout({ children }: LayoutProps) {
           {[
             ["/hub-os", "Dashboard", LayoutDashboard],
             ["/os", "Ordens de Serviço", ClipboardList],
-            ["/instalacoes", "Instalações", CalendarDays],
-            ["/entregas", "Entregas", Truck],
+            ...(hubPermissions.canViewInstallations ? [["/instalacoes", "Instalações", CalendarDays]] : []),
+            ...(hubPermissions.canViewDeliveries ? [["/entregas", "Entregas", Truck]] : []),
             ["/arquivos", "Arquivos", FolderOpen],
             ["/relatorios", "Relatórios", ChartNoAxesColumn],
           ].map(([href, label, Icon]) => (

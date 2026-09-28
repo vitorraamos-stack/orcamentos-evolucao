@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import {
   CalendarDays,
@@ -18,11 +18,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InstallationScheduleDialog } from "../components/InstallationScheduleDialog";
+import { InstallationTeamDialog } from "../components/InstallationTeamDialog";
 import {
   installationAction,
   loadInstallationWorkspace,
   rescheduleInstallation,
   saveTeam,
+  setTeamMembers,
   scheduleInstallation,
 } from "../repositories/installationsRepository";
 import {
@@ -35,7 +37,9 @@ import {
   isMyInstallation,
   isWaitingInstallation,
 } from "../services/installations";
+import { saoPauloDateKey } from "@/shared/lib/saoPauloTime";
 import type { Installation, InstallationTeam, LogisticsOrder } from "../types";
+import { MutationInputDialog } from "@/shared/components/MutationInputDialog";
 const Empty = ({ children }: { children: string }) => (
   <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
     {children}
@@ -54,12 +58,17 @@ export default function InstallationsPage() {
   const [selected, setSelected] = useState<LogisticsOrder | null>(null);
   const [editing, setEditing] = useState<Installation | null>(null);
   const [dialog, setDialog] = useState(false);
+  const [teamDialog, setTeamDialog] = useState(false);
+  const [cancelling, setCancelling] = useState<Installation | null>(null);
+  const [editingTeam, setEditingTeam] = useState<InstallationTeam | null>(null);
   const [routeResult, setRouteResult] = useState<any>(null);
   const [routeDate, setRouteDate] = useState(
     new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(
       new Date()
     )
   );
+  const [routeTeam, setRouteTeam] = useState("");
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -72,20 +81,24 @@ export default function InstallationsPage() {
   }, []);
   useEffect(() => {
     void load();
+    const refresh = () => { if (refreshTimer.current) clearTimeout(refreshTimer.current); refreshTimer.current = setTimeout(() => void load(), 250); };
     const channel = supabase
       .channel("phase4-installations")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "os_installations" },
-        () => setTimeout(load, 250)
+        refresh
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "os_installation_teams" },
-        () => setTimeout(load, 250)
+        refresh
       )
+      .on("postgres_changes", { event: "*", schema: "public", table: "os_installation_team_members" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "os_orders" }, refresh)
       .subscribe();
     return () => {
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
       void supabase.removeChannel(channel);
     };
   }, [load]);
@@ -112,10 +125,6 @@ export default function InstallationsPage() {
     i: Installation
   ) => {
     let reason;
-    if (action === "cancel") {
-      reason = window.prompt("Motivo do cancelamento:") ?? "";
-      if (!reason.trim()) return;
-    }
     try {
       await installationAction(action, i.id, reason);
       toast.success("Instalação atualizada.");
@@ -129,11 +138,10 @@ export default function InstallationsPage() {
       .filter(
         i =>
           i.status === "SCHEDULED" &&
-          new Intl.DateTimeFormat("en-CA", {
-            timeZone: "America/Sao_Paulo",
-          }).format(new Date(i.scheduled_start)) === routeDate
+          saoPauloDateKey(i.scheduled_start) === routeDate && i.team_id === routeTeam
       )
       .map(i => i.os_id);
+    if (!routeTeam) return toast.error("Selecione uma equipe.");
     if (!ids.length)
       return toast.error("Nenhuma instalação agendada para a seleção.");
     const {
@@ -210,6 +218,7 @@ export default function InstallationsPage() {
                           {i.team?.name ?? "Sem equipe"} ·{" "}
                           {i.vehicle_label ?? "Sem veículo"}
                         </p>
+                        <p className="text-sm">Responsável: {i.responsible?.name || i.responsible?.email || "Responsável não definido"}</p>
                         <p className="text-sm text-muted-foreground">
                           <MapPin className="mr-1 inline size-4" />
                           {i.address_snapshot || "Endereço não informado"}
@@ -271,7 +280,7 @@ export default function InstallationsPage() {
                             <Button
                               size="sm"
                               variant="destructive"
-                              onClick={() => act("cancel", i)}
+                              onClick={() => setCancelling(i)}
                             >
                               Cancelar
                             </Button>
@@ -332,13 +341,7 @@ export default function InstallationsPage() {
           <div className="mb-3 flex justify-end">
             {hubPermissions.canManageInstallations && (
               <Button
-                onClick={async () => {
-                  const name = prompt("Nome da equipe");
-                  if (name) {
-                    await saveTeam({ name });
-                    await load();
-                  }
-                }}
+                onClick={() => { setEditingTeam(null); setTeamDialog(true); }}
               >
                 <Users className="mr-2 size-4" />
                 Nova equipe
@@ -351,11 +354,14 @@ export default function InstallationsPage() {
                 <CardHeader>
                   <CardTitle>{t.name}</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <p>{t.default_vehicle_label || "Sem veículo padrão"}</p>
+                <CardContent className="space-y-2">
+                  <p>Veículo padrão: {t.default_vehicle_label || "Não definido"}</p>
                   <Badge variant={t.active ? "default" : "secondary"}>
                     {t.active ? "Ativa" : "Inativa"}
                   </Badge>
+                  <div><b className="text-sm">Líder:</b> {(() => { const m = data.members.find(m => m.team_id === t.id && m.is_lead); const p = data.profiles.find(p => p.id === m?.user_id); return p?.name || p?.email || "Não definido"; })()}</div>
+                  <div><b className="text-sm">Membros:</b> {data.members.filter(m => m.team_id === t.id).map(m => data.profiles.find(p => p.id === m.user_id)?.name || data.profiles.find(p => p.id === m.user_id)?.email).filter(Boolean).join(", ") || "Nenhum"}</div>
+                  {hubPermissions.canManageInstallations && <Button variant="outline" size="sm" onClick={() => { setEditingTeam(t); setTeamDialog(true); }}>Editar</Button>}
                 </CardContent>
               </Card>
             ))}
@@ -371,11 +377,13 @@ export default function InstallationsPage() {
                   value={routeDate}
                   onChange={e => setRouteDate(e.target.value)}
                 />
-                <Button onClick={optimize}>
+                <select className="h-10 rounded-md border bg-background px-3" value={routeTeam} onChange={e => setRouteTeam(e.target.value)}><option value="">Selecione a equipe *</option>{data.teams.filter(t => t.active).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+                {hubPermissions.canManageInstallations && <Button onClick={optimize} disabled={!routeTeam}>
                   <RouteIcon className="mr-2 size-4" />
                   Otimizar rota
-                </Button>
+                </Button>}
               </div>
+              {agenda.some(i => i.status === "SCHEDULED" && saoPauloDateKey(i.scheduled_start) === routeDate && !i.team_id) && <p className="text-sm text-amber-600">Existem instalações sem equipe definida.</p>}
               {routeResult?.groups
                 ?.flatMap((g: any) => g.routes)
                 .map((r: any) => (
@@ -424,6 +432,8 @@ export default function InstallationsPage() {
         order={selected}
         installation={editing}
         teams={data.teams}
+        members={data.members}
+        profiles={data.profiles}
         open={dialog}
         onOpenChange={setDialog}
         onSave={async input => {
@@ -433,6 +443,8 @@ export default function InstallationsPage() {
           await load();
         }}
       />
+      <InstallationTeamDialog open={teamDialog} onOpenChange={setTeamDialog} team={editingTeam} members={data.members} profiles={data.profiles} onSave={async (team, members) => { const saved = await saveTeam(team); const id = team.id ?? saved.id; await setTeamMembers(id, members); toast.success("Equipe salva."); await load(); }} />
+      <MutationInputDialog open={Boolean(cancelling)} onOpenChange={v => { if (!v) setCancelling(null); }} title="Cancelar instalação" label="Motivo" required confirmLabel="Confirmar cancelamento" onConfirm={async reason => { if (cancelling) await installationAction("cancel", cancelling.id, reason); toast.success("Instalação cancelada."); await load(); }} />
     </main>
   );
 }

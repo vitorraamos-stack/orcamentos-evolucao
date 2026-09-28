@@ -9,7 +9,8 @@ export const INSTALLATION_STATUS_LABEL: Record<InstallationStatus, string> = {
   COMPLETED: "Concluída",
   CANCELLED: "Cancelada",
 };
-export const SAO_PAULO_TIME_ZONE = "America/Sao_Paulo";
+import { SAO_PAULO_TIME_ZONE, saoPauloDateKey } from "@/shared/lib/saoPauloTime";
+export { SAO_PAULO_TIME_ZONE };
 export const formatAgendaDate = (iso: string) =>
   new Intl.DateTimeFormat("pt-BR", {
     timeZone: SAO_PAULO_TIME_ZONE,
@@ -36,12 +37,7 @@ export const buildMapsUrl = (i: {
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(i.lat != null && i.lng != null ? `${i.lat},${i.lng}` : (i.address ?? ""))}`;
 export function groupInstallationsByDay(rows: Installation[]) {
   return rows.reduce<Record<string, Installation[]>>((groups, row) => {
-    const day = new Intl.DateTimeFormat("en-CA", {
-      timeZone: SAO_PAULO_TIME_ZONE,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date(row.scheduled_start));
+    const day = saoPauloDateKey(row.scheduled_start);
     (groups[day] ??= []).push(row);
     return groups;
   }, {});

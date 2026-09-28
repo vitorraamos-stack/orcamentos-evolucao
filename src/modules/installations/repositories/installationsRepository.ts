@@ -70,7 +70,7 @@ export async function rescheduleInstallation(
   id: string,
   i: Omit<InstallationScheduleInput, "osId">
 ) {
-  const { error } = await supabase.rpc(
+  const { data, error } = await supabase.rpc(
     "hub_os_reschedule_installation_secure",
     {
       p_installation_id: id,
@@ -85,6 +85,7 @@ export async function rescheduleInstallation(
     }
   );
   fail(error);
+  return data;
 }
 export async function installationAction(
   action: "start" | "complete" | "cancel",
@@ -113,7 +114,7 @@ export async function saveTeam(team: {
   const rpc = team.id
     ? "hub_os_update_installation_team_secure"
     : "hub_os_create_installation_team_secure";
-  const { error } = await supabase.rpc(
+  const { data, error } = await supabase.rpc(
     rpc,
     team.id
       ? {
@@ -130,6 +131,7 @@ export async function saveTeam(team: {
         }
   );
   fail(error);
+  return data as InstallationTeam;
 }
 export async function setTeamMembers(
   teamId: string,
