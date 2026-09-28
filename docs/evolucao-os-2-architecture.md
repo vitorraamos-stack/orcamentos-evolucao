@@ -291,3 +291,9 @@ Uma operação tem responsável próprio e pode estar pendente, em andamento, co
 No avanço para Acabamento, operações produtivas obrigatórias (exceto `FINISHING_QC`) precisam estar concluídas. Para Material Pronto, toda operação obrigatória ativa de item não cancelado precisa estar concluída. Esses guards são server-side. OS antigas sem nenhuma operação conservam o fluxo legado, permitindo implantação gradual.
 
 A modelagem por item explicita responsabilidade e progresso sem introduzir MRP, estoque, custos, capacidade ou templates automáticos. Ela deixa uma fronteira limpa para a Fase 4 consumir materiais prontos em instalação/entrega, sem antecipar agenda, equipes, rotas ou veículos.
+
+## Fase 3.2.1a — Estabilização das Operações Internas
+
+O estado derivado do item passa a considerar o estado **atual** das operações, sem tratar `started_at` histórico como trabalho ativo. Itens cancelados permanecem cancelados e itens sem operações não são alterados. Havendo operação `IN_PROGRESS` ou `BLOCKED`, o item fica `IN_PROGRESS`; fora disso, fica `READY` quando não há operação obrigatória incompleta (inclusive quando todas são opcionais), ou `PENDING` quando ainda há obrigatória pendente. Assim, opcionais `PENDING` ou `COMPLETED` não impedem prontidão, enquanto opcionais efetivamente em andamento ou bloqueadas impedem.
+
+Operações existentes podem ser editadas pela RPC segura já existente, somente nos campos setor, responsável (inclusive remoção), obrigatoriedade e observação; status mantém suas ações próprias. Toda criação, edição, mudança de status ou exclusão recarrega operações e itens em paralelo, refletindo imediatamente o recompute sem skeleton de página inteira. A navegação também distingue explicitamente a Central de OS das rotas reservadas de Arte, Produção e kiosk. Realtime próprio do detalhe permanece uma evolução futura; o refresh após mutações locais cobre esta estabilização.

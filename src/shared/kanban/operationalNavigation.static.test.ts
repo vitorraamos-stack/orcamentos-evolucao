@@ -29,6 +29,5 @@ describe("Fase 3.2 operational navigation", () => {
     expect(layout).not.toContain('"Aprovações"');
     expect(layout).not.toContain('"Quadro Geral"');
     expect(layout).not.toContain('"Produção Externa"');
-    expect(layout).toContain('location === "/os" || /^\\/os\\/[^/]+$/.test(location)');
   });
 });
