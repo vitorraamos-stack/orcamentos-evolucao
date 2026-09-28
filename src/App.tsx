@@ -168,22 +168,10 @@ function Router() {
       ))}
 
       <Route path="/os/arte/aprovacoes">
-        <Layout>
-          <RequireModule moduleKey="hub_os">
-            <HubOsAccessGuard scope="arte">
-              <ArtworkBoardPage preset="approvals" />
-            </HubOsAccessGuard>
-          </RequireModule>
-        </Layout>
+        <Redirect to="/os/arte" />
       </Route>
       <Route path="/os/arte/revisoes">
-        <Layout>
-          <RequireModule moduleKey="hub_os">
-            <HubOsAccessGuard scope="arte">
-              <ArtworkBoardPage preset="revisions" />
-            </HubOsAccessGuard>
-          </RequireModule>
-        </Layout>
+        <Redirect to="/os/arte" />
       </Route>
       <Route path="/os/arte">
         <Layout>
@@ -195,23 +183,12 @@ function Router() {
         </Layout>
       </Route>
 
-      {(
-        [
-          ["/os/producao/impressao", "printing"],
-          ["/os/producao/acabamento", "finishing"],
-          ["/os/producao/letra-caixa", "lettering"],
-          ["/os/producao/externa", "external"],
-          ["/os/producao/pronto", "ready"],
-        ] as const
-      ).map(([path, preset]) => (
+      {[
+        "/os/producao/impressao", "/os/producao/acabamento",
+        "/os/producao/letra-caixa", "/os/producao/externa", "/os/producao/pronto",
+      ].map(path => (
         <Route key={path} path={path}>
-          <Layout>
-            <RequireModule moduleKey="hub_os">
-              <HubOsAccessGuard scope="producao">
-                <ProductionBoardPage preset={preset} />
-              </HubOsAccessGuard>
-            </RequireModule>
-          </Layout>
+          <Redirect to="/os/producao" />
         </Route>
       ))}
       <Route path="/os/producao">

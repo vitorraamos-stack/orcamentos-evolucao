@@ -4,6 +4,7 @@ import type { BoardCardModel, BoardFiltersState, BoardStatus } from "./types";
 
 export const ART_BOARD_COLUMNS: ArtStatus[] = [
   "Caixa de Entrada",
+  "Fila de Arte",
   "Em Criação",
   "Para Aprovação",
   "Ajustes",
@@ -13,9 +14,6 @@ export const PRODUCTION_BOARD_COLUMNS: ProdStatus[] = [
   "Produção",
   "Em Acabamento",
   "Pronto / Avisar Cliente",
-  "Logística (Entrega/Transportadora)",
-  "Instalação Agendada",
-  "Finalizados",
 ];
 
 export function cardStatus(

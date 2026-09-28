@@ -11,12 +11,12 @@ export function calculateBoardMetrics(
   if (board === "art")
     return [
       metric(
-        "Em Criação",
+        "Em Arte",
         cards,
         card => card.order.art_status === "Em Criação"
       ),
       metric(
-        "Para Aprovação",
+        "Aguardando Aprovação",
         cards,
         card => card.order.art_status === "Para Aprovação"
       ),
@@ -29,9 +29,9 @@ export function calculateBoardMetrics(
       metric("Atrasadas", cards, card => isOrderOverdue(card.order)),
     ];
   return [
-    metric("Produção", cards, card => card.order.prod_status === "Produção"),
+    metric("Em Produção", cards, card => card.order.prod_status === "Produção"),
     metric(
-      "Acabamento",
+      "Acabamento / Conferência",
       cards,
       card => card.order.prod_status === "Em Acabamento"
     ),
@@ -41,7 +41,7 @@ export function calculateBoardMetrics(
       card => card.order.production_tag === "AGUARDANDO_INSUMOS"
     ),
     metric(
-      "Prontos",
+      "Material Pronto",
       cards,
       card => card.order.prod_status === "Pronto / Avisar Cliente"
     ),

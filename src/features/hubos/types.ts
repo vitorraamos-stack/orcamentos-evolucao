@@ -16,6 +16,7 @@ export type DeliveryDeadlinePreset =
 
 export type ArtStatus =
   | "Caixa de Entrada"
+  | "Fila de Arte"
   | "Em Criação"
   | "Para Aprovação"
   | "Ajustes"

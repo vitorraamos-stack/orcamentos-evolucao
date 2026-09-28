@@ -1,13 +1,15 @@
 import { useDroppable } from "@dnd-kit/core";
 import { Badge } from "@/components/ui/badge";
 import type { ReactNode } from "react";
+import { getOperationalStatusLabel } from "./statusLabels";
+import type { BoardStatus } from "./types";
 
 export function BoardColumn({
   status,
   count,
   children,
 }: {
-  status: string;
+  status: BoardStatus;
   count: number;
   children: ReactNode;
 }) {
@@ -18,7 +20,7 @@ export function BoardColumn({
       className={`w-[300px] shrink-0 rounded-xl bg-muted/45 p-3 ${drop.isOver ? "ring-2 ring-primary/40" : ""}`}
     >
       <header className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">{status}</h2>
+        <h2 className="text-sm font-semibold">{getOperationalStatusLabel(status)}</h2>
         <Badge variant="secondary">{count}</Badge>
       </header>
       <div className="space-y-3">
