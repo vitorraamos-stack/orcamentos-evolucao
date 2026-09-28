@@ -22,6 +22,7 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { getRoleLabel } from "@/lib/hubRoles";
+import { getOperationalNavState } from "./operationalNavState";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -38,6 +39,7 @@ export default function Layout({ children }: LayoutProps) {
     hasModuleAccess,
   } = useAuth();
   const [location, setLocation] = useLocation();
+  const operationalNav = getOperationalNavState(location);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -95,7 +97,7 @@ export default function Layout({ children }: LayoutProps) {
                     href === "/hub-os"
                       ? location === href
                       : href === "/os"
-                        ? location === "/os" || /^\/os\/[^/]+$/.test(location)
+                        ? operationalNav.orders
                         : location.startsWith(href as string)
                   )
                     ? "secondary"
@@ -106,7 +108,7 @@ export default function Layout({ children }: LayoutProps) {
                   (href === "/hub-os"
                     ? location === href
                     : href === "/os"
-                      ? location === "/os" || /^\/os\/[^/]+$/.test(location)
+                      ? operationalNav.orders
                       : location.startsWith(href as string)) &&
                     "bg-sidebar-accent text-sidebar-accent-foreground"
                 )}
@@ -122,8 +124,8 @@ export default function Layout({ children }: LayoutProps) {
           ] as const).map(([href, label, Icon]) => (
             <Link href={href} key={href}>
               <Button
-                variant={location.startsWith(href as string) ? "secondary" : "ghost"}
-                className="w-full justify-start"
+                variant={(href === "/os/arte" ? operationalNav.art : operationalNav.production) ? "secondary" : "ghost"}
+                className={cn("w-full justify-start", (href === "/os/arte" ? operationalNav.art : operationalNav.production) && "bg-sidebar-accent text-sidebar-accent-foreground")}
               >
                 <Icon className="mr-2 h-4 w-4" />
                 {label}
