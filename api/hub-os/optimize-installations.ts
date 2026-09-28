@@ -99,7 +99,9 @@ function isValidDate(value: unknown): value is string {
 
 function isParsableIsoDate(value: string) {
   const date = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  return (
+    !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+  );
 }
 
 function haversineDistanceKm(a: [number, number], b: [number, number]) {
@@ -188,9 +190,7 @@ function buildGoogleMapsUrl(
 
   // With explicit start we can keep all stops except destination as waypoints.
   // Without explicit start, first stop is the origin and must not be duplicated in waypoints.
-  const waypointStops = startCoords
-    ? stops.slice(0, -1)
-    : stops.slice(1, -1);
+  const waypointStops = startCoords ? stops.slice(0, -1) : stops.slice(1, -1);
 
   const waypoints = waypointStops.map(
     stop => `${stop.coords[1]},${stop.coords[0]}`
@@ -241,17 +241,27 @@ function parseRequestBody(
   }
 
   if (payload.dateFrom && payload.dateTo && payload.dateFrom > payload.dateTo) {
-    throw new InputValidationError("dateFrom deve ser menor ou igual a dateTo.");
+    throw new InputValidationError(
+      "dateFrom deve ser menor ou igual a dateTo."
+    );
   }
 
   const dateWindowDays = Number(payload.dateWindowDays ?? 1);
   const geoClusterRadiusKm = Number(payload.geoClusterRadiusKm ?? 5);
   const maxStopsPerRoute = Number(payload.maxStopsPerRoute ?? 20);
-  if (payload.orderIds !== undefined && payload.orderIds !== null && !Array.isArray(payload.orderIds)) {
+  if (
+    payload.orderIds !== undefined &&
+    payload.orderIds !== null &&
+    !Array.isArray(payload.orderIds)
+  ) {
     throw new InputValidationError("orderIds inválido. Use array de strings.");
   }
 
-  if (payload.startAddress !== undefined && payload.startAddress !== null && typeof payload.startAddress !== "string") {
+  if (
+    payload.startAddress !== undefined &&
+    payload.startAddress !== null &&
+    typeof payload.startAddress !== "string"
+  ) {
     throw new InputValidationError("startAddress inválido. Use string.");
   }
 
@@ -259,13 +269,17 @@ function parseRequestBody(
     ? Array.from(
         new Set(
           payload.orderIds
-            .map((value) => (typeof value === "string" ? value.trim() : ""))
-            .filter((value) => value.length > 0)
+            .map(value => (typeof value === "string" ? value.trim() : ""))
+            .filter(value => value.length > 0)
         )
       )
     : null;
 
-  if (!Number.isFinite(dateWindowDays) || dateWindowDays < 0 || dateWindowDays > MAX_DATE_WINDOW_DAYS) {
+  if (
+    !Number.isFinite(dateWindowDays) ||
+    dateWindowDays < 0 ||
+    dateWindowDays > MAX_DATE_WINDOW_DAYS
+  ) {
     throw new InputValidationError(
       `dateWindowDays inválido. Use valor entre 0 e ${MAX_DATE_WINDOW_DAYS}.`
     );
@@ -301,15 +315,19 @@ function parseRequestBody(
     payload.startCoords &&
     (!Array.isArray(payload.startCoords) ||
       payload.startCoords.length !== 2 ||
-      !payload.startCoords.every((value) => Number.isFinite(value)))
+      !payload.startCoords.every(value => Number.isFinite(value)))
   ) {
-    throw new InputValidationError("startCoords inválido. Use [longitude, latitude].");
+    throw new InputValidationError(
+      "startCoords inválido. Use [longitude, latitude]."
+    );
   }
 
   if (payload.startCoords) {
     const [lng, lat] = payload.startCoords;
     if (lng < -180 || lng > 180 || lat < -90 || lat > 90) {
-      throw new InputValidationError("startCoords fora do intervalo permitido de longitude/latitude.");
+      throw new InputValidationError(
+        "startCoords fora do intervalo permitido de longitude/latitude."
+      );
     }
   }
 
@@ -326,14 +344,21 @@ function parseRequestBody(
   };
 }
 
-async function fetchWithTimeout(input: string, init: RequestInit, timeoutMs = ORS_TIMEOUT_MS) {
+async function fetchWithTimeout(
+  input: string,
+  init: RequestInit,
+  timeoutMs = ORS_TIMEOUT_MS
+) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(input, { ...init, signal: controller.signal });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      throw new TimeoutExternalError("external", `Request timeout after ${timeoutMs}ms`);
+      throw new TimeoutExternalError(
+        "external",
+        `Request timeout after ${timeoutMs}ms`
+      );
     }
     throw error;
   } finally {
@@ -369,7 +394,10 @@ async function requireAdminAuth(req: any, res: any, supabaseAdmin: any) {
     .maybeSingle();
 
   if (profileError) {
-    json(res, 403, { stage: "auth", error: "Não foi possível validar permissões." });
+    json(res, 403, {
+      stage: "auth",
+      error: "Não foi possível validar permissões.",
+    });
     return null;
   }
 
@@ -409,7 +437,10 @@ async function geocodeORS(
 
     const response = await fetchWithTimeout(url.toString(), { method: "GET" });
     if (!response.ok) {
-      throw new ExternalServiceError("geocode", `ORS geocode failed (${response.status})`);
+      throw new ExternalServiceError(
+        "geocode",
+        `ORS geocode failed (${response.status})`
+      );
     }
 
     const data = (await response.json()) as {
@@ -424,8 +455,9 @@ async function geocodeORS(
       if (!coords || coords.length < 2) continue;
 
       const confidence = feature.properties?.confidence ?? 0;
-      const distancePenalty =
-        focusCoords ? haversineDistanceKm(focusCoords, coords) * 0.5 : 0;
+      const distancePenalty = focusCoords
+        ? haversineDistanceKm(focusCoords, coords) * 0.5
+        : 0;
       const score = confidence * 100 - distancePenalty;
 
       if (score > bestScore) {
@@ -436,7 +468,10 @@ async function geocodeORS(
   }
 
   if (!bestCoords) {
-    throw new ExternalServiceError("geocode", "ORS geocode did not return coordinates");
+    throw new ExternalServiceError(
+      "geocode",
+      "ORS geocode did not return coordinates"
+    );
   }
 
   console.log("[hub-os/optimize-installations]", {
@@ -588,7 +623,10 @@ async function optimizeWithORS(
   });
 
   if (!response.ok) {
-    throw new ExternalServiceError("optimization", `ORS optimization failed (${response.status})`);
+    throw new ExternalServiceError(
+      "optimization",
+      `ORS optimization failed (${response.status})`
+    );
   }
 
   const data = (await response.json()) as {
@@ -632,7 +670,6 @@ async function optimizeWithORS(
   };
 }
 
-
 async function fetchDirectionsSummary(
   coordinates: Array<[number, number]>,
   profile: string,
@@ -642,11 +679,11 @@ async function fetchDirectionsSummary(
   const startedAt = Date.now();
 
   const url = new URL(`${ORS_BASE_URL}/v2/directions/${profile}`);
-  url.searchParams.set('api_key', orsApiKey);
+  url.searchParams.set("api_key", orsApiKey);
 
   const response = await fetchWithTimeout(url.toString(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       coordinates,
       instructions: false,
@@ -654,7 +691,10 @@ async function fetchDirectionsSummary(
   });
 
   if (!response.ok) {
-    throw new ExternalServiceError("directions_summary", `ORS directions failed (${response.status})`);
+    throw new ExternalServiceError(
+      "directions_summary",
+      `ORS directions failed (${response.status})`
+    );
   }
 
   const payload = (await response.json()) as {
@@ -665,8 +705,8 @@ async function fetchDirectionsSummary(
   if (!summary) return null;
 
   const summaryData = {
-    distance_m: typeof summary.distance === 'number' ? summary.distance : null,
-    duration_s: typeof summary.duration === 'number' ? summary.duration : null,
+    distance_m: typeof summary.distance === "number" ? summary.distance : null,
+    duration_s: typeof summary.duration === "number" ? summary.duration : null,
   };
 
   console.log("[hub-os/optimize-installations]", {
@@ -704,7 +744,8 @@ export default async function handler(req: any, res: any) {
   try {
     parsed = parseRequestBody(req.body);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Payload inválido.";
+    const message =
+      error instanceof Error ? error.message : "Payload inválido.";
     const status = /excede o limite/i.test(message) ? 413 : 400;
     return json(res, status, {
       stage: "input",
@@ -715,7 +756,11 @@ export default async function handler(req: any, res: any) {
   let resolvedStartCoords = parsed.startCoords;
   if (!resolvedStartCoords && parsed.startAddress) {
     try {
-      resolvedStartCoords = await geocodeORS(parsed.startAddress, orsApiKey, null);
+      resolvedStartCoords = await geocodeORS(
+        parsed.startAddress,
+        orsApiKey,
+        null
+      );
     } catch (error) {
       console.warn("[hub-os/optimize-installations] start geocode failed", {
         stage: "geocode_start",
@@ -741,9 +786,13 @@ export default async function handler(req: any, res: any) {
       .eq("archived", false)
       .order("delivery_date", { ascending: true });
 
-    if (parsed.dateFrom) query = query.gte("delivery_date", parsed.dateFrom);
-    if (parsed.dateTo) query = query.lte("delivery_date", parsed.dateTo);
-    if (parsed.orderIds && parsed.orderIds.length > 0) {
+    // Explicit agenda selections are authoritative. scheduled_start belongs to
+    // os_installations, so delivery_date must not silently discard selected OSs.
+    if (!parsed.orderIds?.length && parsed.dateFrom)
+      query = query.gte("delivery_date", parsed.dateFrom);
+    if (!parsed.orderIds?.length && parsed.dateTo)
+      query = query.lte("delivery_date", parsed.dateTo);
+    if (parsed.orderIds?.length) {
       query = query.in("id", parsed.orderIds);
     }
 
@@ -791,14 +840,21 @@ export default async function handler(req: any, res: any) {
         order.address_lng !== null &&
         order.address_lat !== null
       ) {
-        const cachedCoords: [number, number] = [order.address_lng, order.address_lat];
+        const cachedCoords: [number, number] = [
+          order.address_lng,
+          order.address_lat,
+        ];
         geocodeCache.set(address, cachedCoords);
         return cachedCoords;
       }
 
       try {
         const geocodeStartedAt = Date.now();
-        const coords = await geocodeORS(address, orsApiKey, resolvedStartCoords);
+        const coords = await geocodeORS(
+          address,
+          orsApiKey,
+          resolvedStartCoords
+        );
         geocodeMetrics.totalCalls += 1;
         geocodeMetrics.externalMs += getElapsedMs(geocodeStartedAt);
         geocodeCache.set(address, coords);
@@ -813,11 +869,14 @@ export default async function handler(req: any, res: any) {
           })
           .eq("id", order.id);
         if (updateGeocodeError) {
-          console.warn("[hub-os/optimize-installations] geocode cache update failed", {
-            stage: "db_update",
-            osId: order.id,
-            message: updateGeocodeError.message,
-          });
+          console.warn(
+            "[hub-os/optimize-installations] geocode cache update failed",
+            {
+              stage: "db_update",
+              osId: order.id,
+              message: updateGeocodeError.message,
+            }
+          );
         }
 
         return coords;
@@ -914,7 +973,10 @@ export default async function handler(req: any, res: any) {
                 routeStops,
                 resolvedStartCoords
               ),
-              summary: estimateSummaryFromStops(routeStops, resolvedStartCoords),
+              summary: estimateSummaryFromStops(
+                routeStops,
+                resolvedStartCoords
+              ),
               source: "fallback",
             };
           }
@@ -939,8 +1001,14 @@ export default async function handler(req: any, res: any) {
             ...stops.map(stop => stop.coords),
           ];
 
-          let directionsSummary: { distance_m: number | null; duration_s: number | null } | null = null;
-          if (optimized.summary.distance_m !== null && optimized.summary.duration_s !== null) {
+          let directionsSummary: {
+            distance_m: number | null;
+            duration_s: number | null;
+          } | null = null;
+          if (
+            optimized.summary.distance_m !== null &&
+            optimized.summary.duration_s !== null
+          ) {
             directionsSummary = optimized.summary;
           } else {
             try {
@@ -950,12 +1018,18 @@ export default async function handler(req: any, res: any) {
                 orsApiKey
               );
             } catch (error) {
-              const fallbackReason = error instanceof TimeoutExternalError ? "directions_timeout" : "directions_unavailable";
-              console.warn("[hub-os/optimize-installations] directions summary failed", {
-                stage: "directions_summary",
-                fallbackReason,
-                message: error instanceof Error ? error.message : "unknown",
-              });
+              const fallbackReason =
+                error instanceof TimeoutExternalError
+                  ? "directions_timeout"
+                  : "directions_unavailable";
+              console.warn(
+                "[hub-os/optimize-installations] directions summary failed",
+                {
+                  stage: "directions_summary",
+                  fallbackReason,
+                  message: error instanceof Error ? error.message : "unknown",
+                }
+              );
             }
           }
 
@@ -986,24 +1060,29 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    const { error: eventError } = await supabaseAdmin.from("os_orders_event").insert({
-      os_id: geocoded[0]?.os.id ?? orders[0]?.id,
-      type: "route_optimized",
-      created_by: currentUser.id,
-      payload: {
-        paramsUsed: { ...parsed, startCoords: resolvedStartCoords ?? null },
-        totalCandidates: orders.length,
-        geocoded: geocoded.length,
-        unassigned: unassigned.length,
-        groups: groups.length,
-        routes: totalRoutes,
-      },
-    });
-    if (eventError) {
-      console.warn("[hub-os/optimize-installations] route_optimized event insert failed", {
-        stage: "db_update",
-        message: eventError.message,
+    const { error: eventError } = await supabaseAdmin
+      .from("os_orders_event")
+      .insert({
+        os_id: geocoded[0]?.os.id ?? orders[0]?.id,
+        type: "route_optimized",
+        created_by: currentUser.id,
+        payload: {
+          paramsUsed: { ...parsed, startCoords: resolvedStartCoords ?? null },
+          totalCandidates: orders.length,
+          geocoded: geocoded.length,
+          unassigned: unassigned.length,
+          groups: groups.length,
+          routes: totalRoutes,
+        },
       });
+    if (eventError) {
+      console.warn(
+        "[hub-os/optimize-installations] route_optimized event insert failed",
+        {
+          stage: "db_update",
+          message: eventError.message,
+        }
+      );
     }
 
     const elapsedMs = Date.now() - startedAt;
@@ -1034,7 +1113,11 @@ export default async function handler(req: any, res: any) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro inesperado.";
     const isTimeout = error instanceof TimeoutExternalError;
-    const stage = error instanceof ExternalServiceError || error instanceof TimeoutExternalError ? error.stage : "optimization";
+    const stage =
+      error instanceof ExternalServiceError ||
+      error instanceof TimeoutExternalError
+        ? error.stage
+        : "optimization";
     return json(res, isTimeout ? 504 : 502, {
       stage,
       error: `Falha na otimização ORS: ${message}`,

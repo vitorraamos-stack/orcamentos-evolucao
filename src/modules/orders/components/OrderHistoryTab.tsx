@@ -1,6 +1,18 @@
 import type { OrderActivity } from "../types/orderDetail";
-import { WORK_CENTER_LABELS, type WorkCenter } from "@/modules/production/operations";
+import {
+  WORK_CENTER_LABELS,
+  type WorkCenter,
+} from "@/modules/production/operations";
 const labels: Record<string, string> = {
+  INSTALLATION_SCHEDULED: "Instalação agendada",
+  INSTALLATION_RESCHEDULED: "Instalação reagendada",
+  INSTALLATION_STARTED: "Instalação iniciada",
+  INSTALLATION_COMPLETED: "Instalação concluída",
+  INSTALLATION_CANCELLED: "Instalação cancelada",
+  DELIVERY_SCHEDULED: "Entrega agendada",
+  DELIVERY_STARTED: "Entrega em trânsito",
+  DELIVERY_COMPLETED: "Entrega concluída",
+  DELIVERY_CANCELLED: "Entrega cancelada",
   deadline_changed: "Prazo alterado",
   deadline_completed: "Prazo concluído",
   deadline_reopened: "Prazo reaberto",
@@ -32,14 +44,20 @@ export function formatOrderActivity(
 ) {
   const { scope, from, to, name, due_date } = activity.payload;
   if (activity.type.startsWith("ITEM_OPERATION_")) {
-    const center = WORK_CENTER_LABELS[activity.payload.work_center as WorkCenter] ?? "Operação";
-    if (activity.type === "ITEM_OPERATION_CREATED") return `${center} adicionada ao item.`;
-    if (activity.type === "ITEM_OPERATION_DELETED") return `${center} removida do item.`;
-    if (activity.type === "ITEM_OPERATION_UPDATED") return `${center} atualizada.`;
+    const center =
+      WORK_CENTER_LABELS[activity.payload.work_center as WorkCenter] ??
+      "Operação";
+    if (activity.type === "ITEM_OPERATION_CREATED")
+      return `${center} adicionada ao item.`;
+    if (activity.type === "ITEM_OPERATION_DELETED")
+      return `${center} removida do item.`;
+    if (activity.type === "ITEM_OPERATION_UPDATED")
+      return `${center} atualizada.`;
     const status = String(activity.payload.to_status);
     if (status === "IN_PROGRESS") return `${center} iniciada ou retomada.`;
     if (status === "COMPLETED") return `${center} concluída.`;
-    if (status === "BLOCKED") return `${center} bloqueada: ${String(activity.payload.blocked_reason)}`;
+    if (status === "BLOCKED")
+      return `${center} bloqueada: ${String(activity.payload.blocked_reason)}`;
     return `${center} voltou para pendente.`;
   }
   if (activity.type === "assignee_changed")
