@@ -20,6 +20,8 @@ import FinanceiroPortalPage from "@/modules/hub-os/pages/FinanceiroPortalPage";
 import OperationalDashboardPage from "@/modules/dashboard/OperationalDashboardPage";
 import OrdersCentralPage from "@/modules/orders/pages/OrdersCentralPage";
 import ModulePlaceholderPage from "@/shared/components/ModulePlaceholderPage";
+import InstallationsPage from "@/modules/installations/pages/InstallationsPage";
+import DeliveriesPage from "@/modules/deliveries/pages/DeliveriesPage";
 import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -155,7 +157,22 @@ function Router() {
         </Layout>
       </Route>
 
-      {["instalacoes", "entregas", "arquivos", "relatorios"].map(module => (
+      <Route path="/instalacoes">
+        <Layout>
+          <RequireModule moduleKey="hub_os">
+            <InstallationsPage />
+          </RequireModule>
+        </Layout>
+      </Route>
+      <Route path="/entregas">
+        <Layout>
+          <RequireModule moduleKey="hub_os">
+            <DeliveriesPage />
+          </RequireModule>
+        </Layout>
+      </Route>
+
+      {["arquivos", "relatorios"].map(module => (
         <Route key={module} path={`/${module}`}>
           <Layout>
             <RequireModule moduleKey="hub_os">
@@ -184,8 +201,11 @@ function Router() {
       </Route>
 
       {[
-        "/os/producao/impressao", "/os/producao/acabamento",
-        "/os/producao/letra-caixa", "/os/producao/externa", "/os/producao/pronto",
+        "/os/producao/impressao",
+        "/os/producao/acabamento",
+        "/os/producao/letra-caixa",
+        "/os/producao/externa",
+        "/os/producao/pronto",
       ].map(path => (
         <Route key={path} path={path}>
           <Redirect to="/os/producao" />
