@@ -10,23 +10,17 @@ import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
+import { ArtworkHandoffDialog } from "@/modules/artwork/components/ArtworkHandoffDialog";
+import {
+  listArtworkAssignees,
+  listArtworkBoardOrders,
+} from "@/modules/artwork/repositories/artworkRepository";
+import { ProductionTagDialog } from "@/modules/production/components/ProductionTagDialog";
+import {
+  listProductionAssignees,
+  listProductionBoardOrders,
+} from "@/modules/production/repositories/productionRepository";
 import {
   returnOrderToArt,
   setProductionTag,
@@ -36,7 +30,6 @@ import type {
   DeliveryDeadlinePreset,
   ProductionTag,
 } from "@/features/hubos/types";
-import { DELIVERY_DEADLINE_PRESET_CONFIG } from "@/features/hubos/deliveryDeadlineConfig";
 import { getValidOrderTransitions } from "@/modules/orders/services/orderTransitions";
 import { BoardCard } from "./BoardCard";
 import { BoardColumn } from "./BoardColumn";
@@ -50,10 +43,11 @@ import {
   groupBoardCards,
   PRODUCTION_BOARD_COLUMNS,
 } from "./boardDomain";
-import { listBoardAssignees, listBoardOrders } from "./boardRepository";
 import { moveBoardOrder } from "./boardService";
+import { calculateBoardMetrics } from "./boardMetrics";
 import {
   EMPTY_BOARD_FILTERS,
+  type BoardAssignee,
   type BoardCardModel,
   type BoardFiltersState,
   type BoardKind,
@@ -70,9 +64,7 @@ export function OperationalBoard({
 }) {
   const { user, hubRole, hubPermissions } = useAuth();
   const [cards, setCards] = useState<BoardCardModel[]>([]),
-    [assignees, setAssignees] = useState<
-      Awaited<ReturnType<typeof listBoardAssignees>>
-    >([]);
+    [assignees, setAssignees] = useState<BoardAssignee[]>([]);
   const [filters, setFilters] =
       useState<BoardFiltersState>(EMPTY_BOARD_FILTERS),
     [loading, setLoading] = useState(true),
@@ -103,8 +95,10 @@ export function OperationalBoard({
       if (!silent) setLoading(true);
       try {
         const [nextCards, nextAssignees] = await Promise.all([
-          listBoardOrders(board),
-          listBoardAssignees(board),
+          board === "art"
+            ? listArtworkBoardOrders()
+            : listProductionBoardOrders(),
+          board === "art" ? listArtworkAssignees() : listProductionAssignees(),
         ]);
         setCards(nextCards);
         setAssignees(nextAssignees);
@@ -143,60 +137,10 @@ export function OperationalBoard({
     () => groupBoardCards(visible, board, columns),
     [visible, board, columns]
   );
-  const metrics =
-    board === "art"
-      ? [
-          {
-            label: "Em Criação",
-            count: cards.filter(c => c.order.art_status === "Em Criação")
-              .length,
-          },
-          {
-            label: "Para Aprovação",
-            count: cards.filter(c => c.order.art_status === "Para Aprovação")
-              .length,
-          },
-          {
-            label: "Ajustes",
-            count: cards.filter(c => c.order.art_status === "Ajustes").length,
-          },
-          {
-            label: "Urgentes",
-            count: cards.filter(c => c.order.art_direction_tag === "URGENTE")
-              .length,
-          },
-          {
-            label: "Atrasadas",
-            count: cards.filter(c => c.risk === "CRITICO").length,
-          },
-        ]
-      : [
-          {
-            label: "Produção",
-            count: cards.filter(c => c.order.prod_status === "Produção").length,
-          },
-          {
-            label: "Acabamento",
-            count: cards.filter(c => c.order.prod_status === "Em Acabamento")
-              .length,
-          },
-          {
-            label: "Aguardando insumos",
-            count: cards.filter(
-              c => c.order.production_tag === "AGUARDANDO_INSUMOS"
-            ).length,
-          },
-          {
-            label: "Prontos",
-            count: cards.filter(
-              c => c.order.prod_status === "Pronto / Avisar Cliente"
-            ).length,
-          },
-          {
-            label: "Atrasadas",
-            count: cards.filter(c => c.risk === "CRITICO").length,
-          },
-        ];
+  const metrics = useMemo(
+    () => calculateBoardMetrics(cards, board),
+    [cards, board]
+  );
   const performMove = async (
     card: BoardCardModel,
     to: BoardStatus,
@@ -411,108 +355,32 @@ export function OperationalBoard({
           ))}
         </div>
       </DndContext>
-      <Dialog
-        open={Boolean(handoff)}
-        onOpenChange={open => !open && setHandoff(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Prazo para Produção</DialogTitle>
-            <DialogDescription>
-              O handoff inicia Produção e o prazo no banco.
-            </DialogDescription>
-          </DialogHeader>
-          <Select
-            value={deadlinePreset}
-            onValueChange={value =>
-              setDeadlinePreset(value as DeliveryDeadlinePreset)
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione o prazo" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(DELIVERY_DEADLINE_PRESET_CONFIG).map(
-                ([value, config]) => (
-                  <SelectItem key={value} value={value}>
-                    {config.label}
-                  </SelectItem>
-                )
-              )}
-            </SelectContent>
-          </Select>
-          {deadlinePreset === "CUSTOM" && (
-            <Input
-              type="date"
-              value={manualDate}
-              onChange={event => setManualDate(event.target.value)}
-            />
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setHandoff(null)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => {
-                if (!handoff || !deadlinePreset) return;
-                const card = handoff;
-                setHandoff(null);
-                void performMove(card, "Produzir", {
-                  preset: deadlinePreset,
-                  manualDate,
-                });
-              }}
-            >
-              Enviar para Produção
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={Boolean(tagCard)}
-        onOpenChange={open => !open && setTagCard(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Tag de Produção</DialogTitle>
-            <DialogDescription>
-              A etapa não é alterada por esta condição operacional.
-            </DialogDescription>
-          </DialogHeader>
-          <Select
-            value={tag}
-            onValueChange={value => setTag(value as ProductionTag)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="EM_PRODUCAO">Em produção</SelectItem>
-              <SelectItem value="AGUARDANDO_INSUMOS">
-                Aguardando insumos
-              </SelectItem>
-              <SelectItem value="PRODUCAO_EXTERNA">Produção externa</SelectItem>
-              <SelectItem value="PRONTO">Pronto</SelectItem>
-            </SelectContent>
-          </Select>
-          {(tag === "AGUARDANDO_INSUMOS" ||
-            (tagCard?.order.production_tag === "AGUARDANDO_INSUMOS" &&
-              tag === "EM_PRODUCAO")) && (
-            <Input
-              placeholder={
-                tag === "AGUARDANDO_INSUMOS"
-                  ? "Qual material está faltando?"
-                  : "Como o insumo foi resolvido?"
-              }
-              value={insumos}
-              onChange={event => setInsumos(event.target.value)}
-            />
-          )}
-          <DialogFooter>
-            <Button onClick={() => void saveTag()}>Salvar tag</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ArtworkHandoffDialog
+        card={handoff}
+        preset={deadlinePreset}
+        manualDate={manualDate}
+        onPresetChange={setDeadlinePreset}
+        onManualDateChange={setManualDate}
+        onClose={() => setHandoff(null)}
+        onConfirm={() => {
+          if (!handoff || !deadlinePreset) return;
+          const card = handoff;
+          setHandoff(null);
+          void performMove(card, "Produzir", {
+            preset: deadlinePreset,
+            manualDate,
+          });
+        }}
+      />
+      <ProductionTagDialog
+        card={tagCard}
+        tag={tag}
+        details={insumos}
+        onTagChange={setTag}
+        onDetailsChange={setInsumos}
+        onClose={() => setTagCard(null)}
+        onSave={() => void saveTag()}
+      />
     </div>
   );
 }

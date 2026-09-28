@@ -229,6 +229,7 @@ export default function OrderDetailsDialog({
         );
       const updated = await sendOrderToProduction({
         orderId: order.id,
+        deadlinePreset: order.delivery_deadline_preset!,
         deadlineStartedAt: startedAt,
         deliveryDate,
       });

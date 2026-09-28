@@ -51,6 +51,7 @@ export async function moveBoardOrder(
       );
     return deps.sendOrderToProduction({
       orderId: input.order.id,
+      deadlinePreset: preset,
       deadlineStartedAt: startedAt,
       deliveryDate,
       eventPayload: {

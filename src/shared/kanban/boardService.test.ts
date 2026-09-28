@@ -88,6 +88,7 @@ describe("moveBoardOrder", () => {
     expect(sendOrderToProduction).toHaveBeenCalledWith(
       expect.objectContaining({
         orderId: order().id,
+        deadlinePreset: "CUSTOM",
         deliveryDate: "2026-10-10",
       })
     );
