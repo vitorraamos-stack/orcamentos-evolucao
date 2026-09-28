@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { OsOrder } from "@/features/hubos/types";
+import { getOperationalStatusLabel } from "@/shared/kanban/statusLabels";
 import { OrderRiskBadge } from "@/shared/components/OrderBadges";
 import { calculateOrderRisk } from "../risk";
 import type { OrderAssignee } from "../types/orderDetail";
@@ -17,9 +18,9 @@ export function OrderHeader({ order, assignees, canEdit, transitions, onEdit, on
       <div className="min-w-0 space-y-2">
         <p className="text-sm font-semibold text-muted-foreground">OS #{order.os_number ?? order.sale_number}</p>
         <div><h1 className="break-words text-xl font-bold sm:text-2xl">{order.client_name}</h1><p className="text-base text-muted-foreground">{order.title || order.description || "Sem título"}</p></div>
-        <div className="flex flex-wrap gap-2"><Badge>{order.prod_status || order.art_status}</Badge>{order.art_direction_tag === "URGENTE" && <Badge variant="destructive">Urgente</Badge>}<OrderRiskBadge risk={calculateOrderRisk(order)} /></div>
+        <div className="flex flex-wrap gap-2"><Badge>{getOperationalStatusLabel(order.prod_status || order.art_status)}</Badge>{order.art_direction_tag === "URGENTE" && <Badge variant="destructive">Urgente</Badge>}<OrderRiskBadge risk={calculateOrderRisk(order)} /></div>
       </div>
-      <div className="flex flex-wrap gap-2">{transitions.length > 0 && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline">Alterar etapa</Button></DropdownMenuTrigger><DropdownMenuContent align="end">{transitions.map(option => <DropdownMenuItem key={`${option.board}-${option.value}`} onClick={() => onTransition(option.board, option.value)}>Mover para {option.value}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>}{canEdit && <Button onClick={onEdit}>Editar OS</Button>}</div>
+      <div className="flex flex-wrap gap-2">{transitions.length > 0 && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline">Alterar etapa</Button></DropdownMenuTrigger><DropdownMenuContent align="end">{transitions.map(option => <DropdownMenuItem key={`${option.board}-${option.value}`} onClick={() => onTransition(option.board, option.value)}>Mover para {getOperationalStatusLabel(option.value)}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>}{canEdit && <Button onClick={onEdit}>Editar OS</Button>}</div>
     </div>
     <dl className="mt-5 grid gap-3 border-t pt-4 sm:grid-cols-3">
       <div><dt className="text-xs text-muted-foreground">Prazo final</dt><dd className="font-medium">{date(order.delivery_date)}</dd></div>

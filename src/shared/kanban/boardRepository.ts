@@ -19,31 +19,20 @@ export async function listBoardOrders(
       .eq("archived", false)
       .order("updated_at", { ascending: false })
       .range(from, to);
-    query =
-      board === "art"
-        ? query.is("prod_status", null)
-        : query
-            .not("prod_status", "is", null)
-            .neq("prod_status", "Finalizados");
+    query = board === "art"
+      ? query.or(
+          "and(prod_status.is.null,art_status.in.(\"Caixa de Entrada\",\"Fila de Arte\",\"Em Criação\",\"Para Aprovação\",Ajustes)),and(art_status.eq.Produzir,prod_status.eq.Produção)"
+        )
+      : query.in("prod_status", [
+          "Produção",
+          "Em Acabamento",
+          "Pronto / Avisar Cliente",
+        ]);
     const { data, error } = await query;
     if (error) throw error;
     return (data ?? []) as unknown as OsOrder[];
   });
-  let rows = active;
-  if (board === "production") {
-    const since = new Date();
-    since.setUTCDate(since.getUTCDate() - RECENT_FINISHED_DAYS);
-    const { data, error } = await supabase
-      .from("os_orders")
-      .select(ORDER_FIELDS)
-      .eq("archived", false)
-      .eq("prod_status", "Finalizados")
-      .gte("updated_at", since.toISOString())
-      .order("updated_at", { ascending: false })
-      .limit(RECENT_FINISHED_LIMIT);
-    if (error) throw error;
-    rows = [...active, ...((data ?? []) as unknown as OsOrder[])];
-  }
+  const rows = active;
   const ids = rows.map(row => row.id);
   if (!ids.length) return [];
   const scope = board === "art" ? "ART" : "PRODUCTION";

@@ -24,7 +24,9 @@ export function getOrderOperationalStage(
 }
 
 const ART_TRANSITIONS: Record<string, string[]> = {
-  "Caixa de Entrada": ["Em Criação"],
+  // The legacy Hub's direct Caixa -> Em Criação edge remains server-side only.
+  "Caixa de Entrada": ["Fila de Arte"],
+  "Fila de Arte": ["Em Criação"],
   "Em Criação": ["Para Aprovação"],
   "Para Aprovação": ["Ajustes", "Produzir"],
   Ajustes: ["Em Criação", "Para Aprovação"],
@@ -33,6 +35,8 @@ const ART_TRANSITIONS: Record<string, string[]> = {
 const PROD_TRANSITIONS: Record<string, string[]> = {
   Produção: ["Em Acabamento"],
   "Em Acabamento": ["Pronto / Avisar Cliente"],
+  // These post-production transitions remain for Central/legacy compatibility.
+  // The Fase 3.2 board filters them out and ends visually at Material Pronto.
   "Pronto / Avisar Cliente": ["Logística (Entrega/Transportadora)", "Instalação Agendada", "Finalizados"],
   "Logística (Entrega/Transportadora)": ["Instalação Agendada", "Finalizados"],
   "Instalação Agendada": ["Finalizados"],

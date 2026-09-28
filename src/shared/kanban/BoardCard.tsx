@@ -26,6 +26,7 @@ import {
 import type { BoardCardModel, BoardKind, BoardStatus } from "./types";
 import { formatDatePtBr } from "@/features/hubos/deliveryDeadline";
 import { isOrderOverdue } from "@/modules/orders/risk";
+import { getOperationalStatusLabel } from "./statusLabels";
 
 const TAGS: Record<string, string> = {
   URGENTE: "Urgente",
@@ -182,7 +183,7 @@ export function BoardCard({
           <SelectContent>
             {moves.map(move => (
               <SelectItem key={move} value={move}>
-                {move}
+                {getOperationalStatusLabel(move)}
               </SelectItem>
             ))}
           </SelectContent>

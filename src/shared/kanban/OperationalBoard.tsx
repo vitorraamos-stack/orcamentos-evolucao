@@ -137,6 +137,13 @@ export function OperationalBoard({
     () => groupBoardCards(visible, board, columns),
     [visible, board, columns]
   );
+  const boardMoves = (card: BoardCardModel) =>
+    getValidOrderTransitions({
+      board,
+      from: cardStatus(card, board),
+      role: hubRole,
+      isManager: hubPermissions.isManager,
+    }).filter(move => (columns as BoardStatus[]).includes(move));
   const metrics = useMemo(
     () => calculateBoardMetrics(cards, board),
     [cards, board]
@@ -203,12 +210,7 @@ export function OperationalBoard({
     const card = cards.find(value => value.order.id === active.id);
     const to = String(over.id) as BoardStatus;
     if (!card || cardStatus(card, board) === to) return;
-    const moves = getValidOrderTransitions({
-      board,
-      from: cardStatus(card, board),
-      role: hubRole,
-      isManager: hubPermissions.isManager,
-    });
+    const moves = boardMoves(card);
     if (!moves.includes(to))
       return toast.error("Movimento não permitido pelo fluxo operacional.");
     requestMove(card, to);
@@ -316,12 +318,7 @@ export function OperationalBoard({
                   board={board}
                   canMove={canMove}
                   isManager={hubPermissions.isManager}
-                  moves={getValidOrderTransitions({
-                    board,
-                    from: cardStatus(card, board),
-                    role: hubRole,
-                    isManager: hubPermissions.isManager,
-                  })}
+                  moves={boardMoves(card)}
                   onMove={to => requestMove(card, to)}
                   onTag={
                     board === "production" && canMove

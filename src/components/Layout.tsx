@@ -112,41 +112,16 @@ export default function Layout({ children }: LayoutProps) {
               </Button>
             </Link>
           ))}
-          <div className="px-3 pt-2 text-xs font-semibold text-sidebar-foreground/70">
-            <Palette className="mr-2 inline h-4 w-4" />
-            Arte
-          </div>
-          {[
-            ["/os/arte", "Quadro de Arte"],
-            ["/os/arte/aprovacoes", "Aprovações"],
-            ["/os/arte/revisoes", "Revisões"],
-          ].map(([href, label]) => (
+          {([
+            ["/os/arte", "Arte", Palette],
+            ["/os/producao", "Produção", Factory],
+          ] as const).map(([href, label, Icon]) => (
             <Link href={href} key={href}>
               <Button
-                variant={location === href ? "secondary" : "ghost"}
-                className="h-8 w-full justify-start pl-9 text-sm"
+                variant={location.startsWith(href as string) ? "secondary" : "ghost"}
+                className="w-full justify-start"
               >
-                {label}
-              </Button>
-            </Link>
-          ))}
-          <div className="px-3 pt-2 text-xs font-semibold text-sidebar-foreground/70">
-            <Factory className="mr-2 inline h-4 w-4" />
-            Produção
-          </div>
-          {[
-            ["/os/producao", "Quadro Geral"],
-            ["/os/producao/impressao", "Impressão"],
-            ["/os/producao/acabamento", "Acabamento"],
-            ["/os/producao/letra-caixa", "Letra Caixa"],
-            ["/os/producao/externa", "Produção Externa"],
-            ["/os/producao/pronto", "Material Pronto"],
-          ].map(([href, label]) => (
-            <Link href={href} key={href}>
-              <Button
-                variant={location === href ? "secondary" : "ghost"}
-                className="h-8 w-full justify-start pl-9 text-sm"
-              >
+                <Icon className="mr-2 h-4 w-4" />
                 {label}
               </Button>
             </Link>

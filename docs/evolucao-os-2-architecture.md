@@ -255,3 +255,29 @@ A mesma migration substitui sem overload ambíguo `hub_os_send_to_production_sec
 A migration precisa ser aplicada pelo pipeline Supabase antes do frontend que envia o novo parâmetro. `supabase/tests/operational_boards_phase_3_1.sql` protege publication e grants; os testes TypeScript cobrem paginação além de 500, teto explícito, semântica crítico/atrasado, contrato do preset e lista de tabelas Realtime. Security e Performance Advisors devem ser executados no projeto remoto depois da aplicação, pois o ambiente local não representa findings do projeto hospedado.
 
 Débitos deliberados: as relações em lote poderão ganhar paginação própria se o limite de URL do PostgREST se tornar relevante em massa extrema; nomes amigáveis ainda dependem do e-mail disponível; e o **fluxo independente por item da OS** permanece evolução futura. Instalações e Entregas não foram implementadas nesta fase.
+
+## Fase 3.2 — Simplificação Operacional
+
+Os boards novos agora representam somente a responsabilidade operacional de cada
+setor. Em Arte, o fluxo visual é **Caixa de Entrada → Fila de Arte → Em Arte →
+Aguardando Aprovação**, com o ciclo **Aguardando Aprovação → Ajustes → Em Arte
+ou Aguardando Aprovação**, e o handoff terminal **Aguardando Aprovação → Liberado
+para Produção**. `Fila de Arte` é o único status persistido novo desta fase.
+
+Os labels da interface não renomeiam os valores canônicos: `Em Arte`,
+`Aguardando Aprovação` e `Liberado para Produção` continuam persistidos como
+`Em Criação`, `Para Aprovação` e `Produzir`. O handoff seguro continua criando
+`prod_status = Produção`; por isso a coluna terminal de Arte mostra apenas OS em
+`Produzir + Produção` e deixa de mostrá-las quando a Produção avança.
+
+Em Produção, o fluxo visual foi reduzido a **Em Produção → Acabamento /
+Conferência → Material Pronto**, persistidos respectivamente como `Produção`,
+`Em Acabamento` e `Pronto / Avisar Cliente`. Logística, Instalação e Finalizados
+continuam no contrato e nos fluxos legados, mas saíram do novo board. A Fase 4
+assumirá e redesenhará as responsabilidades de Instalações e Entregas.
+
+Por compatibilidade temporária, a função server-side ainda aceita `Caixa de
+Entrada → Em Criação` para o Hub legado (`/hub-os/kanban`), embora o board novo
+não ofereça essa aresta. Esse desvio é dívida técnica a remover quando o Hub
+legado for desligado. As antigas subrotas especializadas redirecionam para
+`/os/arte` ou `/os/producao`, e a navegação apresenta apenas esses dois destinos.

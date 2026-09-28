@@ -101,3 +101,21 @@ describe("board domain", () => {
     ]);
   });
 });
+
+describe("Fase 3.2 board contract", () => {
+  it("uses canonical columns while exposing human display labels", async () => {
+    const { ART_BOARD_COLUMNS, PRODUCTION_BOARD_COLUMNS } = await import("./boardDomain");
+    const { ART_STATUS_LABELS, PRODUCTION_STATUS_LABELS } = await import("./statusLabels");
+    expect(ART_BOARD_COLUMNS).toEqual(["Caixa de Entrada", "Fila de Arte", "Em Criação", "Para Aprovação", "Ajustes", "Produzir"]);
+    expect(ART_STATUS_LABELS["Em Criação"]).toBe("Em Arte");
+    expect(ART_STATUS_LABELS["Para Aprovação"]).toBe("Aguardando Aprovação");
+    expect(ART_STATUS_LABELS.Produzir).toBe("Liberado para Produção");
+    expect(PRODUCTION_BOARD_COLUMNS).toEqual(["Produção", "Em Acabamento", "Pronto / Avisar Cliente"]);
+    expect(PRODUCTION_STATUS_LABELS.Produção).toBe("Em Produção");
+    expect(PRODUCTION_STATUS_LABELS["Em Acabamento"]).toBe("Acabamento / Conferência");
+    expect(PRODUCTION_STATUS_LABELS["Pronto / Avisar Cliente"]).toBe("Material Pronto");
+    expect(PRODUCTION_BOARD_COLUMNS).not.toContain("Logística (Entrega/Transportadora)");
+    expect(PRODUCTION_BOARD_COLUMNS).not.toContain("Instalação Agendada");
+    expect(PRODUCTION_BOARD_COLUMNS).not.toContain("Finalizados");
+  });
+});

@@ -38,3 +38,13 @@ describe("order operational flow", () => {
     expect(getValidOrderTransitions({ board: "art", from: "Em Criação", role: null })).toEqual([]);
   });
 });
+
+describe("Fase 3.2 art queue", () => {
+  it("requires the new board to pass through Fila de Arte", () => {
+    const context = { role: "arte_finalista" as const, isManager: false };
+    expect(canTransitionArtStatus("Caixa de Entrada", "Fila de Arte", context)).toBe(true);
+    expect(canTransitionArtStatus("Fila de Arte", "Em Criação", context)).toBe(true);
+    expect(canTransitionArtStatus("Fila de Arte", "Para Aprovação", context)).toBe(false);
+    expect(canTransitionArtStatus("Caixa de Entrada", "Em Criação", context)).toBe(false);
+  });
+});
