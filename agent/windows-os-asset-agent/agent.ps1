@@ -355,7 +355,9 @@ function Test-RetentionProtectedAsset {
   return (
     $assetType -eq 'PAYMENT_PROOF' -or
     $assetType -eq 'LAYOUT' -or
+    $assetType -eq 'INSTALLATION_EVIDENCE' -or
     $normalizedPath.Contains('/arte/layout/') -or
+    $normalizedPath.Contains('/instalacoes/') -or
     $objectPath.Contains('/Financeiro/Comprovante/') -or
     $normalizedPath.Contains('/financeiro/comprovante/') -or
     $normalizedPath.Contains('/payment_proofs/')

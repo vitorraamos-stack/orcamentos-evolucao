@@ -46,10 +46,14 @@ select throws_ok(format('select public.hub_os_start_installation_secure(%L)',(se
 select set_config('request.jwt.claim.sub','41000000-0000-4000-8000-000000000006',true);
 select throws_ok(format('select public.hub_os_start_installation_secure(%L)',(select id from public.os_installations where os_id='43000000-0000-4000-8000-000000000001')),'42501','Acesso ao Hub OS obrigatório.','user without Hub OS cannot start');
 select set_config('request.jwt.claim.sub','41000000-0000-4000-8000-000000000002',true);
+update public.os_installation_checklist_items set status='DONE' where installation_id=(select id from public.os_installations where os_id='43000000-0000-4000-8000-000000000001') and phase='PRE_START';
 select lives_ok(format('select public.hub_os_start_installation_secure(%L)',(select id from public.os_installations where os_id='43000000-0000-4000-8000-000000000001')),'assigned installer starts scheduled installation');
 select is((select status from public.os_installations where os_id='43000000-0000-4000-8000-000000000001'),'IN_PROGRESS','start changes status');
 select ok((select started_at is not null from public.os_installations where os_id='43000000-0000-4000-8000-000000000001'),'start fills started_at');
 select ok(exists(select 1 from public.os_orders_event where os_id='43000000-0000-4000-8000-000000000001' and type='INSTALLATION_STARTED'),'start creates event');
+update public.os_installation_checklist_items set status='DONE' where installation_id=(select id from public.os_installations where os_id='43000000-0000-4000-8000-000000000001') and phase='COMPLETION';
+insert into public.os_order_assets(id,os_id,asset_type,object_path,original_name,mime_type,size_bytes,storage_provider) values('44000000-0000-4000-8000-000000000001','43000000-0000-4000-8000-000000000001','INSTALLATION_EVIDENCE','os_orders/43000000-0000-4000-8000-000000000001/Instalacoes/test/after/foto.jpg','foto.jpg','image/jpeg',10,'r2');
+insert into public.os_installation_evidence(installation_id,asset_id,phase) values((select id from public.os_installations where os_id='43000000-0000-4000-8000-000000000001'),'44000000-0000-4000-8000-000000000001','AFTER');
 select lives_ok(format('select public.hub_os_complete_installation_secure(%L)',(select id from public.os_installations where os_id='43000000-0000-4000-8000-000000000001')),'assigned installer completes in-progress installation');
 select is((select status from public.os_installations where os_id='43000000-0000-4000-8000-000000000001'),'COMPLETED','complete changes installation status');
 select ok((select completed_at is not null from public.os_installations where os_id='43000000-0000-4000-8000-000000000001'),'complete fills completed_at');
@@ -58,7 +62,7 @@ select ok(exists(select 1 from public.os_orders_event where os_id='43000000-0000
 select set_config('request.jwt.claim.sub','41000000-0000-4000-8000-000000000002',true);
 select throws_ok(format('select public.hub_os_complete_installation_secure(%L)',(select id from public.os_installations where os_id='43000000-0000-4000-8000-000000000004')),'42501','Instalador somente conclui instalação em execução.','installer cannot complete scheduled installation');
 select set_config('request.jwt.claim.sub','41000000-0000-4000-8000-000000000001',true);
-select lives_ok(format('select public.hub_os_complete_installation_secure(%L)',(select id from public.os_installations where os_id='43000000-0000-4000-8000-000000000004')),'manager can complete scheduled installation directly');
+select throws_ok(format('select public.hub_os_complete_installation_secure(%L)',(select id from public.os_installations where os_id='43000000-0000-4000-8000-000000000004')),'Instalação deve estar em execução para ser concluída.','manager cannot bypass normal completion');
 
 select lives_ok($$select public.hub_os_schedule_installation_secure('43000000-0000-4000-8000-000000000005','2026-10-01 12:00+00')$$,'cancel scenario is scheduled');
 select throws_ok(format('select public.hub_os_cancel_installation_secure(%L,%L)',(select id from public.os_installations where os_id='43000000-0000-4000-8000-000000000005'),''),'Motivo do cancelamento é obrigatório.','cancel reason is required');

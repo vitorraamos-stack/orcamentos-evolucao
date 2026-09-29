@@ -12,6 +12,13 @@ import {
   selectPrimaryInstallation,
 } from "@/modules/installations/services/installations";
 import { loadInstallationsForOrder } from "@/modules/installations/repositories/installationsRepository";
+import { loadInstallationExecution } from "@/modules/installations/repositories/installationExecutionRepository";
+import { InstallationChecklist } from "@/modules/installations/components/InstallationChecklist";
+import { InstallationEvidenceGallery } from "@/modules/installations/components/InstallationEvidenceGallery";
+import type {
+  InstallationChecklistItem,
+  InstallationEvidence,
+} from "@/modules/installations/types";
 import { Button } from "@/components/ui/button";
 import {
   DELIVERY_MODE_LABEL,
@@ -29,6 +36,10 @@ export function OrderInstallationTab({ order }: { order: OsOrder }) {
   const [installationHistory, setInstallationHistory] = useState<
     Installation[]
   >([]);
+  const [fieldData, setFieldData] = useState<{
+    checklist: InstallationChecklistItem[];
+    evidence: InstallationEvidence[];
+  }>({ checklist: [], evidence: [] });
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -36,7 +47,19 @@ export function OrderInstallationTab({ order }: { order: OsOrder }) {
         const rows = await loadInstallationsForOrder(order.id);
         if (alive) {
           setInstallationHistory(rows);
-          setRecord(selectPrimaryInstallation(rows));
+          const primary = selectPrimaryInstallation(rows);
+          setRecord(primary);
+          if (primary)
+            void loadInstallationExecution(primary.id)
+              .then(
+                data =>
+                  alive &&
+                  setFieldData({
+                    checklist: data.checklist,
+                    evidence: data.evidence,
+                  })
+              )
+              .catch(() => {});
         }
         return;
       }
@@ -113,6 +136,14 @@ export function OrderInstallationTab({ order }: { order: OsOrder }) {
                 <dt className="text-muted-foreground">Endereço</dt>
                 <dd>{address || "Endereço não informado"}</dd>
               </div>
+              {installation.completion_notes && (
+                <div className="sm:col-span-2">
+                  <dt className="text-muted-foreground">Observações finais</dt>
+                  <dd className="whitespace-pre-wrap">
+                    {installation.completion_notes}
+                  </dd>
+                </div>
+              )}
               <div className="sm:col-span-2">
                 <dt className="text-muted-foreground">Observações</dt>
                 <dd>{installation.notes || "Sem observações"}</dd>
@@ -168,6 +199,30 @@ export function OrderInstallationTab({ order }: { order: OsOrder }) {
                 </a>
               </Button>
             </div>
+            {fieldData.checklist.length > 0 && (
+              <section className="grid gap-5 border-t pt-4 md:grid-cols-2">
+                <InstallationChecklist
+                  title="Checklist pré-instalação"
+                  items={fieldData.checklist.filter(
+                    item => item.phase === "PRE_START"
+                  )}
+                  readOnly
+                />
+                <InstallationChecklist
+                  title="Checklist final"
+                  items={fieldData.checklist.filter(
+                    item => item.phase === "COMPLETION"
+                  )}
+                  readOnly
+                />
+              </section>
+            )}
+            {fieldData.evidence.length > 0 && (
+              <section className="border-t pt-4">
+                <h3 className="mb-3 font-medium">Galeria de evidências</h3>
+                <InstallationEvidenceGallery evidence={fieldData.evidence} />
+              </section>
+            )}
             {previousInstallations.length > 0 && (
               <section className="border-t pt-3">
                 <h3 className="mb-2 font-medium">Histórico de instalações</h3>

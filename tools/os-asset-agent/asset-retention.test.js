@@ -13,7 +13,9 @@ const isRetentionProtectedAsset = asset => {
   return (
     asset.asset_type === "PAYMENT_PROOF" ||
     asset.asset_type === "LAYOUT" ||
+    asset.asset_type === "INSTALLATION_EVIDENCE" ||
     normalizedPath.includes("/arte/layout/") ||
+    normalizedPath.includes("/instalacoes/") ||
     objectPath.includes("/Financeiro/Comprovante/") ||
     normalizedPath.includes("/financeiro/comprovante/") ||
     normalizedPath.includes("/payment_proofs/")
@@ -26,6 +28,13 @@ describe("os-asset-agent retention cleanup safeguards", () => {
       isRetentionProtectedAsset({
         asset_type: "LAYOUT",
         object_path: "os_orders/abc/Arte/Layout/arquivo.pdf",
+      })
+    ).toBe(true);
+
+    expect(
+      isRetentionProtectedAsset({
+        asset_type: "INSTALLATION_EVIDENCE",
+        object_path: "os_orders/abc/Instalacoes/def/after/foto.jpg",
       })
     ).toBe(true);
 
@@ -56,6 +65,8 @@ describe("os-asset-agent retention cleanup safeguards", () => {
       /\.select\(\s*"id, object_path, storage_provider, storage_bucket, bucket, asset_type"\s*\)/
     );
     expect(agentSource).toContain('asset.asset_type === "LAYOUT"');
+    expect(agentSource).toContain('asset.asset_type === "INSTALLATION_EVIDENCE"');
+    expect(agentSource).toContain('normalizedPath.includes("/instalacoes/")');
     expect(agentSource).toContain('normalizedPath.includes("/arte/layout/")');
     expect(agentSource).toContain(
       "const cleanupCandidates = pendingAssets.filter("
