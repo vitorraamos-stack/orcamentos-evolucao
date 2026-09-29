@@ -16,7 +16,7 @@ import type {
 import type { ItemOperation, OperationStatus, WorkCenter } from "@/modules/production/operations";
 
 export const ORDER_DETAIL_SELECT =
-  "id,os_number,sale_number,client_name,title,description,delivery_date,delivery_deadline_preset,delivery_deadline_started_at,logistic_type,address,address_lat,address_lng,address_geocoded_at,address_geocode_provider,production_tag,insumos_details,insumos_return_notes,insumos_requested_at,insumos_resolved_at,insumos_resolved_by,art_direction_tag,art_status,prod_status,reproducao,letra_caixa,archived,archived_at,archived_by,folder_path,created_by,updated_by,created_at,updated_at";
+  "id,os_number,sale_number,client_name,title,description,delivery_date,delivery_deadline_preset,delivery_deadline_started_at,logistic_type,address,address_lat,address_lng,address_geocoded_at,address_geocode_provider,production_tag,insumos_details,insumos_return_notes,insumos_requested_at,insumos_resolved_at,insumos_resolved_by,art_direction_tag,art_status,prod_status,reproducao,letra_caixa,archived,archived_at,archived_by,created_by,updated_by,created_at,updated_at";
 export const ORDER_ASSET_SELECT =
   "id,os_id,asset_type,object_path,original_name,mime_type,size_bytes,storage_provider,storage_bucket,bucket,uploaded_at,deleted_from_storage_at,r2_etag,error";
 

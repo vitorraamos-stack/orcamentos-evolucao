@@ -4,8 +4,20 @@ import { itemInputSchema, ORDER_ASSET_SELECT, ORDER_DETAIL_SELECT } from "./orde
 
 describe("order detail query plans", () => {
   it("selects explicit order and asset columns", () => {
+    const orderColumns = ORDER_DETAIL_SELECT.split(",");
+
     expect(ORDER_DETAIL_SELECT).not.toContain("*");
-    expect(ORDER_DETAIL_SELECT).toContain("delivery_date");
+    expect(orderColumns).not.toContain("folder_path");
+    expect(orderColumns).toEqual(expect.arrayContaining([
+      "id",
+      "sale_number",
+      "client_name",
+      "logistic_type",
+      "prod_status",
+      "address",
+      "created_at",
+      "updated_at",
+    ]));
     expect(ORDER_ASSET_SELECT).not.toContain("*");
   });
   it("validates item quantities and names", () => {
