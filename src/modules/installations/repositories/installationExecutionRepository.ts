@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { invokeEdgeFunction } from "@/lib/supabase/invokeEdgeFunction";
+import { loadHubUsersByIds } from "@/shared/repositories/hubUsersRepository";
 import type {
   Installation,
   InstallationChecklistItem,
@@ -22,7 +23,7 @@ export async function loadInstallationExecution(id: string) {
     .single();
   fail(installationResult.error);
   const installation = installationResult.data as Installation;
-  const [order, team, profiles, checklist, evidence] = await Promise.all([
+  const [order, team, users, checklist, evidence] = await Promise.all([
     supabase
       .from("os_orders")
       .select(
@@ -37,10 +38,9 @@ export async function loadInstallationExecution(id: string) {
           .eq("id", installation.team_id)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
-    supabase
-      .from("profiles")
-      .select("id,name,email")
-      .in("id", [installation.responsible_id].filter(Boolean) as string[]),
+    loadHubUsersByIds(
+      installation.responsible_id ? [installation.responsible_id] : []
+    ),
     supabase
       .from("os_installation_checklist_items")
       .select("*")
@@ -54,15 +54,13 @@ export async function loadInstallationExecution(id: string) {
       .eq("installation_id", id)
       .order("created_at"),
   ]);
-  [order, team, profiles, checklist, evidence].forEach(result =>
-    fail(result.error)
-  );
+  [order, team, checklist, evidence].forEach(result => fail(result.error));
   return {
     installation: {
       ...installation,
       order: order.data,
       team: team.data,
-      responsible: profiles.data?.[0] ?? null,
+      responsible: users[0] ?? null,
     } as Installation,
     checklist: (checklist.data ?? []) as InstallationChecklistItem[],
     evidence: (evidence.data ?? []) as unknown as InstallationEvidence[],

@@ -14,7 +14,7 @@ vi.mock("@/lib/supabase", () => ({
   },
 }));
 
-import { loadHubUsersByRoles } from "./hubUsersRepository";
+import { loadHubUsersByIds, loadHubUsersByRoles } from "./hubUsersRepository";
 
 describe("loadHubUsersByRoles", () => {
   beforeEach(() => {
@@ -99,5 +99,82 @@ describe("loadHubUsersByRoles", () => {
     await expect(loadHubUsersByRoles(["admin"])).rejects.toThrow(
       "not authorized"
     );
+  });
+});
+
+describe("loadHubUsersByIds", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.rpc.mockResolvedValue({ data: [], error: null });
+  });
+
+  it("returns immediately without querying profiles or the RPC for empty ids", async () => {
+    await expect(loadHubUsersByIds([])).resolves.toEqual([]);
+
+    expect(mocks.profiles).not.toHaveBeenCalled();
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it("uses the RPC full name and preserves the profile role", async () => {
+    mocks.profiles.mockResolvedValue({
+      data: [{ id: "1", email: "joao@empresa.com", role: "instalador" }],
+      error: null,
+    });
+    mocks.rpc.mockResolvedValue({
+      data: [
+        {
+          id: "1",
+          full_name: "João",
+          email: "joao@empresa.com",
+        },
+      ],
+      error: null,
+    });
+
+    await expect(loadHubUsersByIds(["1"])).resolves.toEqual([
+      {
+        id: "1",
+        name: "João",
+        email: "joao@empresa.com",
+        role: "instalador",
+      },
+    ]);
+  });
+
+  it("falls back to the email when the RPC full name is null", async () => {
+    mocks.profiles.mockResolvedValue({
+      data: [{ id: "1", email: "joao@empresa.com", role: "instalador" }],
+      error: null,
+    });
+    mocks.rpc.mockResolvedValue({
+      data: [{ id: "1", full_name: null, email: "joao@empresa.com" }],
+      error: null,
+    });
+
+    const [user] = await loadHubUsersByIds(["1"]);
+
+    expect(user.name).toBe("joao@empresa.com");
+  });
+
+  it("queries only unique, non-empty ids", async () => {
+    mocks.profiles.mockResolvedValue({ data: [], error: null });
+
+    await loadHubUsersByIds(["1", "", "1", "2"]);
+
+    expect(mocks.profiles).toHaveBeenCalledOnce();
+    expect(mocks.profiles).toHaveBeenCalledWith("id", ["1", "2"]);
+  });
+
+  it("propagates display-name RPC errors", async () => {
+    mocks.profiles.mockResolvedValue({
+      data: [{ id: "1", email: "joao@empresa.com", role: "instalador" }],
+      error: null,
+    });
+    mocks.rpc.mockResolvedValue({
+      data: null,
+      error: { message: "not authorized" },
+    });
+
+    await expect(loadHubUsersByIds(["1"])).rejects.toThrow("not authorized");
   });
 });
