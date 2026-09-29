@@ -60,7 +60,6 @@ export type OsOrder = {
   archived: boolean;
   archived_at: string | null;
   archived_by: string | null;
-  folder_path?: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
