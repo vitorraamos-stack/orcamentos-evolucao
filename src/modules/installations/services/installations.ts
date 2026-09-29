@@ -9,7 +9,10 @@ export const INSTALLATION_STATUS_LABEL: Record<InstallationStatus, string> = {
   COMPLETED: "Concluída",
   CANCELLED: "Cancelada",
 };
-import { SAO_PAULO_TIME_ZONE, saoPauloDateKey } from "@/shared/lib/saoPauloTime";
+import {
+  SAO_PAULO_TIME_ZONE,
+  saoPauloDateKey,
+} from "@/shared/lib/saoPauloTime";
 export { SAO_PAULO_TIME_ZONE };
 export const formatAgendaDate = (iso: string) =>
   new Intl.DateTimeFormat("pt-BR", {
@@ -23,9 +26,11 @@ export function buildWazeUrl(input: {
   lng?: number | null;
 }) {
   const url = new URL("https://www.waze.com/ul");
-  if (input.lat != null && input.lng != null)
+  const address = input.address?.trim();
+  if (address) url.searchParams.set("q", address);
+  else if (input.lat != null && input.lng != null)
     url.searchParams.set("ll", `${input.lat},${input.lng}`);
-  else url.searchParams.set("q", input.address?.trim() ?? "");
+  else url.searchParams.set("q", "");
   url.searchParams.set("navigate", "yes");
   return url.toString();
 }
@@ -34,7 +39,7 @@ export const buildMapsUrl = (i: {
   lat?: number | null;
   lng?: number | null;
 }) =>
-  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(i.lat != null && i.lng != null ? `${i.lat},${i.lng}` : (i.address ?? ""))}`;
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(i.address?.trim() || (i.lat != null && i.lng != null ? `${i.lat},${i.lng}` : ""))}`;
 export function groupInstallationsByDay(rows: Installation[]) {
   return rows.reduce<Record<string, Installation[]>>((groups, row) => {
     const day = saoPauloDateKey(row.scheduled_start);

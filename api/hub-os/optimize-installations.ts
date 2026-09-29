@@ -10,10 +10,12 @@ type OptimizePayload = {
   startCoords?: [number, number] | null;
   profile?: "driving-car";
   orderIds?: string[] | null;
+  installationIds?: string[] | null;
 };
 
-type OsCandidate = {
+type RouteCandidate = {
   id: string;
+  installation_id?: string;
   sale_number: string;
   client_name: string;
   delivery_date: string | null;
@@ -26,7 +28,7 @@ type OsCandidate = {
 };
 
 type GeocodedStop = {
-  os: OsCandidate;
+  os: RouteCandidate;
   coords: [number, number];
 };
 
@@ -34,6 +36,7 @@ const ORS_BASE_URL = "https://api.openrouteservice.org";
 const ORS_TIMEOUT_MS = 15000;
 const MAX_REQUEST_BODY_BYTES = 128 * 1024;
 const MAX_ORDER_IDS = 200;
+const CACHE_CLOCK_TOLERANCE_MS = 5_000;
 const MAX_CANDIDATES = 300;
 const MAX_DATE_WINDOW_DAYS = 14;
 const MAX_GEO_CLUSTER_RADIUS_KM = 80;
@@ -66,6 +69,20 @@ class ExternalServiceError extends Error {
   }
 }
 
+class GeocodeValidationError extends Error {
+  reason: "geocode_low_confidence" | "geocode_ambiguous";
+  score: number;
+  constructor(
+    reason: "geocode_low_confidence" | "geocode_ambiguous",
+    score: number
+  ) {
+    super(reason);
+    this.name = "GeocodeValidationError";
+    this.reason = reason;
+    this.score = score;
+  }
+}
+
 const normalizeRole = (role?: string | null) => {
   if (!role) return null;
   if (role === "admin") return "gerente";
@@ -91,6 +108,153 @@ function resolveBodySizeBytes(body: unknown) {
 
 function normalizeAddress(address: string) {
   return address.trim().replace(/\s+/g, " ");
+}
+
+function normalizeAddressForComparison(address: string) {
+  return normalizeAddress(address)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+const GENERIC_ADDRESS_TOKENS = new Set([
+  "rua",
+  "r",
+  "avenida",
+  "av",
+  "rodovia",
+  "estrada",
+  "br",
+  "numero",
+  "n",
+]);
+
+function relevantAddressTokens(value: string) {
+  return normalizeAddressForComparison(value)
+    .split(" ")
+    .filter(token => token.length > 1 && !GENERIC_ADDRESS_TOKENS.has(token));
+}
+
+type GeocodeFeature = {
+  geometry?: { coordinates?: [number, number] };
+  properties?: {
+    confidence?: number;
+    label?: string;
+    name?: string;
+    street?: string;
+    housenumber?: string | number;
+    locality?: string;
+    localadmin?: string;
+    county?: string;
+    region?: string;
+    postalcode?: string;
+    country?: string;
+    country_a?: string;
+    layer?: string;
+    accuracy?: string;
+  };
+};
+
+function scoreGeocodeFeature(
+  inputAddress: string,
+  feature: GeocodeFeature,
+  focusCoords?: [number, number] | null
+) {
+  const properties = feature.properties ?? {};
+  const inputTokens = new Set(relevantAddressTokens(inputAddress));
+  const featureText = [
+    properties.label,
+    properties.name,
+    properties.street,
+    properties.locality,
+    properties.localadmin,
+    properties.county,
+    properties.region,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const featureTokens = new Set(relevantAddressTokens(featureText));
+  const matches = Array.from(inputTokens).filter(token =>
+    featureTokens.has(token)
+  ).length;
+  const overlap = inputTokens.size ? matches / inputTokens.size : 0;
+  const layerBonus: Record<string, number> = {
+    address: 18,
+    venue: 10,
+    street: 5,
+  };
+  let score =
+    (properties.confidence ?? 0) * 30 +
+    overlap * 50 +
+    (layerBonus[properties.layer ?? ""] ?? -30);
+  const inputNumber =
+    normalizeAddressForComparison(inputAddress).match(/\b\d+[a-z]?\b/)?.[0];
+  const resultNumber =
+    properties.housenumber == null
+      ? null
+      : normalizeAddressForComparison(String(properties.housenumber));
+  if (inputNumber && resultNumber)
+    score += inputNumber === resultNumber ? 22 : -35;
+  else if (inputNumber) score -= 5;
+  const coords = feature.geometry?.coordinates;
+  if (focusCoords && coords)
+    score -= Math.min(haversineDistanceKm(focusCoords, coords) * 0.03, 12);
+  return {
+    score,
+    overlap,
+    houseNumberMatch: Boolean(
+      inputNumber && resultNumber && inputNumber === resultNumber
+    ),
+    layer: properties.layer ?? null,
+  };
+}
+
+function selectGeocodeCandidate(
+  inputAddress: string,
+  features: GeocodeFeature[],
+  focusCoords?: [number, number] | null
+) {
+  const uniqueFeatures = Array.from(
+    new Map(
+      features.map(feature => [
+        `${feature.geometry?.coordinates?.join(",")}|${feature.properties?.label ?? ""}`,
+        feature,
+      ])
+    ).values()
+  );
+  const candidates = uniqueFeatures
+    .filter(feature => feature.geometry?.coordinates?.length === 2)
+    .map(feature => ({
+      coords: feature.geometry!.coordinates!,
+      ...scoreGeocodeFeature(inputAddress, feature, focusCoords),
+    }))
+    .sort((a, b) => b.score - a.score);
+  const best = candidates[0];
+  if (!best)
+    throw new ExternalServiceError(
+      "geocode",
+      "ORS geocode did not return coordinates"
+    );
+  if (best.score < 45 || best.overlap < 0.35)
+    throw new GeocodeValidationError("geocode_low_confidence", best.score);
+  const second = candidates[1];
+  if (second && best.score - second.score < 4 && !best.houseNumberMatch)
+    throw new GeocodeValidationError("geocode_ambiguous", best.score);
+  return best;
+}
+
+function isLegacyGeocodeCacheCurrent(
+  geocodedAt?: string | null,
+  updatedAt?: string | null
+) {
+  if (!geocodedAt) return false;
+  if (!updatedAt) return true;
+  return (
+    new Date(geocodedAt).getTime() >=
+    new Date(updatedAt).getTime() - CACHE_CLOCK_TOLERANCE_MS
+  );
 }
 
 function isValidDate(value: unknown): value is string {
@@ -172,34 +336,43 @@ function estimateSummaryFromStops(
 }
 
 function buildGoogleMapsUrl(
-  stops: Array<{ coords: [number, number] }>,
-  startCoords?: [number, number] | null
+  stops: Array<{ coords: [number, number]; address?: string | null }>,
+  startCoords?: [number, number] | null,
+  startAddress?: string | null
 ) {
   if (stops.length === 0) return null;
 
-  if (!startCoords && stops.length === 1) {
-    const [lng, lat] = stops[0].coords;
+  const destinationFor = (stop: {
+    coords: [number, number];
+    address?: string | null;
+  }) => stop.address?.trim() || `${stop.coords[1]},${stop.coords[0]}`;
+
+  if (!startCoords && !startAddress?.trim() && stops.length === 1) {
     const url = new URL("https://www.google.com/maps/search/");
     url.searchParams.set("api", "1");
-    url.searchParams.set("query", `${lat},${lng}`);
+    url.searchParams.set("query", destinationFor(stops[0]));
     return url.toString();
   }
 
-  const origin = startCoords ?? stops[0].coords;
-  const destination = stops[stops.length - 1].coords;
+  const hasExplicitStart = Boolean(startAddress?.trim() || startCoords);
+  const origin =
+    startAddress?.trim() ||
+    (startCoords
+      ? `${startCoords[1]},${startCoords[0]}`
+      : destinationFor(stops[0]));
+  const destination = destinationFor(stops[stops.length - 1]);
 
   // With explicit start we can keep all stops except destination as waypoints.
   // Without explicit start, first stop is the origin and must not be duplicated in waypoints.
-  const waypointStops = startCoords ? stops.slice(0, -1) : stops.slice(1, -1);
-
-  const waypoints = waypointStops.map(
-    stop => `${stop.coords[1]},${stop.coords[0]}`
-  );
+  const waypointStops = hasExplicitStart
+    ? stops.slice(0, -1)
+    : stops.slice(1, -1);
+  const waypoints = waypointStops.map(destinationFor);
 
   const url = new URL("https://www.google.com/maps/dir/");
   url.searchParams.set("api", "1");
-  url.searchParams.set("origin", `${origin[1]},${origin[0]}`);
-  url.searchParams.set("destination", `${destination[1]},${destination[0]}`);
+  url.searchParams.set("origin", origin);
+  url.searchParams.set("destination", destination);
   if (waypoints.length > 0) {
     url.searchParams.set("waypoints", waypoints.join("|"));
   }
@@ -224,6 +397,20 @@ function parseRequestBody(
   const payload = (
     typeof body === "string" ? JSON.parse(body || "{}") : body || {}
   ) as OptimizePayload;
+
+  for (const [field, values] of [
+    ["orderIds", payload.orderIds],
+    ["installationIds", payload.installationIds],
+  ] as const) {
+    if (
+      Array.isArray(values) &&
+      values.some(value => typeof value !== "string" || !value.trim())
+    ) {
+      throw new InputValidationError(
+        `${field} inválido. Todos os IDs devem ser strings não vazias.`
+      );
+    }
+  }
 
   if (
     payload.dateFrom !== undefined &&
@@ -256,6 +443,15 @@ function parseRequestBody(
   ) {
     throw new InputValidationError("orderIds inválido. Use array de strings.");
   }
+  if (
+    payload.installationIds !== undefined &&
+    payload.installationIds !== null &&
+    !Array.isArray(payload.installationIds)
+  ) {
+    throw new InputValidationError(
+      "installationIds inválido. Use array de strings."
+    );
+  }
 
   if (
     payload.startAddress !== undefined &&
@@ -271,6 +467,15 @@ function parseRequestBody(
           payload.orderIds
             .map(value => (typeof value === "string" ? value.trim() : ""))
             .filter(value => value.length > 0)
+        )
+      )
+    : null;
+  const installationIds = Array.isArray(payload.installationIds)
+    ? Array.from(
+        new Set(
+          payload.installationIds
+            .map(value => (typeof value === "string" ? value.trim() : ""))
+            .filter(Boolean)
         )
       )
     : null;
@@ -310,6 +515,11 @@ function parseRequestBody(
       `orderIds excede o limite de ${MAX_ORDER_IDS} itens. Filtre por data ou envie lotes menores.`
     );
   }
+  if (installationIds && installationIds.length > MAX_ORDER_IDS) {
+    throw new InputValidationError(
+      `installationIds excede o limite de ${MAX_ORDER_IDS} itens. Envie lotes menores.`
+    );
+  }
 
   if (
     payload.startCoords &&
@@ -341,6 +551,7 @@ function parseRequestBody(
     startCoords: payload.startCoords ?? null,
     profile: "driving-car",
     orderIds,
+    installationIds,
   };
 }
 
@@ -420,8 +631,7 @@ async function geocodeORS(
   const normalized = normalizeAddress(text);
   const queries = [normalized, `${normalized}, Brasil`];
 
-  let bestCoords: [number, number] | null = null;
-  let bestScore = Number.NEGATIVE_INFINITY;
+  const features: GeocodeFeature[] = [];
 
   for (const queryText of queries) {
     const url = new URL(`${ORS_BASE_URL}/geocode/search`);
@@ -443,42 +653,23 @@ async function geocodeORS(
       );
     }
 
-    const data = (await response.json()) as {
-      features?: Array<{
-        geometry?: { coordinates?: [number, number] };
-        properties?: { confidence?: number };
-      }>;
-    };
+    const data = (await response.json()) as { features?: GeocodeFeature[] };
 
     for (const feature of data.features ?? []) {
       const coords = feature.geometry?.coordinates;
       if (!coords || coords.length < 2) continue;
 
-      const confidence = feature.properties?.confidence ?? 0;
-      const distancePenalty = focusCoords
-        ? haversineDistanceKm(focusCoords, coords) * 0.5
-        : 0;
-      const score = confidence * 100 - distancePenalty;
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestCoords = coords;
-      }
+      features.push(feature);
     }
   }
 
-  if (!bestCoords) {
-    throw new ExternalServiceError(
-      "geocode",
-      "ORS geocode did not return coordinates"
-    );
-  }
+  const best = selectGeocodeCandidate(text, features, focusCoords);
 
   console.log("[hub-os/optimize-installations]", {
     stage: "geocode",
     durationMs: getElapsedMs(geocodeStartedAt),
   });
-  return bestCoords;
+  return best.coords;
 }
 
 function groupByDateWindow(stops: GeocodedStop[], dateWindowDays: number) {
@@ -777,31 +968,76 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    let query = supabaseAdmin
-      .from("os_orders")
-      .select(
-        "id, sale_number, client_name, delivery_date, address, address_lat, address_lng, updated_at, address_geocoded_at, address_geocode_provider"
-      )
-      .eq("logistic_type", "instalacao")
-      .eq("archived", false)
-      .order("delivery_date", { ascending: true });
-
-    // Explicit agenda selections are authoritative. scheduled_start belongs to
-    // os_installations, so delivery_date must not silently discard selected OSs.
-    if (!parsed.orderIds?.length && parsed.dateFrom)
-      query = query.gte("delivery_date", parsed.dateFrom);
-    if (!parsed.orderIds?.length && parsed.dateTo)
-      query = query.lte("delivery_date", parsed.dateTo);
-    if (parsed.orderIds?.length) {
-      query = query.in("id", parsed.orderIds);
+    const installationFlow = Boolean(parsed.installationIds?.length);
+    let orders: RouteCandidate[] = [];
+    if (installationFlow) {
+      const { data: installationRows, error: installationError } =
+        await supabaseAdmin
+          .from("os_installations")
+          .select(
+            "id, os_id, scheduled_start, address_snapshot, address_lat, address_lng, team_id"
+          )
+          .in("id", parsed.installationIds!)
+          .eq("status", "SCHEDULED");
+      if (installationError)
+        return json(res, 500, {
+          stage: "db_query",
+          error: installationError.message,
+        });
+      const installations = installationRows ?? [];
+      const osIds = Array.from(
+        new Set(installations.map((row: any) => row.os_id))
+      );
+      const { data: orderRows, error: orderError } = osIds.length
+        ? await supabaseAdmin
+            .from("os_orders")
+            .select(
+              "id, sale_number, client_name, delivery_date, archived, logistic_type, updated_at, address_geocoded_at, address_geocode_provider"
+            )
+            .in("id", osIds)
+            .eq("archived", false)
+            .eq("logistic_type", "instalacao")
+        : { data: [], error: null };
+      if (orderError)
+        return json(res, 500, { stage: "db_query", error: orderError.message });
+      const byOrderId = new Map(
+        (orderRows ?? []).map((row: any) => [row.id, row])
+      );
+      orders = installations.flatMap((installation: any) => {
+        const order: any = byOrderId.get(installation.os_id);
+        if (!order) return [];
+        return [
+          {
+            ...order,
+            id: order.id,
+            installation_id: installation.id,
+            address: installation.address_snapshot,
+            address_lat: null,
+            address_lng: null,
+            delivery_date:
+              installation.scheduled_start?.slice(0, 10) ?? order.delivery_date,
+          },
+        ];
+      });
+    } else {
+      let query = supabaseAdmin
+        .from("os_orders")
+        .select(
+          "id, sale_number, client_name, delivery_date, address, address_lat, address_lng, updated_at, address_geocoded_at, address_geocode_provider"
+        )
+        .eq("logistic_type", "instalacao")
+        .eq("archived", false)
+        .order("delivery_date", { ascending: true });
+      if (!parsed.orderIds?.length && parsed.dateFrom)
+        query = query.gte("delivery_date", parsed.dateFrom);
+      if (!parsed.orderIds?.length && parsed.dateTo)
+        query = query.lte("delivery_date", parsed.dateTo);
+      if (parsed.orderIds?.length) query = query.in("id", parsed.orderIds);
+      const { data: rows, error: queryError } = await query;
+      if (queryError)
+        return json(res, 500, { stage: "db_query", error: queryError.message });
+      orders = (rows ?? []) as RouteCandidate[];
     }
-
-    const { data: rows, error: queryError } = await query;
-    if (queryError) {
-      return json(res, 500, { stage: "db_query", error: queryError.message });
-    }
-
-    const orders = (rows ?? []) as OsCandidate[];
     if (orders.length > MAX_CANDIDATES) {
       return json(res, 422, {
         stage: "input",
@@ -811,14 +1047,28 @@ export default async function handler(req: any, res: any) {
     const geocodeCache = new Map<string, [number, number]>();
     const geocodeMetrics = { totalCalls: 0, cacheHits: 0, externalMs: 0 };
     const geocoded: GeocodedStop[] = [];
-    const unassigned: Array<{ os_id: string; reason: string }> = [];
+    const unassigned: Array<{
+      installation_id?: string;
+      os_id: string;
+      reason: string;
+      address: string | null;
+      client_name: string;
+      sale_number: string;
+    }> = [];
 
     const resolveGeocode = async (
-      order: OsCandidate
+      order: RouteCandidate
     ): Promise<[number, number] | null> => {
       const address = order.address ? normalizeAddress(order.address) : "";
       if (!address) {
-        unassigned.push({ os_id: order.id, reason: "missing_address" });
+        unassigned.push({
+          installation_id: order.installation_id,
+          os_id: order.id,
+          reason: "missing_address",
+          address: order.address,
+          client_name: order.client_name,
+          sale_number: order.sale_number,
+        });
         return null;
       }
 
@@ -829,11 +1079,12 @@ export default async function handler(req: any, res: any) {
       }
 
       const geocodeIsCurrent =
+        !installationFlow &&
         order.address_geocode_provider === "openrouteservice" &&
-        order.address_geocoded_at &&
-        (!order.updated_at ||
-          new Date(order.address_geocoded_at).getTime() >=
-            new Date(order.updated_at).getTime());
+        isLegacyGeocodeCacheCurrent(
+          order.address_geocoded_at,
+          order.updated_at
+        );
 
       if (
         geocodeIsCurrent &&
@@ -858,16 +1109,24 @@ export default async function handler(req: any, res: any) {
         geocodeMetrics.totalCalls += 1;
         geocodeMetrics.externalMs += getElapsedMs(geocodeStartedAt);
         geocodeCache.set(address, coords);
+        console.log("[hub-os/optimize-installations]", {
+          stage: "geocode",
+          osId: order.id,
+          installationId: order.installation_id,
+          result: "accepted",
+        });
 
-        const { error: updateGeocodeError } = await supabaseAdmin
-          .from("os_orders")
-          .update({
-            address_lat: coords[1],
-            address_lng: coords[0],
-            address_geocoded_at: new Date().toISOString(),
-            address_geocode_provider: "openrouteservice",
-          })
-          .eq("id", order.id);
+        const { error: updateGeocodeError } = installationFlow
+          ? { error: null }
+          : await supabaseAdmin
+              .from("os_orders")
+              .update({
+                address_lat: coords[1],
+                address_lng: coords[0],
+                address_geocoded_at: new Date().toISOString(),
+                address_geocode_provider: "openrouteservice",
+              })
+              .eq("id", order.id);
         if (updateGeocodeError) {
           console.warn(
             "[hub-os/optimize-installations] geocode cache update failed",
@@ -881,14 +1140,48 @@ export default async function handler(req: any, res: any) {
 
         return coords;
       } catch (error) {
+        const reason =
+          error instanceof TimeoutExternalError
+            ? "geocode_timeout"
+            : error instanceof GeocodeValidationError
+              ? error.reason
+              : "geocode_failed";
+        console.warn("[hub-os/optimize-installations]", {
+          stage: "geocode",
+          osId: order.id,
+          installationId: order.installation_id,
+          result: "rejected",
+          reason,
+          score:
+            error instanceof GeocodeValidationError ? error.score : undefined,
+        });
         if (error instanceof TimeoutExternalError) {
-          unassigned.push({ os_id: order.id, reason: "geocode_timeout" });
+          unassigned.push({
+            installation_id: order.installation_id,
+            os_id: order.id,
+            reason,
+            address: order.address,
+            client_name: order.client_name,
+            sale_number: order.sale_number,
+          });
           return null;
         }
-        if (order.address_lng !== null && order.address_lat !== null) {
+        if (
+          !installationFlow &&
+          !(error instanceof GeocodeValidationError) &&
+          order.address_lng !== null &&
+          order.address_lat !== null
+        ) {
           return [order.address_lng, order.address_lat];
         }
-        unassigned.push({ os_id: order.id, reason: "geocode_failed" });
+        unassigned.push({
+          installation_id: order.installation_id,
+          os_id: order.id,
+          reason,
+          address: order.address,
+          client_name: order.client_name,
+          sale_number: order.sale_number,
+        });
         return null;
       }
     };
@@ -909,6 +1202,7 @@ export default async function handler(req: any, res: any) {
         summary: { distance_m: number | null; duration_s: number | null };
         stops: Array<{
           sequence: number;
+          installation_id?: string;
           os_id: string;
           address: string | null;
           coords: [number, number];
@@ -947,6 +1241,7 @@ export default async function handler(req: any, res: any) {
           summary: { distance_m: number | null; duration_s: number | null };
           stops: Array<{
             sequence: number;
+            installation_id?: string;
             os_id: string;
             address: string | null;
             coords: [number, number];
@@ -983,6 +1278,7 @@ export default async function handler(req: any, res: any) {
 
           const stops = optimized.orderedStops.map((item, index) => ({
             sequence: index + 1,
+            installation_id: item.os.installation_id,
             os_id: item.os.id,
             address: item.os.address,
             coords: item.coords,
@@ -1046,7 +1342,11 @@ export default async function handler(req: any, res: any) {
                 estimatedSummary.duration_s,
             },
             stops,
-            googleMapsUrl: buildGoogleMapsUrl(stops, resolvedStartCoords),
+            googleMapsUrl: buildGoogleMapsUrl(
+              stops,
+              resolvedStartCoords,
+              parsed.startAddress
+            ),
           });
           totalRoutes += 1;
         }
@@ -1127,6 +1427,11 @@ export default async function handler(req: any, res: any) {
 
 export {
   normalizeAddress,
+  normalizeAddressForComparison,
+  relevantAddressTokens,
+  scoreGeocodeFeature,
+  selectGeocodeCandidate,
+  isLegacyGeocodeCacheCurrent,
   haversineDistanceKm,
   clusterByGeoRadius,
   buildGoogleMapsUrl,

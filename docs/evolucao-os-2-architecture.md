@@ -304,7 +304,17 @@ A Produção termina em **Material Pronto** (`prod_status = 'Pronto / Avisar Cli
 
 `os_installations` preserva o snapshot do endereço e mantém no máximo uma agenda ativa por OS; equipes e membros vivem em `os_installation_teams` e `os_installation_team_members`. `os_deliveries` separa entrega própria de transportadora e também limita uma operação ativa. As RPCs `SECURITY DEFINER` fazem lock, autorização, mudança de estado macro e evento em uma transação. As filas continuam derivadas de `os_orders`, entidade canônica.
 
-Rotas permanecem sob demanda no endpoint canônico `/api/hub-os/optimize-installations`, com `orderIds` oriundos de `scheduled_start`; não existe tabela de plano nem segunda integração ORS. O fluxo legado de retirada, kiosk e `os_installation_feedbacks` foi preservado. Os grants legados de `order_flow_*`, `kiosk_*` e `installation_feedback*` não foram revogados nesta fase devido aos callers kiosk e tela antiga; a revisão granular permanece débito de segurança.
+Rotas permanecem sob demanda no endpoint canônico `/api/hub-os/optimize-installations`; não existe tabela de plano nem segunda integração ORS. O fluxo legado de retirada, kiosk e `os_installation_feedbacks` foi preservado. Os grants legados de `order_flow_*`, `kiosk_*` e `installation_feedback*` não foram revogados nesta fase devido aos callers kiosk e tela antiga; a revisão granular permanece débito de segurança.
+
+### Hotfix 4.0.1b — Precisão de localização
+
+- No fluxo de agenda, `installationIds` seleciona instalações `SCHEDULED` e `os_installations.address_snapshot` é a fonte canônica do endereço logístico. `orderIds` permanece disponível apenas para compatibilidade.
+- Coordenadas validadas pelo OpenRouteService servem para proximidade, ordem, distância e duração. Elas não substituem o destino informado pela empresa.
+- Google Maps e Waze recebem sempre o endereço textual quando ele estiver disponível; coordenadas são apenas fallback quando o texto estiver vazio.
+- Resultados ORS são comparados por texto, número do imóvel, camada e contexto. Resultado pouco confiável ou ambíguo fica fora da rota e é apresentado como pendência ao gerente.
+- O geocode de `address_snapshot` é mantido somente na memória da requisição e não sobrescreve coordenadas de `os_orders`.
+
+Evolução futura, fora deste hotfix: **confirmação manual da localização da instalação no mapa**, permitindo mover o pin, salvar coordenada confirmada e marcar a localização como verificada.
 
 ## Fase 4.0.1 — Estabilização Logística
 
