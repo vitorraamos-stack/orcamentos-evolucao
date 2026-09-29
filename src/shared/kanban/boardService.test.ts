@@ -88,11 +88,68 @@ describe("moveBoardOrder", () => {
     expect(sendOrderToProduction).toHaveBeenCalledWith(
       expect.objectContaining({
         orderId: order().id,
-        deadlinePreset: "CUSTOM",
-        deliveryDate: "2026-10-10",
       })
     );
     expect(moveOrder).not.toHaveBeenCalled();
+  });
+  it("sends a standard preset directly even before its date is calculated", async () => {
+    const sendOrderToProduction = vi.fn().mockResolvedValue(order());
+    await moveBoardOrder(
+      {
+        order: order({
+          delivery_deadline_preset: "STANDARD_8_12",
+          delivery_date: null,
+        }),
+        board: "art",
+        to: "Produzir",
+        role: "arte_finalista",
+        isManager: false,
+      },
+      { moveOrder: vi.fn(), sendOrderToProduction }
+    );
+    expect(sendOrderToProduction).toHaveBeenCalledOnce();
+  });
+  it("blocks handoff when the OS has no preset", async () => {
+    const sendOrderToProduction = vi.fn();
+    await expect(
+      moveBoardOrder(
+        {
+          order: order({ delivery_deadline_preset: null }),
+          board: "art",
+          to: "Produzir",
+          role: "arte_finalista",
+          isManager: false,
+        },
+        { moveOrder: vi.fn(), sendOrderToProduction }
+      )
+    ).rejects.toThrow("Esta OS está sem prazo de produção");
+    expect(sendOrderToProduction).not.toHaveBeenCalled();
+  });
+  it("blocks CUSTOM without its date and accepts the saved date", async () => {
+    const sendOrderToProduction = vi.fn().mockResolvedValue(order());
+    await expect(
+      moveBoardOrder(
+        {
+          order: order({ delivery_date: null }),
+          board: "art",
+          to: "Produzir",
+          role: "arte_finalista",
+          isManager: false,
+        },
+        { moveOrder: vi.fn(), sendOrderToProduction }
+      )
+    ).rejects.toThrow("prazo personalizado");
+    await moveBoardOrder(
+      {
+        order: order(),
+        board: "art",
+        to: "Produzir",
+        role: "arte_finalista",
+        isManager: false,
+      },
+      { moveOrder: vi.fn(), sendOrderToProduction }
+    );
+    expect(sendOrderToProduction).toHaveBeenCalledOnce();
   });
   it("isolates board roles while manager can operate production", async () => {
     const deps = {

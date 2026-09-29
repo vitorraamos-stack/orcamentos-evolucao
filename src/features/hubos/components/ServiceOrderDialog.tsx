@@ -358,29 +358,18 @@ export default function ServiceOrderDialog({
     if (!order) return;
     setMoving(true);
     try {
-      const nowIso = new Date().toISOString();
-      const startedAt = order.delivery_deadline_started_at ?? nowIso;
-      const resolvedDeliveryDate = resolveDeliveryDate({
-        preset: order.delivery_deadline_preset,
-        startedAt,
-        manualDate: order.delivery_date,
-      });
-
-      const deliveryDate =
-        order.delivery_deadline_preset === "CUSTOM"
-          ? order.delivery_date
-          : resolvedDeliveryDate;
-      if (!deliveryDate) {
+      if (!order.delivery_deadline_preset) {
         throw new Error(
-          "Defina o prazo de entrega antes de iniciar a produção."
+          "Esta OS está sem prazo de produção. Solicite ao Comercial ou Gerência a definição do prazo antes de enviar para Produção."
         );
       }
+      if (order.delivery_deadline_preset === "CUSTOM" && !order.delivery_date)
+        throw new Error(
+          "Esta OS possui prazo personalizado, mas a data não foi definida. Solicite ao Comercial ou Gerência a correção da OS."
+        );
 
       const updated = await sendOrderToProduction({
         orderId: order.id,
-        deadlinePreset: order.delivery_deadline_preset!,
-        deadlineStartedAt: startedAt,
-        deliveryDate,
       });
       onUpdated(updated);
       toast.success("Card enviado para Produção.");
@@ -465,7 +454,7 @@ export default function ServiceOrderDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label>Prazo de produção/entrega</Label>
+                <Label>Prazo de produção</Label>
                 {shouldShowOnlySelectedDeadline ? (
                   <div className="rounded-md border bg-muted/30 p-3 text-sm">
                     {selectedDeadlineConfig?.label ?? "Prazo não informado"}
@@ -499,6 +488,15 @@ export default function ServiceOrderDialog({
                     </div>
                   </RadioGroup>
                 )}
+                {!order?.delivery_deadline_started_at ? (
+                  <p className="text-sm text-muted-foreground">
+                    Contagem ainda não iniciada
+                  </p>
+                ) : order.delivery_date ? (
+                  <p className="text-sm text-muted-foreground">
+                    Previsão: {formatDatePtBr(order.delivery_date)}
+                  </p>
+                ) : null}
                 <div className="space-y-1">
                   <Label>Data manual (somente prazo personalizado)</Label>
                   <Input

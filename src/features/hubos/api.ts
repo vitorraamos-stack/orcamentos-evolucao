@@ -2,7 +2,6 @@ import { supabase } from "@/lib/supabase";
 import { invokeEdgeFunction } from "@/lib/supabase/invokeEdgeFunction";
 import type {
   ArtStatus,
-  DeliveryDeadlinePreset,
   InstallationFeedback,
   OsOrder,
   OsOrderEvent,
@@ -416,24 +415,20 @@ export const updateOrder = async (
 // both statuses are committed by one server-authorized transaction.
 export const sendOrderToProduction = async ({
   orderId,
-  deadlinePreset,
-  deadlineStartedAt,
-  deliveryDate,
   eventPayload = {},
 }: {
   orderId: string;
-  deadlinePreset: DeliveryDeadlinePreset;
-  deadlineStartedAt: string;
-  deliveryDate: string;
   eventPayload?: Record<string, unknown>;
 }) => {
   const { data, error } = await supabase.rpc(
     "hub_os_send_to_production_secure",
     {
       p_os_id: orderId,
-      p_delivery_deadline_preset: deadlinePreset,
-      p_delivery_deadline_started_at: deadlineStartedAt,
-      p_delivery_date: deliveryDate,
+      // Deprecated compatibility parameters. The RPC deliberately ignores
+      // them and resolves the deadline from the locked OS row.
+      p_delivery_deadline_preset: null,
+      p_delivery_deadline_started_at: null,
+      p_delivery_date: null,
       p_event_payload: eventPayload,
     }
   );

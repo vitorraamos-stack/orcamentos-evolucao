@@ -26,7 +26,6 @@ import {
 } from "../api";
 import type { LogisticType, OsOrder, ProductionTag } from "../types";
 import { useAuth } from "@/contexts/AuthContext";
-import { resolveDeliveryDate } from "../deliveryDeadline";
 
 interface OrderDetailsDialogProps {
   order: OsOrder | null;
@@ -216,29 +215,25 @@ export default function OrderDetailsDialog({
     if (!order) return;
     try {
       setMoving(true);
-      const startedAt =
-        order.delivery_deadline_started_at ?? new Date().toISOString();
-      const deliveryDate = resolveDeliveryDate({
-        preset: order.delivery_deadline_preset,
-        startedAt,
-        manualDate: order.delivery_date,
-      });
-      if (!deliveryDate)
+      if (!order.delivery_deadline_preset)
         throw new Error(
-          "Defina o prazo de entrega antes de iniciar a produção."
+          "Esta OS está sem prazo de produção. Solicite ao Comercial ou Gerência a definição do prazo antes de enviar para Produção."
+        );
+      if (order.delivery_deadline_preset === "CUSTOM" && !order.delivery_date)
+        throw new Error(
+          "Esta OS possui prazo personalizado, mas a data não foi definida. Solicite ao Comercial ou Gerência a correção da OS."
         );
       const updated = await sendOrderToProduction({
         orderId: order.id,
-        deadlinePreset: order.delivery_deadline_preset!,
-        deadlineStartedAt: startedAt,
-        deliveryDate,
       });
       onUpdated(updated);
       toast.success("Card enviado para Produção.");
       onOpenChange(false);
     } catch (error) {
       console.error(error);
-      toast.error("Erro ao enviar para Produção.");
+      toast.error(
+        error instanceof Error ? error.message : "Erro ao enviar para Produção."
+      );
     } finally {
       setMoving(false);
     }

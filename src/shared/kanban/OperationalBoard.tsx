@@ -11,7 +11,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArtworkHandoffDialog } from "@/modules/artwork/components/ArtworkHandoffDialog";
 import {
   listArtworkAssignees,
   listArtworkBoardOrders,
@@ -26,10 +25,7 @@ import {
   setProductionTag,
   updateOrderInsumos,
 } from "@/features/hubos/api";
-import type {
-  DeliveryDeadlinePreset,
-  ProductionTag,
-} from "@/features/hubos/types";
+import type { ProductionTag } from "@/features/hubos/types";
 import { getValidOrderTransitions } from "@/modules/orders/services/orderTransitions";
 import { BoardCard } from "./BoardCard";
 import { BoardColumn } from "./BoardColumn";
@@ -70,13 +66,8 @@ export function OperationalBoard({
     [loading, setLoading] = useState(true),
     [error, setError] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null),
-    [handoff, setHandoff] = useState<BoardCardModel | null>(null),
     [tagCard, setTagCard] = useState<BoardCardModel | null>(null);
-  const [deadlinePreset, setDeadlinePreset] = useState<
-      DeliveryDeadlinePreset | ""
-    >(""),
-    [manualDate, setManualDate] = useState(""),
-    [tag, setTag] = useState<ProductionTag>("EM_PRODUCAO"),
+  const [tag, setTag] = useState<ProductionTag>("EM_PRODUCAO"),
     [insumos, setInsumos] = useState("");
   const canMove =
     board === "art"
@@ -148,11 +139,7 @@ export function OperationalBoard({
     () => calculateBoardMetrics(cards, board),
     [cards, board]
   );
-  const performMove = async (
-    card: BoardCardModel,
-    to: BoardStatus,
-    options?: { preset?: DeliveryDeadlinePreset; manualDate?: string }
-  ) => {
+  const performMove = async (card: BoardCardModel, to: BoardStatus) => {
     const previous = cards;
     setCards(current =>
       current.map(value =>
@@ -176,8 +163,6 @@ export function OperationalBoard({
         to,
         role: hubRole,
         isManager: hubPermissions.isManager,
-        preset: options?.preset,
-        manualDate: options?.manualDate,
       });
       toast.success(
         to === "Produzir" ? "OS enviada para Produção." : "Etapa atualizada."
@@ -193,15 +178,22 @@ export function OperationalBoard({
     }
   };
   const requestMove = (card: BoardCardModel, to: BoardStatus) => {
-    if (
-      board === "art" &&
-      to === "Produzir" &&
-      (!card.order.delivery_deadline_preset || !card.order.delivery_date)
-    ) {
-      setDeadlinePreset(card.order.delivery_deadline_preset ?? "");
-      setManualDate(card.order.delivery_date ?? "");
-      setHandoff(card);
-      return;
+    if (board === "art" && to === "Produzir") {
+      if (!card.order.delivery_deadline_preset) {
+        toast.error(
+          "Esta OS está sem prazo de produção. Solicite ao Comercial ou Gerência a definição do prazo antes de enviar para Produção."
+        );
+        return;
+      }
+      if (
+        card.order.delivery_deadline_preset === "CUSTOM" &&
+        !card.order.delivery_date
+      ) {
+        toast.error(
+          "Esta OS possui prazo personalizado, mas a data não foi definida. Solicite ao Comercial ou Gerência a correção da OS."
+        );
+        return;
+      }
     }
     void performMove(card, to);
   };
@@ -352,23 +344,6 @@ export function OperationalBoard({
           ))}
         </div>
       </DndContext>
-      <ArtworkHandoffDialog
-        card={handoff}
-        preset={deadlinePreset}
-        manualDate={manualDate}
-        onPresetChange={setDeadlinePreset}
-        onManualDateChange={setManualDate}
-        onClose={() => setHandoff(null)}
-        onConfirm={() => {
-          if (!handoff || !deadlinePreset) return;
-          const card = handoff;
-          setHandoff(null);
-          void performMove(card, "Produzir", {
-            preset: deadlinePreset,
-            manualDate,
-          });
-        }}
-      />
       <ProductionTagDialog
         card={tagCard}
         tag={tag}

@@ -978,6 +978,22 @@ export default function HubOS() {
     nextStatus: ArtStatus,
     options: MoveOrderToArtStatusOptions = {}
   ) => {
+    if (nextStatus === "Produzir" && !order.delivery_deadline_preset) {
+      toast.error(
+        "Esta OS está sem prazo de produção. Solicite ao Comercial ou Gerência a definição do prazo antes de enviar para Produção."
+      );
+      return;
+    }
+    if (
+      nextStatus === "Produzir" &&
+      order.delivery_deadline_preset === "CUSTOM" &&
+      !order.delivery_date
+    ) {
+      toast.error(
+        "Esta OS possui prazo personalizado, mas a data não foi definida. Solicite ao Comercial ou Gerência a correção da OS."
+      );
+      return;
+    }
     const inboxStatus = ART_COLUMNS[0];
     const inCreationStatus = ART_COLUMNS[1];
     const previous = order;
@@ -1024,9 +1040,6 @@ export default function HubOS() {
         nextStatus === "Produzir"
           ? await sendOrderToProduction({
               orderId: order.id,
-              deadlinePreset: order.delivery_deadline_preset!,
-              deadlineStartedAt: startAt!,
-              deliveryDate: finalDeliveryDate!,
               eventPayload: {
                 source: "kanban",
                 is_external_production:
