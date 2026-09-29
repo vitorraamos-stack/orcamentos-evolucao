@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InstallationScheduleDialog } from "../components/InstallationScheduleDialog";
 import { InstallationTeamDialog } from "../components/InstallationTeamDialog";
+import { InstallationHistoryCard } from "../components/InstallationHistoryCard";
 import {
   installationAction,
   loadInstallationWorkspace,
@@ -36,6 +37,8 @@ import {
   isLegacyInstallation,
   isMyInstallation,
   isWaitingInstallation,
+  getInstallationActions,
+  sortInstallationHistory,
 } from "../services/installations";
 import { saoPauloDateKey } from "@/shared/lib/saoPauloTime";
 import type { Installation, InstallationTeam, LogisticsOrder } from "../types";
@@ -265,35 +268,48 @@ export default function InstallationsPage() {
                               Waze
                             </a>
                           </Button>
-                          {hubPermissions.canManageInstallations &&
-                            i.status === "SCHEDULED" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setEditing(i);
-                                  setDialog(true);
-                                }}
-                              >
-                                Reagendar
-                              </Button>
-                            )}
-                          {hubPermissions.canExecuteInstallations &&
-                            i.status === "SCHEDULED" && (
-                              <Button size="sm" onClick={() => act("start", i)}>
-                                Iniciar
-                              </Button>
-                            )}
-                          {hubPermissions.canExecuteInstallations &&
-                            ["SCHEDULED", "IN_PROGRESS"].includes(i.status) && (
-                              <Button
-                                size="sm"
-                                onClick={() => act("complete", i)}
-                              >
-                                Concluir
-                              </Button>
-                            )}
-                          {hubPermissions.canManageInstallations && (
+                          {getInstallationActions({
+                            status: i.status,
+                            canExecute: hubPermissions.canExecuteInstallations,
+                            isManager: hubPermissions.canManageInstallations,
+                          }).canReschedule && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditing(i);
+                                setDialog(true);
+                              }}
+                            >
+                              Reagendar
+                            </Button>
+                          )}
+                          {getInstallationActions({
+                            status: i.status,
+                            canExecute: hubPermissions.canExecuteInstallations,
+                            isManager: hubPermissions.canManageInstallations,
+                          }).canStart && (
+                            <Button size="sm" onClick={() => act("start", i)}>
+                              Iniciar
+                            </Button>
+                          )}
+                          {getInstallationActions({
+                            status: i.status,
+                            canExecute: hubPermissions.canExecuteInstallations,
+                            isManager: hubPermissions.canManageInstallations,
+                          }).canComplete && (
+                            <Button
+                              size="sm"
+                              onClick={() => act("complete", i)}
+                            >
+                              Concluir
+                            </Button>
+                          )}
+                          {getInstallationActions({
+                            status: i.status,
+                            canExecute: hubPermissions.canExecuteInstallations,
+                            isManager: hubPermissions.canManageInstallations,
+                          }).canCancel && (
                             <Button
                               size="sm"
                               variant="destructive"
@@ -518,21 +534,15 @@ export default function InstallationsPage() {
         </TabsContent>
         <TabsContent value="history">
           <div className="grid gap-3">
-            {data.installations
-              .filter(i => ["COMPLETED", "CANCELLED"].includes(i.status))
+            {sortInstallationHistory(
+              data.installations.filter(i =>
+                ["COMPLETED", "CANCELLED"].includes(i.status)
+              )
+            )
               .slice(0, 100)
               .map(i => (
-                <Card key={i.id}>
-                  <CardContent className="pt-5">
-                    <b>OS {i.order?.sale_number ?? i.os_id.slice(0, 8)}</b> ·{" "}
-                    {INSTALLATION_STATUS_LABEL[i.status]}
-                    <p className="text-sm text-muted-foreground">
-                      {formatAgendaDate(i.scheduled_start)} ·{" "}
-                      {i.team?.name ?? "Sem equipe"}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}{" "}
+                <InstallationHistoryCard key={i.id} installation={i} />
+              ))}
           </div>
         </TabsContent>
       </Tabs>

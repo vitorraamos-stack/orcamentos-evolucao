@@ -323,3 +323,27 @@ A gestão de equipes de instalação passou a incluir membros, líder, veículo 
 A execução de instalações exige acesso ao `hub_os` e papel de gerente ou instalador atribuído. Rotas são montadas por data local e por uma única equipe, preservando o endpoint ORS existente. Datas de instalações e entregas usam explicitamente `America/Sao_Paulo`, sem depender do timezone do navegador.
 
 Entregas próprias registram responsável, veículo e observações; entregas agendadas (e dados operacionais de transportadora em trânsito) podem ser corrigidas pela RPC `hub_os_update_delivery_secure`, sem alterar modalidade, OS ou status. As filas de instalações e entregas acompanham `os_orders` via Realtime, com refresh agrupado, além de suas tabelas operacionais. As regras legadas de retirada e o kiosk não foram alterados.
+
+# Hotfix 4.0.1c — fechamento da Fase 4
+
+O Histórico de Instalações agora enriquece, em lote e sem N+1, todas as
+instalações agendadas, em execução, concluídas e canceladas com o número e o
+cliente da OS. A consulta não depende da fila operacional de OS prontas, de
+modo que ordens já finalizadas continuam identificadas por dados humanos e
+nunca por um prefixo de UUID.
+
+A aba **Instalação / Entrega** da OS apresenta o registro ativo (ou, na
+ausência dele, o mais recente), equipe, responsável resolvido pelo contrato
+`get_user_display_names`, veículo, endereço capturado, observações e timestamps
+em `America/Sao_Paulo`. Instalações anteriores permanecem visíveis em uma
+seção histórica simples, inclusive o motivo de cancelamento. Maps e Waze usam
+os helpers compartilhados e priorizam o endereço textual.
+
+As ações visuais seguem o contrato das RPCs: instalador inicia apenas uma
+instalação agendada atribuída e conclui apenas uma em execução; gerente mantém
+a conclusão direta de uma agendada e pode cancelar registros ativos. A suíte
+frontend cobre identificação humana, fallback sem número, ordenação,
+revisitas e matriz de ações. A suíte pgTAP comportamental cobre agendamento,
+conflito, validação de equipe e responsável, início, conclusão, cancelamento,
+efeitos atômicos na OS/eventos e grants. Nenhuma migration de produto foi
+necessária para este hotfix.
