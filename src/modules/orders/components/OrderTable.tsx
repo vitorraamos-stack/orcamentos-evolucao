@@ -7,6 +7,7 @@ import {
   OrderStatusBadge,
 } from "@/shared/components/OrderBadges";
 import { EmptyState } from "@/shared/components/OperationalUi";
+import { isOrderUrgent } from "@/features/hubos/orderUrgency";
 
 const date = (value?: string | null) =>
   value
@@ -80,9 +81,7 @@ export function OrderTable({ orders }: { orders: OsOrder[] }) {
                   {date(order.delivery_date)}
                 </td>
                 <td className="px-4 py-3">
-                  <OrderPriorityBadge
-                    urgent={order.art_direction_tag === "URGENTE"}
-                  />
+                  <OrderPriorityBadge urgent={isOrderUrgent(order)} />
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">
                   Não atribuído

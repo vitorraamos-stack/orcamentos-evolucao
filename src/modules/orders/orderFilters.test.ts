@@ -21,6 +21,7 @@ describe("matchesQuickFilter", () => {
     ["week", { delivery_date: "2026-09-25" }],
     ["overdue", { delivery_date: "2026-09-17" }],
     ["urgent", { art_direction_tag: "URGENTE" }],
+    ["urgent", { art_direction_tag: "CRIACAO_ARTE", is_urgent: true }],
     ["pending", { production_tag: "AGUARDANDO_INSUMOS" }],
   ];
 

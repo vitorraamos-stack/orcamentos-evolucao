@@ -1,5 +1,6 @@
 import { addBusinessDays } from "./deliveryDeadline";
 import type { ArtDirectionTag, OsOrder } from "./types";
+import { isOrderUrgent } from "./orderUrgency";
 
 type DesignerSlaKind = "business" | "calendar";
 
@@ -48,9 +49,12 @@ export const getDesignerSlaConfig = (tag?: ArtDirectionTag | null) => {
 };
 
 export const resolveDesignerSlaDeadline = (
-  order: Pick<OsOrder, "art_direction_tag" | "created_at">
+  order: Pick<OsOrder, "art_direction_tag" | "created_at"> &
+    Partial<Pick<OsOrder, "is_urgent">>
 ) => {
-  const config = getDesignerSlaConfig(order.art_direction_tag);
+  const config = getDesignerSlaConfig(
+    isOrderUrgent(order) ? "URGENTE" : order.art_direction_tag
+  );
   if (!config) return null;
 
   const baseDate = new Date(order.created_at);
@@ -66,9 +70,12 @@ export const resolveDesignerSlaDeadline = (
 };
 
 export const getDesignerSlaState = (
-  order: Pick<OsOrder, "art_direction_tag" | "created_at">
+  order: Pick<OsOrder, "art_direction_tag" | "created_at"> &
+    Partial<Pick<OsOrder, "is_urgent">>
 ): DesignerSlaState | null => {
-  const config = getDesignerSlaConfig(order.art_direction_tag);
+  const config = getDesignerSlaConfig(
+    isOrderUrgent(order) ? "URGENTE" : order.art_direction_tag
+  );
   const deadline = resolveDesignerSlaDeadline(order);
   if (!config || !deadline) return null;
 
@@ -82,7 +89,8 @@ export const getDesignerSlaState = (
 };
 
 export const getDesignerSlaLabel = (
-  order: Pick<OsOrder, "art_direction_tag" | "created_at">
+  order: Pick<OsOrder, "art_direction_tag" | "created_at"> &
+    Partial<Pick<OsOrder, "is_urgent">>
 ) => {
   const deadline = resolveDesignerSlaDeadline(order);
   const state = getDesignerSlaState(order);

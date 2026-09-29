@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { orderItemInputSchema } from "@/features/hubos/createOrderDomain";
 import { supabase } from "@/lib/supabase";
 import type { OsOrder, OsOrderLayoutAsset } from "@/features/hubos/types";
 import type {
@@ -13,169 +14,496 @@ import type {
   OrderItemStatus,
   UserOption,
 } from "../types/orderDetail";
-import type { ItemOperation, OperationStatus, WorkCenter } from "@/modules/production/operations";
+import type {
+  ItemOperation,
+  OperationStatus,
+  WorkCenter,
+} from "@/modules/production/operations";
 
 export const ORDER_DETAIL_SELECT =
-  "id,os_number,sale_number,client_name,title,description,delivery_date,delivery_deadline_preset,delivery_deadline_started_at,logistic_type,address,address_lat,address_lng,address_geocoded_at,address_geocode_provider,production_tag,insumos_details,insumos_return_notes,insumos_requested_at,insumos_resolved_at,insumos_resolved_by,art_direction_tag,art_status,prod_status,reproducao,letra_caixa,archived,archived_at,archived_by,created_by,updated_by,created_at,updated_at";
+  "id,os_number,sale_number,client_name,title,description,delivery_date,delivery_deadline_preset,delivery_deadline_started_at,logistic_type,address,address_lat,address_lng,address_geocoded_at,address_geocode_provider,production_tag,insumos_details,insumos_return_notes,insumos_requested_at,insumos_resolved_at,insumos_resolved_by,art_direction_tag,is_urgent,art_status,prod_status,reproducao,letra_caixa,archived,archived_at,archived_by,created_by,updated_by,created_at,updated_at";
 export const ORDER_ASSET_SELECT =
   "id,os_id,asset_type,object_path,original_name,mime_type,size_bytes,storage_provider,storage_bucket,bucket,uploaded_at,deleted_from_storage_at,r2_etag,error";
 
 const uuid = z.string().uuid();
-const assigneeInput = z.object({ orderId: uuid, userId: uuid, scope: z.enum(["GENERAL", "ART", "PRODUCTION", "FINISHING", "INSTALLATION"]) });
-const assigneeScopeSchema = z.enum(["GENERAL", "ART", "PRODUCTION", "FINISHING", "INSTALLATION"]);
-const deadlineScopeSchema = z.enum(["ART", "APPROVAL", "PRODUCTION", "FINISHING", "INSTALLATION"]);
-const deadlineInput = z.object({ orderId: uuid, scope: z.enum(["ART", "APPROVAL", "PRODUCTION", "FINISHING", "INSTALLATION"]), dueDate: z.iso.date(), completedAt: z.string().nullable().optional() });
-const optionalText = (max: number) => z.preprocess(value => value === "" ? null : value, z.string().trim().max(max).nullable().optional());
-const optionalPositiveNumber = z.preprocess(value => value === "" || value == null ? null : value, z.coerce.number().positive().max(100000).nullable().optional());
-export const itemInputSchema = z.object({
-  name: z.string().trim().min(1).max(160),
-  description: optionalText(4000),
-  quantity: z.coerce.number().positive().max(100000),
-  width_cm: optionalPositiveNumber,
-  height_cm: optionalPositiveNumber,
-  unit: z.string().trim().min(1).max(30),
-  notes: optionalText(4000),
-  status: z.enum(["PENDING", "IN_PROGRESS", "READY", "CANCELLED"]),
-  sort_order: z.coerce.number().int().min(0),
+const assigneeInput = z.object({
+  orderId: uuid,
+  userId: uuid,
+  scope: z.enum(["GENERAL", "ART", "PRODUCTION", "FINISHING", "INSTALLATION"]),
 });
-const commentInput = z.object({ orderId: uuid, message: z.string().trim().min(1).max(4000) });
+const assigneeScopeSchema = z.enum([
+  "GENERAL",
+  "ART",
+  "PRODUCTION",
+  "FINISHING",
+  "INSTALLATION",
+]);
+const deadlineScopeSchema = z.enum([
+  "ART",
+  "APPROVAL",
+  "PRODUCTION",
+  "FINISHING",
+  "INSTALLATION",
+]);
+const deadlineInput = z.object({
+  orderId: uuid,
+  scope: z.enum(["ART", "APPROVAL", "PRODUCTION", "FINISHING", "INSTALLATION"]),
+  dueDate: z.iso.date(),
+  completedAt: z.string().nullable().optional(),
+});
+export const itemInputSchema = orderItemInputSchema;
+const commentInput = z.object({
+  orderId: uuid,
+  message: z.string().trim().min(1).max(4000),
+});
 
 const throwIfError = (error: { message: string } | null) => {
   if (error) throw new Error(error.message);
 };
-const profileToUser = (profile: unknown, id: string): UserOption | undefined => {
+const profileToUser = (
+  profile: unknown,
+  id: string
+): UserOption | undefined => {
   const row = Array.isArray(profile) ? profile[0] : profile;
   if (!row || typeof row !== "object") return undefined;
-  const email = "email" in row && typeof row.email === "string" ? row.email : null;
+  const email =
+    "email" in row && typeof row.email === "string" ? row.email : null;
   return { id, email, name: email ?? "Usuário" };
 };
 
 export async function getOrderDetail(orderId: string): Promise<OrderDetail> {
   uuid.parse(orderId);
   const [orderResult, assigneesResult, deadlinesResult] = await Promise.all([
-    supabase.from("os_orders").select(ORDER_DETAIL_SELECT).eq("id", orderId).single(),
-    supabase.from("os_order_assignees").select("id,order_id,user_id,scope,created_at,created_by,updated_at,profiles!os_order_assignees_user_id_fkey(email)").eq("order_id", orderId).order("scope"),
-    supabase.from("os_order_deadlines").select("id,order_id,scope,due_date,completed_at,created_at,updated_at").eq("order_id", orderId).order("due_date"),
+    supabase
+      .from("os_orders")
+      .select(ORDER_DETAIL_SELECT)
+      .eq("id", orderId)
+      .single(),
+    supabase
+      .from("os_order_assignees")
+      .select(
+        "id,order_id,user_id,scope,created_at,created_by,updated_at,profiles!os_order_assignees_user_id_fkey(email)"
+      )
+      .eq("order_id", orderId)
+      .order("scope"),
+    supabase
+      .from("os_order_deadlines")
+      .select("id,order_id,scope,due_date,completed_at,created_at,updated_at")
+      .eq("order_id", orderId)
+      .order("due_date"),
   ]);
-  throwIfError(orderResult.error); throwIfError(assigneesResult.error); throwIfError(deadlinesResult.error);
-  const assignees = (assigneesResult.data ?? []).map(row => ({ ...row, user: profileToUser(row.profiles, row.user_id) })) as unknown as OrderAssignee[];
-  return { order: orderResult.data as unknown as OsOrder, assignees, deadlines: (deadlinesResult.data ?? []) as OrderDeadline[] };
+  throwIfError(orderResult.error);
+  throwIfError(assigneesResult.error);
+  throwIfError(deadlinesResult.error);
+  const assignees = (assigneesResult.data ?? []).map(row => ({
+    ...row,
+    user: profileToUser(row.profiles, row.user_id),
+  })) as unknown as OrderAssignee[];
+  return {
+    order: orderResult.data as unknown as OsOrder,
+    assignees,
+    deadlines: (deadlinesResult.data ?? []) as OrderDeadline[],
+  };
 }
 
 export async function listAssignableUsers(limit = 50): Promise<UserOption[]> {
-  const { data, error } = await supabase.from("profiles").select("id,email").order("email").limit(Math.min(100, Math.max(1, limit)));
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id,email")
+    .order("email")
+    .limit(Math.min(100, Math.max(1, limit)));
   throwIfError(error);
-  return (data ?? []).map(profile => ({ id: profile.id, email: profile.email, name: profile.email ?? "Usuário" }));
+  return (data ?? []).map(profile => ({
+    id: profile.id,
+    email: profile.email,
+    name: profile.email ?? "Usuário",
+  }));
 }
 
-export async function setOrderAssignee(orderId: string, scope: AssigneeScope, userId: string) {
+export async function setOrderAssignee(
+  orderId: string,
+  scope: AssigneeScope,
+  userId: string
+) {
   const input = assigneeInput.parse({ orderId, scope, userId });
-  const { data, error } = await supabase.from("os_order_assignees").upsert({ order_id: input.orderId, scope: input.scope, user_id: input.userId }, { onConflict: "order_id,scope" }).select("id,order_id,user_id,scope,created_at,created_by,updated_at").single();
-  throwIfError(error); return data as OrderAssignee;
+  const { data, error } = await supabase
+    .from("os_order_assignees")
+    .upsert(
+      { order_id: input.orderId, scope: input.scope, user_id: input.userId },
+      { onConflict: "order_id,scope" }
+    )
+    .select("id,order_id,user_id,scope,created_at,created_by,updated_at")
+    .single();
+  throwIfError(error);
+  return data as OrderAssignee;
 }
-export async function removeOrderAssignee(orderId: string, scope: AssigneeScope) {
-  uuid.parse(orderId); assigneeScopeSchema.parse(scope);
-  const { error } = await supabase.from("os_order_assignees").delete().eq("order_id", orderId).eq("scope", scope);
+export async function removeOrderAssignee(
+  orderId: string,
+  scope: AssigneeScope
+) {
+  uuid.parse(orderId);
+  assigneeScopeSchema.parse(scope);
+  const { error } = await supabase
+    .from("os_order_assignees")
+    .delete()
+    .eq("order_id", orderId)
+    .eq("scope", scope);
   throwIfError(error);
 }
 
-export async function upsertOrderDeadline(orderId: string, scope: DeadlineScope, dueDate: string, completedAt?: string | null) {
+export async function upsertOrderDeadline(
+  orderId: string,
+  scope: DeadlineScope,
+  dueDate: string,
+  completedAt?: string | null
+) {
   const input = deadlineInput.parse({ orderId, scope, dueDate, completedAt });
-  const { data, error } = await supabase.from("os_order_deadlines").upsert({ order_id: input.orderId, scope: input.scope, due_date: input.dueDate, completed_at: input.completedAt ?? null }, { onConflict: "order_id,scope" }).select().single();
-  throwIfError(error); return data as OrderDeadline;
+  const { data, error } = await supabase
+    .from("os_order_deadlines")
+    .upsert(
+      {
+        order_id: input.orderId,
+        scope: input.scope,
+        due_date: input.dueDate,
+        completed_at: input.completedAt ?? null,
+      },
+      { onConflict: "order_id,scope" }
+    )
+    .select()
+    .single();
+  throwIfError(error);
+  return data as OrderDeadline;
 }
-async function setDeadlineCompletion(orderId: string, scope: DeadlineScope, completedAt: string | null) {
-  uuid.parse(orderId); deadlineScopeSchema.parse(scope);
-  const { data, error } = await supabase.from("os_order_deadlines").update({ completed_at: completedAt }).eq("order_id", orderId).eq("scope", scope).select().single();
-  throwIfError(error); return data as OrderDeadline;
+async function setDeadlineCompletion(
+  orderId: string,
+  scope: DeadlineScope,
+  completedAt: string | null
+) {
+  uuid.parse(orderId);
+  deadlineScopeSchema.parse(scope);
+  const { data, error } = await supabase
+    .from("os_order_deadlines")
+    .update({ completed_at: completedAt })
+    .eq("order_id", orderId)
+    .eq("scope", scope)
+    .select()
+    .single();
+  throwIfError(error);
+  return data as OrderDeadline;
 }
-export const completeOrderDeadline = (orderId: string, scope: DeadlineScope) => setDeadlineCompletion(orderId, scope, new Date().toISOString());
-export const reopenOrderDeadline = (orderId: string, scope: DeadlineScope) => setDeadlineCompletion(orderId, scope, null);
-export async function removeOrderDeadline(orderId: string, scope: DeadlineScope) {
-  uuid.parse(orderId); deadlineScopeSchema.parse(scope);
-  const { error } = await supabase.from("os_order_deadlines").delete().eq("order_id", orderId).eq("scope", scope);
+export const completeOrderDeadline = (orderId: string, scope: DeadlineScope) =>
+  setDeadlineCompletion(orderId, scope, new Date().toISOString());
+export const reopenOrderDeadline = (orderId: string, scope: DeadlineScope) =>
+  setDeadlineCompletion(orderId, scope, null);
+export async function removeOrderDeadline(
+  orderId: string,
+  scope: DeadlineScope
+) {
+  uuid.parse(orderId);
+  deadlineScopeSchema.parse(scope);
+  const { error } = await supabase
+    .from("os_order_deadlines")
+    .delete()
+    .eq("order_id", orderId)
+    .eq("scope", scope);
   throwIfError(error);
 }
 
 export async function listOrderItems(orderId: string) {
   uuid.parse(orderId);
-  const { data, error } = await supabase.from("os_order_items").select("id,order_id,name,description,quantity,width_cm,height_cm,unit,notes,status,sort_order,created_at,updated_at,created_by,deleted_at").eq("order_id", orderId).is("deleted_at", null).order("sort_order");
-  throwIfError(error); return (data ?? []) as OrderItem[];
+  const { data, error } = await supabase
+    .from("os_order_items")
+    .select(
+      "id,order_id,name,description,quantity,width_cm,height_cm,unit,notes,status,sort_order,created_at,updated_at,created_by,deleted_at"
+    )
+    .eq("order_id", orderId)
+    .is("deleted_at", null)
+    .order("sort_order");
+  throwIfError(error);
+  return (data ?? []) as OrderItem[];
 }
 export async function listItemOperations(orderId: string) {
   uuid.parse(orderId);
-  const items = await listOrderItems(orderId); if (!items.length) return [];
-  const { data, error } = await supabase.from("os_order_item_operations").select("id,item_id,work_center,status,assigned_to,is_required,notes,blocked_reason,sort_order,started_at,completed_at,created_at,updated_at").in("item_id", items.map(item => item.id)).is("deleted_at", null).order("sort_order");
-  throwIfError(error); return (data ?? []) as ItemOperation[];
+  const items = await listOrderItems(orderId);
+  if (!items.length) return [];
+  const { data, error } = await supabase
+    .from("os_order_item_operations")
+    .select(
+      "id,item_id,work_center,status,assigned_to,is_required,notes,blocked_reason,sort_order,started_at,completed_at,created_at,updated_at"
+    )
+    .in(
+      "item_id",
+      items.map(item => item.id)
+    )
+    .is("deleted_at", null)
+    .order("sort_order");
+  throwIfError(error);
+  return (data ?? []) as ItemOperation[];
 }
-export async function createItemOperation(input:{itemId:string;workCenter:WorkCenter;assignedTo?:string|null;isRequired:boolean;notes?:string|null;sortOrder?:number}) {
- const {data,error}=await supabase.rpc("hub_os_create_item_operation_secure",{p_item_id:input.itemId,p_work_center:input.workCenter,p_assigned_to:input.assignedTo??null,p_is_required:input.isRequired,p_notes:input.notes??null,p_sort_order:input.sortOrder??0}); throwIfError(error); return data as ItemOperation;
+export async function createItemOperation(input: {
+  itemId: string;
+  workCenter: WorkCenter;
+  assignedTo?: string | null;
+  isRequired: boolean;
+  notes?: string | null;
+  sortOrder?: number;
+}) {
+  const { data, error } = await supabase.rpc(
+    "hub_os_create_item_operation_secure",
+    {
+      p_item_id: input.itemId,
+      p_work_center: input.workCenter,
+      p_assigned_to: input.assignedTo ?? null,
+      p_is_required: input.isRequired,
+      p_notes: input.notes ?? null,
+      p_sort_order: input.sortOrder ?? 0,
+    }
+  );
+  throwIfError(error);
+  return data as ItemOperation;
 }
-export async function setItemOperationStatus(id:string,status:OperationStatus,blockedReason?:string|null) { uuid.parse(id); const {data,error}=await supabase.rpc("hub_os_set_item_operation_status_secure",{p_operation_id:id,p_status:status,p_blocked_reason:blockedReason??null,p_notes:null}); throwIfError(error); return data as ItemOperation; }
-export async function updateItemOperation(id:string,input:{workCenter:WorkCenter;assignedTo?:string|null;isRequired:boolean;notes?:string|null;sortOrder:number}) { uuid.parse(id); const {data,error}=await supabase.rpc("hub_os_update_item_operation_secure",{p_operation_id:id,p_work_center:input.workCenter,p_assigned_to:input.assignedTo??null,p_is_required:input.isRequired,p_notes:input.notes??null,p_sort_order:input.sortOrder}); throwIfError(error); return data as ItemOperation; }
-export async function deleteItemOperation(id:string) { uuid.parse(id); const {data,error}=await supabase.rpc("hub_os_delete_item_operation_secure",{p_operation_id:id}); throwIfError(error); return data as ItemOperation; }
-export async function createOrderItem(orderId: string, input: z.input<typeof itemInputSchema>) {
-  uuid.parse(orderId); const value = itemInputSchema.parse(input);
-  const { data, error } = await supabase.from("os_order_items").insert({ order_id: orderId, ...value }).select().single();
-  throwIfError(error); return data as OrderItem;
+export async function setItemOperationStatus(
+  id: string,
+  status: OperationStatus,
+  blockedReason?: string | null
+) {
+  uuid.parse(id);
+  const { data, error } = await supabase.rpc(
+    "hub_os_set_item_operation_status_secure",
+    {
+      p_operation_id: id,
+      p_status: status,
+      p_blocked_reason: blockedReason ?? null,
+      p_notes: null,
+    }
+  );
+  throwIfError(error);
+  return data as ItemOperation;
 }
-export async function updateOrderItem(id: string, input: Partial<z.input<typeof itemInputSchema>>) {
-  uuid.parse(id); const value = itemInputSchema.partial().parse(input);
-  const { data, error } = await supabase.from("os_order_items").update(value).eq("id", id).select().single();
-  throwIfError(error); return data as OrderItem;
+export async function updateItemOperation(
+  id: string,
+  input: {
+    workCenter: WorkCenter;
+    assignedTo?: string | null;
+    isRequired: boolean;
+    notes?: string | null;
+    sortOrder: number;
+  }
+) {
+  uuid.parse(id);
+  const { data, error } = await supabase.rpc(
+    "hub_os_update_item_operation_secure",
+    {
+      p_operation_id: id,
+      p_work_center: input.workCenter,
+      p_assigned_to: input.assignedTo ?? null,
+      p_is_required: input.isRequired,
+      p_notes: input.notes ?? null,
+      p_sort_order: input.sortOrder,
+    }
+  );
+  throwIfError(error);
+  return data as ItemOperation;
+}
+export async function deleteItemOperation(id: string) {
+  uuid.parse(id);
+  const { data, error } = await supabase.rpc(
+    "hub_os_delete_item_operation_secure",
+    { p_operation_id: id }
+  );
+  throwIfError(error);
+  return data as ItemOperation;
+}
+export async function createOrderItem(
+  orderId: string,
+  input: z.input<typeof itemInputSchema>
+) {
+  uuid.parse(orderId);
+  const value = itemInputSchema.parse(input);
+  const { data, error } = await supabase
+    .from("os_order_items")
+    .insert({ order_id: orderId, ...value })
+    .select()
+    .single();
+  throwIfError(error);
+  return data as OrderItem;
+}
+export async function updateOrderItem(
+  id: string,
+  input: Partial<z.input<typeof itemInputSchema>>
+) {
+  uuid.parse(id);
+  const value = itemInputSchema.partial().parse(input);
+  const { data, error } = await supabase
+    .from("os_order_items")
+    .update(value)
+    .eq("id", id)
+    .select()
+    .single();
+  throwIfError(error);
+  return data as OrderItem;
 }
 export async function removeOrderItem(id: string) {
-  uuid.parse(id); const { error } = await supabase.from("os_order_items").update({ deleted_at: new Date().toISOString() }).eq("id", id); throwIfError(error);
+  uuid.parse(id);
+  const { error } = await supabase
+    .from("os_order_items")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
+  throwIfError(error);
 }
-export async function reorderOrderItems(items: Pick<OrderItem, "id" | "sort_order">[]) {
-  await Promise.all(items.map(item => updateOrderItem(item.id, { sort_order: item.sort_order })));
+export async function reorderOrderItems(
+  items: Pick<OrderItem, "id" | "sort_order">[]
+) {
+  await Promise.all(
+    items.map(item => updateOrderItem(item.id, { sort_order: item.sort_order }))
+  );
 }
 
 export async function listOrderComments(orderId: string) {
   uuid.parse(orderId);
-  const { data, error } = await supabase.from("os_order_comments").select("id,order_id,user_id,message,created_at,updated_at,deleted_at,profiles!os_order_comments_user_id_fkey(email)").eq("order_id", orderId).is("deleted_at", null).order("created_at", { ascending: false });
+  const { data, error } = await supabase
+    .from("os_order_comments")
+    .select(
+      "id,order_id,user_id,message,created_at,updated_at,deleted_at,profiles!os_order_comments_user_id_fkey(email)"
+    )
+    .eq("order_id", orderId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
   throwIfError(error);
-  return (data ?? []).map(row => ({ ...row, user: profileToUser(row.profiles, row.user_id) })) as unknown as OrderComment[];
+  return (data ?? []).map(row => ({
+    ...row,
+    user: profileToUser(row.profiles, row.user_id),
+  })) as unknown as OrderComment[];
 }
 export async function createOrderComment(orderId: string, message: string) {
   const input = commentInput.parse({ orderId, message });
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error("Sessão necessária para comentar.");
-  const { data, error } = await supabase.from("os_order_comments").insert({ order_id: input.orderId, user_id: auth.user.id, message: input.message }).select().single();
-  throwIfError(error); return data as OrderComment;
+  const { data, error } = await supabase
+    .from("os_order_comments")
+    .insert({
+      order_id: input.orderId,
+      user_id: auth.user.id,
+      message: input.message,
+    })
+    .select()
+    .single();
+  throwIfError(error);
+  return data as OrderComment;
 }
 export async function updateOrderComment(id: string, message: string) {
-  uuid.parse(id); const value = z.string().trim().min(1).max(4000).parse(message);
-  const { data, error } = await supabase.from("os_order_comments").update({ message: value }).eq("id", id).select().single(); throwIfError(error); return data as OrderComment;
+  uuid.parse(id);
+  const value = z.string().trim().min(1).max(4000).parse(message);
+  const { data, error } = await supabase
+    .from("os_order_comments")
+    .update({ message: value })
+    .eq("id", id)
+    .select()
+    .single();
+  throwIfError(error);
+  return data as OrderComment;
 }
 export async function removeOrderComment(id: string) {
-  uuid.parse(id); const { error } = await supabase.from("os_order_comments").update({ deleted_at: new Date().toISOString() }).eq("id", id); throwIfError(error);
+  uuid.parse(id);
+  const { error } = await supabase
+    .from("os_order_comments")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
+  throwIfError(error);
 }
 
 export async function listOrderActivities(orderId: string) {
   uuid.parse(orderId);
-  const { data, error } = await supabase.from("os_orders_event").select("id,os_id,type,payload,created_by,created_at").eq("os_id", orderId).order("created_at", { ascending: false }).limit(100);
+  const { data, error } = await supabase
+    .from("os_orders_event")
+    .select("id,os_id,type,payload,created_by,created_at")
+    .eq("os_id", orderId)
+    .order("created_at", { ascending: false })
+    .limit(100);
   throwIfError(error);
   const activities = (data ?? []) as OrderActivity[];
-  const userIds = Array.from(new Set(activities.map(activity => activity.created_by).filter((id): id is string => Boolean(id))));
+  const userIds = Array.from(
+    new Set(
+      activities
+        .map(activity => activity.created_by)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
   if (!userIds.length) return activities;
-  const { data: names, error: namesError } = await supabase.rpc("get_user_display_names", { user_ids: userIds });
+  const { data: names, error: namesError } = await supabase.rpc(
+    "get_user_display_names",
+    { user_ids: userIds }
+  );
   throwIfError(namesError);
-  const users = new Map(((names ?? []) as { id: string; full_name: string | null; email: string | null }[]).map(profile => [profile.id, { id: profile.id, name: profile.full_name || profile.email || "Usuário", email: profile.email }]));
-  return activities.map(activity => ({ ...activity, actor: activity.created_by ? users.get(activity.created_by) : undefined }));
+  const users = new Map(
+    (
+      (names ?? []) as {
+        id: string;
+        full_name: string | null;
+        email: string | null;
+      }[]
+    ).map(profile => [
+      profile.id,
+      {
+        id: profile.id,
+        name: profile.full_name || profile.email || "Usuário",
+        email: profile.email,
+      },
+    ])
+  );
+  return activities.map(activity => ({
+    ...activity,
+    actor: activity.created_by ? users.get(activity.created_by) : undefined,
+  }));
 }
-export async function recordOrderEvent(input: { orderId: string; type: string; payload?: Record<string, unknown> }) {
-  uuid.parse(input.orderId); z.string().min(1).max(80).parse(input.type);
+export async function recordOrderEvent(input: {
+  orderId: string;
+  type: string;
+  payload?: Record<string, unknown>;
+}) {
+  uuid.parse(input.orderId);
+  z.string().min(1).max(80).parse(input.type);
   const { data: auth } = await supabase.auth.getUser();
-  const { error } = await supabase.from("os_orders_event").insert({ os_id: input.orderId, type: input.type, payload: input.payload ?? {}, created_by: auth.user?.id ?? null }); throwIfError(error);
+  const { error } = await supabase
+    .from("os_orders_event")
+    .insert({
+      os_id: input.orderId,
+      type: input.type,
+      payload: input.payload ?? {},
+      created_by: auth.user?.id ?? null,
+    });
+  throwIfError(error);
 }
 export async function listOrderFiles(orderId: string) {
   uuid.parse(orderId);
-  const { data, error } = await supabase.from("os_order_assets").select(ORDER_ASSET_SELECT).eq("os_id", orderId).is("deleted_from_storage_at", null).order("uploaded_at", { ascending: false });
-  throwIfError(error); return (data ?? []) as OsOrderLayoutAsset[];
+  const { data, error } = await supabase
+    .from("os_order_assets")
+    .select(ORDER_ASSET_SELECT)
+    .eq("os_id", orderId)
+    .is("deleted_from_storage_at", null)
+    .order("uploaded_at", { ascending: false });
+  throwIfError(error);
+  return (data ?? []) as OsOrderLayoutAsset[];
 }
-export async function updateOrderOperationalFields(orderId: string, input: { title?: string | null; description?: string | null; delivery_date?: string | null; logistic_type?: OsOrder["logistic_type"]; address?: string | null; art_direction_tag?: OsOrder["art_direction_tag"] }) {
+export async function updateOrderOperationalFields(
+  orderId: string,
+  input: {
+    title?: string | null;
+    description?: string | null;
+    delivery_date?: string | null;
+    logistic_type?: OsOrder["logistic_type"];
+    address?: string | null;
+    art_direction_tag?: OsOrder["art_direction_tag"];
+    is_urgent?: boolean;
+  }
+) {
   uuid.parse(orderId);
-  const { data, error } = await supabase.rpc("hub_os_update_order_secure", { p_os_id: orderId, p_patch: input, p_event_type: "details_updated", p_event_payload: { fields: Object.keys(input) } });
-  throwIfError(error); return data as unknown as OsOrder;
+  const { data, error } = await supabase.rpc("hub_os_update_order_secure", {
+    p_os_id: orderId,
+    p_patch: input,
+    p_event_type: "details_updated",
+    p_event_payload: { fields: Object.keys(input) },
+  });
+  throwIfError(error);
+  return data as unknown as OsOrder;
 }
