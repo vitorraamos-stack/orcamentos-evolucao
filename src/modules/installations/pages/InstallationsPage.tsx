@@ -81,7 +81,10 @@ export default function InstallationsPage() {
   }, []);
   useEffect(() => {
     void load();
-    const refresh = () => { if (refreshTimer.current) clearTimeout(refreshTimer.current); refreshTimer.current = setTimeout(() => void load(), 250); };
+    const refresh = () => {
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+      refreshTimer.current = setTimeout(() => void load(), 250);
+    };
     const channel = supabase
       .channel("phase4-installations")
       .on(
@@ -94,8 +97,16 @@ export default function InstallationsPage() {
         { event: "*", schema: "public", table: "os_installation_teams" },
         refresh
       )
-      .on("postgres_changes", { event: "*", schema: "public", table: "os_installation_team_members" }, refresh)
-      .on("postgres_changes", { event: "*", schema: "public", table: "os_orders" }, refresh)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "os_installation_team_members" },
+        refresh
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "os_orders" },
+        refresh
+      )
       .subscribe();
     return () => {
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
@@ -138,9 +149,10 @@ export default function InstallationsPage() {
       .filter(
         i =>
           i.status === "SCHEDULED" &&
-          saoPauloDateKey(i.scheduled_start) === routeDate && i.team_id === routeTeam
+          saoPauloDateKey(i.scheduled_start) === routeDate &&
+          i.team_id === routeTeam
       )
-      .map(i => i.os_id);
+      .map(i => i.id);
     if (!routeTeam) return toast.error("Selecione uma equipe.");
     if (!ids.length)
       return toast.error("Nenhuma instalação agendada para a seleção.");
@@ -153,7 +165,7 @@ export default function InstallationsPage() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${session?.access_token}`,
       },
-      body: JSON.stringify({ orderIds: ids }),
+      body: JSON.stringify({ installationIds: ids }),
     });
     const body = await response.json();
     if (!response.ok) return toast.error(body.error);
@@ -218,7 +230,12 @@ export default function InstallationsPage() {
                           {i.team?.name ?? "Sem equipe"} ·{" "}
                           {i.vehicle_label ?? "Sem veículo"}
                         </p>
-                        <p className="text-sm">Responsável: {i.responsible?.name || i.responsible?.email || "Responsável não definido"}</p>
+                        <p className="text-sm">
+                          Responsável:{" "}
+                          {i.responsible?.name ||
+                            i.responsible?.email ||
+                            "Responsável não definido"}
+                        </p>
                         <p className="text-sm text-muted-foreground">
                           <MapPin className="mr-1 inline size-4" />
                           {i.address_snapshot || "Endereço não informado"}
@@ -341,7 +358,10 @@ export default function InstallationsPage() {
           <div className="mb-3 flex justify-end">
             {hubPermissions.canManageInstallations && (
               <Button
-                onClick={() => { setEditingTeam(null); setTeamDialog(true); }}
+                onClick={() => {
+                  setEditingTeam(null);
+                  setTeamDialog(true);
+                }}
               >
                 <Users className="mr-2 size-4" />
                 Nova equipe
@@ -355,13 +375,46 @@ export default function InstallationsPage() {
                   <CardTitle>{t.name}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <p>Veículo padrão: {t.default_vehicle_label || "Não definido"}</p>
+                  <p>
+                    Veículo padrão: {t.default_vehicle_label || "Não definido"}
+                  </p>
                   <Badge variant={t.active ? "default" : "secondary"}>
                     {t.active ? "Ativa" : "Inativa"}
                   </Badge>
-                  <div><b className="text-sm">Líder:</b> {(() => { const m = data.members.find(m => m.team_id === t.id && m.is_lead); const p = data.profiles.find(p => p.id === m?.user_id); return p?.name || p?.email || "Não definido"; })()}</div>
-                  <div><b className="text-sm">Membros:</b> {data.members.filter(m => m.team_id === t.id).map(m => data.profiles.find(p => p.id === m.user_id)?.name || data.profiles.find(p => p.id === m.user_id)?.email).filter(Boolean).join(", ") || "Nenhum"}</div>
-                  {hubPermissions.canManageInstallations && <Button variant="outline" size="sm" onClick={() => { setEditingTeam(t); setTeamDialog(true); }}>Editar</Button>}
+                  <div>
+                    <b className="text-sm">Líder:</b>{" "}
+                    {(() => {
+                      const m = data.members.find(
+                        m => m.team_id === t.id && m.is_lead
+                      );
+                      const p = data.profiles.find(p => p.id === m?.user_id);
+                      return p?.name || p?.email || "Não definido";
+                    })()}
+                  </div>
+                  <div>
+                    <b className="text-sm">Membros:</b>{" "}
+                    {data.members
+                      .filter(m => m.team_id === t.id)
+                      .map(
+                        m =>
+                          data.profiles.find(p => p.id === m.user_id)?.name ||
+                          data.profiles.find(p => p.id === m.user_id)?.email
+                      )
+                      .filter(Boolean)
+                      .join(", ") || "Nenhum"}
+                  </div>
+                  {hubPermissions.canManageInstallations && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setEditingTeam(t);
+                        setTeamDialog(true);
+                      }}
+                    >
+                      Editar
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -377,13 +430,68 @@ export default function InstallationsPage() {
                   value={routeDate}
                   onChange={e => setRouteDate(e.target.value)}
                 />
-                <select className="h-10 rounded-md border bg-background px-3" value={routeTeam} onChange={e => setRouteTeam(e.target.value)}><option value="">Selecione a equipe *</option>{data.teams.filter(t => t.active).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
-                {hubPermissions.canManageInstallations && <Button onClick={optimize} disabled={!routeTeam}>
-                  <RouteIcon className="mr-2 size-4" />
-                  Otimizar rota
-                </Button>}
+                <select
+                  className="h-10 rounded-md border bg-background px-3"
+                  value={routeTeam}
+                  onChange={e => setRouteTeam(e.target.value)}
+                >
+                  <option value="">Selecione a equipe *</option>
+                  {data.teams
+                    .filter(t => t.active)
+                    .map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                </select>
+                {hubPermissions.canManageInstallations && (
+                  <Button onClick={optimize} disabled={!routeTeam}>
+                    <RouteIcon className="mr-2 size-4" />
+                    Otimizar rota
+                  </Button>
+                )}
               </div>
-              {agenda.some(i => i.status === "SCHEDULED" && saoPauloDateKey(i.scheduled_start) === routeDate && !i.team_id) && <p className="text-sm text-amber-600">Existem instalações sem equipe definida.</p>}
+              {agenda.some(
+                i =>
+                  i.status === "SCHEDULED" &&
+                  saoPauloDateKey(i.scheduled_start) === routeDate &&
+                  !i.team_id
+              ) && (
+                <p className="text-sm text-amber-600">
+                  Existem instalações sem equipe definida.
+                </p>
+              )}
+              {routeResult?.unassigned?.length > 0 && (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950"
+                >
+                  <p className="font-semibold">
+                    Algumas instalações não puderam ter a localização validada.
+                  </p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+                    {routeResult.unassigned.map((item: any) => (
+                      <li key={item.installation_id ?? item.os_id}>
+                        OS {item.sale_number ?? item.os_id}{" "}
+                        {item.client_name ? `· ${item.client_name}` : ""} —{" "}
+                        {item.address || "Endereço não informado"} —{" "}
+                        {(
+                          {
+                            missing_address: "Endereço não informado",
+                            geocode_timeout:
+                              "Serviço de localização demorou para responder",
+                            geocode_failed: "Endereço não localizado",
+                            geocode_low_confidence:
+                              "Localização automática pouco confiável",
+                            geocode_ambiguous:
+                              "Foram encontradas múltiplas localizações possíveis",
+                          } as Record<string, string>
+                        )[item.reason] ?? item.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {routeResult?.groups
                 ?.flatMap((g: any) => g.routes)
                 .map((r: any) => (
@@ -443,8 +551,36 @@ export default function InstallationsPage() {
           await load();
         }}
       />
-      <InstallationTeamDialog open={teamDialog} onOpenChange={setTeamDialog} team={editingTeam} members={data.members} profiles={data.profiles} onSave={async (team, members) => { const saved = await saveTeam(team); const id = team.id ?? saved.id; await setTeamMembers(id, members); toast.success("Equipe salva."); await load(); }} />
-      <MutationInputDialog open={Boolean(cancelling)} onOpenChange={v => { if (!v) setCancelling(null); }} title="Cancelar instalação" label="Motivo" required confirmLabel="Confirmar cancelamento" onConfirm={async reason => { if (cancelling) await installationAction("cancel", cancelling.id, reason); toast.success("Instalação cancelada."); await load(); }} />
+      <InstallationTeamDialog
+        open={teamDialog}
+        onOpenChange={setTeamDialog}
+        team={editingTeam}
+        members={data.members}
+        profiles={data.profiles}
+        onSave={async (team, members) => {
+          const saved = await saveTeam(team);
+          const id = team.id ?? saved.id;
+          await setTeamMembers(id, members);
+          toast.success("Equipe salva.");
+          await load();
+        }}
+      />
+      <MutationInputDialog
+        open={Boolean(cancelling)}
+        onOpenChange={v => {
+          if (!v) setCancelling(null);
+        }}
+        title="Cancelar instalação"
+        label="Motivo"
+        required
+        confirmLabel="Confirmar cancelamento"
+        onConfirm={async reason => {
+          if (cancelling)
+            await installationAction("cancel", cancelling.id, reason);
+          toast.success("Instalação cancelada.");
+          await load();
+        }}
+      />
     </main>
   );
 }

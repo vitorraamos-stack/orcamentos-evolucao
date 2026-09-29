@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildWazeUrl,
+  buildMapsUrl,
   groupInstallationsByDay,
   isLegacyInstallation,
   isMyInstallation,
@@ -24,6 +25,20 @@ describe("installation logistics domain", () => {
   it("builds Waze coordinate and address links", () => {
     expect(buildWazeUrl({ lat: -23, lng: -46 })).toContain("ll=-23%2C-46");
     expect(buildWazeUrl({ address: "Rua A" })).toContain("q=Rua+A");
+  });
+  it("prefers the textual address over automatic coordinates for navigation", () => {
+    const input = {
+      address: "Rua João Grumiche, 196 - Kobrasol - São José",
+      lat: -27.596329,
+      lng: -48.611681,
+    };
+    const maps = new URL(buildMapsUrl(input));
+    const waze = new URL(buildWazeUrl(input));
+    expect(maps.searchParams.get("query")).toBe(input.address);
+    expect(maps.searchParams.get("query")).not.toContain("-27.596329");
+    expect(waze.searchParams.get("q")).toBe(input.address);
+    expect(waze.searchParams.get("ll")).toBeNull();
+    expect(waze.searchParams.get("navigate")).toBe("yes");
   });
   it("groups using Sao Paulo calendar day", () => {
     const rows = [

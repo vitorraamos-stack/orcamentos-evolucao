@@ -24,10 +24,12 @@ export type OptimizeInstallationRoutePayload = {
   startCoords?: [number, number] | null;
   profile?: "driving-car";
   orderIds?: string[] | null;
+  installationIds?: string[] | null;
 };
 
 export type OptimizedRouteStop = {
   sequence: number;
+  installation_id?: string;
   os_id: string;
   address: string | null;
   coords: [number, number];
@@ -46,8 +48,11 @@ export type OptimizeInstallationRouteResponse = {
     routes: number;
   };
   unassigned: Array<{
+    installation_id?: string;
     os_id: string;
     reason: string;
+    address?: string | null;
+    client_name?: string;
   }>;
   groups: Array<{
     groupId: string;
