@@ -268,6 +268,15 @@ export default function InstallationsPage() {
                               Waze
                             </a>
                           </Button>
+                          {hubPermissions.canExecuteInstallations && (
+                            <Button asChild size="sm">
+                              <Link href={`/instalacoes/execucao/${i.id}`}>
+                                {i.status === "SCHEDULED"
+                                  ? "Abrir execução"
+                                  : "Continuar execução"}
+                              </Link>
+                            </Button>
+                          )}
                           {getInstallationActions({
                             status: i.status,
                             canExecute: hubPermissions.canExecuteInstallations,
@@ -282,27 +291,6 @@ export default function InstallationsPage() {
                               }}
                             >
                               Reagendar
-                            </Button>
-                          )}
-                          {getInstallationActions({
-                            status: i.status,
-                            canExecute: hubPermissions.canExecuteInstallations,
-                            isManager: hubPermissions.canManageInstallations,
-                          }).canStart && (
-                            <Button size="sm" onClick={() => act("start", i)}>
-                              Iniciar
-                            </Button>
-                          )}
-                          {getInstallationActions({
-                            status: i.status,
-                            canExecute: hubPermissions.canExecuteInstallations,
-                            isManager: hubPermissions.canManageInstallations,
-                          }).canComplete && (
-                            <Button
-                              size="sm"
-                              onClick={() => act("complete", i)}
-                            >
-                              Concluir
                             </Button>
                           )}
                           {getInstallationActions({

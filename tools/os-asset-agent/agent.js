@@ -187,7 +187,9 @@ const isRetentionProtectedAsset = asset => {
   return (
     asset.asset_type === "PAYMENT_PROOF" ||
     asset.asset_type === "LAYOUT" ||
+    asset.asset_type === "INSTALLATION_EVIDENCE" ||
     normalizedPath.includes("/arte/layout/") ||
+    normalizedPath.includes("/instalacoes/") ||
     objectPath.includes("/Financeiro/Comprovante/") ||
     normalizedPath.includes("/financeiro/comprovante/") ||
     normalizedPath.includes("/payment_proofs/")

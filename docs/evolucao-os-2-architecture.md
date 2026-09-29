@@ -347,3 +347,12 @@ revisitas e matriz de ações. A suíte pgTAP comportamental cobre agendamento,
 conflito, validação de equipe e responsável, início, conclusão, cancelamento,
 efeitos atômicos na OS/eventos e grants. Nenhuma migration de produto foi
 necessária para este hotfix.
+## Fase 4.1 — Operação do Instalador em Campo
+
+A execução mobile de uma instalação continua centrada em `os_installations` e adiciona dois registros operacionais: `os_installation_checklist_items` (pré-instalação e conferência final) e `os_installation_evidence` (fotos antes, durante e depois). O checklist padrão é criado no servidor; iniciar exige o checklist prévio e concluir exige checklist final e ao menos uma evidência `AFTER`. Uma RPC exclusiva de gerente permite conclusão excepcional com motivo e evento de auditoria.
+
+As fotos usam o tipo `INSTALLATION_EVIDENCE`, bucket R2 privado e URLs assinadas temporárias. O banco persiste apenas o `object_path`: não persiste signed URLs, não cria `os_order_asset_jobs` e não depende do SMB. Os dois Asset Agents também protegem defensivamente esse tipo e caminhos `/Instalacoes/` contra limpeza.
+
+A rota mobile `/instalacoes/execucao/:id` reúne dados da OS, destino Maps/Waze, checklists, upload e galeria, observações finais e prontidão para conclusão. As validações de UI são conveniência; presigner e RPC repetem autorização por gerente, responsável ou membro da equipe, status, fase, MIME, tamanho, caminho e limites. O detalhe da OS reutiliza checklist e galeria em modo somente leitura.
+
+`os_installation_feedbacks` permanece separado e inalterado para o kiosk e o fluxo legado de feedback/revisão. Ele não recebe dados da execução 4.1.

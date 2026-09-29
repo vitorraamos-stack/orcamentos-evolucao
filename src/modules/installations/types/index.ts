@@ -11,6 +11,39 @@ export type InstallationTeam = {
   notes: string | null;
   members?: TeamMember[];
 };
+export type InstallationChecklistPhase = "PRE_START" | "COMPLETION";
+export type InstallationChecklistStatus = "PENDING" | "DONE" | "NOT_APPLICABLE";
+export type InstallationChecklistItem = {
+  id: string;
+  installation_id: string;
+  phase: InstallationChecklistPhase;
+  code: string;
+  label: string;
+  status: InstallationChecklistStatus;
+  is_required: boolean;
+  allow_not_applicable: boolean;
+  note: string | null;
+  completed_by: string | null;
+  completed_at: string | null;
+  sort_order: number;
+};
+export type InstallationEvidencePhase = "BEFORE" | "DURING" | "AFTER";
+export type InstallationEvidence = {
+  id: string;
+  installation_id: string;
+  asset_id: string;
+  phase: InstallationEvidencePhase;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
+  asset?: {
+    object_path: string;
+    original_name: string;
+    mime_type: string;
+    size_bytes: number;
+  } | null;
+  creator?: { name?: string | null; email?: string | null } | null;
+};
 export type TeamMember = {
   team_id: string;
   user_id: string;
@@ -31,6 +64,7 @@ export type Installation = {
   address_lat: number | null;
   address_lng: number | null;
   notes: string | null;
+  completion_notes: string | null;
   started_at: string | null;
   completed_at: string | null;
   cancelled_at: string | null;

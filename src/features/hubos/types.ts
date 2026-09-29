@@ -86,10 +86,15 @@ export type OsOrderEvent = {
   } | null;
 };
 
-export type OsOrderLayoutAsset = {
+export type OsOrderAsset = {
   id: string;
   os_id: string;
-  asset_type: "LAYOUT";
+  asset_type:
+    | "CLIENT_FILE"
+    | "PAYMENT_PROOF"
+    | "PURCHASE_ORDER"
+    | "LAYOUT"
+    | "INSTALLATION_EVIDENCE";
   object_path: string;
   original_name: string | null;
   mime_type: string | null;
@@ -102,6 +107,7 @@ export type OsOrderLayoutAsset = {
   r2_etag?: string | null;
   error?: string | null;
 };
+export type OsOrderLayoutAsset = OsOrderAsset;
 
 export type HubOsFilters = {
   search: string;

@@ -21,6 +21,7 @@ import OperationalDashboardPage from "@/modules/dashboard/OperationalDashboardPa
 import OrdersCentralPage from "@/modules/orders/pages/OrdersCentralPage";
 import ModulePlaceholderPage from "@/shared/components/ModulePlaceholderPage";
 import InstallationsPage from "@/modules/installations/pages/InstallationsPage";
+import InstallationExecutionPage from "@/modules/installations/pages/InstallationExecutionPage";
 import DeliveriesPage from "@/modules/deliveries/pages/DeliveriesPage";
 import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -157,17 +158,36 @@ function Router() {
         </Layout>
       </Route>
 
+      <Route path="/instalacoes/execucao/:id">
+        <Layout>
+          <RequireModule moduleKey="hub_os">
+            {hubPermissions.canExecuteInstallations ? (
+              <InstallationExecutionPage />
+            ) : (
+              <Redirect to="/instalacoes" />
+            )}
+          </RequireModule>
+        </Layout>
+      </Route>
       <Route path="/instalacoes">
         <Layout>
           <RequireModule moduleKey="hub_os">
-            {hubPermissions.canViewInstallations ? <InstallationsPage /> : <Redirect to="/" />}
+            {hubPermissions.canViewInstallations ? (
+              <InstallationsPage />
+            ) : (
+              <Redirect to="/" />
+            )}
           </RequireModule>
         </Layout>
       </Route>
       <Route path="/entregas">
         <Layout>
           <RequireModule moduleKey="hub_os">
-            {hubPermissions.canViewDeliveries ? <DeliveriesPage /> : <Redirect to="/" />}
+            {hubPermissions.canViewDeliveries ? (
+              <DeliveriesPage />
+            ) : (
+              <Redirect to="/" />
+            )}
           </RequireModule>
         </Layout>
       </Route>
