@@ -23,15 +23,7 @@ const throwIfError = (error: { message: string } | null) => {
   if (error) throw new Error(error.message);
 };
 
-export async function loadHubUsersByRoles(roles: string[]): Promise<HubUser[]> {
-  const { data: profileData, error: profileError } = await supabase
-    .from("profiles")
-    .select("id,email,role")
-    .in("role", roles);
-
-  throwIfError(profileError);
-
-  const profiles = (profileData ?? []) as ProfileRow[];
+async function resolveHubUsers(profiles: ProfileRow[]): Promise<HubUser[]> {
   if (profiles.length === 0) return [];
 
   const { data: displayData, error: displayError } = await supabase.rpc(
@@ -59,4 +51,29 @@ export async function loadHubUsersByRoles(roles: string[]): Promise<HubUser[]> {
       role: profile.role,
     };
   });
+}
+
+export async function loadHubUsersByRoles(roles: string[]): Promise<HubUser[]> {
+  const { data: profileData, error: profileError } = await supabase
+    .from("profiles")
+    .select("id,email,role")
+    .in("role", roles);
+
+  throwIfError(profileError);
+
+  return resolveHubUsers((profileData ?? []) as ProfileRow[]);
+}
+
+export async function loadHubUsersByIds(ids: string[]): Promise<HubUser[]> {
+  const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+  if (uniqueIds.length === 0) return [];
+
+  const { data: profileData, error: profileError } = await supabase
+    .from("profiles")
+    .select("id,email,role")
+    .in("id", uniqueIds);
+
+  throwIfError(profileError);
+
+  return resolveHubUsers((profileData ?? []) as ProfileRow[]);
 }
