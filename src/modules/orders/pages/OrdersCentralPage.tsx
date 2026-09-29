@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -9,6 +10,8 @@ import {
 } from "@/components/ui/select";
 import { ART_COLUMNS, PROD_COLUMNS } from "@/features/hubos/constants";
 import type { OsOrder } from "@/features/hubos/types";
+import CreateOSDialog from "@/features/hubos/components/CreateOSDialog";
+import { useAuth } from "@/contexts/AuthContext";
 import { listOperationalOrders } from "../orderRepository";
 import type { QuickOrderFilter } from "../orderFilters";
 import { OrderSearch } from "../components/OrderSearch";
@@ -32,6 +35,8 @@ const quickFilters: Array<[QuickOrderFilter, string]> = [
 ];
 
 export default function OrdersCentralPage() {
+  const { hubPermissions } = useAuth();
+  const [, setLocation] = useLocation();
   const [orders, setOrders] = useState<OsOrder[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -74,10 +79,18 @@ export default function OrdersCentralPage() {
   }, [search]);
   return (
     <div className="pb-10">
-      <PageHeader
-        title="Ordens de Serviço"
-        description={`${total} ordens encontradas · acompanhamento operacional centralizado`}
-      />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <PageHeader
+          title="Ordens de Serviço"
+          description={`${total} ordens encontradas · acompanhamento operacional centralizado`}
+        />
+        {hubPermissions.canCreateOs && (
+          <CreateOSDialog
+            triggerLabel="+ Nova OS"
+            onCreated={order => setLocation(`/os/${order.id}`)}
+          />
+        )}
+      </div>
       <div className="mb-4 flex flex-col gap-3">
         <OrderSearch value={search} onChange={setSearch} />
         <div className="flex gap-2 overflow-x-auto pb-1">

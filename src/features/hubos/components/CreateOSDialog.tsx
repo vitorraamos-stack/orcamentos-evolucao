@@ -81,9 +81,13 @@ const OS_DRAFT_STORAGE_KEY = "hubos:create-os-draft";
 
 interface CreateOSDialogProps {
   onCreated: (order: OsOrder) => void;
+  triggerLabel?: string;
 }
 
-export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
+export default function CreateOSDialog({
+  onCreated,
+  triggerLabel = "Nova OS",
+}: CreateOSDialogProps) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [confirmDraftDialogOpen, setConfirmDraftDialogOpen] = useState(false);
@@ -614,7 +618,7 @@ export default function CreateOSDialog({ onCreated }: CreateOSDialogProps) {
       }}
     >
       <DialogUi.DialogTrigger asChild>
-        <Button>Gerar Ordem de Serviço</Button>
+        <Button>{triggerLabel}</Button>
       </DialogUi.DialogTrigger>
       <DialogUi.DialogContent
         className="max-h-[calc(100vh-2rem)] w-[95vw] overflow-y-auto sm:max-w-4xl lg:max-w-5xl"
