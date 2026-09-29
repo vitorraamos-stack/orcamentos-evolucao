@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { loadHubUsersByRoles } from "@/shared/repositories/hubUsersRepository";
 import type {
   Installation,
   InstallationScheduleInput,
@@ -26,12 +27,9 @@ export async function loadInstallationWorkspace() {
       .eq("archived", false)
       .in("prod_status", ["Pronto / Avisar Cliente", "Instalação Agendada"])
       .limit(200),
-    supabase
-      .from("profiles")
-      .select("id,name,email,role")
-      .in("role", ["instalador", "gerente", "admin"]),
+    loadHubUsersByRoles(["instalador", "gerente", "admin"]),
   ]);
-  [installations, teams, members, orders, profiles].forEach(r => fail(r.error));
+  [installations, teams, members, orders].forEach(r => fail(r.error));
   const teamRows = (teams.data ?? []) as InstallationTeam[];
   const orderMap = new Map((orders.data ?? []).map(o => [o.id, o]));
   return {
@@ -39,13 +37,12 @@ export async function loadInstallationWorkspace() {
       ...i,
       order: orderMap.get(i.os_id) ?? null,
       team: teamRows.find(t => t.id === i.team_id) ?? null,
-      responsible:
-        (profiles.data ?? []).find(p => p.id === i.responsible_id) ?? null,
+      responsible: profiles.find(p => p.id === i.responsible_id) ?? null,
     })) as Installation[],
     teams: teamRows,
     members: members.data ?? [],
     orders: (orders.data ?? []) as LogisticsOrder[],
-    profiles: profiles.data ?? [],
+    profiles,
   };
 }
 export async function scheduleInstallation(i: InstallationScheduleInput) {
