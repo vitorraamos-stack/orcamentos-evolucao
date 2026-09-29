@@ -105,7 +105,7 @@ export default function OsKanbanPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/os/novo">
+          <Link href="/os">
             <Button>Nova OS</Button>
           </Link>
           <Button variant="outline" onClick={loadData}>

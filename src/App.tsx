@@ -13,7 +13,6 @@ import ProductionBoardPage from "@/modules/production/pages/ProductionBoardPage"
 import OsDetailPage from "@/modules/hub-os/pages/OsDetailPage";
 import OrderDetailPage from "@/modules/orders/pages/OrderDetailPage";
 import OsKioskPage from "@/modules/hub-os/pages/OsKioskPage";
-import OsCreatePage from "@/modules/hub-os/pages/OsCreatePage";
 import OsAuditPage from "@/modules/hub-os/pages/OsAuditPage";
 import OsPendentesPage from "@/modules/hub-os/pages/OsPendentesPage";
 import FinanceiroPortalPage from "@/modules/hub-os/pages/FinanceiroPortalPage";
@@ -252,13 +251,7 @@ function Router() {
       </Route>
 
       <Route path="/os/novo">
-        <Layout>
-          <RequireModule moduleKey="hub_os">
-            <HubOsAccessGuard scope="create">
-              <OsCreatePage />
-            </HubOsAccessGuard>
-          </RequireModule>
-        </Layout>
+        <Redirect to="/os" />
       </Route>
 
       <Route path="/os/:id">

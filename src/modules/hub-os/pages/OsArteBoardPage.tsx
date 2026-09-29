@@ -315,7 +315,7 @@ export default function OsArteBoardPage() {
             <ToggleGroupItem value="arte">Arte</ToggleGroupItem>
             <ToggleGroupItem value="producao">Produção</ToggleGroupItem>
           </ToggleGroup>
-          <Link href="/os/novo">
+          <Link href="/os">
             <Button>Nova OS</Button>
           </Link>
           <Button variant="outline" onClick={loadData}>
