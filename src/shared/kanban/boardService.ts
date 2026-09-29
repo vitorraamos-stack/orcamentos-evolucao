@@ -1,11 +1,5 @@
-import type {
-  ArtStatus,
-  DeliveryDeadlinePreset,
-  OsOrder,
-  ProdStatus,
-} from "@/features/hubos/types";
+import type { ArtStatus, OsOrder, ProdStatus } from "@/features/hubos/types";
 import { moveOrder, sendOrderToProduction } from "@/features/hubos/api";
-import { resolveDeliveryDate } from "@/features/hubos/deliveryDeadline";
 import { canTransitionOrderStatus } from "@/modules/orders/services/orderTransitions";
 import type { HubRole } from "@/lib/hubRoles";
 
@@ -15,8 +9,6 @@ export type MoveBoardOrderInput = {
   to: ArtStatus | ProdStatus;
   role: HubRole | null;
   isManager: boolean;
-  preset?: DeliveryDeadlinePreset | null;
-  manualDate?: string | null;
 };
 
 export async function moveBoardOrder(
@@ -38,27 +30,21 @@ export async function moveBoardOrder(
     throw new Error("Movimento não permitido para esta etapa ou papel.");
   }
   if (input.board === "art" && input.to === "Produzir") {
-    const preset = input.preset ?? input.order.delivery_deadline_preset;
-    const startedAt = new Date().toISOString();
-    const deliveryDate = resolveDeliveryDate({
-      preset,
-      startedAt,
-      manualDate: input.manualDate ?? input.order.delivery_date,
-    });
-    if (!preset || !deliveryDate)
+    const preset = input.order.delivery_deadline_preset;
+    if (!preset)
       throw new Error(
-        "Defina o prazo de entrega antes de enviar para Produção."
+        "Esta OS está sem prazo de produção. Solicite ao Comercial ou Gerência a definição do prazo antes de enviar para Produção."
+      );
+    if (preset === "CUSTOM" && !input.order.delivery_date)
+      throw new Error(
+        "Esta OS possui prazo personalizado, mas a data não foi definida. Solicite ao Comercial ou Gerência a correção da OS."
       );
     return deps.sendOrderToProduction({
       orderId: input.order.id,
-      deadlinePreset: preset,
-      deadlineStartedAt: startedAt,
-      deliveryDate,
       eventPayload: {
         board: "art",
         from,
         to: "Produzir",
-        delivery_deadline_preset: preset,
       },
     });
   }

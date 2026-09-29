@@ -82,21 +82,18 @@ describe("src/features/hubos/api secure mutation contracts", () => {
     });
   });
 
-  it("sendOrderToProduction envia prazo como parâmetros operacionais", async () => {
+  it("sendOrderToProduction não permite override dos dados de prazo", async () => {
     const { sendOrderToProduction } = await import("./api");
     rpc.mockResolvedValueOnce({ data: { id: "os-4" }, error: null });
     await sendOrderToProduction({
       orderId: "os-4",
-      deadlinePreset: "FAST_5_8",
-      deadlineStartedAt: "2026-09-25T13:00:00.000Z",
-      deliveryDate: "2026-10-05",
       eventPayload: { source: "dialog" },
     });
     expect(rpc).toHaveBeenCalledWith("hub_os_send_to_production_secure", {
       p_os_id: "os-4",
-      p_delivery_deadline_preset: "FAST_5_8",
-      p_delivery_deadline_started_at: "2026-09-25T13:00:00.000Z",
-      p_delivery_date: "2026-10-05",
+      p_delivery_deadline_preset: null,
+      p_delivery_deadline_started_at: null,
+      p_delivery_date: null,
       p_event_payload: { source: "dialog" },
     });
   });

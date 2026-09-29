@@ -651,7 +651,11 @@ export default function CreateOSDialog({
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <Label>Prazo de produção/entrega</Label>
+                  <Label>Prazo de produção</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Definido pelo Comercial/Gerência. A contagem começa após a
+                    aprovação da arte.
+                  </p>
                   <RadioGroup
                     value={deliveryDeadlinePreset ?? ""}
                     onValueChange={value =>
