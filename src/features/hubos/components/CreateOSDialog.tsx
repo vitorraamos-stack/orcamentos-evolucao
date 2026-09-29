@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as DialogUi from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -12,30 +12,28 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Bold,
+  CalendarDays,
+  Check,
+  Circle,
+  FileText,
+  Flame,
   Italic,
   List,
   ListOrdered,
+  Package,
+  Plus,
+  Store,
+  Trash2,
+  Truck,
   Underline,
   UploadCloud,
+  Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
 import type {
@@ -44,1096 +42,1117 @@ import type {
   LogisticType,
   OsOrder,
 } from "../types";
-import { createOrder } from "../api";
-import { ART_COLUMNS } from "../constants";
-import {
-  ART_DIRECTION_TAG_CONFIG,
-  ART_DIRECTION_TAGS,
-} from "../artDirectionTagConfig";
-import { useAuth } from "@/contexts/AuthContext";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { createOrder, findOrderBySaleNumber } from "../api";
+import { ART_DIRECTION_TAG_CONFIG } from "../artDirectionTagConfig";
+import { ART_DIRECTION_CHOICES } from "../orderUrgency";
 import {
   DELIVERY_DEADLINE_PRESET_CONFIG,
   DELIVERY_DEADLINE_PRESETS,
 } from "../deliveryDeadlineConfig";
 import {
+  emptyOrderItem,
+  getCreateOrderCompletion,
+  orderItemInputSchema,
+  type CreateOrderItemDraft,
+} from "../createOrderDomain";
+import { useAuth } from "@/contexts/AuthContext";
+import {
   uploadAssetsForOrder,
   uploadFinancialDocsForOrder,
   validateFiles,
+  type FinancialDoc,
+  type FinancialDocType,
+  type FinancialInstallmentLabel,
 } from "@/features/hubos/assets";
 import {
   ACCEPTED_ASSET_CONTENT_TYPES,
   MAX_ASSET_FILE_SIZE_BYTES,
 } from "@/features/hubos/assetUtils";
-import type {
-  FinancialDoc,
-  FinancialDocType,
-  FinancialInstallmentLabel,
-} from "@/features/hubos/assets";
 
-const DEFAULT_FINANCIAL_DOC_TYPE: FinancialDocType = "PAYMENT_PROOF";
-const DEFAULT_INSTALLMENT_LABEL: FinancialInstallmentLabel = "1/1";
 const OS_DRAFT_STORAGE_KEY = "hubos:create-os-draft";
+const errorClass = "text-sm font-medium text-destructive";
+const deadlineIcons = {
+  FAST_5_8: "⚡",
+  STANDARD_8_12: "●",
+  STRUCTURE_INSTALL_15_25: "🏗",
+  CUSTOM: "📅",
+} as const;
+const deadlineHints = {
+  FAST_5_8: "Produção rápida",
+  STANDARD_8_12: "Prazo padrão",
+  STRUCTURE_INSTALL_15_25: "Estruturas",
+  CUSTOM: "Definir data",
+} as const;
+const logistics = [
+  { value: "retirada", label: "Retirada", icon: Store },
+  { value: "entrega", label: "Entrega", icon: Truck },
+  { value: "instalacao", label: "Instalação", icon: Wrench },
+] as const;
 
-interface CreateOSDialogProps {
-  onCreated: (order: OsOrder) => void;
-  triggerLabel?: string;
-}
+type Errors = Record<string, string>;
+type ExistingOrder = {
+  id: string;
+  os_number: number | null;
+  sale_number: string;
+  client_name: string;
+  art_status: string;
+  prod_status: string | null;
+};
+
+const Section = ({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) => (
+  <Card>
+    <CardHeader className="pb-3">
+      <CardTitle className="text-lg">{title}</CardTitle>
+      {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+    </CardHeader>
+    <CardContent className="space-y-4">{children}</CardContent>
+  </Card>
+);
+const FieldError = ({ id, children }: { id: string; children?: string }) =>
+  children ? (
+    <p id={id} role="alert" className={errorClass}>
+      {children}
+    </p>
+  ) : null;
 
 export default function CreateOSDialog({
   onCreated,
   triggerLabel = "Nova OS",
-}: CreateOSDialogProps) {
+}: {
+  onCreated: (order: OsOrder) => void;
+  triggerLabel?: string;
+}) {
   const { user } = useAuth();
-  const [open, setOpen] = useState(false);
-  const [confirmDraftDialogOpen, setConfirmDraftDialogOpen] = useState(false);
-  const [saleNumber, setSaleNumber] = useState("");
-  const [clientName, setClientName] = useState("");
-  const [description, setDescription] = useState("");
-  const [deliveryDate, setDeliveryDate] = useState("");
-  const [deliveryDeadlinePreset, setDeliveryDeadlinePreset] =
-    useState<DeliveryDeadlinePreset | null>(null);
-  const [logisticType, setLogisticType] = useState<LogisticType>("retirada");
-  const [address, setAddress] = useState("");
-  const [selectedArtDirectionTag, setSelectedArtDirectionTag] =
-    useState<ArtDirectionTag | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [financialDocs, setFinancialDocs] = useState<FinancialDoc[]>([]);
-  const [uploadingAssets, setUploadingAssets] = useState(false);
-  const [pendingOrder, setPendingOrder] = useState<OsOrder | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const financialDocInputRef = useRef<HTMLInputElement | null>(null);
-  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
-  const reproducao = false;
-  const letraCaixa = false;
+  const [open, setOpen] = useState(false),
+    [confirmClose, setConfirmClose] = useState(false);
+  const [saleNumber, setSaleNumber] = useState(""),
+    [clientName, setClientName] = useState(""),
+    [description, setDescription] = useState("");
+  const [deliveryDate, setDeliveryDate] = useState(""),
+    [deadline, setDeadline] = useState<DeliveryDeadlinePreset | null>(null);
+  const [logisticType, setLogisticType] = useState<LogisticType>("retirada"),
+    [address, setAddress] = useState("");
+  const [artDirection, setArtDirection] = useState<ArtDirectionTag | null>(
+      null
+    ),
+    [isUrgent, setIsUrgent] = useState(false);
+  const [items, setItems] = useState<CreateOrderItemDraft[]>([
+    emptyOrderItem(),
+  ]);
+  const [files, setFiles] = useState<File[]>([]),
+    [financialDocs, setFinancialDocs] = useState<FinancialDoc[]>([]);
+  const [errors, setErrors] = useState<Errors>({}),
+    [saving, setSaving] = useState(false),
+    [pendingOrder, setPendingOrder] = useState<OsOrder | null>(null);
+  const [existingOrder, setExistingOrder] = useState<ExistingOrder | null>(
+    null
+  );
+  const descriptionRef = useRef<HTMLTextAreaElement>(null),
+    fileRef = useRef<HTMLInputElement>(null),
+    financialRef = useRef<HTMLInputElement>(null);
 
-  const saveDraft = () => {
-    try {
-      const payload = {
+  const completion = useMemo(
+    () =>
+      getCreateOrderCompletion({
         saleNumber,
         clientName,
         description,
+        items,
+        artDirectionTag: artDirection,
+        deadlinePreset: deadline,
         deliveryDate,
-        deliveryDeadlinePreset,
         logisticType,
         address,
-        selectedArtDirectionTag,
-      };
-      localStorage.setItem(OS_DRAFT_STORAGE_KEY, JSON.stringify(payload));
-    } catch (error) {
-      console.error("Erro ao salvar rascunho local da OS.", error);
-    }
-  };
+      }),
+    [
+      saleNumber,
+      clientName,
+      description,
+      items,
+      artDirection,
+      deadline,
+      deliveryDate,
+      logisticType,
+      address,
+    ]
+  );
+  const completeCount = Object.values(completion).filter(Boolean).length;
+  const hasData = Boolean(
+    saleNumber ||
+    clientName ||
+    description ||
+    deadline ||
+    address ||
+    artDirection ||
+    isUrgent ||
+    files.length ||
+    financialDocs.length ||
+    items.some(item => String(item.name).trim())
+  );
 
-  const clearDraft = () => {
+  useEffect(() => {
+    if (!open) return;
     try {
+      const raw = localStorage.getItem(OS_DRAFT_STORAGE_KEY);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      setSaleNumber(draft.saleNumber ?? "");
+      setClientName(draft.clientName ?? "");
+      setDescription(draft.description ?? "");
+      setDeliveryDate(draft.deliveryDate ?? "");
+      setDeadline(draft.deliveryDeadlinePreset ?? null);
+      setLogisticType(draft.logisticType ?? "retirada");
+      setAddress(draft.address ?? "");
+      setArtDirection(draft.selectedArtDirectionTag ?? null);
+      setIsUrgent(draft.isUrgent ?? false);
+      setItems(
+        Array.isArray(draft.items) && draft.items.length
+          ? draft.items
+          : [emptyOrderItem()]
+      );
+    } catch {
       localStorage.removeItem(OS_DRAFT_STORAGE_KEY);
-    } catch (error) {
-      console.error("Erro ao limpar rascunho local da OS.", error);
     }
-  };
+  }, [open]);
+
+  useEffect(() => {
+    setExistingOrder(null);
+    if (!open || !saleNumber.trim()) return;
+    const timer = window.setTimeout(
+      () =>
+        void findOrderBySaleNumber(saleNumber)
+          .then(row => setExistingOrder(row as ExistingOrder | null))
+          .catch(() => undefined),
+      450
+    );
+    return () => window.clearTimeout(timer);
+  }, [open, saleNumber]);
 
   const reset = () => {
     setSaleNumber("");
     setClientName("");
     setDescription("");
     setDeliveryDate("");
-    setDeliveryDeadlinePreset(null);
+    setDeadline(null);
     setLogisticType("retirada");
     setAddress("");
-    setSelectedArtDirectionTag(null);
-    setSelectedFiles([]);
+    setArtDirection(null);
+    setIsUrgent(false);
+    setItems([emptyOrderItem()]);
+    setFiles([]);
     setFinancialDocs([]);
+    setErrors({});
     setPendingOrder(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-    if (financialDocInputRef.current) {
-      financialDocInputRef.current.value = "";
-    }
   };
-
-  const closeDialogAfterConfirmation = () => {
-    setConfirmDraftDialogOpen(false);
+  const saveLocalDraft = () =>
+    localStorage.setItem(
+      OS_DRAFT_STORAGE_KEY,
+      JSON.stringify({
+        saleNumber,
+        clientName,
+        description,
+        deliveryDate,
+        deliveryDeadlinePreset: deadline,
+        logisticType,
+        address,
+        selectedArtDirectionTag: artDirection,
+        items,
+        isUrgent,
+      })
+    );
+  const close = () => {
     setOpen(false);
+    setConfirmClose(false);
     reset();
   };
+  const requestClose = () => (hasData ? setConfirmClose(true) : close());
+  const updateItem = (index: number, patch: Partial<CreateOrderItemDraft>) =>
+    setItems(current =>
+      current.map((item, i) => (i === index ? { ...item, ...patch } : item))
+    );
 
-  const confirmSaveDraftAndCreateCard = async () => {
-    const draftHasAnyData =
-      Boolean(saleNumber.trim()) ||
-      Boolean(clientName.trim()) ||
-      Boolean(description.trim()) ||
-      Boolean(deliveryDate) ||
-      Boolean(deliveryDeadlinePreset) ||
-      logisticType !== "retirada" ||
-      Boolean(address.trim()) ||
-      Boolean(selectedArtDirectionTag) ||
-      selectedFiles.length > 0 ||
-      financialDocs.length > 0;
-
-    if (!draftHasAnyData) {
-      setConfirmDraftDialogOpen(false);
-      setOpen(false);
-      reset();
-      toast.message("Nenhum dado para salvar como rascunho.");
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      const order = await createOrder({
-        sale_number: saleNumber.trim() || "Rascunho",
-        client_name: clientName.trim() || "Rascunho",
-        title: "Rascunho",
-        description: description.trim() || "Rascunho",
-        delivery_deadline_preset: deliveryDeadlinePreset,
-        delivery_deadline_started_at: null,
-        delivery_date:
-          deliveryDeadlinePreset === "CUSTOM" ? deliveryDate || null : null,
-        logistic_type: logisticType,
-        address: logisticType === "retirada" ? null : address || null,
-        art_status: ART_COLUMNS[0],
-        prod_status: null,
-        art_direction_tag: selectedArtDirectionTag,
-        reproducao,
-        letra_caixa: letraCaixa,
-        created_by: user?.id ?? null,
-        updated_by: user?.id ?? null,
+  const validate = () => {
+    const next: Errors = {};
+    if (!saleNumber.trim()) next.saleNumber = "Informe o número da venda.";
+    if (!clientName.trim()) next.clientName = "Informe o cliente.";
+    if (!description.trim())
+      next.description = "Informe o briefing para a Arte.";
+    if (!artDirection || artDirection === "URGENTE")
+      next.artDirection = "Selecione a necessidade da Arte.";
+    if (!deadline) next.deadline = "Selecione o prazo de produção.";
+    if (deadline === "CUSTOM" && !deliveryDate)
+      next.deliveryDate = "Informe a data combinada.";
+    if (logisticType !== "retirada" && !address.trim())
+      next.address = "Informe o endereço do serviço.";
+    if (!items.length) next.items = "Adicione pelo menos um item.";
+    items.forEach((item, index) => {
+      const parsed = orderItemInputSchema.safeParse({
+        ...item,
+        status: "PENDING",
+        sort_order: index,
       });
-
-      onCreated(order);
-      saveDraft();
-      setConfirmDraftDialogOpen(false);
-      setOpen(false);
-      reset();
-      toast.success("Rascunho salvo na Caixa de Entrada.");
-    } catch (error) {
-      console.error(error);
-      toast.error("Não foi possível salvar o rascunho.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const hasDraftableData =
-    Boolean(saleNumber.trim()) ||
-    Boolean(clientName.trim()) ||
-    Boolean(description.trim()) ||
-    Boolean(deliveryDate) ||
-    Boolean(deliveryDeadlinePreset) ||
-    logisticType !== "retirada" ||
-    Boolean(address.trim()) ||
-    Boolean(selectedArtDirectionTag) ||
-    selectedFiles.length > 0 ||
-    financialDocs.length > 0;
-
-  const handleSaveAsDraft = async () => {
-    if (!hasDraftableData) {
-      setConfirmDraftDialogOpen(false);
-      setOpen(false);
-      reset();
-      toast.message("Nenhum dado para salvar como rascunho.");
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      const order = await createOrder({
-        sale_number: saleNumber.trim() || "Rascunho",
-        client_name: clientName.trim() || "Rascunho",
-        title: "Rascunho",
-        description: description.trim() || "Rascunho",
-        delivery_deadline_preset: deliveryDeadlinePreset,
-        delivery_deadline_started_at: null,
-        delivery_date:
-          deliveryDeadlinePreset === "CUSTOM" ? deliveryDate || null : null,
-        logistic_type: logisticType,
-        address: logisticType === "retirada" ? null : address || null,
-        art_status: ART_COLUMNS[0],
-        prod_status: null,
-        art_direction_tag: selectedArtDirectionTag,
-        reproducao,
-        letra_caixa: letraCaixa,
-        created_by: user?.id ?? null,
-        updated_by: user?.id ?? null,
-      });
-
-      onCreated(order);
-      saveDraft();
-      setConfirmDraftDialogOpen(false);
-      setOpen(false);
-      reset();
-      toast.success("Rascunho salvo na Caixa de Entrada.");
-    } catch (error) {
-      console.error(error);
-      toast.error("Não foi possível salvar o rascunho.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const formatFileSize = (size: number) => {
-    if (size < 1024) return `${size} B`;
-    const kb = size / 1024;
-    if (kb < 1024) return `${kb.toFixed(1)} KB`;
-    const mb = kb / 1024;
-    return `${mb.toFixed(1)} MB`;
-  };
-
-  const handleAssetChange = (files: FileList | null) => {
-    if (!files) return;
-    const nextFiles = [...selectedFiles, ...Array.from(files)];
-    const validation = validateFiles(nextFiles);
-    if (!validation.ok) {
-      toast.error(validation.error ?? "Arquivos inválidos.");
-      return;
-    }
-    setSelectedFiles(nextFiles);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  const removeAssetFile = (index: number) => {
-    setSelectedFiles(current =>
-      current.filter((_, itemIndex) => itemIndex !== index)
-    );
-  };
-
-  const handleFinancialDocChange = (files: FileList | null) => {
-    if (!files) return;
-    const nextFiles = [
-      ...financialDocs.map(doc => doc.file),
-      ...Array.from(files),
-    ];
-    const validation = validateFiles(nextFiles);
-    if (!validation.ok) {
-      toast.error(validation.error ?? "Arquivos inválidos.");
-      return;
-    }
-    setFinancialDocs(current => [
-      ...current,
-      ...Array.from(files).map(file => ({
-        file,
-        type: DEFAULT_FINANCIAL_DOC_TYPE,
-        installmentLabel: DEFAULT_INSTALLMENT_LABEL,
-        secondDueDate: null,
-      })),
-    ]);
-    if (financialDocInputRef.current) {
-      financialDocInputRef.current.value = "";
-    }
-  };
-
-  const removeFinancialDoc = (index: number) => {
-    setFinancialDocs(current =>
-      current.filter((_, itemIndex) => itemIndex !== index)
-    );
-  };
-
-  const updateFinancialDocType = (index: number, newType: FinancialDocType) => {
-    setFinancialDocs(current =>
-      current.map((doc, itemIndex) =>
-        itemIndex === index
-          ? {
-              ...doc,
-              type: newType,
-              installmentLabel:
-                newType === "PAYMENT_PROOF"
-                  ? (doc.installmentLabel ?? DEFAULT_INSTALLMENT_LABEL)
-                  : undefined,
-              secondDueDate:
-                newType === "PAYMENT_PROOF"
-                  ? (doc.secondDueDate ?? null)
-                  : undefined,
-            }
-          : doc
-      )
-    );
-  };
-
-  const updateInstallmentLabel = (
-    index: number,
-    installmentLabel: FinancialInstallmentLabel
-  ) => {
-    setFinancialDocs(current =>
-      current.map((doc, itemIndex) =>
-        itemIndex === index
-          ? {
-              ...doc,
-              installmentLabel,
-              secondDueDate:
-                installmentLabel === "1/2" ? (doc.secondDueDate ?? "") : null,
-            }
-          : doc
-      )
-    );
-  };
-
-  const updateSecondDueDate = (index: number, secondDueDate: string) => {
-    setFinancialDocs(current =>
-      current.map((doc, itemIndex) =>
-        itemIndex === index ? { ...doc, secondDueDate } : doc
-      )
-    );
-  };
-
-  const financialTypeLabels: Record<FinancialDocType, string> = {
-    PAYMENT_PROOF: "Comprovante",
-    PURCHASE_ORDER: "Ordem de compra",
-  };
-
-  const applyWrap = (prefix: string, suffix = prefix) => {
-    const textarea = descriptionRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart ?? 0;
-    const end = textarea.selectionEnd ?? 0;
-    const before = description.slice(0, start);
-    const selection = description.slice(start, end);
-    const after = description.slice(end);
-    const nextValue = `${before}${prefix}${selection}${suffix}${after}`;
-    setDescription(nextValue);
-    requestAnimationFrame(() => {
-      textarea.focus();
-      const cursorStart = start + prefix.length;
-      const cursorEnd = cursorStart + selection.length;
-      textarea.setSelectionRange(cursorStart, cursorEnd);
+      if (!parsed.success)
+        parsed.error.issues.forEach(issue => {
+          next[`item-${index}-${String(issue.path[0])}`] ??= issue.message;
+        });
     });
+    setErrors(next);
+    if (Object.keys(next).length)
+      window.setTimeout(() => {
+        const element = document.querySelector<HTMLElement>(
+          "[aria-invalid='true']"
+        );
+        element?.scrollIntoView({ behavior: "smooth", block: "center" });
+        element?.focus();
+      }, 0);
+    return !Object.keys(next).length;
   };
 
-  const applyLinePrefix = (prefix: string) => {
-    const textarea = descriptionRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart ?? 0;
-    const end = textarea.selectionEnd ?? 0;
-    const value = description;
-    const lineStart = value.lastIndexOf("\n", start - 1) + 1;
-    const lineEndIndex = value.indexOf("\n", end);
-    const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
-    const block = value.slice(lineStart, lineEnd);
-    const nextBlock = block
-      .split("\n")
-      .map(line => (line.trim() ? `${prefix}${line}` : line))
-      .join("\n");
-    const nextValue = `${value.slice(0, lineStart)}${nextBlock}${value.slice(lineEnd)}`;
-    setDescription(nextValue);
-    requestAnimationFrame(() => {
-      textarea.focus();
-      textarea.setSelectionRange(lineStart, lineStart + nextBlock.length);
-    });
-  };
-
-  const handleSubmit = async () => {
-    const trimmedAddress = address.trim();
-
-    const assetValidation = validateFiles(selectedFiles);
-    if (!assetValidation.ok) {
-      toast.error(assetValidation.error ?? "Arquivos inválidos.");
-      return;
-    }
-    const financialValidation = validateFiles(
-      financialDocs.map(doc => doc.file)
-    );
-    if (!financialValidation.ok) {
-      toast.error(
-        financialValidation.error ?? "Documentos financeiros inválidos."
-      );
-      return;
-    }
-
-    const invalidProofDoc = financialDocs.find(
-      doc =>
-        doc.type === "PAYMENT_PROOF" &&
-        doc.installmentLabel === "1/2" &&
-        !doc.secondDueDate
-    );
-    if (invalidProofDoc) {
-      toast.error("Para comprovante 1/2, a Data 2ª Parcela é obrigatória.");
-      return;
-    }
-
-    if (pendingOrder) {
-      if (selectedFiles.length === 0 && financialDocs.length === 0) {
-        toast.error("Selecione ao menos um arquivo para reenviar.");
-        return;
-      }
-
+  const submit = async (draft = false) => {
+    if (pendingOrder && !draft) {
       try {
-        if (selectedFiles.length > 0) {
-          setUploadingAssets(true);
+        setSaving(true);
+        if (files.length)
           await uploadAssetsForOrder({
             osId: pendingOrder.id,
-            files: selectedFiles,
+            files,
             userId: user?.id ?? null,
           });
-          toast.success("Arquivos enviados e aguardando sincronização.");
-        }
-        if (financialDocs.length > 0) {
-          setUploadingAssets(true);
+        if (financialDocs.length)
           await uploadFinancialDocsForOrder({
             orderId: pendingOrder.id,
             docs: financialDocs,
             userId: user?.id ?? null,
           });
-          toast.success(
-            "Documentos financeiros enviados e aguardando sincronização."
-          );
-        }
-        clearDraft();
-        reset();
-        setOpen(false);
-      } catch (uploadError) {
-        console.error(uploadError);
-        toast.error(
-          uploadError instanceof Error
-            ? uploadError.message
-            : "Falha ao reenviar os arquivos. Tente novamente."
-        );
+        localStorage.removeItem(OS_DRAFT_STORAGE_KEY);
+        toast.success("Arquivos enviados com sucesso.");
+        close();
+      } catch {
+        toast.error("Não foi possível reenviar os arquivos.");
       } finally {
-        setUploadingAssets(false);
+        setSaving(false);
       }
       return;
     }
-
-    if (!saleNumber || !clientName || !description || !deliveryDeadlinePreset) {
-      toast.error("Preencha os campos obrigatórios.");
+    if (
+      !draft &&
+      financialDocs.some(
+        doc =>
+          doc.type === "PAYMENT_PROOF" &&
+          doc.installmentLabel === "1/2" &&
+          !doc.secondDueDate
+      )
+    ) {
+      toast.error("Informe a data da 2ª parcela.");
       return;
     }
-
-    if (deliveryDeadlinePreset === "CUSTOM" && !deliveryDate) {
-      toast.error("Informe a data manual para o prazo personalizado.");
+    if (!draft && !validate()) {
+      toast.error("Revise os campos destacados.");
       return;
     }
-    if (logisticType !== "retirada" && !trimmedAddress) {
-      toast.error("O endereço é obrigatório para entrega e instalação.");
+    const validItems = items
+      .map((item, i) =>
+        orderItemInputSchema.safeParse({
+          ...item,
+          status: "PENDING",
+          sort_order: i,
+        })
+      )
+      .filter(result => result.success)
+      .map(result => result.data);
+    if (draft && !hasData) {
+      toast.message("Nenhum dado para salvar como rascunho.");
       return;
     }
-    if (!selectedArtDirectionTag) {
-      toast.error("Selecione a tag de direcionamento de arte.");
-      return;
-    }
-
     try {
       setSaving(true);
       const order = await createOrder({
-        sale_number: saleNumber,
-        client_name: clientName,
-        description,
-        delivery_deadline_preset: deliveryDeadlinePreset,
+        sale_number: saleNumber.trim() || "Rascunho",
+        client_name: clientName.trim() || "Rascunho",
+        title: draft ? "Rascunho" : null,
+        description: description.trim() || (draft ? "Rascunho" : null),
+        delivery_deadline_preset: deadline,
         delivery_deadline_started_at: null,
-        delivery_date:
-          deliveryDeadlinePreset === "CUSTOM" ? deliveryDate : null,
+        delivery_date: deadline === "CUSTOM" ? deliveryDate || null : null,
         logistic_type: logisticType,
-        address: logisticType === "retirada" ? null : trimmedAddress,
-        art_status: ART_COLUMNS[0],
-        prod_status: null,
-        art_direction_tag: selectedArtDirectionTag,
-        reproducao,
-        letra_caixa: letraCaixa,
-        created_by: user?.id ?? null,
-        updated_by: user?.id ?? null,
+        address: logisticType === "retirada" ? null : address.trim() || null,
+        art_direction_tag: artDirection,
+        is_urgent: isUrgent,
+        is_draft: draft,
+        items: validItems.map(
+          ({ status: _status, sort_order: _sort, ...item }) => item
+        ),
+        reproducao: false,
+        letra_caixa: false,
       });
       onCreated(order);
-      toast.success("Ordem criada com sucesso.");
-
-      if (selectedFiles.length > 0) {
+      if (draft) saveLocalDraft();
+      else localStorage.removeItem(OS_DRAFT_STORAGE_KEY);
+      if (!draft) {
         try {
-          setUploadingAssets(true);
-          await uploadAssetsForOrder({
-            osId: order.id,
-            files: selectedFiles,
-            userId: user?.id ?? null,
-          });
-          toast.success("Arquivos enviados e aguardando sincronização.");
-        } catch (uploadError) {
-          console.error(uploadError);
-          toast.error(
-            uploadError instanceof Error
-              ? uploadError.message
-              : "OS criada, mas o envio dos arquivos falhou. Reenvie os arquivos."
-          );
+          if (files.length)
+            await uploadAssetsForOrder({
+              osId: order.id,
+              files,
+              userId: user?.id ?? null,
+            });
+          if (financialDocs.length)
+            await uploadFinancialDocsForOrder({
+              orderId: order.id,
+              docs: financialDocs,
+              userId: user?.id ?? null,
+            });
+        } catch {
           setPendingOrder(order);
-          setFinancialDocs([]);
-          if (financialDocInputRef.current) {
-            financialDocInputRef.current.value = "";
-          }
+          toast.error("OS criada, mas alguns arquivos não foram enviados.");
           return;
-        } finally {
-          setUploadingAssets(false);
         }
       }
-      if (financialDocs.length > 0) {
-        try {
-          setUploadingAssets(true);
-          await uploadFinancialDocsForOrder({
-            orderId: order.id,
-            docs: financialDocs,
-            userId: user?.id ?? null,
-          });
-          toast.success(
-            "Documentos financeiros enviados e aguardando sincronização."
-          );
-        } catch (financialError) {
-          console.error(financialError);
-          toast.error(
-            financialError instanceof Error
-              ? financialError.message
-              : "OS criada, mas houve erro ao enviar documentos financeiros."
-          );
-        } finally {
-          setUploadingAssets(false);
-        }
-      }
-      clearDraft();
-      reset();
-      setOpen(false);
+      toast.success(
+        draft ? "Rascunho salvo na Caixa de Entrada." : "OS criada com sucesso."
+      );
+      close();
     } catch (error) {
-      console.error(error);
-      toast.error("Erro ao criar ordem de serviço.");
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível criar a OS."
+      );
     } finally {
       setSaving(false);
     }
   };
 
+  const addFiles = (incoming: FileList | null, financial = false) => {
+    if (!incoming) return;
+    const list = Array.from(incoming);
+    const all = financial
+      ? [...financialDocs.map(d => d.file), ...list]
+      : [...files, ...list];
+    const checked = validateFiles(all);
+    if (!checked.ok) {
+      toast.error(checked.error);
+      return;
+    }
+    if (financial)
+      setFinancialDocs(current => [
+        ...current,
+        ...list.map(file => ({
+          file,
+          type: "PAYMENT_PROOF" as const,
+          installmentLabel: "1/1" as const,
+          secondDueDate: null,
+        })),
+      ]);
+    else setFiles(all);
+  };
+  const wrap = (before: string, after = before) => {
+    const area = descriptionRef.current;
+    if (!area) return;
+    const start = area.selectionStart,
+      end = area.selectionEnd;
+    setDescription(
+      description.slice(0, start) +
+        before +
+        description.slice(start, end) +
+        after +
+        description.slice(end)
+    );
+  };
+
   return (
     <DialogUi.Dialog
       open={open}
-      onOpenChange={nextOpen => {
-        if (!nextOpen && confirmDraftDialogOpen) {
-          return;
-        }
-
-        setOpen(nextOpen);
-        if (!nextOpen) {
-          reset();
-        }
-      }}
+      onOpenChange={value => (value ? setOpen(true) : requestClose())}
     >
       <DialogUi.DialogTrigger asChild>
         <Button>{triggerLabel}</Button>
       </DialogUi.DialogTrigger>
       <DialogUi.DialogContent
-        className="max-h-[calc(100vh-2rem)] w-[95vw] overflow-y-auto sm:max-w-4xl lg:max-w-5xl"
+        className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl"
         onInteractOutside={event => {
           event.preventDefault();
-          setConfirmDraftDialogOpen(true);
+          requestClose();
         }}
       >
-        <DialogUi.DialogHeader>
-          <DialogUi.DialogTitle>Nova Ordem de Serviço</DialogUi.DialogTitle>
+        <DialogUi.DialogHeader className="border-b px-5 py-4 sm:px-6">
+          <DialogUi.DialogTitle className="text-xl">
+            Nova Ordem de Serviço
+          </DialogUi.DialogTitle>
+          <DialogUi.DialogDescription>
+            Venda aprovada → entrada na operação
+          </DialogUi.DialogDescription>
         </DialogUi.DialogHeader>
-        <div className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-1">
-                  <Label>Nº da venda</Label>
+        <div className="grid flex-1 overflow-y-auto lg:grid-cols-[minmax(0,7fr)_minmax(260px,3fr)]">
+          <main className="space-y-5 p-4 sm:p-6">
+            <Section
+              title="Informações da OS"
+              subtitle="Esta OS será criada na Caixa de Entrada do setor de Arte."
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="sale-number">Nº da venda *</Label>
                   <Input
+                    id="sale-number"
                     value={saleNumber}
-                    onChange={event => setSaleNumber(event.target.value)}
-                    disabled={Boolean(pendingOrder)}
+                    onChange={e => setSaleNumber(e.target.value)}
+                    aria-invalid={Boolean(errors.saleNumber)}
+                    aria-describedby="sale-number-error"
                   />
+                  <FieldError id="sale-number-error">
+                    {errors.saleNumber}
+                  </FieldError>
                 </div>
-                <div className="space-y-1">
-                  <Label>Cliente</Label>
+                <div>
+                  <Label htmlFor="client-name">Cliente *</Label>
                   <Input
+                    id="client-name"
                     value={clientName}
-                    onChange={event => setClientName(event.target.value)}
-                    disabled={Boolean(pendingOrder)}
+                    onChange={e => setClientName(e.target.value)}
+                    aria-invalid={Boolean(errors.clientName)}
+                    aria-describedby="client-name-error"
                   />
+                  <FieldError id="client-name-error">
+                    {errors.clientName}
+                  </FieldError>
                 </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label>Prazo de produção</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Definido pelo Comercial/Gerência. A contagem começa após a
-                    aprovação da arte.
+              </div>
+              {existingOrder && (
+                <div
+                  role="status"
+                  className="rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950"
+                >
+                  <strong>
+                    Venda {existingOrder.sale_number} já possui uma OS.
+                  </strong>
+                  <p>
+                    OS #{existingOrder.os_number ?? existingOrder.sale_number} ·{" "}
+                    {existingOrder.client_name} ·{" "}
+                    {existingOrder.prod_status ?? existingOrder.art_status}
                   </p>
-                  <RadioGroup
-                    value={deliveryDeadlinePreset ?? ""}
-                    onValueChange={value =>
-                      setDeliveryDeadlinePreset(value as DeliveryDeadlinePreset)
-                    }
-                    disabled={Boolean(pendingOrder)}
+                  <a
+                    className="font-semibold underline"
+                    href={`/os/${existingOrder.id}`}
                   >
-                    <div className="space-y-2">
-                      {DELIVERY_DEADLINE_PRESETS.map(preset => {
-                        const config = DELIVERY_DEADLINE_PRESET_CONFIG[preset];
-                        return (
-                          <Tooltip key={preset}>
-                            <TooltipTrigger asChild>
-                              <label className="flex items-center gap-2 text-sm">
-                                <RadioGroupItem value={preset} />
-                                {config.label}
-                              </label>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              {config.tooltip}
-                            </TooltipContent>
-                          </Tooltip>
-                        );
-                      })}
-                    </div>
-                  </RadioGroup>
-                  <div className="space-y-1">
-                    <Label>Data manual (somente prazo personalizado)</Label>
+                    Abrir OS existente
+                  </a>
+                </div>
+              )}
+            </Section>
+
+            <Section
+              title="Itens do pedido"
+              subtitle="Descreva o que será produzido, sem informações comerciais."
+            >
+              {errors.items && (
+                <FieldError id="items-error">{errors.items}</FieldError>
+              )}
+              {items.map((item, index) => (
+                <div
+                  key={index}
+                  className="space-y-3 rounded-xl border bg-muted/20 p-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <strong>Item {index + 1}</strong>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setItems(current =>
+                          current.filter((_, i) => i !== index)
+                        )
+                      }
+                      aria-label={`Excluir item ${index + 1}`}
+                    >
+                      <Trash2 className="mr-1 h-4 w-4" />
+                      Excluir
+                    </Button>
+                  </div>
+                  <div>
+                    <Label htmlFor={`item-${index}-name`}>Nome do item *</Label>
                     <Input
-                      type="date"
-                      value={deliveryDate}
-                      onChange={event => setDeliveryDate(event.target.value)}
-                      disabled={
-                        Boolean(pendingOrder) ||
-                        deliveryDeadlinePreset !== "CUSTOM"
+                      id={`item-${index}-name`}
+                      value={String(item.name)}
+                      onChange={e =>
+                        updateItem(index, { name: e.target.value })
+                      }
+                      aria-invalid={Boolean(errors[`item-${index}-name`])}
+                    />
+                    <FieldError id={`item-${index}-name-error`}>
+                      {errors[`item-${index}-name`]}
+                    </FieldError>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div>
+                      <Label htmlFor={`item-${index}-quantity`}>Qtd. *</Label>
+                      <Input
+                        id={`item-${index}-quantity`}
+                        type="number"
+                        min="0.001"
+                        step="0.001"
+                        value={String(item.quantity)}
+                        onChange={e =>
+                          updateItem(index, { quantity: e.target.value })
+                        }
+                        aria-invalid={Boolean(errors[`item-${index}-quantity`])}
+                      />
+                      <FieldError id={`item-${index}-quantity-error`}>
+                        {errors[`item-${index}-quantity`]}
+                      </FieldError>
+                    </div>
+                    <div>
+                      <Label>Largura (cm)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={
+                          item.width_cm == null ? "" : String(item.width_cm)
+                        }
+                        onChange={e =>
+                          updateItem(index, { width_cm: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>Altura (cm)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={
+                          item.height_cm == null ? "" : String(item.height_cm)
+                        }
+                        onChange={e =>
+                          updateItem(index, { height_cm: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>Unidade *</Label>
+                      <Input
+                        value={String(item.unit)}
+                        onChange={e =>
+                          updateItem(index, { unit: e.target.value })
+                        }
+                        aria-invalid={Boolean(errors[`item-${index}-unit`])}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Descrição / especificação</Label>
+                    <Textarea
+                      value={String(item.description ?? "")}
+                      onChange={e =>
+                        updateItem(index, { description: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Observações</Label>
+                    <Input
+                      value={String(item.notes ?? "")}
+                      onChange={e =>
+                        updateItem(index, { notes: e.target.value })
                       }
                     />
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <Label>Tipo de logística</Label>
-                  <RadioGroup
-                    value={logisticType}
-                    onValueChange={value =>
-                      setLogisticType(value as LogisticType)
-                    }
-                    disabled={Boolean(pendingOrder)}
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  setItems(current => [
+                    ...current,
+                    { ...emptyOrderItem(), sort_order: current.length },
+                  ])
+                }
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Adicionar outro item
+              </Button>
+            </Section>
+
+            <Section
+              title="Briefing / Orientações para Arte"
+              subtitle="Informe o que o setor de Arte precisa saber para executar este pedido."
+            >
+              <div className="rounded-md border">
+                <div className="flex gap-1 border-b p-1">
+                  {[
+                    [Bold, "Aplicar negrito", "**"],
+                    [Italic, "Aplicar itálico", "*"],
+                    [Underline, "Aplicar sublinhado", "__"],
+                  ].map(([Icon, label, marker]) => (
+                    <Button
+                      key={String(label)}
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={String(label)}
+                      onClick={() => wrap(String(marker))}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </Button>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Aplicar lista"
                   >
-                    <div className="flex flex-wrap gap-4">
-                      <label className="flex items-center gap-2 text-sm">
-                        <RadioGroupItem value="retirada" />
-                        Retirada
-                      </label>
-                      <label className="flex items-center gap-2 text-sm">
-                        <RadioGroupItem value="entrega" />
-                        Entrega
-                      </label>
-                      <label className="flex items-center gap-2 text-sm">
-                        <RadioGroupItem value="instalacao" />
-                        Instalação
-                      </label>
-                    </div>
-                  </RadioGroup>
+                    <List className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Aplicar lista numerada"
+                  >
+                    <ListOrdered className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Textarea
+                  ref={descriptionRef}
+                  id="briefing"
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  rows={7}
+                  className="border-0 focus-visible:ring-0"
+                  placeholder={
+                    "Objetivo / o que deve ser criado:\nTextos obrigatórios:\nReferências do cliente:\nObservações importantes:"
+                  }
+                  aria-invalid={Boolean(errors.description)}
+                  aria-describedby="briefing-error"
+                />
+              </div>
+              <FieldError id="briefing-error">{errors.description}</FieldError>
+            </Section>
+
+            <Section title="Arte e Prioridade">
+              <div>
+                <Label>Necessidade da Arte *</Label>
+                <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                  {ART_DIRECTION_CHOICES.map(tag => (
+                    <button
+                      key={tag}
+                      type="button"
+                      aria-pressed={artDirection === tag}
+                      onClick={() => setArtDirection(tag)}
+                      className={`rounded-xl border p-4 text-left outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-ring ${artDirection === tag ? "border-primary bg-primary/5" : "hover:bg-muted"}`}
+                    >
+                      <strong>{ART_DIRECTION_TAG_CONFIG[tag].label}</strong>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {ART_DIRECTION_TAG_CONFIG[tag].text}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+                <FieldError id="art-error">{errors.artDirection}</FieldError>
+              </div>
+              <div>
+                <Label>Prioridade</Label>
+                <div className="mt-2 grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    aria-pressed={!isUrgent}
+                    onClick={() => setIsUrgent(false)}
+                    className={`rounded-xl border p-3 font-medium ${!isUrgent ? "border-primary bg-primary/5" : ""}`}
+                  >
+                    <Circle className="mr-2 inline h-4 w-4" />
+                    Normal
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={isUrgent}
+                    onClick={() => setIsUrgent(true)}
+                    className={`rounded-xl border p-3 font-medium ${isUrgent ? "border-destructive bg-destructive/10 text-destructive" : ""}`}
+                  >
+                    <Flame className="mr-2 inline h-4 w-4" />
+                    Urgente
+                  </button>
                 </div>
               </div>
+            </Section>
 
-              {logisticType !== "retirada" && (
-                <div className="space-y-1">
-                  <Label>Endereço</Label>
+            <Section
+              title="Prazo de Produção"
+              subtitle="Definido pelo Comercial/Gerência. A contagem começa após a aprovação da arte."
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                {DELIVERY_DEADLINE_PRESETS.map(value => (
+                  <button
+                    type="button"
+                    key={value}
+                    aria-pressed={deadline === value}
+                    onClick={() => setDeadline(value)}
+                    className={`rounded-xl border p-4 text-left ${deadline === value ? "border-primary bg-primary/5" : "hover:bg-muted"}`}
+                  >
+                    <span className="text-xl" aria-hidden>
+                      {deadlineIcons[value]}
+                    </span>
+                    <strong className="ml-2">
+                      {DELIVERY_DEADLINE_PRESET_CONFIG[value].label}
+                    </strong>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {deadlineHints[value]}
+                    </p>
+                  </button>
+                ))}
+              </div>
+              <FieldError id="deadline-error">{errors.deadline}</FieldError>
+              {deadline === "CUSTOM" && (
+                <div>
+                  <Label htmlFor="delivery-date">Data combinada *</Label>
                   <Input
-                    value={address}
-                    onChange={event => setAddress(event.target.value)}
-                    required
-                    disabled={Boolean(pendingOrder)}
+                    id="delivery-date"
+                    type="date"
+                    value={deliveryDate}
+                    onChange={e => setDeliveryDate(e.target.value)}
+                    aria-invalid={Boolean(errors.deliveryDate)}
                   />
+                  <FieldError id="delivery-date-error">
+                    {errors.deliveryDate}
+                  </FieldError>
                 </div>
               )}
-            </div>
+            </Section>
 
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <Label>Descrição</Label>
-                <div className="rounded-md border border-input bg-background">
-                  <div className="flex flex-wrap items-center gap-1 border-b border-input px-2 py-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => applyWrap("**")}
-                      disabled={Boolean(pendingOrder)}
-                      aria-label="Aplicar negrito"
-                    >
-                      <Bold className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => applyWrap("*")}
-                      disabled={Boolean(pendingOrder)}
-                      aria-label="Aplicar itálico"
-                    >
-                      <Italic className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => applyWrap("__")}
-                      disabled={Boolean(pendingOrder)}
-                      aria-label="Aplicar sublinhado"
-                    >
-                      <Underline className="h-4 w-4" />
-                    </Button>
-                    <div className="h-5 w-px bg-border" aria-hidden="true" />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => applyLinePrefix("- ")}
-                      disabled={Boolean(pendingOrder)}
-                      aria-label="Aplicar lista com marcadores"
-                    >
-                      <List className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => applyLinePrefix("1. ")}
-                      disabled={Boolean(pendingOrder)}
-                      aria-label="Aplicar lista numerada"
-                    >
-                      <ListOrdered className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <Textarea
-                    ref={descriptionRef}
-                    value={description}
-                    onChange={event => setDescription(event.target.value)}
-                    rows={4}
-                    placeholder={`Descrição detalhada do pedido:
-Material:
-Orientações para a criação de arte:`}
-                    disabled={Boolean(pendingOrder)}
-                    className="min-h-[120px] rounded-none border-0 shadow-none focus-visible:border-transparent focus-visible:ring-0"
+            <Section title="Logística">
+              <div className="grid gap-3 sm:grid-cols-3">
+                {logistics.map(({ value, label, icon: Icon }) => (
+                  <button
+                    type="button"
+                    key={value}
+                    aria-pressed={logisticType === value}
+                    onClick={() => setLogisticType(value)}
+                    className={`rounded-xl border p-4 font-medium ${logisticType === value ? "border-primary bg-primary/5" : "hover:bg-muted"}`}
+                  >
+                    <Icon className="mx-auto mb-2 h-5 w-5" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {logisticType !== "retirada" && (
+                <div>
+                  <Label htmlFor="address">Endereço do serviço *</Label>
+                  <Input
+                    id="address"
+                    value={address}
+                    onChange={e => setAddress(e.target.value)}
+                    aria-invalid={Boolean(errors.address)}
                   />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Tag de direcionamento</Label>
-                <div className="flex flex-wrap gap-2">
-                  {ART_DIRECTION_TAGS.map(tag => {
-                    const config = ART_DIRECTION_TAG_CONFIG[tag];
-                    const isSelected = selectedArtDirectionTag === tag;
-                    return (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => {
-                          setSelectedArtDirectionTag(tag);
-                          if (tag === "URGENTE") {
-                            toast.warning(
-                              "Use essa tag para pedidos que são realmente urgentes. Ex: Pedido para o dia seguinte."
-                            );
-                          }
-                        }}
-                        disabled={Boolean(pendingOrder)}
-                        className="rounded-full border px-3 py-1 text-xs font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                        style={{
-                          borderColor: config.color,
-                          backgroundColor: isSelected
-                            ? config.color
-                            : "transparent",
-                          color: isSelected ? "#FFFFFF" : config.color,
-                        }}
-                      >
-                        {config.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                {selectedArtDirectionTag && (
-                  <p className="text-sm font-medium text-orange-600">
-                    {ART_DIRECTION_TAG_CONFIG[selectedArtDirectionTag].text}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div>
-              <Label>Anexos (opcional)</Label>
-              <p className="text-xs text-muted-foreground">
-                Anexe arquivos de arte, referências e documentos financeiros
-                relacionados à OS.
-              </p>
-            </div>
-            <Accordion type="multiple" className="space-y-2">
-              <AccordionItem
-                value="art-assets"
-                className="rounded-lg border border-muted px-4"
-              >
-                <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
-                  <span>
-                    Arte e referências ({selectedFiles.length} arquivo
-                    {selectedFiles.length === 1 ? "" : "s"})
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent className="pt-2">
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="os-assets"
-                      className="text-xs text-muted-foreground"
-                    >
-                      Arquivos de arte e referências
-                    </Label>
-                    <Input
-                      ref={fileInputRef}
-                      id="os-assets"
-                      type="file"
-                      multiple
-                      accept={ACCEPTED_ASSET_CONTENT_TYPES.join(",")}
-                      disabled={uploadingAssets || Boolean(pendingOrder)}
-                      onChange={event => handleAssetChange(event.target.files)}
-                      className="sr-only"
-                    />
-                    <label
-                      htmlFor="os-assets"
-                      className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
-                    >
-                      <UploadCloud className="h-6 w-6" />
-                      <div className="space-y-1">
-                        <p className="font-medium text-foreground">
-                          Clique para adicionar arquivos
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {selectedFiles.length > 0
-                            ? `${selectedFiles.length} arquivo(s) selecionado(s).`
-                            : "Arraste e solte ou selecione no seu computador."}
-                        </p>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Máximo de{" "}
-                        {Math.round(MAX_ASSET_FILE_SIZE_BYTES / 1024 / 1024)}MB
-                        por arquivo.
-                      </p>
-                    </label>
-                    {selectedFiles.length > 0 && (
-                      <ul className="space-y-2 rounded-md border border-muted p-3 text-sm">
-                        {selectedFiles.map((file, index) => (
-                          <li
-                            key={`${file.name}-${file.lastModified}`}
-                            className="flex items-center justify-between gap-3"
-                          >
-                            <div>
-                              <p className="font-medium">{file.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {formatFileSize(file.size)}
-                              </p>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeAssetFile(index)}
-                              disabled={uploadingAssets}
-                            >
-                              Remover
-                            </Button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {pendingOrder && (
-                      <p className="text-xs text-amber-600">
-                        A OS foi criada. Reenvie os arquivos para concluir a
-                        sincronização.
-                      </p>
-                    )}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem
-                value="financial-docs"
-                className="rounded-lg border border-muted px-4"
-              >
-                <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
-                  <span>
-                    Documentos financeiros ({financialDocs.length} arquivo
-                    {financialDocs.length === 1 ? "" : "s"})
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent className="pt-2">
-                  <div className="space-y-3">
-                    <p className="text-xs text-muted-foreground">
-                      Selecione comprovantes e ordens de compra para acompanhar
-                      a OS.
+                  <FieldError id="address-error">{errors.address}</FieldError>
+                  {logisticType === "instalacao" && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Equipe e horário serão definidos posteriormente no módulo
+                      de Instalações.
                     </p>
-                    <div className="space-y-1">
-                      <Label htmlFor="financial-docs">
-                        Anexar documento(s)
-                      </Label>
-                      <Input
-                        ref={financialDocInputRef}
-                        id="financial-docs"
-                        type="file"
-                        multiple
-                        accept={ACCEPTED_ASSET_CONTENT_TYPES.join(",")}
-                        disabled={uploadingAssets || Boolean(pendingOrder)}
-                        onChange={event =>
-                          handleFinancialDocChange(event.target.files)
-                        }
-                        className="sr-only"
-                      />
-                      <label
-                        htmlFor="financial-docs"
-                        className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
-                      >
-                        <UploadCloud className="h-6 w-6" />
-                        <div className="space-y-1">
-                          <p className="font-medium text-foreground">
-                            Clique para adicionar documentos
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {financialDocs.length > 0
-                              ? `${financialDocs.length} arquivo(s) anexado(s).`
-                              : "Arraste e solte ou selecione no seu computador."}
-                          </p>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Máximo de{" "}
-                          {Math.round(MAX_ASSET_FILE_SIZE_BYTES / 1024 / 1024)}
-                          MB por arquivo.
-                        </p>
-                      </label>
-                    </div>
-                    {financialDocs.length > 0 && (
-                      <ul className="space-y-2 rounded-md border border-muted p-3 text-sm">
-                        {financialDocs.map((doc, index) => (
-                          <li
-                            key={`${doc.file.name}-${doc.file.lastModified}`}
-                            className="flex flex-wrap items-center gap-3"
-                          >
-                            <div className="min-w-[200px] flex-1">
-                              <p className="font-medium">{doc.file.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {formatFileSize(doc.file.size)}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="secondary">
-                                {financialTypeLabels[doc.type]}
-                              </Badge>
-                              <Select
-                                value={doc.type}
-                                onValueChange={value =>
-                                  updateFinancialDocType(
-                                    index,
-                                    value as FinancialDocType
-                                  )
-                                }
-                                disabled={
-                                  uploadingAssets || Boolean(pendingOrder)
-                                }
-                              >
-                                <SelectTrigger className="h-8 w-[180px] text-xs">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="PAYMENT_PROOF">
-                                    Comprovante
-                                  </SelectItem>
-                                  <SelectItem value="PURCHASE_ORDER">
-                                    Ordem de compra
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
-                              {doc.type === "PAYMENT_PROOF" && (
-                                <>
-                                  <Select
-                                    value={
-                                      doc.installmentLabel ??
-                                      DEFAULT_INSTALLMENT_LABEL
-                                    }
-                                    onValueChange={value =>
-                                      updateInstallmentLabel(
-                                        index,
-                                        value as FinancialInstallmentLabel
-                                      )
-                                    }
-                                    disabled={
-                                      uploadingAssets || Boolean(pendingOrder)
-                                    }
-                                  >
-                                    <SelectTrigger className="h-8 w-[90px] text-xs">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="1/1">1/1</SelectItem>
-                                      <SelectItem value="1/2">1/2</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  {(doc.installmentLabel ??
-                                    DEFAULT_INSTALLMENT_LABEL) === "1/2" && (
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs font-medium text-foreground">
-                                        Data 2ª Parcela:
-                                      </span>
-                                      <Input
-                                        type="date"
-                                        className="h-8 w-[170px] text-xs"
-                                        value={doc.secondDueDate ?? ""}
-                                        onChange={event =>
-                                          updateSecondDueDate(
-                                            index,
-                                            event.target.value
-                                          )
-                                        }
-                                        disabled={
-                                          uploadingAssets ||
-                                          Boolean(pendingOrder)
-                                        }
-                                      />
-                                    </div>
-                                  )}
-                                </>
-                              )}
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeFinancialDoc(index)}
-                                disabled={
-                                  uploadingAssets || Boolean(pendingOrder)
-                                }
-                              >
-                                Remover
-                              </Button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </div>
-        </div>
-        <div className="sticky bottom-0 border-t bg-background pt-4">
-          <Button onClick={handleSubmit} disabled={saving || uploadingAssets}>
-            {pendingOrder ? "Enviar arquivos" : "Gerar Ordem de Serviço"}
-          </Button>
-        </div>
-      </DialogUi.DialogContent>
+                  )}
+                </div>
+              )}
+            </Section>
 
-      <AlertDialog
-        open={confirmDraftDialogOpen}
-        onOpenChange={setConfirmDraftDialogOpen}
-      >
+            <Section
+              title="Arquivos e documentos"
+              subtitle={`Formatos permitidos · até ${Math.round(MAX_ASSET_FILE_SIZE_BYTES / 1024 / 1024)} MB por arquivo`}
+            >
+              <UploadBox
+                title="Arte e referências"
+                files={files}
+                inputRef={fileRef}
+                onFiles={list => addFiles(list)}
+                onRemove={i =>
+                  setFiles(current => current.filter((_, index) => index !== i))
+                }
+              />
+              <UploadBox
+                title="Documentos financeiros"
+                files={financialDocs.map(doc => doc.file)}
+                inputRef={financialRef}
+                onFiles={list => addFiles(list, true)}
+                onRemove={i =>
+                  setFinancialDocs(current =>
+                    current.filter((_, index) => index !== i)
+                  )
+                }
+              />
+              {financialDocs.map((doc, index) => (
+                <div
+                  key={`${doc.file.name}-${index}`}
+                  className="grid gap-2 rounded-lg border p-3 sm:grid-cols-3"
+                >
+                  <select
+                    className="rounded-md border bg-background px-3"
+                    value={doc.type}
+                    onChange={e =>
+                      setFinancialDocs(current =>
+                        current.map((d, i) =>
+                          i === index
+                            ? { ...d, type: e.target.value as FinancialDocType }
+                            : d
+                        )
+                      )
+                    }
+                  >
+                    <option value="PAYMENT_PROOF">Comprovante</option>
+                    <option value="PURCHASE_ORDER">Ordem de compra</option>
+                  </select>
+                  {doc.type === "PAYMENT_PROOF" && (
+                    <select
+                      className="rounded-md border bg-background px-3"
+                      value={doc.installmentLabel}
+                      onChange={e =>
+                        setFinancialDocs(current =>
+                          current.map((d, i) =>
+                            i === index
+                              ? {
+                                  ...d,
+                                  installmentLabel: e.target
+                                    .value as FinancialInstallmentLabel,
+                                }
+                              : d
+                          )
+                        )
+                      }
+                    >
+                      <option value="1/1">1/1</option>
+                      <option value="1/2">1/2</option>
+                      <option value="2/2">2/2</option>
+                    </select>
+                  )}
+                  {doc.type === "PAYMENT_PROOF" &&
+                    doc.installmentLabel === "1/2" && (
+                      <Input
+                        type="date"
+                        value={doc.secondDueDate ?? ""}
+                        onChange={e =>
+                          setFinancialDocs(current =>
+                            current.map((d, i) =>
+                              i === index
+                                ? { ...d, secondDueDate: e.target.value }
+                                : d
+                            )
+                          )
+                        }
+                      />
+                    )}
+                </div>
+              ))}
+            </Section>
+          </main>
+          <aside className="hidden border-l bg-muted/20 p-5 lg:block">
+            <Summary
+              sale={saleNumber}
+              client={clientName}
+              items={items.length}
+              art={artDirection}
+              urgent={isUrgent}
+              deadline={deadline}
+              logisticsValue={logisticType}
+              fileCount={files.length + financialDocs.length}
+              completion={completion}
+            />
+          </aside>
+        </div>
+        <footer className="sticky bottom-0 flex flex-wrap items-center justify-between gap-2 border-t bg-background/95 px-4 py-3 backdrop-blur">
+          <span className="text-sm text-muted-foreground">
+            {completeCount}/6 seções concluídas
+          </span>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={requestClose} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => void submit(true)}
+              disabled={saving}
+            >
+              Salvar rascunho
+            </Button>
+            <Button onClick={() => void submit(false)} disabled={saving}>
+              {saving
+                ? "CRIANDO OS..."
+                : pendingOrder
+                  ? "Reenviar arquivos"
+                  : "Criar OS"}
+            </Button>
+          </div>
+        </footer>
+      </DialogUi.DialogContent>
+      <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Tem certeza que deseja fechar?</AlertDialogTitle>
+            <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
             <AlertDialogDescription>
-              Para evitar perda acidental de informações, confirme se deseja
-              fechar a tela de Nova Ordem de Serviço.
+              Existem informações preenchidas nesta OS.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="sm:justify-between">
             <AlertDialogCancel>Continuar editando</AlertDialogCancel>
-            <AlertDialogAction onClick={closeDialogAfterConfirmation}>
-              Fechar
-            </AlertDialogAction>
+            <Button variant="outline" onClick={() => void submit(true)}>
+              Salvar rascunho
+            </Button>
+            <AlertDialogAction onClick={close}>Descartar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </DialogUi.Dialog>
+  );
+}
+
+function UploadBox({
+  title,
+  files,
+  inputRef,
+  onFiles,
+  onRemove,
+}: {
+  title: string;
+  files: File[];
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  onFiles: (files: FileList | null) => void;
+  onRemove: (index: number) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{title}</Label>
+      <div
+        className="rounded-xl border-2 border-dashed p-4 text-center"
+        onDragOver={e => e.preventDefault()}
+        onDrop={e => {
+          e.preventDefault();
+          onFiles(e.dataTransfer.files);
+        }}
+      >
+        <UploadCloud className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Arraste e solte aqui ou</p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-2"
+          onClick={() => inputRef.current?.click()}
+        >
+          Selecionar arquivos
+        </Button>
+        <input
+          ref={inputRef}
+          className="hidden"
+          type="file"
+          multiple
+          accept={ACCEPTED_ASSET_CONTENT_TYPES.join(",")}
+          onChange={e => onFiles(e.target.files)}
+        />
+      </div>
+      {files.map((file, index) => (
+        <div
+          key={`${file.name}-${index}`}
+          className="flex items-center gap-2 rounded-lg border p-2 text-sm"
+        >
+          <FileText className="h-4 w-4" />
+          <span className="min-w-0 flex-1 truncate">{file.name}</span>
+          <span className="text-xs text-muted-foreground">
+            {(file.size / 1024).toFixed(1)} KB
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => onRemove(index)}
+            aria-label={`Remover ${file.name}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Summary({
+  sale,
+  client,
+  items,
+  art,
+  urgent,
+  deadline,
+  logisticsValue,
+  fileCount,
+  completion,
+}: {
+  sale: string;
+  client: string;
+  items: number;
+  art: ArtDirectionTag | null;
+  urgent: boolean;
+  deadline: DeliveryDeadlinePreset | null;
+  logisticsValue: LogisticType;
+  fileCount: number;
+  completion: ReturnType<typeof getCreateOrderCompletion>;
+}) {
+  const values = [
+    ["Venda", sale || "—"],
+    ["Cliente", client || "—"],
+    ["Itens", `${items} ${items === 1 ? "item" : "itens"}`],
+    ["Arte", art ? ART_DIRECTION_TAG_CONFIG[art].label : "—"],
+    ["Prioridade", urgent ? "URGENTE" : "Normal"],
+    ["Prazo", deadline ? DELIVERY_DEADLINE_PRESET_CONFIG[deadline].label : "—"],
+    ["Logística", logistics.find(x => x.value === logisticsValue)?.label],
+    ["Arquivos", `${fileCount} arquivo(s)`],
+  ];
+  return (
+    <Card className="sticky top-0">
+      <CardHeader>
+        <CardTitle>Resumo da OS</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <dl className="space-y-3">
+          {values.map(([label, value]) => (
+            <div key={label}>
+              <dt className="text-xs text-muted-foreground">{label}</dt>
+              <dd className="font-medium">{value}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="my-4 border-t" />
+        <div className="space-y-2">
+          {Object.entries(completion).map(([key, done]) => (
+            <p
+              key={key}
+              className={done ? "text-emerald-700" : "text-muted-foreground"}
+            >
+              {done ? (
+                <Check className="mr-2 inline h-4 w-4" />
+              ) : (
+                <Circle className="mr-2 inline h-4 w-4" />
+              )}
+              {
+                {
+                  identification: "Informações",
+                  items: "Itens",
+                  briefing: "Briefing",
+                  artwork: "Arte",
+                  deadline: "Prazo",
+                  logistics: "Logística",
+                }[key]
+              }
+            </p>
+          ))}
+        </div>
+        {urgent && (
+          <Badge variant="destructive" className="mt-4">
+            <Flame className="mr-1 h-3 w-3" />
+            URGENTE
+          </Badge>
+        )}
+      </CardContent>
+    </Card>
   );
 }

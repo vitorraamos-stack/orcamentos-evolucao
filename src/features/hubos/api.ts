@@ -7,6 +7,7 @@ import type {
   OsOrderEvent,
   OsOrderLayoutAsset,
   ProdStatus,
+  CreateOrderPayload,
 } from "./types";
 import {
   findForbiddenConsultorFields,
@@ -341,13 +342,25 @@ export const fetchOrderAssetDownloadUrl = async (
   return data.downloadUrl;
 };
 
-export const createOrder = async (payload: Partial<OsOrder>) => {
+export const createOrder = async (payload: CreateOrderPayload) => {
   const { data, error } = await supabase.rpc("hub_os_create_order_secure", {
     p_payload: payload,
   });
 
   if (error) throw new Error(error.message);
   return data as OsOrder;
+};
+
+export const findOrderBySaleNumber = async (saleNumber: string) => {
+  const { data, error } = await supabase
+    .from("os_orders")
+    .select("id,os_number,sale_number,client_name,art_status,prod_status")
+    .eq("sale_number", saleNumber.trim())
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
 };
 
 const loadCurrentUserRole = async () => {

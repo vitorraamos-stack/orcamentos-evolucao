@@ -81,7 +81,12 @@ export function quickFilterOperations(
         { method: "lt", column: "delivery_date", value: today },
       ];
     case "urgent":
-      return [{ method: "eq", column: "art_direction_tag", value: "URGENTE" }];
+      return [
+        {
+          method: "or",
+          expression: "is_urgent.eq.true,art_direction_tag.eq.URGENTE",
+        },
+      ];
     case "pending":
       return [
         {

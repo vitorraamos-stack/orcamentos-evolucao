@@ -1,6 +1,7 @@
 import type { ArtStatus, ProdStatus } from "@/features/hubos/types";
 import { isOrderOverdue } from "@/modules/orders/risk";
 import type { BoardCardModel, BoardFiltersState, BoardStatus } from "./types";
+import { isOrderUrgent } from "@/features/hubos/orderUrgency";
 
 export const ART_BOARD_COLUMNS: ArtStatus[] = [
   "Caixa de Entrada",
@@ -31,8 +32,7 @@ export function sortBoardCards(cards: BoardCardModel[]) {
     const byRisk = risk[a.risk] - risk[b.risk];
     if (byRisk) return byRisk;
     const urgent =
-      Number(b.order.art_direction_tag === "URGENTE") -
-      Number(a.order.art_direction_tag === "URGENTE");
+      Number(isOrderUrgent(b.order)) - Number(isOrderUrgent(a.order));
     if (urgent) return urgent;
     const due = (a.order.delivery_date ?? "9999-12-31").localeCompare(
       b.order.delivery_date ?? "9999-12-31"
@@ -71,7 +71,7 @@ export function filterBoardCards(
       (!term || searchable.includes(term)) &&
       (!filters.mine || card.assignee?.userId === userId) &&
       (!filters.overdue || isOrderOverdue(order)) &&
-      (!filters.urgent || order.art_direction_tag === "URGENTE") &&
+      (!filters.urgent || isOrderUrgent(order)) &&
       (filters.assigneeId === "all" ||
         card.assignee?.userId === filters.assigneeId) &&
       (filters.artTag === "all" ||
@@ -80,10 +80,13 @@ export function filterBoardCards(
         order.production_tag === "AGUARDANDO_INSUMOS") &&
       (!filters.external || order.production_tag === "PRODUCAO_EXTERNA") &&
       (!filters.reproducao || order.reproducao) &&
-      (!filters.letraCaixa || order.letra_caixa)
-      && (filters.workCenter === "all" || card.operationWorkCenters?.includes(filters.workCenter))
-      && (!filters.blockedOperations || (card.productionOperationsBlocked ?? 0) > 0)
-      && (!filters.myOperations || Boolean(userId && card.operationAssigneeIds?.includes(userId)))
+      (!filters.letraCaixa || order.letra_caixa) &&
+      (filters.workCenter === "all" ||
+        card.operationWorkCenters?.includes(filters.workCenter)) &&
+      (!filters.blockedOperations ||
+        (card.productionOperationsBlocked ?? 0) > 0) &&
+      (!filters.myOperations ||
+        Boolean(userId && card.operationAssigneeIds?.includes(userId)))
     );
   });
 }

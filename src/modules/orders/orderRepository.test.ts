@@ -34,9 +34,8 @@ describe("quickFilterOperations", () => {
       value: "2026-09-18",
     });
     expect(quickFilterOperations("urgent", now)).toContainEqual({
-      method: "eq",
-      column: "art_direction_tag",
-      value: "URGENTE",
+      method: "or",
+      expression: "is_urgent.eq.true,art_direction_tag.eq.URGENTE",
     });
     expect(quickFilterOperations("pending", now)[0]).toMatchObject({
       method: "or",

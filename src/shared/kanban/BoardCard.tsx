@@ -28,6 +28,7 @@ import { formatDatePtBr } from "@/features/hubos/deliveryDeadline";
 import { isOrderOverdue } from "@/modules/orders/risk";
 import { getOperationalStatusLabel } from "./statusLabels";
 import { WORK_CENTER_LABELS } from "@/modules/production/operations";
+import { isOrderUrgent } from "@/features/hubos/orderUrgency";
 
 const TAGS: Record<string, string> = {
   URGENTE: "Urgente",
@@ -73,6 +74,7 @@ export function BoardCard({
       : ["PRODUCTION", "FINISHING"].includes(item.scope)
   );
   const badges = [
+    isOrderUrgent(card.order) ? "Urgente" : null,
     isOrderOverdue(card.order)
       ? "Atrasado"
       : card.risk === "CRITICO"
@@ -156,9 +158,35 @@ export function BoardCard({
         ))}
       </div>
       <div className="grid gap-1 text-xs text-muted-foreground">
-        {board === "production" && (card.productionOperationsTotal ?? 0) > 0 && <span>{card.productionOperationsCompleted}/{card.productionOperationsTotal} operações concluídas</span>}
-        {board === "production" && (card.activeWorkCenters?.length ?? 0) > 0 && <span className="flex flex-wrap gap-1">{card.activeWorkCenters?.slice(0,2).map(center => <Badge key={center} variant="outline" className="text-[10px]">{WORK_CENTER_LABELS[center]}</Badge>)}{(card.activeWorkCenters?.length ?? 0) > 2 && <Badge variant="outline" className="text-[10px]">+{(card.activeWorkCenters?.length ?? 0) - 2}</Badge>}</span>}
-        {board === "production" && (card.productionOperationsBlocked ?? 0) > 0 && <Badge variant="destructive" className="w-fit text-[10px]">{card.productionOperationsBlocked} bloqueada{(card.productionOperationsBlocked ?? 0) > 1 ? "s" : ""}</Badge>}
+        {board === "production" &&
+          (card.productionOperationsTotal ?? 0) > 0 && (
+            <span>
+              {card.productionOperationsCompleted}/
+              {card.productionOperationsTotal} operações concluídas
+            </span>
+          )}
+        {board === "production" &&
+          (card.activeWorkCenters?.length ?? 0) > 0 && (
+            <span className="flex flex-wrap gap-1">
+              {card.activeWorkCenters?.slice(0, 2).map(center => (
+                <Badge key={center} variant="outline" className="text-[10px]">
+                  {WORK_CENTER_LABELS[center]}
+                </Badge>
+              ))}
+              {(card.activeWorkCenters?.length ?? 0) > 2 && (
+                <Badge variant="outline" className="text-[10px]">
+                  +{(card.activeWorkCenters?.length ?? 0) - 2}
+                </Badge>
+              )}
+            </span>
+          )}
+        {board === "production" &&
+          (card.productionOperationsBlocked ?? 0) > 0 && (
+            <Badge variant="destructive" className="w-fit text-[10px]">
+              {card.productionOperationsBlocked} bloqueada
+              {(card.productionOperationsBlocked ?? 0) > 1 ? "s" : ""}
+            </Badge>
+          )}
         <span className="flex items-center gap-1">
           <CalendarDays className="h-3.5 w-3.5" />
           {deadline

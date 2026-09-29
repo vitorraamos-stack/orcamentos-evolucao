@@ -1,6 +1,7 @@
 import type { OsOrder } from "@/features/hubos/types";
 import { addLocalDays, formatLocalDate } from "@/shared/lib/date";
 import { isOrderFinished, isOrderOverdue } from "./risk";
+import { isOrderUrgent } from "@/features/hubos/orderUrgency";
 
 export type QuickOrderFilter =
   | "all"
@@ -38,7 +39,7 @@ export function matchesQuickFilter(
     case "overdue":
       return isOrderOverdue(order, now);
     case "urgent":
-      return order.art_direction_tag === "URGENTE";
+      return isOrderUrgent(order);
     case "pending":
       return (
         order.production_tag === "AGUARDANDO_INSUMOS" ||

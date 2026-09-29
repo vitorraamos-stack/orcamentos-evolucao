@@ -3,12 +3,15 @@ import { calculateOrderRisk } from "@/modules/orders/risk";
 import type { BoardAssignee, BoardCardModel, BoardKind } from "./types";
 import type { OsOrder } from "@/features/hubos/types";
 import { fetchAllPages } from "./boardPagination";
-import { operationSummary, type ItemOperation } from "@/modules/production/operations";
+import {
+  operationSummary,
+  type ItemOperation,
+} from "@/modules/production/operations";
 export const RECENT_FINISHED_LIMIT = 100;
 export const RECENT_FINISHED_DAYS = 30;
 
 const ORDER_FIELDS =
-  "id,os_number,sale_number,client_name,title,description,delivery_date,delivery_deadline_preset,delivery_deadline_started_at,logistic_type,address,production_tag,insumos_details,insumos_return_notes,insumos_requested_at,insumos_resolved_at,insumos_resolved_by,art_direction_tag,art_status,prod_status,reproducao,letra_caixa,archived,archived_at,archived_by,created_by,updated_by,created_at,updated_at";
+  "id,os_number,sale_number,client_name,title,description,delivery_date,delivery_deadline_preset,delivery_deadline_started_at,logistic_type,address,production_tag,insumos_details,insumos_return_notes,insumos_requested_at,insumos_resolved_at,insumos_resolved_by,art_direction_tag,is_urgent,art_status,prod_status,reproducao,letra_caixa,archived,archived_at,archived_by,created_by,updated_by,created_at,updated_at";
 
 export async function listBoardOrders(
   board: BoardKind
@@ -20,15 +23,16 @@ export async function listBoardOrders(
       .eq("archived", false)
       .order("updated_at", { ascending: false })
       .range(from, to);
-    query = board === "art"
-      ? query.or(
-          "and(prod_status.is.null,art_status.in.(\"Caixa de Entrada\",\"Fila de Arte\",\"Em Criação\",\"Para Aprovação\",Ajustes)),and(art_status.eq.Produzir,prod_status.eq.Produção)"
-        )
-      : query.in("prod_status", [
-          "Produção",
-          "Em Acabamento",
-          "Pronto / Avisar Cliente",
-        ]);
+    query =
+      board === "art"
+        ? query.or(
+            'and(prod_status.is.null,art_status.in.("Caixa de Entrada","Fila de Arte","Em Criação","Para Aprovação",Ajustes)),and(art_status.eq.Produzir,prod_status.eq.Produção)'
+          )
+        : query.in("prod_status", [
+            "Produção",
+            "Em Acabamento",
+            "Pronto / Avisar Cliente",
+          ]);
     const { data, error } = await query;
     if (error) throw error;
     return (data ?? []) as unknown as OsOrder[];
@@ -70,11 +74,14 @@ export async function listBoardOrders(
   const commentsByOrderId = groupByOrderId(comments.data ?? []);
   const deadlinesByOrderId = groupByOrderId(deadlines.data ?? []);
   const itemRows = items.data ?? [];
-  const operationRows = await fetchOperationsChunked(itemRows.map(item => item.id));
+  const operationRows = await fetchOperationsChunked(
+    itemRows.map(item => item.id)
+  );
   const operationsByItemId = new Map<string, ItemOperation[]>();
   for (const operation of operationRows) {
     const values = operationsByItemId.get(operation.item_id) ?? [];
-    values.push(operation); operationsByItemId.set(operation.item_id, values);
+    values.push(operation);
+    operationsByItemId.set(operation.item_id, values);
   }
   return rows.map(order => {
     const assignment = assigneeByOrderId.get(order.id);
@@ -82,7 +89,9 @@ export async function listBoardOrders(
       email?: string | null;
     } | null;
     const orderItems = itemsByOrderId.get(order.id) ?? [];
-    const operations = orderItems.flatMap(item => operationsByItemId.get(item.id) ?? []);
+    const operations = orderItems.flatMap(
+      item => operationsByItemId.get(item.id) ?? []
+    );
     const production = operationSummary(operations);
     return {
       order,
@@ -107,19 +116,47 @@ export async function listBoardOrders(
       productionOperationsCompleted: production.completed,
       productionOperationsBlocked: production.blocked,
       activeWorkCenters: production.activeWorkCenters,
-      operationWorkCenters: Array.from(new Set(operations.filter(value => value.status !== "COMPLETED").map(value => value.work_center))),
-      operationAssigneeIds: Array.from(new Set(operations.filter(value => value.status !== "COMPLETED" && value.assigned_to).map(value => value.assigned_to!))),
+      operationWorkCenters: Array.from(
+        new Set(
+          operations
+            .filter(value => value.status !== "COMPLETED")
+            .map(value => value.work_center)
+        )
+      ),
+      operationAssigneeIds: Array.from(
+        new Set(
+          operations
+            .filter(value => value.status !== "COMPLETED" && value.assigned_to)
+            .map(value => value.assigned_to!)
+        )
+      ),
     };
   });
 }
 
 async function fetchOperationsChunked(itemIds: string[]) {
   const chunks: string[][] = [];
-  for (let index = 0; index < itemIds.length; index += 200) chunks.push(itemIds.slice(index, index + 200));
+  for (let index = 0; index < itemIds.length; index += 200)
+    chunks.push(itemIds.slice(index, index + 200));
   const results: ItemOperation[] = [];
   for (let index = 0; index < chunks.length; index += 4) {
-    const batch = await Promise.all(chunks.slice(index, index + 4).map(ids => supabase.from("os_order_item_operations").select("id,item_id,work_center,status,assigned_to,is_required,notes,blocked_reason,sort_order,started_at,completed_at,created_at,updated_at").in("item_id", ids).is("deleted_at", null)));
-    for (const result of batch) { if (result.error) throw result.error; results.push(...((result.data ?? []) as ItemOperation[])); }
+    const batch = await Promise.all(
+      chunks
+        .slice(index, index + 4)
+        .map(ids =>
+          supabase
+            .from("os_order_item_operations")
+            .select(
+              "id,item_id,work_center,status,assigned_to,is_required,notes,blocked_reason,sort_order,started_at,completed_at,created_at,updated_at"
+            )
+            .in("item_id", ids)
+            .is("deleted_at", null)
+        )
+    );
+    for (const result of batch) {
+      if (result.error) throw result.error;
+      results.push(...((result.data ?? []) as ItemOperation[]));
+    }
   }
   return results;
 }

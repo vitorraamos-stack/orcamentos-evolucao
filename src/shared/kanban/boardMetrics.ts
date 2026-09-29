@@ -1,5 +1,6 @@
 import { isOrderOverdue } from "@/modules/orders/risk";
 import type { BoardCardModel, BoardKind } from "./types";
+import { isOrderUrgent } from "@/features/hubos/orderUrgency";
 
 export type BoardMetric = { label: string; count: number };
 
@@ -10,22 +11,14 @@ export function calculateBoardMetrics(
 ): BoardMetric[] {
   if (board === "art")
     return [
-      metric(
-        "Em Arte",
-        cards,
-        card => card.order.art_status === "Em Criação"
-      ),
+      metric("Em Arte", cards, card => card.order.art_status === "Em Criação"),
       metric(
         "Aguardando Aprovação",
         cards,
         card => card.order.art_status === "Para Aprovação"
       ),
       metric("Ajustes", cards, card => card.order.art_status === "Ajustes"),
-      metric(
-        "Urgentes",
-        cards,
-        card => card.order.art_direction_tag === "URGENTE"
-      ),
+      metric("Urgentes", cards, card => isOrderUrgent(card.order)),
       metric("Atrasadas", cards, card => isOrderOverdue(card.order)),
     ];
   return [

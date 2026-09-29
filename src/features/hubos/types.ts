@@ -53,6 +53,7 @@ export type OsOrder = {
   insumos_resolved_at: string | null;
   insumos_resolved_by: string | null;
   art_direction_tag: ArtDirectionTag | null;
+  is_urgent: boolean;
   art_status: ArtStatus;
   prod_status: ProdStatus | null;
   reproducao: boolean;
@@ -64,6 +65,21 @@ export type OsOrder = {
   updated_by: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type CreateOrderItemInput = {
+  name: string;
+  description?: string | null;
+  quantity: number;
+  width_cm?: number | null;
+  height_cm?: number | null;
+  unit: string;
+  notes?: string | null;
+};
+
+export type CreateOrderPayload = Partial<OsOrder> & {
+  items?: CreateOrderItemInput[];
+  is_draft?: boolean;
 };
 
 export type OsOrderEvent = {
