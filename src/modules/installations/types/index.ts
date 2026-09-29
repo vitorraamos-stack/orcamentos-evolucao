@@ -35,9 +35,17 @@ export type Installation = {
   completed_at: string | null;
   cancelled_at: string | null;
   cancelled_reason: string | null;
+  created_at: string;
+  updated_at: string;
   order?: LogisticsOrder | null;
   team?: InstallationTeam | null;
   responsible?: { name?: string | null; email?: string | null } | null;
+};
+export type InstallationActions = {
+  canStart: boolean;
+  canComplete: boolean;
+  canCancel: boolean;
+  canReschedule: boolean;
 };
 export type LogisticsOrder = {
   id: string;

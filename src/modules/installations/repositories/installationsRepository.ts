@@ -14,7 +14,7 @@ export async function loadInstallationWorkspace() {
     supabase
       .from("os_installations")
       .select("*")
-      .order("scheduled_start", { ascending: true })
+      .order("updated_at", { ascending: false })
       .limit(250),
     supabase.from("os_installation_teams").select("*").order("name"),
     supabase.from("os_installation_team_members").select("*"),
@@ -30,10 +30,25 @@ export async function loadInstallationWorkspace() {
     loadHubUsersByRoles(["instalador", "gerente", "admin"]),
   ]);
   [installations, teams, members, orders].forEach(r => fail(r.error));
+  const installationRows = (installations.data ?? []) as Installation[];
+  const installationOrderIds = Array.from(
+    new Set(installationRows.map(i => i.os_id))
+  );
+  const installationOrders = installationOrderIds.length
+    ? await supabase
+        .from("os_orders")
+        .select(
+          "id,sale_number,client_name,delivery_date,address,address_lat,address_lng,logistic_type,prod_status,archived,updated_at"
+        )
+        .in("id", installationOrderIds)
+    : { data: [], error: null };
+  fail(installationOrders.error);
   const teamRows = (teams.data ?? []) as InstallationTeam[];
-  const orderMap = new Map((orders.data ?? []).map(o => [o.id, o]));
+  const orderMap = new Map(
+    ((installationOrders.data ?? []) as LogisticsOrder[]).map(o => [o.id, o])
+  );
   return {
-    installations: (installations.data ?? []).map(i => ({
+    installations: installationRows.map(i => ({
       ...i,
       order: orderMap.get(i.os_id) ?? null,
       team: teamRows.find(t => t.id === i.team_id) ?? null,
@@ -44,6 +59,33 @@ export async function loadInstallationWorkspace() {
     orders: (orders.data ?? []) as LogisticsOrder[],
     profiles,
   };
+}
+
+export async function loadInstallationsForOrder(osId: string) {
+  const [installations, teams, profiles] = await Promise.all([
+    supabase
+      .from("os_installations")
+      .select("*")
+      .eq("os_id", osId)
+      .order("created_at", { ascending: false }),
+    supabase.from("os_installation_teams").select("*"),
+    loadHubUsersByRoles(["instalador", "gerente", "admin"]),
+  ]);
+  fail(installations.error);
+  fail(teams.error);
+  const teamMap = new Map(
+    ((teams.data ?? []) as InstallationTeam[]).map(team => [team.id, team])
+  );
+  const profileMap = new Map(profiles.map(profile => [profile.id, profile]));
+  return ((installations.data ?? []) as Installation[]).map(installation => ({
+    ...installation,
+    team: installation.team_id
+      ? (teamMap.get(installation.team_id) ?? null)
+      : null,
+    responsible: installation.responsible_id
+      ? (profileMap.get(installation.responsible_id) ?? null)
+      : null,
+  }));
 }
 export async function scheduleInstallation(i: InstallationScheduleInput) {
   const { data, error } = await supabase.rpc(
