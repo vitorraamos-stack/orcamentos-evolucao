@@ -17,4 +17,12 @@ describe("OrdersCentralPage dedicated creation entry", () => {
     expect(source).not.toContain("CreateOSDialog");
     expect(source).not.toContain("`/os/${order.id}`");
   });
+
+  it("keeps quick filters, reset and one-page pagination behavior visible", () => {
+    expect(source).toContain('["urgent", "Urgentes"]');
+    expect(source).toContain('["finished", "Finalizadas"]');
+    expect(source).toContain("clearFilters");
+    expect(source).toContain("pages > 1");
+    expect(source).toContain("Mostrando {orders.length} de {total} ordens");
+  });
 });
