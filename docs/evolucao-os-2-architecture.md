@@ -306,6 +306,8 @@ A Produção termina em **Material Pronto** (`prod_status = 'Pronto / Avisar Cli
 
 Rotas permanecem sob demanda no endpoint canônico `/api/hub-os/optimize-installations`; não existe tabela de plano nem segunda integração ORS. O fluxo legado de retirada, kiosk e `os_installation_feedbacks` foi preservado. Os grants legados de `order_flow_*`, `kiosk_*` e `installation_feedback*` não foram revogados nesta fase devido aos callers kiosk e tela antiga; a revisão granular permanece débito de segurança.
 
+Na Retirada, o fluxo é **Material Pronto → Cliente Avisado → Retirado → Finalizados**. A conclusão da retirada é protegida por RPC atômica, restrita aos perfis autorizados de logística e valida `logistic_type = 'retirada'` antes de alterar o estado da OS.
+
 ### Hotfix 4.0.1b — Precisão de localização
 
 - No fluxo de agenda, `installationIds` seleciona instalações `SCHEDULED` e `os_installations.address_snapshot` é a fonte canônica do endereço logístico. `orderIds` permanece disponível apenas para compatibilidade.
