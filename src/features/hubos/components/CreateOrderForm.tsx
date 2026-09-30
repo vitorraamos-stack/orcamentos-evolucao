@@ -60,6 +60,7 @@ import {
   emptyOrderItem,
   getCreateOrderCompletion,
   normalizeCreateOrderItem,
+  toCreateOrderItemPayload,
   type CreateOrderItemDraft,
 } from "../createOrderDomain";
 import { useAuth } from "@/contexts/AuthContext";
@@ -396,9 +397,7 @@ export default function CreateOrderForm({
         art_direction_tag: artDirection,
         is_urgent: isUrgent,
         is_draft: draft,
-        items: validItems.map(
-          ({ status: _status, sort_order: _sort, ...item }) => item
-        ),
+        items: validItems.map(toCreateOrderItemPayload),
         reproducao: false,
         letra_caixa: false,
       });
@@ -600,7 +599,7 @@ export default function CreateOrderForm({
                     </FieldError>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Largura (cm)</Label>
+                    <Label>Largura ({item.measurement_unit})</Label>
                     <Input
                       type="number"
                       min="0"
@@ -611,7 +610,7 @@ export default function CreateOrderForm({
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Altura (cm)</Label>
+                    <Label>Altura ({item.measurement_unit})</Label>
                     <Input
                       type="number"
                       min="0"
@@ -624,18 +623,24 @@ export default function CreateOrderForm({
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor={`item-${index}-unit`}>Unidade *</Label>
+                    <Label htmlFor={`item-${index}-measurement-unit`}>
+                      Unidade das medidas *
+                    </Label>
                     <Select
-                      value={String(item.unit)}
-                      onValueChange={unit =>
-                        updateItem(index, { unit: unit as "cm" | "m" })
+                      value={String(item.measurement_unit)}
+                      onValueChange={measurementUnit =>
+                        updateItem(index, {
+                          measurement_unit: measurementUnit as "cm" | "m",
+                        })
                       }
                     >
                       <SelectTrigger
-                        id={`item-${index}-unit`}
+                        id={`item-${index}-measurement-unit`}
                         className="w-full"
-                        aria-invalid={Boolean(errors[`item-${index}-unit`])}
-                        aria-describedby={`item-${index}-unit-error`}
+                        aria-invalid={Boolean(
+                          errors[`item-${index}-measurement_unit`]
+                        )}
+                        aria-describedby={`item-${index}-measurement-unit-error`}
                       >
                         <SelectValue />
                       </SelectTrigger>
@@ -644,8 +649,8 @@ export default function CreateOrderForm({
                         <SelectItem value="m">m</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FieldError id={`item-${index}-unit-error`}>
-                      {errors[`item-${index}-unit`]}
+                    <FieldError id={`item-${index}-measurement-unit-error`}>
+                      {errors[`item-${index}-measurement_unit`]}
                     </FieldError>
                   </div>
                 </div>

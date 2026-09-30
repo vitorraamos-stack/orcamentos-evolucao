@@ -9,7 +9,7 @@ const source = readFileSync(
 describe("new order item unit selector", () => {
   it("uses the design-system selector with only cm and m", () => {
     const unitField = source.slice(
-      source.indexOf("<Label htmlFor={`item-${index}-unit`}>"),
+      source.indexOf("<Label htmlFor={`item-${index}-measurement-unit`}>"),
       source.indexOf("<Label>Descrição / especificação</Label>")
     );
 
