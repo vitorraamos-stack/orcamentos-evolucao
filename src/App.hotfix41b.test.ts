@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
 
-describe("Hotfix 4.1b legacy creation route", () => {
-  it("redirects /os/novo to the canonical OS central", () => {
+describe("Hotfix 4.1f dedicated creation route", () => {
+  it("renders the creation page inside the protected application layout", () => {
     expect(source).toMatch(
-      /<Route path="\/os\/novo">\s*<Redirect to="\/os" \/>\s*<\/Route>/
+      /<Route path="\/os\/novo">\s*<Layout>\s*<RequireModule moduleKey="hub_os">\s*<CreateOrderPage \/>/
     );
-    expect(source).not.toContain("<OsCreatePage />");
+    expect(source).not.toMatch(
+      /<Route path="\/os\/novo">\s*<Redirect to="\/os" \/>/
+    );
   });
 });

@@ -11,12 +11,13 @@ import type { Os } from '../types';
 import { PRODUCAO_STATUSES } from '../statuses';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'wouter';
+import { createOrderPath } from '@/features/hubos/createOrderNavigation';
 
 const formatDateTime = (value: string) =>
   new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
 export default function OsProducaoBoardPage() {
-  const { user, hasModuleAccess } = useAuth();
+  const { user, hasModuleAccess, hubPermissions } = useAuth();
   const [, setLocation] = useLocation();
   const [orders, setOrders] = useState<Os[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,9 +106,11 @@ export default function OsProducaoBoardPage() {
             <ToggleGroupItem value="arte">Arte</ToggleGroupItem>
             <ToggleGroupItem value="producao">Produção</ToggleGroupItem>
           </ToggleGroup>
-          <Link href="/os">
-            <Button>Nova OS</Button>
-          </Link>
+          {hubPermissions.canCreateOs && (
+            <Link href={createOrderPath('/os/producao')}>
+              <Button>Nova OS</Button>
+            </Link>
+          )}
           <Button variant="outline" onClick={loadData}>
             Atualizar
           </Button>

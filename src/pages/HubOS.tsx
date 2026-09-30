@@ -50,7 +50,7 @@ import { uploadLayoutForOrder, validateFiles } from "@/features/hubos/assets";
 import KanbanColumn from "@/features/hubos/components/KanbanColumn";
 import KanbanCard from "@/features/hubos/components/KanbanCard";
 import ServiceOrderDialog from "@/features/hubos/components/ServiceOrderDialog";
-import CreateOSDialog from "@/features/hubos/components/CreateOSDialog";
+import { createOrderPath } from "@/features/hubos/createOrderNavigation";
 import ArtDirectionTagPopup from "@/features/hubos/components/ArtDirectionTagPopup";
 import AcabamentoLabelDialog from "@/features/hubos/components/AcabamentoLabelDialog";
 import { generateQrCodeDataUrl } from "@/features/hubos/utils/qrCode";
@@ -1801,11 +1801,11 @@ export default function HubOS() {
             </Link>
           )}
           {hubPermissions.canCreateOs && (
-            <CreateOSDialog
-              onCreated={order => {
-                setOrders(prev => [order, ...prev]);
-              }}
-            />
+            <Button
+              onClick={() => setLocation(createOrderPath("/hub-os/kanban"))}
+            >
+              Nova OS
+            </Button>
           )}
           <Button variant="outline" onClick={loadOrders} disabled={loading}>
             Atualizar
