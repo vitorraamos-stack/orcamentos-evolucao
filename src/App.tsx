@@ -18,6 +18,7 @@ import OsPendentesPage from "@/modules/hub-os/pages/OsPendentesPage";
 import FinanceiroPortalPage from "@/modules/hub-os/pages/FinanceiroPortalPage";
 import OperationalDashboardPage from "@/modules/dashboard/OperationalDashboardPage";
 import OrdersCentralPage from "@/modules/orders/pages/OrdersCentralPage";
+import CreateOrderPage from "@/modules/orders/pages/CreateOrderPage";
 import ModulePlaceholderPage from "@/shared/components/ModulePlaceholderPage";
 import InstallationsPage from "@/modules/installations/pages/InstallationsPage";
 import InstallationExecutionPage from "@/modules/installations/pages/InstallationExecutionPage";
@@ -251,7 +252,11 @@ function Router() {
       </Route>
 
       <Route path="/os/novo">
-        <Redirect to="/os" />
+        <Layout>
+          <RequireModule moduleKey="hub_os">
+            <CreateOrderPage />
+          </RequireModule>
+        </Layout>
       </Route>
 
       <Route path="/os/:id">

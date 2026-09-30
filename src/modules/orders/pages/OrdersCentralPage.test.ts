@@ -6,16 +6,15 @@ const source = readFileSync(
   "utf8"
 );
 
-describe("OrdersCentralPage canonical creation entry", () => {
-  it("shows the canonical dialog only with create permission", () => {
+describe("OrdersCentralPage dedicated creation entry", () => {
+  it("shows a permission-protected button that preserves the central as origin", () => {
     expect(source).toContain("hubPermissions.canCreateOs &&");
-    expect(source).toContain("<CreateOSDialog");
-    expect(source).toContain('triggerLabel="+ Nova OS"');
+    expect(source).toContain("+ Nova OS");
+    expect(source).toContain('setLocation(createOrderPath("/os"))');
   });
 
-  it("opens a newly-created canonical order", () => {
-    expect(source).toContain(
-      "onCreated={order => setLocation(`/os/${order.id}`)}"
-    );
+  it("does not open a creation dialog or navigate to a newly-created detail", () => {
+    expect(source).not.toContain("CreateOSDialog");
+    expect(source).not.toContain("`/os/${order.id}`");
   });
 });

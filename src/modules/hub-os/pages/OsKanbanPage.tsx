@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { fetchOsList, fetchOsStatuses, updateOs, createOsEvent } from "../api";
 import type { Os, OsStatus } from "../types";
 import { useAuth } from "@/contexts/AuthContext";
+import { createOrderPath } from "@/features/hubos/createOrderNavigation";
 import {
   isDeliveryRetirada,
   useGlobalOrderFlowState,
@@ -28,7 +29,7 @@ const formatDateTime = (value: string) =>
   });
 
 export default function OsKanbanPage() {
-  const { user } = useAuth();
+  const { user, hubPermissions } = useAuth();
   const { isAvisado, isRetirado, setAvisado, markRetirado } =
     useGlobalOrderFlowState();
   const [statuses, setStatuses] = useState<OsStatus[]>([]);
@@ -105,9 +106,11 @@ export default function OsKanbanPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/os">
-            <Button>Nova OS</Button>
-          </Link>
+          {hubPermissions.canCreateOs && (
+            <Link href={createOrderPath("/hub-os/kanban")}>
+              <Button>Nova OS</Button>
+            </Link>
+          )}
           <Button variant="outline" onClick={loadData}>
             Atualizar
           </Button>

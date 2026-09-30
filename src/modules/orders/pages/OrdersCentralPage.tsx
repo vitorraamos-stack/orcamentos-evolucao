@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { ART_COLUMNS, PROD_COLUMNS } from "@/features/hubos/constants";
 import type { OsOrder } from "@/features/hubos/types";
-import CreateOSDialog from "@/features/hubos/components/CreateOSDialog";
+import { createOrderPath } from "@/features/hubos/createOrderNavigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { listOperationalOrders } from "../orderRepository";
 import type { QuickOrderFilter } from "../orderFilters";
@@ -85,10 +85,9 @@ export default function OrdersCentralPage() {
           description={`${total} ordens encontradas · acompanhamento operacional centralizado`}
         />
         {hubPermissions.canCreateOs && (
-          <CreateOSDialog
-            triggerLabel="+ Nova OS"
-            onCreated={order => setLocation(`/os/${order.id}`)}
-          />
+          <Button onClick={() => setLocation(createOrderPath("/os"))}>
+            + Nova OS
+          </Button>
         )}
       </div>
       <div className="mb-4 flex flex-col gap-3">

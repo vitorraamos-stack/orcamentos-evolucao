@@ -15,6 +15,7 @@ import type { Os } from '../types';
 import { ARTE_STATUSES, PRODUCAO_STATUSES } from '../statuses';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'wouter';
+import { createOrderPath } from '@/features/hubos/createOrderNavigation';
 import { uploadLayoutForOrder, validateFiles } from '@/features/hubos/assets';
 
 const formatDateTime = (value: string) =>
@@ -32,7 +33,7 @@ const APPROVAL_COPY_TEXT =
   'Olá! 👋 Sua arte está pronta para aprovação.\n\nPara garantirmos que o seu material fique perfeito, pedimos que você confira *COM MUITA ATENÇÃO* a imagem.\n\n\n*📌 Checklist de Conferência:*\n*• Textos e Números:* Verifique toda a ortografia, telefones e endereços.\n*• Medidas:* Confira se as dimensões informadas estão corretas.\n*• Links e QR Codes:* Se houver, teste a leitura e o direcionamento.\n*• Cores:* Lembre-se que pode haver uma variação de até 10% na tonalidade entre o que você vê na tela (celular/computador) e o material impresso.\n\n\n*⚠️ Importante:* A produção é iniciada exatamente com o arquivo aprovado nesta etapa. Após a sua aprovação, não conseguimos cobrir custos de reprodução por erros de grafia, medidas ou artes enviadas por você que estejam fora dos padrões.\n\n\nEstá tudo certinho? Se sim, é só responder com *"ARTE APROVADA"* para mandarmos para a produção! 🚀';
 
 export default function OsArteBoardPage() {
-  const { user } = useAuth();
+  const { user, hubPermissions } = useAuth();
   const [, setLocation] = useLocation();
   const [orders, setOrders] = useState<Os[]>([]);
   const [loading, setLoading] = useState(true);
@@ -315,9 +316,11 @@ export default function OsArteBoardPage() {
             <ToggleGroupItem value="arte">Arte</ToggleGroupItem>
             <ToggleGroupItem value="producao">Produção</ToggleGroupItem>
           </ToggleGroup>
-          <Link href="/os">
-            <Button>Nova OS</Button>
-          </Link>
+          {hubPermissions.canCreateOs && (
+            <Link href={createOrderPath('/os/arte')}>
+              <Button>Nova OS</Button>
+            </Link>
+          )}
           <Button variant="outline" onClick={loadData}>
             Atualizar
           </Button>
