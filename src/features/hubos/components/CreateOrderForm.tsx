@@ -13,6 +13,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
@@ -49,9 +56,10 @@ import {
   DELIVERY_DEADLINE_PRESETS,
 } from "../deliveryDeadlineConfig";
 import {
+  createOrderItemInputSchema,
   emptyOrderItem,
   getCreateOrderCompletion,
-  orderItemInputSchema,
+  normalizeCreateOrderItem,
   type CreateOrderItemDraft,
 } from "../createOrderDomain";
 import { useAuth } from "@/contexts/AuthContext";
@@ -214,7 +222,7 @@ export default function CreateOrderForm({
       setIsUrgent(draft.isUrgent ?? false);
       setItems(
         Array.isArray(draft.items) && draft.items.length
-          ? draft.items
+          ? draft.items.map(normalizeCreateOrderItem)
           : [emptyOrderItem()]
       );
     } catch {
@@ -293,7 +301,7 @@ export default function CreateOrderForm({
       next.address = "Informe o endereço do serviço.";
     if (!items.length) next.items = "Adicione pelo menos um item.";
     items.forEach((item, index) => {
-      const parsed = orderItemInputSchema.safeParse({
+      const parsed = createOrderItemInputSchema.safeParse({
         ...item,
         status: "PENDING",
         sort_order: index,
@@ -361,7 +369,7 @@ export default function CreateOrderForm({
     }
     const validItems = items
       .map((item, i) =>
-        orderItemInputSchema.safeParse({
+        createOrderItemInputSchema.safeParse({
           ...item,
           status: "PENDING",
           sort_order: i,
@@ -616,14 +624,29 @@ export default function CreateOrderForm({
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Unidade *</Label>
-                    <Input
+                    <Label htmlFor={`item-${index}-unit`}>Unidade *</Label>
+                    <Select
                       value={String(item.unit)}
-                      onChange={e =>
-                        updateItem(index, { unit: e.target.value })
+                      onValueChange={unit =>
+                        updateItem(index, { unit: unit as "cm" | "m" })
                       }
-                      aria-invalid={Boolean(errors[`item-${index}-unit`])}
-                    />
+                    >
+                      <SelectTrigger
+                        id={`item-${index}-unit`}
+                        className="w-full"
+                        aria-invalid={Boolean(errors[`item-${index}-unit`])}
+                        aria-describedby={`item-${index}-unit-error`}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cm">cm</SelectItem>
+                        <SelectItem value="m">m</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FieldError id={`item-${index}-unit-error`}>
+                      {errors[`item-${index}-unit`]}
+                    </FieldError>
                   </div>
                 </div>
                 <div className="space-y-1.5">

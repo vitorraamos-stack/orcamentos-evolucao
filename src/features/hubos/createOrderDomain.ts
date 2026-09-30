@@ -30,18 +30,30 @@ export const orderItemInputSchema = z.object({
   sort_order: z.coerce.number().int().min(0),
 });
 
-export type CreateOrderItemDraft = z.input<typeof orderItemInputSchema>;
+export const createOrderItemInputSchema = orderItemInputSchema.extend({
+  unit: z.enum(["cm", "m"], { error: "Selecione cm ou m." }),
+});
+
+export type CreateOrderItemDraft = z.input<typeof createOrderItemInputSchema>;
 export const emptyOrderItem = (): CreateOrderItemDraft => ({
   name: "",
   description: "",
   quantity: 1,
   width_cm: null,
   height_cm: null,
-  unit: "un",
+  unit: "cm",
   notes: "",
   status: "PENDING",
   sort_order: 0,
 });
+
+export const normalizeCreateOrderItem = (
+  item: Omit<CreateOrderItemDraft, "unit"> & { unit?: unknown }
+): CreateOrderItemDraft =>
+  ({
+    ...item,
+    unit: item.unit === "cm" || item.unit === "m" ? item.unit : "cm",
+  }) as CreateOrderItemDraft;
 
 export type CreateOrderCompletionInput = {
   saleNumber: string;
@@ -60,7 +72,9 @@ export function getCreateOrderCompletion(input: CreateOrderCompletionInput) {
     identification: Boolean(input.saleNumber.trim() && input.clientName.trim()),
     items:
       input.items.length > 0 &&
-      input.items.every(item => orderItemInputSchema.safeParse(item).success),
+      input.items.every(
+        item => createOrderItemInputSchema.safeParse(item).success
+      ),
     briefing: Boolean(input.description.trim()),
     artwork:
       input.artDirectionTag === "ARTE_PRONTA_EDICAO" ||
