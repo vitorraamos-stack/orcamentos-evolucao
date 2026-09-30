@@ -39,6 +39,7 @@ export default function Layout({ children }: LayoutProps) {
     hasModuleAccess,
   } = useAuth();
   const [location, setLocation] = useLocation();
+  const isCreateOrderPage = location.startsWith("/os/novo");
   const operationalNav = getOperationalNavState(location);
 
   useEffect(() => {
@@ -319,8 +320,18 @@ export default function Layout({ children }: LayoutProps) {
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto p-4 md:p-8">
-          <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-col">
+        <main
+          className={cn(
+            "flex-1 p-4 md:p-8",
+            isCreateOrderPage ? "overflow-visible" : "overflow-auto"
+          )}
+        >
+          <div
+            className={cn(
+              "mx-auto flex w-full max-w-6xl min-h-0 flex-col",
+              isCreateOrderPage ? "h-auto" : "h-full"
+            )}
+          >
             {children}
           </div>
         </main>

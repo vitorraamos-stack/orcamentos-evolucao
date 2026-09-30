@@ -927,18 +927,20 @@ export default function CreateOrderForm({
             ))}
           </Section>
         </main>
-        <aside className="p-4 sm:p-6 lg:sticky lg:top-6 lg:self-start lg:p-0">
-          <Summary
-            sale={saleNumber}
-            client={clientName}
-            items={items.length}
-            art={artDirection}
-            urgent={isUrgent}
-            deadline={deadline}
-            logisticsValue={logisticType}
-            fileCount={files.length + financialDocs.length}
-            completion={completion}
-          />
+        <aside className="p-4 sm:p-6 lg:p-0">
+          <div className="lg:sticky lg:top-6">
+            <Summary
+              sale={saleNumber}
+              client={clientName}
+              items={items.length}
+              art={artDirection}
+              urgent={isUrgent}
+              deadline={deadline}
+              logisticsValue={logisticType}
+              fileCount={files.length + financialDocs.length}
+              completion={completion}
+            />
+          </div>
         </aside>
       </div>
       <footer className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-2 border-t bg-background/95 px-4 py-3 backdrop-blur">
