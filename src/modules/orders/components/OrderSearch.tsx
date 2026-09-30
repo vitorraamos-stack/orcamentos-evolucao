@@ -14,7 +14,7 @@ export function OrderSearch({
       <Input
         aria-label="Buscar ordens de serviço"
         className="pl-9"
-        placeholder="Buscar por OS, cliente, título ou descrição"
+        placeholder="Buscar por OS, cliente, título ou descrição..."
         value={value}
         onChange={event => onChange(event.target.value)}
       />

@@ -9,6 +9,8 @@ export type OrderListQuery = {
   search?: string;
   artStatus?: string;
   prodStatus?: string;
+  urgent?: boolean;
+  logisticType?: OsOrder["logistic_type"];
   quickFilter?: QuickOrderFilter;
   now?: Date;
 };
@@ -106,6 +108,8 @@ export async function listOperationalOrders({
   search,
   artStatus,
   prodStatus,
+  urgent,
+  logisticType,
   quickFilter = "all",
   now = new Date(),
 }: OrderListQuery) {
@@ -123,6 +127,11 @@ export async function listOperationalOrders({
   }
   if (artStatus) query = query.eq("art_status", artStatus);
   if (prodStatus) query = query.eq("prod_status", prodStatus);
+  if (urgent === true)
+    query = query.or("is_urgent.eq.true,art_direction_tag.eq.URGENTE");
+  else if (urgent === false)
+    query = query.eq("is_urgent", false).neq("art_direction_tag", "URGENTE");
+  if (logisticType) query = query.eq("logistic_type", logisticType);
   for (const operation of quickFilterOperations(quickFilter, now)) {
     if (operation.method === "or") query = query.or(operation.expression);
     else if (operation.method === "eq")
@@ -142,6 +151,18 @@ export async function listOperationalOrders({
     page: safePage,
     pageSize: safeSize,
   };
+}
+
+/** Lightweight, unfiltered dataset used only by the summary cards. */
+export async function listOperationalOrderSummaryRows() {
+  const { data, count, error } = await supabase
+    .from("os_orders")
+    .select(
+      "id,delivery_date,logistic_type,prod_status,art_status,archived,is_urgent,art_direction_tag,updated_at",
+      { count: "exact" }
+    );
+  if (error) throw new Error(error.message);
+  return { orders: (data ?? []) as unknown as OsOrder[], total: count ?? 0 };
 }
 
 export async function getOperationalDashboardMetrics(
