@@ -927,7 +927,7 @@ export default function CreateOrderForm({
             ))}
           </Section>
         </main>
-        <aside className="p-4 sm:p-6 lg:p-0">
+        <aside className="p-4 sm:p-6 lg:sticky lg:top-6 lg:self-start lg:p-0">
           <Summary
             sale={saleNumber}
             client={clientName}
@@ -1089,7 +1089,7 @@ function Summary({
     ["Arquivos", `${fileCount} arquivo(s)`],
   ];
   return (
-    <Card className="sticky top-20">
+    <Card>
       <CardHeader>
         <CardTitle>Resumo da OS</CardTitle>
       </CardHeader>
