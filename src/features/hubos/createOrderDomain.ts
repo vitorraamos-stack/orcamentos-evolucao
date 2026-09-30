@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type {
   ArtDirectionTag,
+  CreateOrderItemInput,
   DeliveryDeadlinePreset,
   LogisticType,
 } from "./types";
@@ -31,7 +32,10 @@ export const orderItemInputSchema = z.object({
 });
 
 export const createOrderItemInputSchema = orderItemInputSchema.extend({
-  unit: z.enum(["cm", "m"], { error: "Selecione cm ou m." }),
+  unit: z.literal("un"),
+  measurement_unit: z.enum(["cm", "m"], {
+    error: "Selecione cm ou m.",
+  }),
 });
 
 export type CreateOrderItemDraft = z.input<typeof createOrderItemInputSchema>;
@@ -41,19 +45,49 @@ export const emptyOrderItem = (): CreateOrderItemDraft => ({
   quantity: 1,
   width_cm: null,
   height_cm: null,
-  unit: "cm",
+  unit: "un",
+  measurement_unit: "cm",
   notes: "",
   status: "PENDING",
   sort_order: 0,
 });
 
 export const normalizeCreateOrderItem = (
-  item: Omit<CreateOrderItemDraft, "unit"> & { unit?: unknown }
+  item: Omit<CreateOrderItemDraft, "unit" | "measurement_unit"> & {
+    unit?: unknown;
+    measurement_unit?: unknown;
+  }
 ): CreateOrderItemDraft =>
   ({
     ...item,
-    unit: item.unit === "cm" || item.unit === "m" ? item.unit : "cm",
+    measurement_unit:
+      item.measurement_unit === "cm" || item.measurement_unit === "m"
+        ? item.measurement_unit
+        : item.unit === "cm" || item.unit === "m"
+          ? item.unit
+          : "cm",
+    unit: "un",
   }) as CreateOrderItemDraft;
+
+export const normalizeMeasurementToCm = (
+  value: number | null | undefined,
+  unit: "cm" | "m"
+): number | null => {
+  if (value == null) return null;
+  return Number((unit === "m" ? value * 100 : value).toFixed(2));
+};
+
+export const toCreateOrderItemPayload = (
+  item: z.output<typeof createOrderItemInputSchema>
+): CreateOrderItemInput => ({
+  name: item.name,
+  description: item.description,
+  quantity: item.quantity,
+  width_cm: normalizeMeasurementToCm(item.width_cm, item.measurement_unit),
+  height_cm: normalizeMeasurementToCm(item.height_cm, item.measurement_unit),
+  unit: "un",
+  notes: item.notes,
+});
 
 export type CreateOrderCompletionInput = {
   saleNumber: string;
