@@ -46,6 +46,8 @@ export default function DeliveriesPage() {
   const [dialog, setDialog] = useState(false);
   const [editing, setEditing] = useState<Delivery | null>(null);
   const [mutation, setMutation] = useState<{ action: "cancel" | "complete"; delivery: Delivery } | null>(null);
+  const [pickupBusyId, setPickupBusyId] = useState<string | null>(null);
+  const pickupBusyRef = useRef<string | null>(null);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const load = useCallback(async () => {
     try {
@@ -89,6 +91,12 @@ export default function DeliveriesPage() {
   );
   const flowFor = (o: LogisticsOrder) =>
     data.flow.find(f => f.source_type === "os_orders" && f.source_id === o.id);
+  const activePickups = pickups.filter(o => !flowFor(o)?.retirado_at);
+  const completedPickups = pickups.filter(o => Boolean(flowFor(o)?.retirado_at));
+  const activeDeliveries = data.deliveries.filter(d =>
+    ["SCHEDULED", "IN_TRANSIT"].includes(d.status)
+  );
+  const completedDeliveries = data.deliveries.filter(d => d.status === "COMPLETED");
   const notify = async (o: LogisticsOrder, value = true) => {
     await setOrderFlowAvisado(
       { sourceType: "os_orders", sourceId: o.id },
@@ -100,12 +108,26 @@ export default function DeliveriesPage() {
     await load();
   };
   const pickup = async (o: LogisticsOrder) => {
-    await markOrderFlowRetiradoAndFinalize({
-      identity: { sourceType: "os_orders", sourceId: o.id },
-      actorName: null,
-    });
-    toast.success("Retirada concluída e OS finalizada.");
-    await load();
+    if (pickupBusyRef.current) return;
+    pickupBusyRef.current = o.id;
+    setPickupBusyId(o.id);
+    try {
+      await markOrderFlowRetiradoAndFinalize({
+        identity: { sourceType: "os_orders", sourceId: o.id },
+        actorName: null,
+      });
+      toast.success("Retirada concluída e OS finalizada.");
+      await load();
+    } catch (cause) {
+      toast.error(
+        cause instanceof Error
+          ? cause.message
+          : "Não foi possível concluir a retirada."
+      );
+    } finally {
+      pickupBusyRef.current = null;
+      setPickupBusyId(null);
+    }
   };
   const act = async (a: "start" | "complete" | "cancel", d: Delivery, extra = "") => {
     await deliveryAction(a, d.id, extra);
@@ -132,9 +154,17 @@ export default function DeliveriesPage() {
             Aguardando{" "}
             <Badge className="ml-2">{waiting.length + legacy.length}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="pickup">Retirada</TabsTrigger>
-          <TabsTrigger value="dispatch">Entrega / Transportadora</TabsTrigger>
-          <TabsTrigger value="done">Concluídas</TabsTrigger>
+          <TabsTrigger value="pickup">
+            Retirada <Badge className="ml-2">{activePickups.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="dispatch">
+            Entrega / Transportadora
+            <Badge className="ml-2">{activeDeliveries.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="done">
+            Concluídas
+            <Badge className="ml-2">{completedDeliveries.length + completedPickups.length}</Badge>
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="waiting">
           <div className="grid gap-3">
@@ -179,7 +209,7 @@ export default function DeliveriesPage() {
         </TabsContent>
         <TabsContent value="pickup">
           <div className="grid gap-3">
-            {pickups.map(o => {
+            {activePickups.map(o => {
               const flow = flowFor(o);
               return (
                 <Card key={o.id}>
@@ -199,36 +229,36 @@ export default function DeliveriesPage() {
                     </div>
                     {hubPermissions.canManageDeliveries && (
                       <div className="flex gap-2">
-                        {!flow?.retirado_at && (
-                          <Button
-                            variant="outline"
-                            onClick={() => notify(o, !flow?.avisado_at)}
-                          >
-                            <Bell className="mr-2 size-4" />
-                            {flow?.avisado_at
-                              ? "Desmarcar aviso"
-                              : "Avisar cliente"}
-                          </Button>
-                        )}
-                        {!flow?.retirado_at && (
-                          <Button onClick={() => pickup(o)}>
-                            <PackageCheck className="mr-2 size-4" />
-                            Marcar retirado
-                          </Button>
-                        )}
+                        <Button
+                          variant="outline"
+                          onClick={() => notify(o, !flow?.avisado_at)}
+                        >
+                          <Bell className="mr-2 size-4" />
+                          {flow?.avisado_at
+                            ? "Desmarcar aviso"
+                            : "Avisar cliente"}
+                        </Button>
+                        <Button
+                          disabled={pickupBusyId === o.id}
+                          onClick={() => pickup(o)}
+                        >
+                          <PackageCheck className="mr-2 size-4" />
+                          {pickupBusyId === o.id ? "Concluindo..." : "Marcar retirado"}
+                        </Button>
                       </div>
                     )}
                   </CardContent>
                 </Card>
               );
             })}
+            {!activePickups.length && (
+              <Empty>Nenhuma retirada aguardando conclusão.</Empty>
+            )}
           </div>
         </TabsContent>
         <TabsContent value="dispatch">
           <div className="grid gap-3">
-            {data.deliveries
-              .filter(d => ["SCHEDULED", "IN_TRANSIT"].includes(d.status))
-              .map(d => (
+            {activeDeliveries.map(d => (
                 <Card key={d.id}>
                   <CardContent className="space-y-3 pt-5">
                     <div className="flex justify-between">
@@ -283,9 +313,7 @@ export default function DeliveriesPage() {
         </TabsContent>
         <TabsContent value="done">
           <div className="grid gap-3">
-            {data.deliveries
-              .filter(d => d.status === "COMPLETED")
-              .map(d => (
+            {completedDeliveries.map(d => (
                 <Card key={d.id}>
                   <CardContent className="pt-5">
                     <b>Entrega · OS {d.order?.sale_number ?? "—"}</b>
@@ -297,9 +325,7 @@ export default function DeliveriesPage() {
                   </CardContent>
                 </Card>
               ))}
-            {pickups
-              .filter(o => flowFor(o)?.retirado_at)
-              .map(o => (
+            {completedPickups.map(o => (
                 <Card key={o.id}>
                   <CardContent className="pt-5">
                     <b>Retirada · OS {o.sale_number ?? "—"}</b>
