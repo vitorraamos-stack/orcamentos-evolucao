@@ -484,7 +484,7 @@ export default function CreateOrderForm({
             subtitle="Esta OS será criada na Caixa de Entrada do setor de Arte."
           >
             <div className="grid gap-4 sm:grid-cols-2">
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="sale-number">Nº da venda *</Label>
                 <Input
                   id="sale-number"
@@ -497,7 +497,7 @@ export default function CreateOrderForm({
                   {errors.saleNumber}
                 </FieldError>
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="client-name">Cliente *</Label>
                 <Input
                   id="client-name"
@@ -561,7 +561,7 @@ export default function CreateOrderForm({
                     Excluir
                   </Button>
                 </div>
-                <div>
+                <div className="space-y-1.5">
                   <Label htmlFor={`item-${index}-name`}>Nome do item *</Label>
                   <Input
                     id={`item-${index}-name`}
@@ -574,7 +574,7 @@ export default function CreateOrderForm({
                   </FieldError>
                 </div>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor={`item-${index}-quantity`}>Qtd. *</Label>
                     <Input
                       id={`item-${index}-quantity`}
@@ -591,7 +591,7 @@ export default function CreateOrderForm({
                       {errors[`item-${index}-quantity`]}
                     </FieldError>
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label>Largura (cm)</Label>
                     <Input
                       type="number"
@@ -602,7 +602,7 @@ export default function CreateOrderForm({
                       }
                     />
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label>Altura (cm)</Label>
                     <Input
                       type="number"
@@ -615,7 +615,7 @@ export default function CreateOrderForm({
                       }
                     />
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label>Unidade *</Label>
                     <Input
                       value={String(item.unit)}
@@ -626,7 +626,7 @@ export default function CreateOrderForm({
                     />
                   </div>
                 </div>
-                <div>
+                <div className="space-y-1.5">
                   <Label>Descrição / especificação</Label>
                   <Textarea
                     value={String(item.description ?? "")}
@@ -635,7 +635,7 @@ export default function CreateOrderForm({
                     }
                   />
                 </div>
-                <div>
+                <div className="space-y-1.5">
                   <Label>Observações</Label>
                   <Input
                     value={String(item.notes ?? "")}
@@ -716,9 +716,9 @@ export default function CreateOrderForm({
           </Section>
 
           <Section title="Arte e Prioridade">
-            <div>
+            <div className="space-y-1.5">
               <Label>Necessidade da Arte *</Label>
-              <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
                 {ART_DIRECTION_CHOICES.map(tag => (
                   <button
                     key={tag}
@@ -736,9 +736,9 @@ export default function CreateOrderForm({
               </div>
               <FieldError id="art-error">{errors.artDirection}</FieldError>
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label>Prioridade</Label>
-              <div className="mt-2 grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
                   aria-pressed={!isUrgent}
@@ -788,7 +788,7 @@ export default function CreateOrderForm({
             </div>
             <FieldError id="deadline-error">{errors.deadline}</FieldError>
             {deadline === "CUSTOM" && (
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="delivery-date">Data combinada *</Label>
                 <Input
                   id="delivery-date"
@@ -820,7 +820,7 @@ export default function CreateOrderForm({
               ))}
             </div>
             {logisticType !== "retirada" && (
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="address">Endereço do serviço *</Label>
                 <Input
                   id="address"
@@ -830,7 +830,7 @@ export default function CreateOrderForm({
                 />
                 <FieldError id="address-error">{errors.address}</FieldError>
                 {logisticType === "instalacao" && (
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     Equipe e horário serão definidos posteriormente no módulo de
                     Instalações.
                   </p>
@@ -1002,7 +1002,7 @@ function UploadBox({
   onRemove: (index: number) => void;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <Label>{title}</Label>
       <div
         className="rounded-xl border-2 border-dashed p-4 text-center"
