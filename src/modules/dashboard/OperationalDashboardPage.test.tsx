@@ -41,7 +41,7 @@ describe("OperationalDashboardSections", () => {
       ["Material pronto", 106],
       ["Aguardando insumos", 107],
       ["Produção externa", 108],
-      ["Financeiro", 109],
+      ["Pendências financeiras", 109],
       ["Atrasadas", 110],
       ["Prazo hoje", 111],
       ["Prazo amanhã", 112],
@@ -59,9 +59,9 @@ describe("OperationalDashboardSections", () => {
       "/os/producao/em-producao",
       "/os/producao/acabamento",
       "/os/producao/pronto",
-      "/os/producao/insumos",
+      "/os/insumos",
       "/os/producao/externa",
-      "/financeiro",
+      "/hub-os/pendentes",
       "/os?quick=overdue",
       "/os?quick=today",
       "/os?quick=tomorrow",
@@ -69,6 +69,7 @@ describe("OperationalDashboardSections", () => {
     destinations.forEach(href =>
       expect(html).toContain(`href="${href.replaceAll("&", "&amp;")}"`)
     );
+    expect(html).not.toContain('href="/financeiro"');
   });
 
   it("supports the permission-safe finance fallback", () => {

@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import type { OsOrder } from "@/features/hubos/types";
 import { addLocalDays, formatLocalDate } from "@/shared/lib/date";
 import type { QuickOrderFilter } from "./orderFilters";
+import { getConsultantFinancePendingSummary } from "@/features/hubos/financePending";
 
 export type OrderListQuery = {
   page: number;
@@ -39,19 +40,6 @@ export type OperationalDashboardMetrics = {
 export type OperationalAttentionMetrics = {
   awaitingSupplies: number;
   financePending: number;
-};
-
-const ACTIONABLE_FINANCE_STATUSES = [
-  "AWAITING_PROOF",
-  "PENDING_REVIEW",
-  "REJEITADO",
-  "CADASTRO_PENDENTE",
-] as const;
-
-type ActionableFinanceRow = {
-  id: string;
-  os_id: string | null;
-  status: (typeof ACTIONABLE_FINANCE_STATUSES)[number];
 };
 
 type FilterOperation =
@@ -213,28 +201,6 @@ export async function getOperationalDashboardMetrics(
   return data as unknown as OperationalDashboardMetrics;
 }
 
-async function loadAllActionableFinanceRows() {
-  const pageSize = 1000;
-  const rows: ActionableFinanceRow[] = [];
-  let from = 0;
-  while (true) {
-    const { data, error } = await supabase
-      .from("os_finance_installments")
-      .select("id,os_id,status")
-      .in("status", [...ACTIONABLE_FINANCE_STATUSES])
-      .order("id", { ascending: true })
-      .range(from, from + pageSize - 1);
-    if (error) throw new Error(error.message);
-    const page = (data ?? []) as ActionableFinanceRow[];
-    rows.push(...page);
-    if (page.length < pageSize) break;
-    const next = from + page.length;
-    if (next <= from) break;
-    from = next;
-  }
-  return rows;
-}
-
 export async function getOperationalAttentionMetrics(): Promise<OperationalAttentionMetrics> {
   const { count, error } = await supabase
     .from("os_orders")
@@ -246,14 +212,10 @@ export async function getOperationalAttentionMetrics(): Promise<OperationalAtten
 
   // Only installments that still require action are queried. Counting distinct
   // OS prevents multiple pending installments from inflating the dashboard.
-  const financeRows = await loadAllActionableFinanceRows();
+  const financeSummary = await getConsultantFinancePendingSummary();
   return {
     awaitingSupplies: count ?? 0,
-    financePending: new Set(
-      financeRows
-        .map(row => row.os_id)
-        .filter((id): id is string => Boolean(id))
-    ).size,
+    financePending: financeSummary.totalOrders,
   };
 }
 
