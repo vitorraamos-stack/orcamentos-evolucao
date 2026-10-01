@@ -36,6 +36,24 @@ export type OperationalDashboardMetrics = {
   installationLoad: number;
 };
 
+export type OperationalAttentionMetrics = {
+  awaitingSupplies: number;
+  financePending: number;
+};
+
+const ACTIONABLE_FINANCE_STATUSES = [
+  "AWAITING_PROOF",
+  "PENDING_REVIEW",
+  "REJEITADO",
+  "CADASTRO_PENDENTE",
+] as const;
+
+type ActionableFinanceRow = {
+  id: string;
+  os_id: string | null;
+  status: (typeof ACTIONABLE_FINANCE_STATUSES)[number];
+};
+
 type FilterOperation =
   | { method: "eq" | "lt" | "gte" | "lte"; column: string; value: unknown }
   | { method: "or"; expression: string };
@@ -193,6 +211,50 @@ export async function getOperationalDashboardMetrics(
   );
   if (error) throw new Error(error.message);
   return data as unknown as OperationalDashboardMetrics;
+}
+
+async function loadAllActionableFinanceRows() {
+  const pageSize = 1000;
+  const rows: ActionableFinanceRow[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("os_finance_installments")
+      .select("id,os_id,status")
+      .in("status", [...ACTIONABLE_FINANCE_STATUSES])
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(error.message);
+    const page = (data ?? []) as ActionableFinanceRow[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+    const next = from + page.length;
+    if (next <= from) break;
+    from = next;
+  }
+  return rows;
+}
+
+export async function getOperationalAttentionMetrics(): Promise<OperationalAttentionMetrics> {
+  const { count, error } = await supabase
+    .from("os_orders")
+    .select("id", { count: "exact", head: true })
+    .eq("production_tag", "AGUARDANDO_INSUMOS")
+    .or("archived.is.null,archived.eq.false")
+    .or("prod_status.is.null,prod_status.not.ilike.%finaliz%");
+  if (error) throw new Error(error.message);
+
+  // Only installments that still require action are queried. Counting distinct
+  // OS prevents multiple pending installments from inflating the dashboard.
+  const financeRows = await loadAllActionableFinanceRows();
+  return {
+    awaitingSupplies: count ?? 0,
+    financePending: new Set(
+      financeRows
+        .map(row => row.os_id)
+        .filter((id): id is string => Boolean(id))
+    ).size,
+  };
 }
 
 export async function listOperationalAttentionOrders(

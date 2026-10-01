@@ -1,15 +1,30 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import { AlertTriangle, ArrowRight } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  ChartNoAxesColumnIncreasing,
+  CircleDollarSign,
+  ClipboardList,
+  Clock3,
+  Factory,
+  PackageCheck,
+  Palette,
+  PackageSearch,
+  TriangleAlert,
+  Wrench,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { OsOrder } from "@/features/hubos/types";
 import {
   getOperationalDashboardMetrics,
+  getOperationalAttentionMetrics,
   listOperationalAttentionOrders,
   type DashboardPeriod,
   type OperationalDashboardMetrics,
+  type OperationalAttentionMetrics,
 } from "@/modules/orders/orderRepository";
 import { calculateOrderRisk } from "@/modules/orders/risk";
 import { addLocalDays, formatLocalDate } from "@/shared/lib/date";
@@ -44,11 +59,122 @@ function periodRange(
   };
 }
 
+export function OperationalDashboardSections({
+  metrics,
+  attentionMetrics,
+}: {
+  metrics: OperationalDashboardMetrics;
+  attentionMetrics: OperationalAttentionMetrics;
+}) {
+  return (
+    <>
+      <section className="rounded-lg border bg-card p-4 sm:p-5">
+        <div className="mb-4 flex items-start gap-2">
+          <ChartNoAxesColumnIncreasing
+            aria-hidden="true"
+            className="mt-0.5 h-5 w-5 text-primary"
+          />
+          <div>
+            <h2 className="font-semibold">Fluxo atual</h2>
+            <p className="text-xs text-muted-foreground">
+              Quantidade de OS por etapa atual da operação.
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+          <StatCard
+            label="OS ativas"
+            value={metrics.active}
+            icon={ClipboardList}
+          />
+          <StatCard label="Em Arte" value={metrics.art} icon={Palette} />
+          <StatCard
+            label="Aguardando aprovação"
+            value={metrics.approval}
+            tone="warning"
+            icon={Clock3}
+          />
+          <StatCard
+            label="Em Produção"
+            value={metrics.production}
+            icon={Factory}
+          />
+          <StatCard
+            label="Em Acabamento"
+            value={metrics.finish}
+            icon={Wrench}
+          />
+          <StatCard
+            label="Material pronto"
+            value={metrics.ready}
+            tone="success"
+            icon={PackageCheck}
+          />
+        </div>
+      </section>
+      <section className="mt-5 rounded-lg border border-destructive/20 bg-destructive/[0.02] p-4 sm:p-5">
+        <div className="mb-4 flex items-start gap-2">
+          <TriangleAlert
+            aria-hidden="true"
+            className="mt-0.5 h-5 w-5 text-destructive"
+          />
+          <div>
+            <h2 className="font-semibold">Atenção e pendências</h2>
+            <p className="text-xs text-muted-foreground">
+              Situações que exigem atenção para manter o fluxo da operação.
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+          <StatCard
+            label="Aguardando insumos"
+            value={attentionMetrics.awaitingSupplies}
+            tone="warning"
+            icon={PackageSearch}
+          />
+          <StatCard
+            label="Produção externa"
+            value={metrics.externalProduction}
+            tone="warning"
+            icon={Factory}
+          />
+          <StatCard
+            label="Financeiro"
+            value={attentionMetrics.financePending}
+            tone="danger"
+            icon={CircleDollarSign}
+          />
+          <StatCard
+            label="Atrasadas"
+            value={metrics.overdue}
+            tone="danger"
+            icon={AlertTriangle}
+          />
+          <StatCard
+            label="Prazo hoje"
+            value={metrics.today}
+            tone="danger"
+            icon={Clock3}
+          />
+          <StatCard
+            label="Prazo amanhã"
+            value={metrics.tomorrow}
+            tone="warning"
+            icon={Clock3}
+          />
+        </div>
+      </section>
+    </>
+  );
+}
+
 export default function OperationalDashboardPage() {
   const [metrics, setMetrics] = useState<OperationalDashboardMetrics | null>(
     null
   );
   const [attention, setAttention] = useState<OsOrder[]>([]);
+  const [attentionMetrics, setAttentionMetrics] =
+    useState<OperationalAttentionMetrics | null>(null);
   const [period, setPeriod] = useState<Period>("week");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
@@ -67,10 +193,12 @@ export default function OperationalDashboardPage() {
     setError("");
     Promise.all([
       getOperationalDashboardMetrics(range),
+      getOperationalAttentionMetrics(),
       listOperationalAttentionOrders(8),
     ])
-      .then(([nextMetrics, nextAttention]) => {
+      .then(([nextMetrics, nextAttentionMetrics, nextAttention]) => {
         setMetrics(nextMetrics);
+        setAttentionMetrics(nextAttentionMetrics);
         setAttention(nextAttention);
       })
       .catch(reason =>
@@ -161,43 +289,13 @@ export default function OperationalDashboardPage() {
       ) : error ? (
         <ErrorState message={error} retry={load} />
       ) : (
-        metrics && (
+        metrics &&
+        attentionMetrics && (
           <>
-            <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-              <StatCard label="OS ativas" value={metrics.active} />
-              <StatCard label="Em Arte" value={metrics.art} />
-              <StatCard
-                label="Aguardando aprovação"
-                value={metrics.approval}
-                tone="warning"
-              />
-              <StatCard label="Em Produção" value={metrics.production} />
-              <StatCard label="Em Acabamento" value={metrics.finish} />
-              <StatCard
-                label="Material pronto"
-                value={metrics.ready}
-                tone="success"
-              />
-              <StatCard
-                label="Instalações no período"
-                value={metrics.installations}
-              />
-              <StatCard
-                label="Atrasadas no período"
-                value={metrics.overdue}
-                tone="danger"
-              />
-              <StatCard
-                label="Prazo hoje"
-                value={metrics.today}
-                tone="danger"
-              />
-              <StatCard
-                label="Prazo amanhã"
-                value={metrics.tomorrow}
-                tone="warning"
-              />
-            </section>
+            <OperationalDashboardSections
+              metrics={metrics}
+              attentionMetrics={attentionMetrics}
+            />
             <div className="mt-6 grid gap-5 lg:grid-cols-5">
               <Card className="lg:col-span-3">
                 <CardHeader>
@@ -256,9 +354,9 @@ export default function OperationalDashboardPage() {
               </Card>
             </div>
             <p className="mt-4 text-xs text-muted-foreground">
-              Estoque operacional considera todas as OS acessíveis. Instalações
-              e atrasos respeitam o período e usam a data de entrega enquanto
-              não existe uma data de instalação dedicada.
+              Fluxo atual, Aguardando insumos, Produção externa e Financeiro
+              refletem o estado atual das OS. Atrasos e prazos respeitam o
+              período selecionado; instalação permanece na carga operacional.
             </p>
           </>
         )

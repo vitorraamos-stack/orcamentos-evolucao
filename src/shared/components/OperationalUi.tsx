@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { AlertCircle, LoaderCircle } from "lucide-react";
+import { AlertCircle, LoaderCircle, type LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 export function PageHeader({
   title,
@@ -28,10 +29,14 @@ export function StatCard({
   label,
   value,
   tone = "neutral",
+  icon: Icon,
+  className,
 }: {
   label: string;
   value: number;
   tone?: "neutral" | "danger" | "warning" | "success";
+  icon?: LucideIcon;
+  className?: string;
 }) {
   const colors = {
     neutral: "border-l-blue-500",
@@ -40,9 +45,12 @@ export function StatCard({
     success: "border-l-emerald-500",
   };
   return (
-    <Card className={`border-l-4 ${colors[tone]}`}>
+    <Card className={cn("border-l-4", colors[tone], className)}>
       <CardContent className="p-4">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <div className="flex items-center gap-2 text-muted-foreground">
+          {Icon && <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />}
+          <p className="text-xs font-medium leading-tight">{label}</p>
+        </div>
         <p className="mt-1 text-2xl font-bold tabular-nums">{value}</p>
       </CardContent>
     </Card>
