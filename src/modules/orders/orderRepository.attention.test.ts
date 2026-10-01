@@ -70,10 +70,27 @@ describe("getOperationalAttentionMetrics", () => {
   it("queries every actionable status and counts distinct OS", async () => {
     mocks.financeRange.mockResolvedValueOnce({
       data: [
-        { id: "1", os_id: "os-a", status: "AWAITING_PROOF" },
-        { id: "2", os_id: "os-a", status: "PENDING_REVIEW" },
-        { id: "3", os_id: "os-b", status: "REJEITADO" },
-        { id: "4", os_id: "os-c", status: "CADASTRO_PENDENTE" },
+        {
+          id: "1",
+          os_id: "os-a",
+          status: "AWAITING_PROOF",
+          installment_no: 2,
+          total_installments: 2,
+        },
+        {
+          id: "3",
+          os_id: "os-b",
+          status: "REJEITADO",
+          installment_no: 1,
+          total_installments: 1,
+        },
+        {
+          id: "4",
+          os_id: "os-c",
+          status: "CADASTRO_PENDENTE",
+          installment_no: 1,
+          total_installments: 1,
+        },
       ],
       error: null,
     });
@@ -82,9 +99,8 @@ describe("getOperationalAttentionMetrics", () => {
 
     expect(mocks.financeIn).toHaveBeenCalledWith("status", [
       "AWAITING_PROOF",
-      "PENDING_REVIEW",
-      "REJEITADO",
       "CADASTRO_PENDENTE",
+      "REJEITADO",
     ]);
     expect(mocks.financeIn.mock.calls[0][1]).not.toContain("CONCILIADO");
     expect(mocks.financeIn.mock.calls[0][1]).not.toContain("LANCADO");
@@ -96,11 +112,21 @@ describe("getOperationalAttentionMetrics", () => {
       id: String(index),
       os_id: `os-${index}`,
       status: "AWAITING_PROOF",
+      installment_no: 2,
+      total_installments: 2,
     }));
     mocks.financeRange
       .mockResolvedValueOnce({ data: firstPage, error: null })
       .mockResolvedValueOnce({
-        data: [{ id: "1000", os_id: "os-1000", status: "REJEITADO" }],
+        data: [
+          {
+            id: "1000",
+            os_id: "os-1000",
+            status: "REJEITADO",
+            installment_no: 1,
+            total_installments: 1,
+          },
+        ],
         error: null,
       });
 

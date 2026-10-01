@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
+import { RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import {
   fetchFinanceQueue,
   fetchPendingSecondInstallments,
@@ -14,119 +18,119 @@ import type { FinanceInstallment } from "@/features/hubos/types";
 import { uploadReceiptForOrder } from "@/features/hubos/assets";
 import { useAuth } from "@/contexts/AuthContext";
 import { labelFinanceStatus } from "@/lib/financeStatusLabels";
+import {
+  summarizeConsultantFinancePending,
+  type ConsultantFinancePendingGroup,
+} from "@/features/hubos/financePending";
 
-const buildFinanceNoteHistory = ({
-  existing,
-  actor,
-  statusLabel,
-  note,
-}: {
-  existing?: string | null;
-  actor: "CONSULTOR" | "BPO";
-  statusLabel: string;
-  note?: string | null;
-}) => {
-  const cleanNote = note?.trim();
-  const timestamp = new Date().toLocaleString("pt-BR");
-  const header = `[${timestamp}] ${actor} • ${statusLabel}`;
-  const entry = cleanNote ? `${header}\n${cleanNote}` : header;
-  return [existing?.trim(), entry].filter(Boolean).join("\n\n");
+type Item = {
+  key: string;
+  group: ConsultantFinancePendingGroup;
+  value: FinanceInstallment;
 };
-
-const formatDatePtBr = (value?: string | null) => {
-  if (!value) return "—";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const [year, month, day] = value.split("-");
-    if (year && month && day) {
-      return `${day}/${month}/${year}`;
-    }
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString("pt-BR");
+type Filter = "all" | ConsultantFinancePendingGroup;
+const groupLabel: Record<ConsultantFinancePendingGroup, string> = {
+  second_installment: "2ª Parcela",
+  registration: "Cadastro Pendente",
+  rejected: "Rejeitado",
 };
+const formatDate = (value?: string | null) =>
+  value
+    ? new Date(
+        value.includes("T") ? value : `${value}T12:00:00`
+      ).toLocaleDateString("pt-BR")
+    : "—";
+const noteHistory = (existing: string | null, status: string, note: string) =>
+  [
+    existing?.trim(),
+    `[${new Date().toLocaleString("pt-BR")}] CONSULTOR • ${status}\n${note.trim()}`.trim(),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
 export default function OsPendentesPage() {
   const { user } = useAuth();
-  const [, setLocation] = useLocation();
-  const [secondInstallmentItems, setSecondInstallmentItems] = useState<
-    FinanceInstallment[]
-  >([]);
-  const [registrationPendingItems, setRegistrationPendingItems] = useState<
-    FinanceInstallment[]
-  >([]);
-  const [rejectedItems, setRejectedItems] = useState<FinanceInstallment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<Item[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
   const [file, setFile] = useState<File | null>(null);
-  const [sending, setSending] = useState(false);
-  const [consultantNote, setConsultantNote] = useState("");
-  const [returningToFinance, setReturningToFinance] = useState(false);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const [secondData, registrationPendingData, rejectedData] =
-        await Promise.all([
-          fetchPendingSecondInstallments(),
-          fetchFinanceQueue(["CADASTRO_PENDENTE"]),
-          fetchFinanceQueue(["REJEITADO"]),
-        ]);
-
-      setSecondInstallmentItems(secondData);
-      setRegistrationPendingItems(registrationPendingData);
-      setRejectedItems(rejectedData);
-
-      setSelectedKey(current => {
-        if (current) return current;
-        if (secondData[0]) return `second:${secondData[0].id}`;
-        if (registrationPendingData[0])
-          return `cadastro:${registrationPendingData[0].id}`;
-        if (rejectedData[0]) return `rejected:${rejectedData[0].id}`;
-        return null;
-      });
+      const [second, registration, rejected] = await Promise.all([
+        fetchPendingSecondInstallments(),
+        fetchFinanceQueue(["CADASTRO_PENDENTE"]),
+        fetchFinanceQueue(["REJEITADO"]),
+      ]);
+      const next: Item[] = [
+        ...second.map(value => ({
+          key: `second:${value.id}`,
+          group: "second_installment" as const,
+          value,
+        })),
+        ...registration.map(value => ({
+          key: `registration:${value.id}`,
+          group: "registration" as const,
+          value,
+        })),
+        ...rejected.map(value => ({
+          key: `rejected:${value.id}`,
+          group: "rejected" as const,
+          value,
+        })),
+      ];
+      setItems(next);
+      setSelectedKey(current =>
+        next.some(item => item.key === current)
+          ? current
+          : (next[0]?.key ?? null)
+      );
     } catch (error) {
-      console.error(error);
-      toast.error("Não foi possível carregar os pendentes.");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível carregar as pendências."
+      );
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    load();
   }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  const selected = useMemo(() => {
-    if (!selectedKey) return null;
-    const [group, id] = selectedKey.split(":");
-    const source =
-      group === "second"
-        ? secondInstallmentItems
-        : group === "cadastro"
-          ? registrationPendingItems
-          : rejectedItems;
-    return source.find(item => item.id === id) ?? null;
-  }, [
-    selectedKey,
-    secondInstallmentItems,
-    registrationPendingItems,
-    rejectedItems,
-  ]);
+  const summary = summarizeConsultantFinancePending(
+    items.map(({ value }) => value)
+  );
+  const visible = useMemo(() => {
+    const term = search.trim().toLocaleLowerCase("pt-BR");
+    return items.filter(
+      item =>
+        (filter === "all" || item.group === filter) &&
+        (!term ||
+          [
+            item.value.os_orders?.sale_number,
+            item.value.os_orders?.client_name,
+          ].some(value =>
+            String(value ?? "")
+              .toLocaleLowerCase("pt-BR")
+              .includes(term)
+          ))
+    );
+  }, [items, filter, search]);
+  const selected = items.find(item => item.key === selectedKey) ?? null;
 
-  const selectedGroup = selectedKey?.split(":")[0] ?? null;
-
-  const handleSubmitSecondProof = async () => {
-    if (!selected?.os_orders?.id || !file) {
-      toast.error("Selecione um comprovante.");
-      return;
-    }
-
+  const upload = async () => {
+    if (!selected?.value.os_orders?.id || !file || busy) return;
+    setBusy(true);
     try {
-      setSending(true);
       await uploadReceiptForOrder({
-        osId: selected.os_orders.id,
+        osId: selected.value.os_orders.id,
         file,
         userId: user?.id ?? null,
         installmentLabel: "2/2",
@@ -135,266 +139,272 @@ export default function OsPendentesPage() {
       setFile(null);
       await load();
     } catch (error) {
-      console.error(error);
       toast.error(
         error instanceof Error
           ? error.message
           : "Falha ao anexar comprovante 2/2."
       );
     } finally {
-      setSending(false);
+      setBusy(false);
     }
   };
-
-  const handleReturnToFinanceQueue = async () => {
-    if (!selected) {
-      toast.error("Selecione uma solicitação.");
-      return;
-    }
-
+  const returnToFinance = async () => {
+    if (!selected || busy) return;
+    setBusy(true);
+    const label =
+      selected.group === "registration"
+        ? "Cadastro corrigido"
+        : "Ajuste concluído";
     try {
-      setReturningToFinance(true);
-      const notePrefix =
-        selectedGroup === "cadastro"
-          ? "Consultor confirmou atualização de cadastro."
-          : "Consultor confirmou ajuste solicitado (rejeitado).";
-
-      const nextNote = buildFinanceNoteHistory({
-        existing: selected.notes,
-        actor: "CONSULTOR",
-        statusLabel: notePrefix,
-        note: consultantNote,
-      });
-
       await updateFinanceInstallment({
-        id: selected.id,
+        id: selected.value.id,
         status: "PENDING_REVIEW",
-        notes: nextNote || null,
+        notes: noteHistory(selected.value.notes, label, note),
         reviewedBy: user?.id ?? null,
       });
-
       toast.success("Solicitação enviada de volta para a fila do financeiro.");
-      setConsultantNote("");
+      setNote("");
       await load();
     } catch (error) {
-      console.error(error);
       toast.error(
         error instanceof Error
           ? error.message
-          : "Não foi possível enviar para a fila do financeiro."
+          : "Não foi possível reenviar ao Financeiro."
       );
     } finally {
-      setReturningToFinance(false);
+      setBusy(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
+    <div className="space-y-4">
+      <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-semibold">Pendentes Financeiro</h1>
+          <h1 className="text-2xl font-semibold">Pendências Financeiras</h1>
           <p className="text-sm text-muted-foreground">
-            Visão consolidada do financeiro BPO para consultores e gerência.
+            Pendências que precisam de ação do Comercial antes de retornar ao
+            Financeiro.
           </p>
         </div>
-        <Button variant="outline" onClick={() => setLocation("/hub-os")}>
-          Voltar ao Hub OS
+        <Button variant="outline" onClick={() => void load()}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Atualizar
         </Button>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>2ª Parcela ({secondInstallmentItems.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {loading && (
-              <p className="text-sm text-muted-foreground">Carregando...</p>
-            )}
-            {!loading && secondInstallmentItems.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                Nenhuma OS pendente de 2ª parcela.
-              </p>
-            )}
-            {secondInstallmentItems.map(item => (
-              <button
-                key={item.id}
-                type="button"
-                className={`w-full rounded border p-3 text-left text-sm ${selectedKey === `second:${item.id}` ? "border-primary" : "border-border"}`}
-                onClick={() => setSelectedKey(`second:${item.id}`)}
-              >
-                <p className="font-medium">
-                  OS #{item.os_orders?.sale_number ?? "—"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {item.os_orders?.client_name ?? "Sem cliente"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Venc.: {formatDatePtBr(item.due_date)}
-                </p>
-              </button>
+      </header>
+      {loading ? (
+        <>
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            {[1, 2, 3, 4].map(i => (
+              <Skeleton key={i} className="h-20" />
             ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              Cadastro Pendente ({registrationPendingItems.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {loading && (
-              <p className="text-sm text-muted-foreground">Carregando...</p>
-            )}
-            {!loading && registrationPendingItems.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                Nenhuma OS em cadastro pendente.
-              </p>
-            )}
-            {registrationPendingItems.map(item => (
-              <button
-                key={item.id}
-                type="button"
-                className={`w-full rounded border p-3 text-left text-sm ${selectedKey === `cadastro:${item.id}` ? "border-primary" : "border-border"}`}
-                onClick={() => setSelectedKey(`cadastro:${item.id}`)}
-              >
-                <p className="font-medium">
-                  OS #{item.os_orders?.sale_number ?? "—"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {item.os_orders?.client_name ?? "Sem cliente"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {labelFinanceStatus(item.status)}
-                </p>
-              </button>
+          </div>
+          <Skeleton className="h-[32rem]" />
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            {[
+              ["Total", summary.totalOrders],
+              ["2ª parcela", summary.secondInstallments],
+              ["Cadastro pendente", summary.registrationPending],
+              ["Rejeitados", summary.rejected],
+            ].map(([label, value]) => (
+              <Card key={label}>
+                <CardContent className="p-3">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="text-xl font-semibold">{value}</p>
+                </CardContent>
+              </Card>
             ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Rejeitados ({rejectedItems.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {loading && (
-              <p className="text-sm text-muted-foreground">Carregando...</p>
-            )}
-            {!loading && rejectedItems.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                Nenhuma OS rejeitada.
-              </p>
-            )}
-            {rejectedItems.map(item => (
-              <button
-                key={item.id}
-                type="button"
-                className={`w-full rounded border p-3 text-left text-sm ${selectedKey === `rejected:${item.id}` ? "border-primary" : "border-border"}`}
-                onClick={() => setSelectedKey(`rejected:${item.id}`)}
-              >
-                <p className="font-medium">
-                  OS #{item.os_orders?.sale_number ?? "—"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {item.os_orders?.client_name ?? "Sem cliente"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {labelFinanceStatus(item.status)}
-                </p>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Detalhe</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!selected && (
-            <p className="text-sm text-muted-foreground">
-              Selecione uma OS para visualizar detalhes.
-            </p>
-          )}
-          {selected && (
-            <>
-              <div className="space-y-1 text-sm">
-                <p>
-                  <span className="font-medium">OS:</span> #
-                  {selected.os_orders?.sale_number}
-                </p>
-                <p>
-                  <span className="font-medium">Cliente:</span>{" "}
-                  {selected.os_orders?.client_name}
-                </p>
-                <p>
-                  <span className="font-medium">Status:</span>{" "}
-                  {labelFinanceStatus(selected.status)}
-                </p>
-                <p>
-                  <span className="font-medium">Parcela:</span>{" "}
-                  {selected.installment_no}/{selected.total_installments}
-                </p>
-                <p>
-                  <span className="font-medium">Data 2ª parcela:</span>{" "}
-                  {formatDatePtBr(selected.due_date)}
-                </p>
-                {selected.notes && (
-                  <p className="whitespace-pre-wrap">
-                    <span className="font-medium">Observação:</span>{" "}
-                    {selected.notes}
+          </div>
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <Card>
+              <CardContent className="space-y-3 p-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    className="pl-9"
+                    placeholder="Buscar por OS ou cliente..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {[
+                    ["all", "Todas"],
+                    ["second_installment", "2ª parcela"],
+                    ["registration", "Cadastro pendente"],
+                    ["rejected", "Rejeitados"],
+                  ].map(([value, label]) => (
+                    <Button
+                      key={value}
+                      size="sm"
+                      variant={filter === value ? "default" : "outline"}
+                      onClick={() => setFilter(value as Filter)}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+                <div className="max-h-[60vh] space-y-2 overflow-auto">
+                  {visible.length === 0 && (
+                    <p className="py-12 text-center text-sm text-muted-foreground">
+                      Nenhuma pendência para este filtro.
+                    </p>
+                  )}
+                  {visible.map(item => (
+                    <button
+                      type="button"
+                      key={item.key}
+                      onClick={() => {
+                        setSelectedKey(item.key);
+                        setFile(null);
+                        setNote("");
+                      }}
+                      className={`w-full rounded-lg border p-3 text-left hover:bg-muted/40 ${selectedKey === item.key ? "border-primary bg-primary/5" : ""}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <strong>
+                          OS #{item.value.os_orders?.sale_number ?? "—"}
+                        </strong>
+                        <Badge
+                          variant={
+                            item.group === "rejected"
+                              ? "destructive"
+                              : "secondary"
+                          }
+                        >
+                          {groupLabel[item.group]}
+                        </Badge>
+                      </div>
+                      <p className="text-sm">
+                        {item.value.os_orders?.client_name ?? "Sem cliente"}
+                      </p>
+                      <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+                        <span>{labelFinanceStatus(item.value.status)}</span>
+                        <span>
+                          {item.value.due_date
+                            ? `Venc. ${formatDate(item.value.due_date)}`
+                            : ""}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="space-y-5 p-5">
+                {!selected ? (
+                  <p className="py-12 text-center text-sm text-muted-foreground">
+                    Selecione uma OS para visualizar detalhes.
                   </p>
+                ) : (
+                  <>
+                    <div className="flex justify-between gap-3">
+                      <div>
+                        <h2 className="text-xl font-semibold">
+                          OS #{selected.value.os_orders?.sale_number}
+                        </h2>
+                        <p className="text-muted-foreground">
+                          {selected.value.os_orders?.client_name}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={
+                          selected.group === "rejected"
+                            ? "destructive"
+                            : "secondary"
+                        }
+                      >
+                        {groupLabel[selected.group]}
+                      </Badge>
+                    </div>
+                    <dl className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <dt className="text-muted-foreground">Parcela</dt>
+                        <dd>
+                          {selected.value.installment_no}/
+                          {selected.value.total_installments}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">Vencimento</dt>
+                        <dd>{formatDate(selected.value.due_date)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">Status</dt>
+                        <dd>{labelFinanceStatus(selected.value.status)}</dd>
+                      </div>
+                    </dl>
+                    {selected.value.notes && (
+                      <section>
+                        <h3 className="text-sm font-semibold">
+                          Observações / histórico
+                        </h3>
+                        <div className="mt-2 whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm">
+                          {selected.value.notes}
+                        </div>
+                      </section>
+                    )}
+                    <Button asChild variant="outline">
+                      <Link href={`/os/${selected.value.os_id}`}>Abrir OS</Link>
+                    </Button>
+                    {selected.group === "second_installment" && (
+                      <section className="space-y-3 border-t pt-4">
+                        <Label htmlFor="proof">
+                          Anexar comprovante da 2ª parcela
+                        </Label>
+                        <Input
+                          id="proof"
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={e => setFile(e.target.files?.[0] ?? null)}
+                        />
+                        {file && (
+                          <p className="text-sm text-muted-foreground">
+                            Arquivo: {file.name}
+                          </p>
+                        )}
+                        <Button
+                          disabled={!file || busy}
+                          onClick={() => void upload()}
+                        >
+                          {busy ? "Enviando..." : "Enviar comprovante"}
+                        </Button>
+                      </section>
+                    )}
+                    {(selected.group === "registration" ||
+                      selected.group === "rejected") && (
+                      <section className="space-y-3 border-t pt-4">
+                        <Label htmlFor="note">
+                          Atualização do consultor (opcional)
+                        </Label>
+                        <Textarea
+                          id="note"
+                          value={note}
+                          onChange={e => setNote(e.target.value)}
+                          placeholder="Descreva o que foi ajustado para o Financeiro revisar"
+                        />
+                        <Button
+                          disabled={busy}
+                          onClick={() => void returnToFinance()}
+                        >
+                          {busy
+                            ? "Enviando..."
+                            : selected.group === "registration"
+                              ? "Cadastro corrigido — reenviar ao Financeiro"
+                              : "Ajuste concluído — reenviar ao Financeiro"}
+                        </Button>
+                      </section>
+                    )}
+                  </>
                 )}
-              </div>
-
-              {selectedGroup === "second" && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Anexar comprovante 2ª parcela</Label>
-                    <Input
-                      type="file"
-                      accept="image/*,application/pdf"
-                      onChange={event =>
-                        setFile(event.target.files?.[0] ?? null)
-                      }
-                    />
-                  </div>
-                  <Button
-                    onClick={handleSubmitSecondProof}
-                    disabled={!file || sending}
-                  >
-                    {sending ? "Enviando..." : "Anexar comprovante 2/2"}
-                  </Button>
-                </>
-              )}
-
-              {(selectedGroup === "cadastro" ||
-                selectedGroup === "rejected") && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Atualização do consultor (opcional)</Label>
-                    <Input
-                      placeholder="Descreva o que foi ajustado para o financeiro revisar"
-                      value={consultantNote}
-                      onChange={event => setConsultantNote(event.target.value)}
-                    />
-                  </div>
-                  <Button
-                    onClick={handleReturnToFinanceQueue}
-                    disabled={returningToFinance}
-                  >
-                    {returningToFinance
-                      ? "Enviando para o financeiro..."
-                      : "Confirmar atualização e enviar ao financeiro"}
-                  </Button>
-                </>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
     </div>
   );
 }

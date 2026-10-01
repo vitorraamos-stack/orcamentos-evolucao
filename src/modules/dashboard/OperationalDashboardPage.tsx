@@ -15,7 +15,6 @@ import {
   Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { OsOrder } from "@/features/hubos/types";
@@ -63,11 +62,11 @@ function periodRange(
 export function OperationalDashboardSections({
   metrics,
   attentionMetrics,
-  financeHref,
 }: {
   metrics: OperationalDashboardMetrics;
   attentionMetrics: OperationalAttentionMetrics;
-  financeHref: string;
+  /** Kept optional for compatibility; consultant pending navigation is fixed. */
+  financeHref?: string;
 }) {
   return (
     <>
@@ -144,7 +143,7 @@ export function OperationalDashboardSections({
             value={attentionMetrics.awaitingSupplies}
             tone="warning"
             icon={PackageSearch}
-            href="/os/producao/insumos"
+            href="/os/insumos"
           />
           <StatCard
             label="Produção externa"
@@ -154,11 +153,11 @@ export function OperationalDashboardSections({
             href="/os/producao/externa"
           />
           <StatCard
-            label="Financeiro"
+            label="Pendências financeiras"
             value={attentionMetrics.financePending}
             tone="danger"
             icon={CircleDollarSign}
-            href={financeHref}
+            href="/hub-os/pendentes"
           />
           <StatCard
             label="Atrasadas"
@@ -188,7 +187,6 @@ export function OperationalDashboardSections({
 }
 
 export default function OperationalDashboardPage() {
-  const { hasModuleAccess } = useAuth();
   const [metrics, setMetrics] = useState<OperationalDashboardMetrics | null>(
     null
   );
@@ -315,11 +313,6 @@ export default function OperationalDashboardPage() {
             <OperationalDashboardSections
               metrics={metrics}
               attentionMetrics={attentionMetrics}
-              financeHref={
-                hasModuleAccess("hub_os_financeiro")
-                  ? "/financeiro"
-                  : "/hub-os/pendentes"
-              }
             />
             <div className="mt-6 grid gap-5 lg:grid-cols-5">
               <Card className="lg:col-span-3">
