@@ -82,16 +82,16 @@ export function OrderTable({
     );
   return (
     <div className="overflow-x-auto rounded-xl border bg-card shadow-xs">
-      <table className="w-full table-fixed text-sm">
+      <table className="w-full min-w-[1040px] table-fixed text-sm 2xl:min-w-0">
         <colgroup>
+          <col className="w-[17%]" />
           <col className="w-[18%]" />
-          <col className="w-[20%]" />
           <col className="w-[14%]" />
           <col className="w-[10%]" />
           <col className="w-[14%]" />
           <col className="w-[12%]" />
           <col className="w-[7%]" />
-          <col className="w-[5%]" />
+          <col className="w-[8%]" />
         </colgroup>
         <thead className="sticky top-0 z-10 border-b bg-muted/90 text-left text-[11px] uppercase tracking-wide text-muted-foreground backdrop-blur">
           <tr>
@@ -172,22 +172,22 @@ export function OrderTable({
                 >
                   {date(order.delivery_date)}
                 </td>
-                <td className="space-y-1 px-2 py-2.5">
+                <td className="space-y-1 overflow-hidden px-2 py-2.5">
                   <OrderPriorityBadge urgent={isOrderUrgent(order)} />
                   <div>
                     <OrderLogisticsCell type={order.logistic_type} />
                   </div>
                 </td>
-                <td className="px-2 py-2.5">
-                  <span className="inline-flex whitespace-nowrap items-center gap-1.5 text-muted-foreground">
+                <td className="overflow-hidden px-2 py-2.5">
+                  <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-muted-foreground">
                     <span className="rounded-full bg-muted p-1">
                       <UserRound className="h-3 w-3" aria-hidden="true" />
                     </span>
-                    Sem responsável
+                    <span className="truncate">Sem responsável</span>
                   </span>
                 </td>
                 <td className="overflow-hidden px-2 py-2.5">
-                  <span className="inline-flex items-center gap-1">
+                  <span className="inline-flex max-w-full items-center gap-1 overflow-hidden">
                     {risk === "CRITICO" && (
                       <AlertTriangle
                         className="h-4 w-4 text-destructive"

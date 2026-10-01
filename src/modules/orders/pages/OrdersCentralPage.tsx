@@ -78,6 +78,11 @@ export default function OrdersCentralPage() {
   const [prodStatus, setProdStatus] = useState("all");
   const [priority, setPriority] = useState("all");
   const [logistics, setLogistics] = useState("all");
+  const [draftQuick, setDraftQuick] = useState<QuickOrderFilter>("all");
+  const [draftArtStatus, setDraftArtStatus] = useState("all");
+  const [draftProdStatus, setDraftProdStatus] = useState("all");
+  const [draftPriority, setDraftPriority] = useState("all");
+  const [draftLogistics, setDraftLogistics] = useState("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -98,7 +103,38 @@ export default function OrdersCentralPage() {
     setProdStatus("all");
     setPriority("all");
     setLogistics("all");
+    setDraftQuick("all");
+    setDraftArtStatus("all");
+    setDraftProdStatus("all");
+    setDraftPriority("all");
+    setDraftLogistics("all");
     setPage(1);
+  };
+  const handleFiltersOpenChange = (open: boolean) => {
+    if (open) {
+      setDraftQuick(quick);
+      setDraftArtStatus(artStatus);
+      setDraftProdStatus(prodStatus);
+      setDraftPriority(priority);
+      setDraftLogistics(logistics);
+    }
+    setFiltersOpen(open);
+  };
+  const clearDraftFilters = () => {
+    setDraftQuick("all");
+    setDraftArtStatus("all");
+    setDraftProdStatus("all");
+    setDraftPriority("all");
+    setDraftLogistics("all");
+  };
+  const applyDraftFilters = () => {
+    setQuick(draftQuick);
+    setArtStatus(draftArtStatus);
+    setProdStatus(draftProdStatus);
+    setPriority(draftPriority);
+    setLogistics(draftLogistics);
+    setPage(1);
+    setFiltersOpen(false);
   };
   const load = () => {
     setLoading(true);
@@ -163,7 +199,7 @@ export default function OrdersCentralPage() {
 
   const selectFilters = (
     <div className="grid gap-2 sm:grid-cols-2">
-      <Select value={artStatus} onValueChange={setArtStatus}>
+      <Select value={draftArtStatus} onValueChange={setDraftArtStatus}>
         <SelectTrigger>
           <SelectValue placeholder="Etapa de arte" />
         </SelectTrigger>
@@ -176,7 +212,7 @@ export default function OrdersCentralPage() {
           ))}
         </SelectContent>
       </Select>
-      <Select value={prodStatus} onValueChange={setProdStatus}>
+      <Select value={draftProdStatus} onValueChange={setDraftProdStatus}>
         <SelectTrigger>
           <SelectValue placeholder="Etapa de produção" />
         </SelectTrigger>
@@ -189,7 +225,7 @@ export default function OrdersCentralPage() {
           ))}
         </SelectContent>
       </Select>
-      <Select value={priority} onValueChange={setPriority}>
+      <Select value={draftPriority} onValueChange={setDraftPriority}>
         <SelectTrigger>
           <SelectValue placeholder="Prioridade" />
         </SelectTrigger>
@@ -199,7 +235,7 @@ export default function OrdersCentralPage() {
           <SelectItem value="urgent">Urgente</SelectItem>
         </SelectContent>
       </Select>
-      <Select value={logistics} onValueChange={setLogistics}>
+      <Select value={draftLogistics} onValueChange={setDraftLogistics}>
         <SelectTrigger>
           <SelectValue placeholder="Logística" />
         </SelectTrigger>
@@ -276,7 +312,10 @@ export default function OrdersCentralPage() {
             <CardContent className="space-y-3 px-4">
               <div className="flex gap-2">
                 <OrderSearch value={search} onChange={setSearch} />
-                <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+                <Popover
+                  open={filtersOpen}
+                  onOpenChange={handleFiltersOpenChange}
+                >
                   <PopoverTrigger asChild>
                     <Button variant="outline">
                       <Filter className="h-4 w-4" />
@@ -303,8 +342,10 @@ export default function OrdersCentralPage() {
                             key={value}
                             size="sm"
                             className="rounded-full"
-                            variant={quick === value ? "default" : "outline"}
-                            onClick={() => setQuick(value)}
+                            variant={
+                              draftQuick === value ? "default" : "outline"
+                            }
+                            onClick={() => setDraftQuick(value)}
                           >
                             {label}
                           </Button>
@@ -316,16 +357,11 @@ export default function OrdersCentralPage() {
                     </p>
                     {selectFilters}
                     <div className="flex justify-between border-t pt-3">
-                      <Button variant="ghost" onClick={clearFilters}>
+                      <Button variant="ghost" onClick={clearDraftFilters}>
                         <RotateCcw className="h-4 w-4" />
                         Limpar
                       </Button>
-                      <Button
-                        onClick={() => {
-                          setPage(1);
-                          setFiltersOpen(false);
-                        }}
-                      >
+                      <Button onClick={applyDraftFilters}>
                         Aplicar filtros
                       </Button>
                     </div>

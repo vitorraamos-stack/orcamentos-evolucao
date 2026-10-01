@@ -166,6 +166,7 @@ export async function listOperationalOrderSummaryRows() {
       .select(
         "id,delivery_date,prod_status,art_status,archived,is_urgent,art_direction_tag"
       )
+      .order("id", { ascending: true })
       .range(from, from + pageSize - 1);
     if (error) throw new Error(error.message);
     const page = (data ?? []) as unknown as OsOrder[];
