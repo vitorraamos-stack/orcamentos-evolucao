@@ -82,18 +82,26 @@ export function OrderTable({
     );
   return (
     <div className="overflow-x-auto rounded-xl border bg-card shadow-xs">
-      <table className="w-full min-w-[1120px] text-sm">
+      <table className="w-full table-fixed text-sm">
+        <colgroup>
+          <col className="w-[18%]" />
+          <col className="w-[20%]" />
+          <col className="w-[14%]" />
+          <col className="w-[10%]" />
+          <col className="w-[14%]" />
+          <col className="w-[12%]" />
+          <col className="w-[7%]" />
+          <col className="w-[5%]" />
+        </colgroup>
         <thead className="sticky top-0 z-10 border-b bg-muted/90 text-left text-[11px] uppercase tracking-wide text-muted-foreground backdrop-blur">
           <tr>
             {[
-              "OS",
-              "Cliente",
-              "Título / serviço",
-              "Etapa atual",
+              "OS / Cliente",
+              "Serviço",
+              "Etapa",
               "Prazo",
-              "Prioridade",
+              "Operação",
               "Responsável",
-              "Logística",
               "Risco",
               "Ações",
             ].map(label => (
@@ -119,21 +127,21 @@ export function OrderTable({
                     "border-l-2 border-l-destructive bg-destructive/[0.025]"
                 )}
               >
-                <td className="px-3 py-3 font-semibold tabular-nums">
+                <td className="min-w-0 px-2 py-2.5 font-semibold tabular-nums">
                   <Link
                     href={path}
                     className="whitespace-nowrap text-primary underline-offset-4 hover:underline"
                   >
                     #{order.sale_number || order.os_number || "—"}
                   </Link>
+                  <p
+                    className="truncate font-normal text-muted-foreground"
+                    title={order.client_name}
+                  >
+                    {order.client_name}
+                  </p>
                 </td>
-                <td
-                  className="max-w-44 truncate px-3 py-3 font-medium"
-                  title={order.client_name}
-                >
-                  {order.client_name}
-                </td>
-                <td className="max-w-56 px-3 py-3">
+                <td className="min-w-0 px-2 py-2.5">
                   <p
                     className="truncate font-medium"
                     title={order.title || order.description || "Sem título"}
@@ -149,14 +157,14 @@ export function OrderTable({
                     </p>
                   )}
                 </td>
-                <td className="px-3 py-3">
+                <td className="overflow-hidden px-2 py-2.5">
                   <OrderStatusBadge
                     status={order.prod_status || order.art_status}
                   />
                 </td>
                 <td
                   className={cn(
-                    "whitespace-nowrap px-3 py-3",
+                    "whitespace-nowrap px-2 py-2.5",
                     !order.delivery_date && "text-muted-foreground",
                     risk === "ATENCAO" && "font-medium text-amber-700",
                     risk === "CRITICO" && "font-semibold text-destructive"
@@ -164,10 +172,13 @@ export function OrderTable({
                 >
                   {date(order.delivery_date)}
                 </td>
-                <td className="px-3 py-3">
+                <td className="space-y-1 px-2 py-2.5">
                   <OrderPriorityBadge urgent={isOrderUrgent(order)} />
+                  <div>
+                    <OrderLogisticsCell type={order.logistic_type} />
+                  </div>
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-2 py-2.5">
                   <span className="inline-flex whitespace-nowrap items-center gap-1.5 text-muted-foreground">
                     <span className="rounded-full bg-muted p-1">
                       <UserRound className="h-3 w-3" aria-hidden="true" />
@@ -175,10 +186,7 @@ export function OrderTable({
                     Sem responsável
                   </span>
                 </td>
-                <td className="px-3 py-3">
-                  <OrderLogisticsCell type={order.logistic_type} />
-                </td>
-                <td className="px-3 py-3">
+                <td className="overflow-hidden px-2 py-2.5">
                   <span className="inline-flex items-center gap-1">
                     {risk === "CRITICO" && (
                       <AlertTriangle
@@ -189,7 +197,7 @@ export function OrderTable({
                     <OrderRiskBadge risk={risk} />
                   </span>
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-1 py-2.5">
                   <div className="flex items-center gap-1">
                     <Tooltip>
                       <TooltipTrigger asChild>

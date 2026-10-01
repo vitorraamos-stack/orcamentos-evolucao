@@ -40,6 +40,7 @@ export default function Layout({ children }: LayoutProps) {
   } = useAuth();
   const [location, setLocation] = useLocation();
   const isCreateOrderPage = location.startsWith("/os/novo");
+  const isOrdersCentralPage = location === "/os";
   const operationalNav = getOperationalNavState(location);
 
   useEffect(() => {
@@ -86,8 +87,12 @@ export default function Layout({ children }: LayoutProps) {
           {[
             ["/hub-os", "Dashboard", LayoutDashboard],
             ["/os", "Ordens de Serviço", ClipboardList],
-            ...(hubPermissions.canViewInstallations ? [["/instalacoes", "Instalações", CalendarDays]] : []),
-            ...(hubPermissions.canViewDeliveries ? [["/entregas", "Entregas", Truck]] : []),
+            ...(hubPermissions.canViewInstallations
+              ? [["/instalacoes", "Instalações", CalendarDays]]
+              : []),
+            ...(hubPermissions.canViewDeliveries
+              ? [["/entregas", "Entregas", Truck]]
+              : []),
             ["/arquivos", "Arquivos", FolderOpen],
             ["/relatorios", "Relatórios", ChartNoAxesColumn],
           ].map(([href, label, Icon]) => (
@@ -119,14 +124,30 @@ export default function Layout({ children }: LayoutProps) {
               </Button>
             </Link>
           ))}
-          {([
-            ["/os/arte", "Arte", Palette],
-            ["/os/producao", "Produção", Factory],
-          ] as const).map(([href, label, Icon]) => (
+          {(
+            [
+              ["/os/arte", "Arte", Palette],
+              ["/os/producao", "Produção", Factory],
+            ] as const
+          ).map(([href, label, Icon]) => (
             <Link href={href} key={href}>
               <Button
-                variant={(href === "/os/arte" ? operationalNav.art : operationalNav.production) ? "secondary" : "ghost"}
-                className={cn("w-full justify-start", (href === "/os/arte" ? operationalNav.art : operationalNav.production) && "bg-sidebar-accent text-sidebar-accent-foreground")}
+                variant={
+                  (
+                    href === "/os/arte"
+                      ? operationalNav.art
+                      : operationalNav.production
+                  )
+                    ? "secondary"
+                    : "ghost"
+                }
+                className={cn(
+                  "w-full justify-start",
+                  (href === "/os/arte"
+                    ? operationalNav.art
+                    : operationalNav.production) &&
+                    "bg-sidebar-accent text-sidebar-accent-foreground"
+                )}
               >
                 <Icon className="mr-2 h-4 w-4" />
                 {label}
@@ -328,7 +349,8 @@ export default function Layout({ children }: LayoutProps) {
         >
           <div
             className={cn(
-              "mx-auto flex w-full max-w-6xl min-h-0 flex-col",
+              "mx-auto flex w-full min-h-0 flex-col",
+              isOrdersCentralPage ? "max-w-none" : "max-w-6xl",
               isCreateOrderPage ? "h-auto" : "h-full"
             )}
           >

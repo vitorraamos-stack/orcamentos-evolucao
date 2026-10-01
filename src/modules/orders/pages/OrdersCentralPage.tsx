@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { Filter, RotateCcw } from "lucide-react";
+import { Filter, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -48,7 +53,7 @@ function OrdersLoading() {
           <Skeleton key={index} className="h-20 rounded-xl" />
         ))}
       </div>
-      <Skeleton className="h-36 rounded-xl" />
+      <Skeleton className="h-16 rounded-xl" />
       <div className="space-y-2 rounded-xl border p-4">
         {Array.from({ length: 6 }, (_, index) => (
           <Skeleton key={index} className="h-10 w-full" />
@@ -76,9 +81,13 @@ export default function OrdersCentralPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const advancedCount = [artStatus, prodStatus, priority, logistics].filter(
-    value => value !== "all"
-  ).length;
+  const advancedCount = [
+    quick,
+    artStatus,
+    prodStatus,
+    priority,
+    logistics,
+  ].filter(value => value !== "all").length;
   const hasFilters = Boolean(search || quick !== "all" || advancedCount);
 
   const clearFilters = () => {
@@ -152,20 +161,14 @@ export default function OrdersCentralPage() {
   );
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const advancedFilters = (
-    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-      <Select
-        value={artStatus}
-        onValueChange={value => {
-          setPage(1);
-          setArtStatus(value);
-        }}
-      >
+  const selectFilters = (
+    <div className="grid gap-2 sm:grid-cols-2">
+      <Select value={artStatus} onValueChange={setArtStatus}>
         <SelectTrigger>
           <SelectValue placeholder="Etapa de arte" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">Todas as etapas de arte</SelectItem>
+          <SelectItem value="all">Etapa de arte</SelectItem>
           {ART_COLUMNS.map(value => (
             <SelectItem key={value} value={value}>
               {value}
@@ -173,18 +176,12 @@ export default function OrdersCentralPage() {
           ))}
         </SelectContent>
       </Select>
-      <Select
-        value={prodStatus}
-        onValueChange={value => {
-          setPage(1);
-          setProdStatus(value);
-        }}
-      >
+      <Select value={prodStatus} onValueChange={setProdStatus}>
         <SelectTrigger>
           <SelectValue placeholder="Etapa de produção" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">Todas as etapas de produção</SelectItem>
+          <SelectItem value="all">Etapa de produção</SelectItem>
           {PROD_COLUMNS.map(value => (
             <SelectItem key={value} value={value}>
               {value}
@@ -192,34 +189,22 @@ export default function OrdersCentralPage() {
           ))}
         </SelectContent>
       </Select>
-      <Select
-        value={priority}
-        onValueChange={value => {
-          setPage(1);
-          setPriority(value);
-        }}
-      >
+      <Select value={priority} onValueChange={setPriority}>
         <SelectTrigger>
           <SelectValue placeholder="Prioridade" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">Todas as prioridades</SelectItem>
+          <SelectItem value="all">Prioridade</SelectItem>
           <SelectItem value="normal">Normal</SelectItem>
           <SelectItem value="urgent">Urgente</SelectItem>
         </SelectContent>
       </Select>
-      <Select
-        value={logistics}
-        onValueChange={value => {
-          setPage(1);
-          setLogistics(value);
-        }}
-      >
+      <Select value={logistics} onValueChange={setLogistics}>
         <SelectTrigger>
           <SelectValue placeholder="Logística" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">Toda logística</SelectItem>
+          <SelectItem value="all">Logística</SelectItem>
           <SelectItem value="retirada">Retirada</SelectItem>
           <SelectItem value="entrega">Entrega</SelectItem>
           <SelectItem value="instalacao">Instalação</SelectItem>
@@ -227,6 +212,47 @@ export default function OrdersCentralPage() {
       </Select>
     </div>
   );
+  const activeChips = [
+    quick !== "all"
+      ? {
+          key: "quick",
+          label: quickFilters.find(([value]) => value === quick)?.[1],
+          clear: () => setQuick("all"),
+        }
+      : null,
+    artStatus !== "all"
+      ? {
+          key: "art",
+          label: `Arte: ${artStatus}`,
+          clear: () => setArtStatus("all"),
+        }
+      : null,
+    prodStatus !== "all"
+      ? {
+          key: "prod",
+          label: `Produção: ${prodStatus}`,
+          clear: () => setProdStatus("all"),
+        }
+      : null,
+    priority !== "all"
+      ? {
+          key: "priority",
+          label: `Prioridade: ${priority === "urgent" ? "Urgente" : "Normal"}`,
+          clear: () => setPriority("all"),
+        }
+      : null,
+    logistics !== "all"
+      ? {
+          key: "logistics",
+          label: `Logística: ${logistics === "instalacao" ? "Instalação" : logistics === "entrega" ? "Entrega" : "Retirada"}`,
+          clear: () => setLogistics("all"),
+        }
+      : null,
+  ].filter(Boolean) as Array<{
+    key: string;
+    label?: string;
+    clear: () => void;
+  }>;
 
   return (
     <main className="space-y-4 pb-10">
@@ -248,49 +274,85 @@ export default function OrdersCentralPage() {
           <OrdersSummaryCards summary={summary} />
           <Card className="gap-4 py-4 shadow-xs">
             <CardContent className="space-y-3 px-4">
-              <div className="flex flex-col gap-2 md:flex-row">
+              <div className="flex gap-2">
                 <OrderSearch value={search} onChange={setSearch} />
-                <Button
-                  variant="outline"
-                  onClick={() => setFiltersOpen(value => !value)}
-                  aria-expanded={filtersOpen}
-                >
-                  <Filter className="h-4 w-4" />
-                  Filtros
-                  {advancedCount > 0 && (
-                    <Badge className="ml-1 h-5 min-w-5 px-1.5">
-                      {advancedCount}
-                    </Badge>
-                  )}
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={!hasFilters}
-                  onClick={clearFilters}
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  Limpar filtros
-                </Button>
-              </div>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {quickFilters.map(([value, label]) => (
-                  <Button
-                    key={value}
-                    size="sm"
-                    className="shrink-0 rounded-full"
-                    variant={quick === value ? "default" : "outline"}
-                    onClick={() => {
-                      setPage(1);
-                      setQuick(value);
-                    }}
+                <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline">
+                      <Filter className="h-4 w-4" />
+                      Filtros
+                      {advancedCount > 0 && (
+                        <Badge className="ml-1 h-5 min-w-5 px-1.5">
+                          {advancedCount}
+                        </Badge>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="end"
+                    className="w-[min(32rem,calc(100vw-2rem))] space-y-4"
                   >
-                    {label}
-                  </Button>
-                ))}
+                    <h2 className="font-semibold">Filtros</h2>
+                    <section className="space-y-2">
+                      <p className="text-xs font-semibold uppercase text-muted-foreground">
+                        Situação
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {quickFilters.map(([value, label]) => (
+                          <Button
+                            key={value}
+                            size="sm"
+                            className="rounded-full"
+                            variant={quick === value ? "default" : "outline"}
+                            onClick={() => setQuick(value)}
+                          >
+                            {label}
+                          </Button>
+                        ))}
+                      </div>
+                    </section>
+                    <p className="text-xs font-semibold uppercase text-muted-foreground">
+                      Etapas e classificação
+                    </p>
+                    {selectFilters}
+                    <div className="flex justify-between border-t pt-3">
+                      <Button variant="ghost" onClick={clearFilters}>
+                        <RotateCcw className="h-4 w-4" />
+                        Limpar
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setPage(1);
+                          setFiltersOpen(false);
+                        }}
+                      >
+                        Aplicar filtros
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
-              <div className="hidden md:block">{advancedFilters}</div>
-              {filtersOpen && (
-                <div className="md:hidden">{advancedFilters}</div>
+              {activeChips.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {activeChips.map(chip => (
+                    <Button
+                      key={chip.key}
+                      variant="secondary"
+                      size="sm"
+                      className="rounded-full"
+                      onClick={() => {
+                        chip.clear();
+                        setPage(1);
+                      }}
+                    >
+                      {chip.label}
+                      <X className="h-3 w-3" />
+                    </Button>
+                  ))}
+                  <Button variant="ghost" size="sm" onClick={clearFilters}>
+                    Limpar filtros
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>
