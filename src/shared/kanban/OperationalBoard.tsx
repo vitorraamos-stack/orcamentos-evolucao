@@ -8,6 +8,7 @@ import {
 } from "@dnd-kit/core";
 import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -58,6 +59,23 @@ export function OperationalBoard({
   board: BoardKind;
   preset?: string;
 }) {
+  const presetTitles: Record<string, string> =
+    board === "art"
+      ? {
+          all: "Arte",
+          approvals: "Arte · Aguardando aprovação",
+          revisions: "Arte · Ajustes",
+        }
+      : {
+          all: "Produção",
+          production: "Produção · Em produção",
+          printing: "Produção · Impressão",
+          finishing: "Produção · Em acabamento",
+          lettering: "Produção · Letra caixa",
+          supplies: "Produção · Aguardando insumos",
+          external: "Produção · Produção externa",
+          ready: "Produção · Material pronto",
+        };
   const { user, hubRole, hubPermissions } = useAuth();
   const [cards, setCards] = useState<BoardCardModel[]>([]),
     [assignees, setAssignees] = useState<BoardAssignee[]>([]);
@@ -263,7 +281,7 @@ export function OperationalBoard({
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">
-            {board === "art" ? "Quadro de Arte" : "Quadro de Produção"}
+            {presetTitles[preset] ?? presetTitles.all}
           </h1>
           <p className="text-sm text-muted-foreground">
             {updatedAt
@@ -271,10 +289,19 @@ export function OperationalBoard({
               : "Projeção operacional das OS"}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => void load()}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Atualizar
-        </Button>
+        <div className="flex gap-2">
+          {preset !== "all" && (
+            <Button asChild variant="outline" size="sm">
+              <Link href={board === "art" ? "/os/arte" : "/os/producao"}>
+                Ver quadro completo
+              </Link>
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => void load()}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Atualizar
+          </Button>
+        </div>
       </header>
       <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
         {metrics.map(metric => (

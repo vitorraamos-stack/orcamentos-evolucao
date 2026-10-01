@@ -2,15 +2,20 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const app = readFileSync(new URL("../../App.tsx", import.meta.url), "utf8");
-const layout = readFileSync(new URL("../../components/Layout.tsx", import.meta.url), "utf8");
+const layout = readFileSync(
+  new URL("../../components/Layout.tsx", import.meta.url),
+  "utf8"
+);
 
 describe("Fase 3.2 operational navigation", () => {
   it.each([
-    "/os/arte/aprovacoes",
-    "/os/arte/revisoes",
-  ])("redirects the old art route %s", route => {
-    const block = app.slice(app.indexOf(`<Route path=\"${route}\">`), app.indexOf(`<Route path=\"${route}\">`) + 160);
-    expect(block).toContain('<Redirect to="/os/arte" />');
+    ["/os/arte/aprovacoes", "approvals"],
+    ["/os/arte/revisoes", "revisions"],
+  ])("renders the focused art route %s", (route, preset) => {
+    const start = app.indexOf(`<Route path=\"${route}\">`);
+    const block = app.slice(start, start + 320);
+    expect(block).toContain(`<ArtworkBoardPage preset=\"${preset}\" />`);
+    expect(block).not.toContain('<Redirect to="/os/arte" />');
   });
 
   it.each([
@@ -19,7 +24,7 @@ describe("Fase 3.2 operational navigation", () => {
     "/os/producao/letra-caixa",
     "/os/producao/externa",
     "/os/producao/pronto",
-  ])("keeps old production bookmark %s in the redirect list", route => {
+  ])("keeps the focused production route %s", route => {
     expect(app).toContain(`\"${route}\"`);
   });
 

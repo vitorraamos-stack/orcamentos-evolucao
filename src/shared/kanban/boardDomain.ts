@@ -100,6 +100,12 @@ export function applyArtworkPreset(cards: BoardCardModel[], preset: string) {
 }
 
 export function applyProductionPreset(cards: BoardCardModel[], preset: string) {
+  if (preset === "production")
+    return cards.filter(card => card.order.prod_status === "Produção");
+  if (preset === "supplies")
+    return cards.filter(
+      card => card.order.production_tag === "AGUARDANDO_INSUMOS"
+    );
   if (preset === "printing")
     return cards.filter(
       card => card.order.prod_status === "Produção" && card.order.reproducao

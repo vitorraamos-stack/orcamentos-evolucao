@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { parseQuickFilterFromSearch } from "../quickFilterSearch";
 
 const source = readFileSync(
   new URL("./OrdersCentralPage.tsx", import.meta.url),
@@ -7,6 +8,21 @@ const source = readFileSync(
 );
 
 describe("OrdersCentralPage dedicated creation entry", () => {
+  it.each([
+    ["?quick=active", "active"],
+    ["?quick=overdue", "overdue"],
+    ["?quick=today", "today"],
+    ["?quick=tomorrow", "tomorrow"],
+    ["?quick=INVALID", "all"],
+  ])("parses the quick deep link %s", (search, expected) => {
+    expect(parseQuickFilterFromSearch(search)).toBe(expected);
+  });
+
+  it("synchronizes and clears the quick URL parameter without reload", () => {
+    expect(source).toContain('url.searchParams.delete("quick")');
+    expect(source).toContain('url.searchParams.set("quick", quick)');
+    expect(source).toContain("window.history.replaceState");
+  });
   it("shows a permission-protected button that preserves the central as origin", () => {
     expect(source).toContain("hubPermissions.canCreateOs &&");
     expect(source).toContain("+ Nova OS");
@@ -27,8 +43,8 @@ describe("OrdersCentralPage dedicated creation entry", () => {
   });
 
   it("keeps popover edits in drafts until filters are applied", () => {
-    expect(source).toContain(
-      "const [draftQuick, setDraftQuick] = useState<QuickOrderFilter>"
+    expect(source).toMatch(
+      /const \[draftQuick, setDraftQuick\] =\s+useState<QuickOrderFilter>/
     );
     expect(source).toContain("onOpenChange={handleFiltersOpenChange}");
     expect(source).toContain("setDraftQuick(quick)");
