@@ -1,5 +1,11 @@
 import type { ReactNode } from "react";
-import { AlertCircle, LoaderCircle, type LucideIcon } from "lucide-react";
+import {
+  AlertCircle,
+  ChevronRight,
+  LoaderCircle,
+  type LucideIcon,
+} from "lucide-react";
+import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -31,12 +37,16 @@ export function StatCard({
   tone = "neutral",
   icon: Icon,
   className,
+  href,
+  ariaLabel,
 }: {
   label: string;
   value: number;
   tone?: "neutral" | "danger" | "warning" | "success";
   icon?: LucideIcon;
   className?: string;
+  href?: string;
+  ariaLabel?: string;
 }) {
   const colors = {
     neutral: "border-l-blue-500",
@@ -44,16 +54,42 @@ export function StatCard({
     warning: "border-l-amber-500",
     success: "border-l-emerald-500",
   };
-  return (
-    <Card className={cn("border-l-4", colors[tone], className)}>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          {Icon && <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />}
-          <p className="text-xs font-medium leading-tight">{label}</p>
+  const card = (
+    <Card
+      className={cn(
+        "gap-0 border-l-4 py-0 shadow-sm",
+        colors[tone],
+        href &&
+          "transition duration-150 group-hover:-translate-y-0.5 group-hover:bg-muted/20 group-hover:shadow-md group-active:scale-[0.99]",
+        className
+      )}
+    >
+      <CardContent className="flex min-h-[78px] items-center justify-between gap-3 px-3 py-2.5">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            {Icon && <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />}
+            <p className="text-xs font-medium leading-tight">{label}</p>
+          </div>
+          <p className="mt-1 text-xl font-bold tabular-nums">{value}</p>
         </div>
-        <p className="mt-1 text-2xl font-bold tabular-nums">{value}</p>
+        {href && (
+          <ChevronRight
+            aria-hidden="true"
+            className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground"
+          />
+        )}
       </CardContent>
     </Card>
+  );
+  if (!href) return card;
+  return (
+    <Link
+      href={href}
+      aria-label={ariaLabel ?? `Abrir ${label} — ${value} ordens`}
+      className="group block cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+    >
+      {card}
+    </Link>
   );
 }
 

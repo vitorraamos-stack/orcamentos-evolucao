@@ -205,10 +205,22 @@ function Router() {
       ))}
 
       <Route path="/os/arte/aprovacoes">
-        <Redirect to="/os/arte" />
+        <Layout>
+          <RequireModule moduleKey="hub_os">
+            <HubOsAccessGuard scope="arte">
+              <ArtworkBoardPage preset="approvals" />
+            </HubOsAccessGuard>
+          </RequireModule>
+        </Layout>
       </Route>
       <Route path="/os/arte/revisoes">
-        <Redirect to="/os/arte" />
+        <Layout>
+          <RequireModule moduleKey="hub_os">
+            <HubOsAccessGuard scope="arte">
+              <ArtworkBoardPage preset="revisions" />
+            </HubOsAccessGuard>
+          </RequireModule>
+        </Layout>
       </Route>
       <Route path="/os/arte">
         <Layout>
@@ -220,22 +232,32 @@ function Router() {
         </Layout>
       </Route>
 
-      {[
-        "/os/producao/impressao",
-        "/os/producao/acabamento",
-        "/os/producao/letra-caixa",
-        "/os/producao/externa",
-        "/os/producao/pronto",
-      ].map(path => (
+      {(
+        [
+          ["/os/producao/em-producao", "production"],
+          ["/os/producao/impressao", "printing"],
+          ["/os/producao/acabamento", "finishing"],
+          ["/os/producao/letra-caixa", "lettering"],
+          ["/os/producao/insumos", "supplies"],
+          ["/os/producao/externa", "external"],
+          ["/os/producao/pronto", "ready"],
+        ] as const
+      ).map(([path, preset]) => (
         <Route key={path} path={path}>
-          <Redirect to="/os/producao" />
+          <Layout>
+            <RequireModule moduleKey="hub_os">
+              <HubOsAccessGuard scope="producao">
+                <ProductionBoardPage preset={preset} />
+              </HubOsAccessGuard>
+            </RequireModule>
+          </Layout>
         </Route>
       ))}
       <Route path="/os/producao">
         <Layout>
           <RequireModule moduleKey="hub_os">
             <HubOsAccessGuard scope="producao">
-              <ProductionBoardPage />
+              <ProductionBoardPage preset="all" />
             </HubOsAccessGuard>
           </RequireModule>
         </Layout>

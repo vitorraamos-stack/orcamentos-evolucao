@@ -4,9 +4,11 @@ export default function ProductionBoardPage({
 }: {
   preset?:
     | "all"
+    | "production"
     | "printing"
     | "finishing"
     | "lettering"
+    | "supplies"
     | "external"
     | "ready";
 }) {

@@ -26,6 +26,7 @@ import {
   listOperationalOrderSummaryRows,
 } from "../orderRepository";
 import type { QuickOrderFilter } from "../orderFilters";
+import { parseQuickFilterFromSearch } from "../quickFilterSearch";
 import { OrderSearch } from "../components/OrderSearch";
 import { OrderTable } from "../components/OrderTable";
 import { OrdersSummaryCards } from "../components/OrdersSummaryCards";
@@ -44,6 +45,12 @@ const quickFilters: Array<[QuickOrderFilter, string]> = [
   ["pending", "Pendentes"],
   ["finished", "Finalizadas"],
 ];
+
+function initialQuickFilter() {
+  return typeof window === "undefined"
+    ? "all"
+    : parseQuickFilterFromSearch(window.location.search);
+}
 
 function OrdersLoading() {
   return (
@@ -73,12 +80,13 @@ export default function OrdersCentralPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
-  const [quick, setQuick] = useState<QuickOrderFilter>("all");
+  const [quick, setQuick] = useState<QuickOrderFilter>(initialQuickFilter);
   const [artStatus, setArtStatus] = useState("all");
   const [prodStatus, setProdStatus] = useState("all");
   const [priority, setPriority] = useState("all");
   const [logistics, setLogistics] = useState("all");
-  const [draftQuick, setDraftQuick] = useState<QuickOrderFilter>("all");
+  const [draftQuick, setDraftQuick] =
+    useState<QuickOrderFilter>(initialQuickFilter);
   const [draftArtStatus, setDraftArtStatus] = useState("all");
   const [draftProdStatus, setDraftProdStatus] = useState("all");
   const [draftPriority, setDraftPriority] = useState("all");
@@ -94,6 +102,13 @@ export default function OrdersCentralPage() {
     logistics,
   ].filter(value => value !== "all").length;
   const hasFilters = Boolean(search || quick !== "all" || advancedCount);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (quick === "all") url.searchParams.delete("quick");
+    else url.searchParams.set("quick", quick);
+    window.history.replaceState(window.history.state, "", url);
+  }, [quick]);
 
   const clearFilters = () => {
     setSearch("");

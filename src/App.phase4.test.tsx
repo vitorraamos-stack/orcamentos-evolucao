@@ -10,4 +10,14 @@ describe("phase 4 navigation", () => {
     expect(app).toContain('path="/entregas"');
     expect(app).toContain("<DeliveriesPage />");
   });
+  it("renders focused art and production routes with real presets", () => {
+    expect(app).toContain('<ArtworkBoardPage preset="approvals" />');
+    expect(app).toContain('<ArtworkBoardPage preset="revisions" />');
+    expect(app).toContain('["/os/producao/em-producao", "production"]');
+    expect(app).toContain('["/os/producao/acabamento", "finishing"]');
+    expect(app).toContain('["/os/producao/insumos", "supplies"]');
+    expect(app).toContain('["/os/producao/externa", "external"]');
+    expect(app).toContain('["/os/producao/pronto", "ready"]');
+    expect(app).not.toContain('<Redirect to="/os/producao" />');
+  });
 });

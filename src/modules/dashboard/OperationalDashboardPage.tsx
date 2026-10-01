@@ -15,6 +15,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { OsOrder } from "@/features/hubos/types";
@@ -62,14 +63,16 @@ function periodRange(
 export function OperationalDashboardSections({
   metrics,
   attentionMetrics,
+  financeHref,
 }: {
   metrics: OperationalDashboardMetrics;
   attentionMetrics: OperationalAttentionMetrics;
+  financeHref: string;
 }) {
   return (
     <>
-      <section className="rounded-lg border bg-card p-4 sm:p-5">
-        <div className="mb-4 flex items-start gap-2">
+      <section className="rounded-lg border bg-card p-3 sm:p-4">
+        <div className="mb-2.5 flex items-start gap-2">
           <ChartNoAxesColumnIncreasing
             aria-hidden="true"
             className="mt-0.5 h-5 w-5 text-primary"
@@ -81,39 +84,49 @@ export function OperationalDashboardSections({
             </p>
           </div>
         </div>
-        <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
           <StatCard
             label="OS ativas"
             value={metrics.active}
             icon={ClipboardList}
+            href="/os?quick=active"
           />
-          <StatCard label="Em Arte" value={metrics.art} icon={Palette} />
+          <StatCard
+            label="Em Arte"
+            value={metrics.art}
+            icon={Palette}
+            href="/os/arte"
+          />
           <StatCard
             label="Aguardando aprovação"
             value={metrics.approval}
             tone="warning"
             icon={Clock3}
+            href="/os/arte/aprovacoes"
           />
           <StatCard
             label="Em Produção"
             value={metrics.production}
             icon={Factory}
+            href="/os/producao/em-producao"
           />
           <StatCard
             label="Em Acabamento"
             value={metrics.finish}
             icon={Wrench}
+            href="/os/producao/acabamento"
           />
           <StatCard
             label="Material pronto"
             value={metrics.ready}
             tone="success"
             icon={PackageCheck}
+            href="/os/producao/pronto"
           />
         </div>
       </section>
-      <section className="mt-5 rounded-lg border border-destructive/20 bg-destructive/[0.02] p-4 sm:p-5">
-        <div className="mb-4 flex items-start gap-2">
+      <section className="mt-3 rounded-lg border border-destructive/20 bg-destructive/[0.02] p-3 sm:p-4">
+        <div className="mb-2.5 flex items-start gap-2">
           <TriangleAlert
             aria-hidden="true"
             className="mt-0.5 h-5 w-5 text-destructive"
@@ -125,42 +138,48 @@ export function OperationalDashboardSections({
             </p>
           </div>
         </div>
-        <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
           <StatCard
             label="Aguardando insumos"
             value={attentionMetrics.awaitingSupplies}
             tone="warning"
             icon={PackageSearch}
+            href="/os/producao/insumos"
           />
           <StatCard
             label="Produção externa"
             value={metrics.externalProduction}
             tone="warning"
             icon={Factory}
+            href="/os/producao/externa"
           />
           <StatCard
             label="Financeiro"
             value={attentionMetrics.financePending}
             tone="danger"
             icon={CircleDollarSign}
+            href={financeHref}
           />
           <StatCard
             label="Atrasadas"
             value={metrics.overdue}
             tone="danger"
             icon={AlertTriangle}
+            href="/os?quick=overdue"
           />
           <StatCard
             label="Prazo hoje"
             value={metrics.today}
             tone="danger"
             icon={Clock3}
+            href="/os?quick=today"
           />
           <StatCard
             label="Prazo amanhã"
             value={metrics.tomorrow}
             tone="warning"
             icon={Clock3}
+            href="/os?quick=tomorrow"
           />
         </div>
       </section>
@@ -169,6 +188,7 @@ export function OperationalDashboardSections({
 }
 
 export default function OperationalDashboardPage() {
+  const { hasModuleAccess } = useAuth();
   const [metrics, setMetrics] = useState<OperationalDashboardMetrics | null>(
     null
   );
@@ -295,6 +315,11 @@ export default function OperationalDashboardPage() {
             <OperationalDashboardSections
               metrics={metrics}
               attentionMetrics={attentionMetrics}
+              financeHref={
+                hasModuleAccess("hub_os_financeiro")
+                  ? "/financeiro"
+                  : "/hub-os/pendentes"
+              }
             />
             <div className="mt-6 grid gap-5 lg:grid-cols-5">
               <Card className="lg:col-span-3">
