@@ -358,3 +358,7 @@ As fotos usam o tipo `INSTALLATION_EVIDENCE`, bucket R2 privado e URLs assinadas
 A rota mobile `/instalacoes/execucao/:id` reúne dados da OS, destino Maps/Waze, checklists, upload e galeria, observações finais e prontidão para conclusão. As validações de UI são conveniência; presigner e RPC repetem autorização por gerente, responsável ou membro da equipe, status, fase, MIME, tamanho, caminho e limites. O detalhe da OS reutiliza checklist e galeria em modo somente leitura.
 
 `os_installation_feedbacks` permanece separado e inalterado para o kiosk e o fluxo legado de feedback/revisão. Ele não recebe dados da execução 4.1.
+
+## Governança de exclusão (Fase 4.6a)
+
+Arquivar e excluir definitivamente são operações distintas. O arquivamento preserva todo o histórico; o hard delete, exclusivo de gerente/admin, valida motivo, confirmação e retenção financeira no servidor, remove dependências em uma transação e mantém `os_order_deletion_audit` sem FK para a OS. Objetos R2 elegíveis são removidos somente após o commit e o resultado fica registrado na auditoria. Cópias locais, diretórios Windows e SMB não são removidos automaticamente.

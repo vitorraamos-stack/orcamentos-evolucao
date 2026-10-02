@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { isOrderUrgent } from "@/features/hubos/orderUrgency";
+import { OrderActionsMenu } from "./OrderActionsMenu";
 
 const date = (value: string | null) =>
   value
@@ -33,12 +34,18 @@ export function OrderHeader({
   transitions,
   onEdit,
   onTransition,
+  canManage = false,
+  onArchive,
+  onDelete,
 }: {
   order: OsOrder;
   assignees: OrderAssignee[];
   canEdit: boolean;
   transitions: { board: "art" | "production"; value: ArtStatus | ProdStatus }[];
   onEdit: () => void;
+  canManage?: boolean;
+  onArchive?: () => void;
+  onDelete?: () => void;
   onTransition: (
     board: "art" | "production",
     value: ArtStatus | ProdStatus
@@ -91,6 +98,7 @@ export function OrderHeader({
             </DropdownMenu>
           )}
           {canEdit && <Button onClick={onEdit}>Editar OS</Button>}
+          {canManage && onArchive && onDelete && <OrderActionsMenu onArchive={onArchive} onDelete={onDelete} />}
         </div>
       </div>
       <dl className="mt-5 grid gap-3 border-t pt-4 sm:grid-cols-3">
