@@ -3,6 +3,8 @@ import type { LogisticsOrder } from "@/modules/installations/types";
 import type { Delivery } from "../types";
 import {
   buildCompletedLogistics,
+  filterCompletedLogistics,
+  getWeekStartKey,
   isDeliveryCompletedToday,
   isDeliveryOverdue,
   isPickupCompletedToday,
@@ -175,6 +177,39 @@ describe("deliveriesPresentation", () => {
         () => ({ retirado_at: "2026-10-02T10:00:00Z" })
       ).map(item => item.kind)
     ).toEqual(["pickup", "delivery"]);
+  });
+  it.each([
+    ["2026-10-04", "2026-09-28"],
+    ["2026-10-05", "2026-10-05"],
+    ["2026-10-06", "2026-10-05"],
+    ["2026-10-11", "2026-10-05"],
+    ["2026-10-01", "2026-09-28"],
+    ["2027-01-01", "2026-12-28"],
+  ])("calcula a segunda-feira de %s sem timezone local", (key, expected) => {
+    expect(getWeekStartKey(key)).toBe(expected);
+  });
+  it("filtra a semana por chaves de São Paulo entre segunda e hoje", () => {
+    const entries = [
+      ["sep-28", "2026-09-28T12:00:00-03:00"],
+      ["oct-01", "2026-10-01T12:00:00-03:00"],
+      ["oct-04", "2026-10-04T12:00:00-03:00"],
+      ["oct-05", "2026-10-05T12:00:00-03:00"],
+    ].map(([id, occurredAt]) => ({
+      kind: "delivery" as const,
+      id,
+      occurredAt,
+      delivery: delivery(id, "COMPLETED", null, occurredAt),
+    }));
+
+    expect(
+      filterCompletedLogistics(
+        entries,
+        "",
+        "all",
+        "week",
+        new Date("2026-10-04T12:00:00-03:00")
+      ).map(entry => entry.id)
+    ).toEqual(["sep-28", "oct-01", "oct-04"]);
   });
   it("reconcilia seleção", () => {
     expect(reconcileDeliverySelection("b", ["a", "b"])).toBe("b");
