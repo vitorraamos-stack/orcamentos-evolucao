@@ -11,8 +11,6 @@ import {
   Factory,
   CalendarDays,
   Truck,
-  FolderOpen,
-  ChartNoAxesColumn,
   Package,
   LogOut,
   Menu,
@@ -95,8 +93,6 @@ export default function Layout({ children }: LayoutProps) {
             ...(hubPermissions.canViewDeliveries
               ? [["/entregas", "Entregas", Truck]]
               : []),
-            ["/arquivos", "Arquivos", FolderOpen],
-            ["/relatorios", "Relatórios", ChartNoAxesColumn],
           ].map(([href, label, Icon]) => (
             <Link href={href as string} key={href as string}>
               <Button
