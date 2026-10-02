@@ -74,7 +74,8 @@ begin
  return jsonb_build_object('audit_id',aid,'os_id',o.id,'display_number',expected,'sale_number',o.sale_number,'client_name',o.client_name,'counts',counts,'r2_keys',to_jsonb(keys),'r2_cleanup_status',case when cardinality(keys)=0 then 'NOT_REQUIRED' else 'PENDING' end);
 end $$;
 
-create or replace function public.hub_os_delete_order_secure(p_os_id uuid,p_reason text,p_payload jsonb default '{}') returns void
+drop function public.hub_os_delete_order_secure(uuid,text,jsonb);
+create or replace function public.hub_os_delete_order_secure(p_os_id uuid,p_reason text default 'delete'::text,p_payload jsonb default '{}') returns void
 language plpgsql security definer set search_path=public as $$ begin perform public.hub_os_delete_order_secure_v2(p_os_id,p_reason,p_payload->>'confirmation',p_payload); end $$;
 
 create or replace function public.hub_os_mark_order_delete_cleanup_secure(p_audit_id uuid,p_deleted_count integer,p_errors jsonb) returns public.os_order_deletion_audit
