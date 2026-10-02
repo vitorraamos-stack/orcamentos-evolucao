@@ -1,7 +1,7 @@
 -- Hotfix 4.6b: behavioral hard-delete coverage.
 -- Run with `supabase test db` after applying all migrations locally.
 begin;
-select plan(20);
+select plan(23);
 
 alter table public.profiles drop constraint if exists profiles_role_check;
 
