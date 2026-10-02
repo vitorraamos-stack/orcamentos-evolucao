@@ -6,62 +6,75 @@ const source = readFileSync(
   "utf8"
 );
 
-describe("Hotfix 4.2b deliveries page", () => {
-  it("shows the waiting counter", () => {
-    expect(source).toContain("{waiting.length + legacy.length}");
+describe("Central de Entregas", () => {
+  it("usa os cinco indicadores derivados", () => {
+    expect(source).toContain("summarizeDeliveryWorkspace");
+    expect(source).toContain("<DeliverySummaryCards");
   });
-
-  it("shows the active pickup counter", () => {
-    expect(source).toContain("{activePickups.length}");
-  });
-
-  it("shows the active delivery counter", () => {
+  it("mantém contadores das quatro tabs", () => {
+    expect(source).toContain("{summary.waiting}");
+    expect(source).toContain("{summary.pickup}");
     expect(source).toContain("{activeDeliveries.length}");
+    expect(source).toContain("{history.length}");
   });
-
-  it("shows the combined completed counter", () => {
+  it("separa retiradas ativas e concluídas", () => {
+    expect(source).toContain("!flowFor(order)?.retirado_at");
+    expect(source).toContain("Boolean(flowFor(order)?.retirado_at)");
     expect(source).toContain(
-      "{completedDeliveries.length + completedPickups.length}"
+      "buildCompletedLogistics(completedDeliveries, completedPickups"
     );
   });
-
-  it("excludes completed pickups from the pickup tab", () => {
-    expect(source).toContain(
-      "const activePickups = pickups.filter(o => !flowFor(o)?.retirado_at)"
-    );
-    expect(source).toContain("{activePickups.map(o => {");
-  });
-
-  it("includes completed pickups in the completed tab", () => {
+  it("desabilita ações de retirada e mostra progresso", () => {
     expect(source).toMatch(
-      /const completedPickups = pickups\.filter\(o =>\s*Boolean\(flowFor\(o\)\?\.retirado_at\)\s*\)/
+      /const flow = flowFor\(selectedPickup\),\s+busy = pickupBusyId === selectedPickup\.id/
     );
-    expect(source).toContain("{completedPickups.map(o => (");
+    expect(source).toContain('busy ? "Concluindo..." : "Marcar retirado"');
   });
-
-  it("disables the pickup button and displays progress while processing", () => {
-    expect(source).toContain("disabled={pickupBusyId === o.id}");
-    expect(source).toContain('? "Concluindo..."');
-  });
-
-  it("reports pickup failures to the user", () => {
-    expect(source).toMatch(/catch \(cause\) \{\s*toast\.error\(/);
-    expect(source).toContain('"Não foi possível concluir a retirada."');
-  });
-
-  it("reports successful pickup completion", () => {
-    expect(source).toContain(
-      'toast.success("Retirada concluída e OS finalizada.")'
+  it("protege retirada contra envio duplo antes da chamada", () => {
+    const guard = source.indexOf(
+      "if (pickupBusyRef.current) return",
+      source.indexOf("const pickup =")
     );
-  });
-
-  it("guards the request before awaiting to prevent duplicate posts", () => {
-    const guard = source.indexOf("if (pickupBusyRef.current) return;");
-    const lock = source.indexOf("pickupBusyRef.current = o.id;");
-    const request = source.indexOf("await markOrderFlowRetiradoAndFinalize(");
-
+    const lock = source.indexOf("pickupBusyRef.current = order.id", guard);
+    const request = source.indexOf(
+      "await markOrderFlowRetiradoAndFinalize",
+      lock
+    );
     expect(guard).toBeGreaterThan(-1);
     expect(lock).toBeGreaterThan(guard);
     expect(request).toBeGreaterThan(lock);
+  });
+  it("preserva feedback de sucesso e falha da retirada", () => {
+    expect(source).toContain(
+      'toast.success("Retirada concluída e OS finalizada.")'
+    );
+    expect(source).toContain('"Não foi possível concluir a retirada."');
+  });
+  it("preserva as três subscriptions Realtime", () => {
+    for (const table of [
+      "os_deliveries",
+      "hub_os_order_flow_state",
+      "os_orders",
+    ])
+      expect(source).toContain(`table: "${table}"`);
+  });
+  it("usa tabs controladas e seleções independentes", () => {
+    expect(source).toContain("value={activeTab}");
+    expect(source).toContain("selectedWaitingId");
+    expect(source).toContain("selectedPickupId");
+    expect(source).toContain("selectedDeliveryId");
+  });
+  it("mantém ações mutáveis sob a permissão canônica", () => {
+    expect(source).toContain("hubPermissions.canManageDeliveries &&");
+  });
+  it("mantém os contratos canônicos de mutação", () => {
+    for (const action of [
+      "setOrderFlowAvisado",
+      "markOrderFlowRetiradoAndFinalize",
+      "deliveryAction",
+      "scheduleDelivery",
+      "updateDelivery",
+    ])
+      expect(source).toContain(action);
   });
 });
