@@ -29,6 +29,7 @@ import { isOrderOverdue } from "@/modules/orders/risk";
 import { getOperationalStatusLabel } from "./statusLabels";
 import { WORK_CENTER_LABELS } from "@/modules/production/operations";
 import { isOrderUrgent } from "@/features/hubos/orderUrgency";
+import { formatArtworkDeadline, getArtworkCardDeadline } from "@/modules/artwork/presentation/artworkPresentation";
 
 const TAGS: Record<string, string> = {
   URGENTE: "Urgente",
@@ -49,6 +50,8 @@ export function BoardCard({
   onMove,
   onTag,
   onReturn,
+  onOpenDetails,
+  queuePosition,
 }: {
   card: BoardCardModel;
   board: BoardKind;
@@ -58,6 +61,8 @@ export function BoardCard({
   onMove: (status: BoardStatus) => void;
   onTag?: () => void;
   onReturn?: () => void;
+  onOpenDetails?: () => void;
+  queuePosition?: number;
 }) {
   const drag = useDraggable({
     id: card.order.id,
@@ -73,6 +78,7 @@ export function BoardCard({
       ? ["ART", "APPROVAL"].includes(item.scope)
       : ["PRODUCTION", "FINISHING"].includes(item.scope)
   );
+  const overdue = isOrderOverdue(card.order);
   const badges = [
     isOrderUrgent(card.order) ? "Urgente" : null,
     isOrderOverdue(card.order)
@@ -98,12 +104,16 @@ export function BoardCard({
       style={style}
       {...drag.listeners}
       {...drag.attributes}
-      className="space-y-3 p-3 shadow-sm transition hover:border-primary/40"
+      onClick={event => {
+        if (board === "art" && !drag.isDragging && !(event.target as HTMLElement).closest("a,button,[role=button],[role=menuitem]")) onOpenDetails?.();
+      }}
+      className={`space-y-3 p-3 shadow-sm transition hover:border-primary/40 ${board === "art" ? `cursor-pointer py-3 ${overdue ? "border-l-2 border-l-destructive" : isOrderUrgent(card.order) ? "border-l-2 border-l-primary" : ""}` : ""}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-medium text-muted-foreground">
             OS #{card.order.os_number ?? card.order.sale_number}
+            {board === "art" && queuePosition && <span className="ml-2 font-semibold text-primary">#{queuePosition} na fila</span>}
           </p>
           <Link href={`/os/${card.order.id}`}>
             <a className="block truncate font-semibold hover:underline">
@@ -134,6 +144,7 @@ export function BoardCard({
                 Tag de Produção
               </DropdownMenuItem>
             )}
+            {board === "art" && onOpenDetails && <DropdownMenuItem onClick={onOpenDetails}>Ver detalhes</DropdownMenuItem>}
             {board === "production" && isManager && onReturn && (
               <DropdownMenuItem onClick={onReturn}>
                 Voltar para Arte
@@ -189,7 +200,7 @@ export function BoardCard({
           )}
         <span className="flex items-center gap-1">
           <CalendarDays className="h-3.5 w-3.5" />
-          {deadline
+          {board === "art" ? formatArtworkDeadline(getArtworkCardDeadline(card)) : deadline
             ? `Etapa ${formatDatePtBr(deadline.dueDate)}`
             : `Prazo ${formatDatePtBr(card.order.delivery_date)}`}
         </span>
@@ -197,7 +208,7 @@ export function BoardCard({
           <UserRound className="h-3.5 w-3.5" />
           {card.assignee?.name ?? "Sem responsável"}
         </span>
-        <span>
+        {(board === "production" || card.itemsTotal > 0) && <span>
           {card.itemsReady}/{card.itemsTotal} itens prontos{" "}
           {card.commentsTotal > 0 && (
             <>
@@ -205,7 +216,7 @@ export function BoardCard({
               {card.commentsTotal}
             </>
           )}
-        </span>
+        </span>}
       </div>
       {canMove && moves.length > 0 && (
         <Select onValueChange={value => onMove(value as BoardStatus)}>
