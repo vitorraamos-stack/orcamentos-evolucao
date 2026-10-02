@@ -4,10 +4,12 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
+  type DragOverEvent,
+  type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, RefreshCw, SearchX } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -51,6 +53,11 @@ import {
   type BoardStatus,
 } from "./types";
 import { useBoardRealtime } from "./useBoardRealtime";
+import { ArtworkFilters, clearArtworkFilters } from "@/modules/artwork/components/ArtworkFilters";
+import { ArtworkSummaryCards } from "@/modules/artwork/components/ArtworkSummaryCards";
+import { ArtworkQuickView } from "@/modules/artwork/components/ArtworkQuickView";
+import { getArtworkQueuePositions, getBoardColumnDomId, sortArtworkCards } from "@/modules/artwork/presentation/artworkPresentation";
+import type { ArtStatus } from "@/features/hubos/types";
 
 export function OperationalBoard({
   board,
@@ -85,6 +92,11 @@ export function OperationalBoard({
     [error, setError] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null),
     [tagCard, setTagCard] = useState<BoardCardModel | null>(null);
+  const [focusedColumn, setFocusedColumn] = useState<ArtStatus | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [activeDragCardId, setActiveDragCardId] = useState<string | null>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<BoardStatus | null>(null);
+  const boardScrollRef = useRef<HTMLDivElement>(null);
   const [tag, setTag] = useState<ProductionTag>("EM_PRODUCAO"),
     [insumos, setInsumos] = useState("");
   const canMove =
@@ -143,7 +155,7 @@ export function OperationalBoard({
     [presetCards, filters, user?.id]
   );
   const grouped = useMemo(
-    () => groupBoardCards(visible, board, columns),
+    () => groupBoardCards(board === "art" ? sortArtworkCards(visible) : visible, board, columns, board === "art"),
     [visible, board, columns]
   );
   const boardMoves = (card: BoardCardModel) =>
@@ -157,6 +169,14 @@ export function OperationalBoard({
     () => calculateBoardMetrics(cards, board),
     [cards, board]
   );
+  const queuePositions = useMemo(() => getArtworkQueuePositions(presetCards), [presetCards]);
+  const selectedCard = cards.find(card => card.order.id === selectedCardId) ?? null;
+  useEffect(() => { if (selectedCardId && !selectedCard) setSelectedCardId(null); }, [selectedCardId, selectedCard]);
+  const focusColumn = (status: ArtStatus) => {
+    const next = focusedColumn === status ? null : status;
+    setFocusedColumn(next);
+    if (next) requestAnimationFrame(() => document.getElementById(getBoardColumnDomId(next))?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" }));
+  };
   const performMove = async (card: BoardCardModel, to: BoardStatus) => {
     const previous = cards;
     setCards(current =>
@@ -222,7 +242,7 @@ export function OperationalBoard({
     if (!card || cardStatus(card, board) === to) return;
     const moves = boardMoves(card);
     if (!moves.includes(to))
-      return toast.error("Movimento não permitido pelo fluxo operacional.");
+      return toast.error(board === "art" ? "Movimento não permitido pelo fluxo da Arte para esta OS." : "Movimento não permitido pelo fluxo operacional.");
     requestMove(card, to);
   };
   const saveTag = async () => {
@@ -257,6 +277,8 @@ export function OperationalBoard({
     return (
       <div className="space-y-4">
         <div className="h-24 animate-pulse rounded-xl bg-muted" />
+        {board === "art" && <div className="grid grid-cols-2 gap-2 md:grid-cols-5">{Array.from({ length: 5 }, (_, index) => <div key={index} className="h-[72px] animate-pulse rounded-xl bg-muted" />)}</div>}
+        {board === "art" && <div className="h-16 animate-pulse rounded-xl bg-muted" />}
         <div className="flex gap-4 overflow-hidden">
           {columns.map(column => (
             <div
@@ -276,6 +298,10 @@ export function OperationalBoard({
         </Button>
       </div>
     );
+  const activeCard = cards.find(card => card.order.id === activeDragCardId);
+  const validDragMoves = activeCard ? boardMoves(activeCard) : [];
+  const dragStart = ({ active }: DragStartEvent) => board === "art" && setActiveDragCardId(String(active.id));
+  const dragOver = ({ over }: DragOverEvent) => board === "art" && setDragOverStatus(over ? String(over.id) as BoardStatus : null);
   return (
     <div className="space-y-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
@@ -283,13 +309,10 @@ export function OperationalBoard({
           <h1 className="text-2xl font-semibold">
             {presetTitles[preset] ?? presetTitles.all}
           </h1>
-          <p className="text-sm text-muted-foreground">
-            {updatedAt
-              ? `Atualizado às ${updatedAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
-              : "Projeção operacional das OS"}
-          </p>
+          <p className="text-sm text-muted-foreground">{board === "art" ? "Acompanhe criação, ajustes e aprovações do setor." : updatedAt ? `Atualizado às ${updatedAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : "Projeção operacional das OS"}</p>
         </div>
         <div className="flex gap-2">
+          {board === "art" && updatedAt && <span className="hidden self-center text-xs text-muted-foreground sm:inline">Atualizado às {updatedAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>}
           {preset !== "all" && (
             <Button asChild variant="outline" size="sm">
               <Link href={board === "art" ? "/os/arte" : "/os/producao"}>
@@ -303,32 +326,34 @@ export function OperationalBoard({
           </Button>
         </div>
       </header>
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+      {board === "art" ? <ArtworkSummaryCards metrics={metrics} focusedColumn={focusedColumn} urgent={filters.urgent} overdue={filters.overdue} onFocus={focusColumn} onUrgent={() => setFilters(value => ({ ...value, urgent: !value.urgent }))} onOverdue={() => setFilters(value => ({ ...value, overdue: !value.overdue }))}/> : <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
         {metrics.map(metric => (
           <div key={metric.label} className="rounded-lg bg-muted/55 px-3 py-2">
             <p className="text-xs text-muted-foreground">{metric.label}</p>
             <p className="text-xl font-semibold">{metric.count}</p>
           </div>
         ))}
-      </div>
-      <BoardFilters
+      </div>}
+      {board === "art" ? <ArtworkFilters value={filters} assignees={assignees} onChange={setFilters}/> : <BoardFilters
         board={board}
         value={filters}
         assignees={assignees}
         onChange={setFilters}
-      />
+      />}
       {visible.length === 0 && cards.length > 0 ? (
-        <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-          Nenhuma OS encontrada com estes filtros.
-        </p>
+        <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground"><SearchX className="mx-auto mb-2 h-6 w-6"/><strong className="block text-foreground">Nenhuma OS encontrada</strong><p className="mb-3">Revise ou limpe os filtros aplicados.</p>{board === "art" && <Button variant="outline" onClick={() => setFilters(clearArtworkFilters(filters))}>Limpar filtros</Button>}</div>
       ) : null}
-      <DndContext sensors={sensors} onDragEnd={dragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-4">
+      <DndContext sensors={sensors} onDragStart={dragStart} onDragOver={dragOver} onDragCancel={() => { setActiveDragCardId(null); setDragOverStatus(null); }} onDragEnd={event => { dragEnd(event); setActiveDragCardId(null); setDragOverStatus(null); }}>
+        <div className="relative"><Button aria-label="Rolar quadro para a esquerda" variant="secondary" size="icon" className="absolute left-1 top-1/2 z-20 hidden rounded-full shadow md:flex" onClick={() => boardScrollRef.current?.scrollBy({ left: -320, behavior: "smooth" })}><ChevronLeft/></Button><Button aria-label="Rolar quadro para a direita" variant="secondary" size="icon" className="absolute right-1 top-1/2 z-20 hidden rounded-full shadow md:flex" onClick={() => boardScrollRef.current?.scrollBy({ left: 320, behavior: "smooth" })}><ChevronRight/></Button>
+        <div ref={boardScrollRef} className="flex gap-4 overflow-x-auto pb-4">
           {columns.map(column => (
             <BoardColumn
               key={column}
               status={column}
               count={grouped.get(column)?.length ?? 0}
+              variant={board === "art" ? "art-modern" : "default"}
+              focused={focusedColumn === column}
+              dropAllowed={board === "art" && dragOverStatus === column ? validDragMoves.includes(column) : null}
             >
               {grouped.get(column)?.map(card => (
                 <BoardCard
@@ -339,6 +364,8 @@ export function OperationalBoard({
                   isManager={hubPermissions.isManager}
                   moves={boardMoves(card)}
                   onMove={to => requestMove(card, to)}
+                  onOpenDetails={board === "art" ? () => setSelectedCardId(card.order.id) : undefined}
+                  queuePosition={board === "art" ? queuePositions.get(card.order.id) : undefined}
                   onTag={
                     board === "production" && canMove
                       ? () => {
@@ -369,8 +396,9 @@ export function OperationalBoard({
               ))}
             </BoardColumn>
           ))}
-        </div>
+        </div></div>
       </DndContext>
+      {board === "art" && <ArtworkQuickView card={selectedCard} open={Boolean(selectedCard)} canMove={canMove} moves={selectedCard ? boardMoves(selectedCard) : []} onOpenChange={open => !open && setSelectedCardId(null)} onMove={to => selectedCard && requestMove(selectedCard, to)}/>}
       <ProductionTagDialog
         card={tagCard}
         tag={tag}

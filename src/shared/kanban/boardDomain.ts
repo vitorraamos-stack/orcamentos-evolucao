@@ -44,12 +44,13 @@ export function sortBoardCards(cards: BoardCardModel[]) {
 export function groupBoardCards(
   cards: BoardCardModel[],
   board: "art" | "production",
-  columns: BoardStatus[]
+  columns: BoardStatus[],
+  preserveOrder = false
 ) {
   const grouped = new Map(
     columns.map(column => [column, [] as BoardCardModel[]])
   );
-  sortBoardCards(cards).forEach(card =>
+  (preserveOrder ? cards : sortBoardCards(cards)).forEach(card =>
     grouped.get(cardStatus(card, board))?.push(card)
   );
   return grouped;
