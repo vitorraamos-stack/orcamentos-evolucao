@@ -2,14 +2,17 @@ import { describe, expect, it } from "vitest";
 import type { Installation } from "../types";
 import {
   filterAgendaInstallations,
+  filterInstallationsByWeek,
   formatRouteDistance,
   formatRouteDuration,
   getSaoPauloWeekDays,
   getSaoPauloWeekRange,
+  getTeamSchedulePresentation,
   isInstallationCompletedThisWeek,
   isInstallationToday,
   isScheduledInstallationOverdue,
   sortWaitingOrders,
+  shiftWeekStart,
   summarizeInstallations,
 } from "./installationsPresentation";
 
@@ -74,6 +77,51 @@ describe("installations presentation", () => {
       "2027-01-02",
       "2027-01-03",
     ]);
+  });
+  it("shifts week starts across month and year boundaries", () => {
+    expect(shiftWeekStart("2026-10-05", 1)).toBe("2026-10-12");
+    expect(shiftWeekStart("2026-10-05", -1)).toBe("2026-09-28");
+    expect(shiftWeekStart("2026-12-28", 1)).toBe("2027-01-04");
+    expect(shiftWeekStart("2027-01-04", -1)).toBe("2026-12-28");
+  });
+  it("filters only the selected week across month and year boundaries", () => {
+    const rows = [
+      row({ id: "september", scheduled_start: "2026-09-28T15:00:00Z" }),
+      row({ id: "october", scheduled_start: "2026-10-04T15:00:00Z" }),
+      row({ id: "other-week", scheduled_start: "2026-10-05T15:00:00Z" }),
+      row({ id: "december", scheduled_start: "2026-12-28T15:00:00Z" }),
+      row({ id: "january", scheduled_start: "2027-01-03T15:00:00Z" }),
+    ];
+    expect(
+      filterInstallationsByWeek(rows, "2026-09-28").map(item => item.id)
+    ).toEqual(["september", "october"]);
+    expect(
+      filterInstallationsByWeek(rows, "2026-12-28").map(item => item.id)
+    ).toEqual(["december", "january"]);
+    expect(filterInstallationsByWeek(rows, "2026-10-12")).toEqual([]);
+  });
+  it("derives a team's today count and next installation from its supplied dataset", () => {
+    const visibleTeamSchedule = [
+      row({ id: "other-team", team_id: "team-2" }),
+      row({ id: "today", team_id: "team-1" }),
+      row({
+        id: "next-later",
+        team_id: "team-1",
+        scheduled_start: "2026-10-04T15:00:00Z",
+      }),
+      row({
+        id: "next",
+        team_id: "team-1",
+        scheduled_start: "2026-10-03T15:00:00Z",
+      }),
+    ];
+    const result = getTeamSchedulePresentation({
+      teamId: "team-1",
+      installations: visibleTeamSchedule,
+      now,
+    });
+    expect(result.todayCount).toBe(1);
+    expect(result.nextInstallation?.id).toBe("next");
   });
   it("counts completed events in the current Sao Paulo week", () => {
     expect(
