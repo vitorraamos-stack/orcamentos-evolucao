@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -22,6 +22,7 @@ import {
   summarizeConsultantFinancePending,
   type ConsultantFinancePendingGroup,
 } from "@/features/hubos/financePending";
+import { reconcilePendingSelection } from "./osPendentesSelection";
 
 type Item = {
   key: string;
@@ -58,8 +59,21 @@ export default function OsPendentesPage() {
   const [file, setFile] = useState<File | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const selectedKeyRef = useRef<string | null>(null);
+  const loadingRef = useRef(false);
+
+  const selectItem = useCallback((key: string | null) => {
+    if (key === selectedKeyRef.current) return;
+
+    selectedKeyRef.current = key;
+    setSelectedKey(key);
+    setFile(null);
+    setNote("");
+  }, []);
 
   const load = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
     try {
       const [second, registration, rejected] = await Promise.all([
@@ -85,11 +99,12 @@ export default function OsPendentesPage() {
         })),
       ];
       setItems(next);
-      setSelectedKey(current =>
-        next.some(item => item.key === current)
-          ? current
-          : (next[0]?.key ?? null)
+      const current = selectedKeyRef.current;
+      const nextKey = reconcilePendingSelection(
+        current,
+        next.map(item => item.key)
       );
+      selectItem(nextKey);
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -97,9 +112,10 @@ export default function OsPendentesPage() {
           : "Não foi possível carregar as pendências."
       );
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
-  }, []);
+  }, [selectItem]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -123,10 +139,24 @@ export default function OsPendentesPage() {
           ))
     );
   }, [items, filter, search]);
-  const selected = items.find(item => item.key === selectedKey) ?? null;
+  useEffect(() => {
+    const nextKey = reconcilePendingSelection(
+      selectedKey,
+      visible.map(item => item.key)
+    );
+    selectItem(nextKey);
+  }, [selectedKey, selectItem, visible]);
+  const selected = visible.find(item => item.key === selectedKey) ?? null;
 
   const upload = async () => {
-    if (!selected?.value.os_orders?.id || !file || busy) return;
+    if (
+      !selected ||
+      selected.group !== "second_installment" ||
+      !selected.value.os_orders?.id ||
+      !file ||
+      busy
+    )
+      return;
     setBusy(true);
     try {
       await uploadReceiptForOrder({
@@ -149,7 +179,12 @@ export default function OsPendentesPage() {
     }
   };
   const returnToFinance = async () => {
-    if (!selected || busy) return;
+    if (
+      !selected ||
+      (selected.group !== "registration" && selected.group !== "rejected") ||
+      busy
+    )
+      return;
     setBusy(true);
     const label =
       selected.group === "registration"
@@ -186,7 +221,11 @@ export default function OsPendentesPage() {
             Financeiro.
           </p>
         </div>
-        <Button variant="outline" onClick={() => void load()}>
+        <Button
+          variant="outline"
+          disabled={busy || loading}
+          onClick={() => void load()}
+        >
           <RefreshCw className="mr-2 h-4 w-4" />
           Atualizar
         </Button>
@@ -226,6 +265,7 @@ export default function OsPendentesPage() {
                     className="pl-9"
                     placeholder="Buscar por OS ou cliente..."
                     value={search}
+                    disabled={busy}
                     onChange={e => setSearch(e.target.value)}
                   />
                 </div>
@@ -240,6 +280,7 @@ export default function OsPendentesPage() {
                       key={value}
                       size="sm"
                       variant={filter === value ? "default" : "outline"}
+                      disabled={busy}
                       onClick={() => setFilter(value as Filter)}
                     >
                       {label}
@@ -256,12 +297,9 @@ export default function OsPendentesPage() {
                     <button
                       type="button"
                       key={item.key}
-                      onClick={() => {
-                        setSelectedKey(item.key);
-                        setFile(null);
-                        setNote("");
-                      }}
-                      className={`w-full rounded-lg border p-3 text-left hover:bg-muted/40 ${selectedKey === item.key ? "border-primary bg-primary/5" : ""}`}
+                      disabled={busy}
+                      onClick={() => selectItem(item.key)}
+                      className={`w-full rounded-lg border p-3 text-left hover:bg-muted/40 disabled:opacity-60 ${selectedKey === item.key ? "border-primary bg-primary/5" : ""}`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <strong>
@@ -356,8 +394,10 @@ export default function OsPendentesPage() {
                           Anexar comprovante da 2ª parcela
                         </Label>
                         <Input
+                          key={selected.key}
                           id="proof"
                           type="file"
+                          disabled={busy}
                           accept="image/*,application/pdf"
                           onChange={e => setFile(e.target.files?.[0] ?? null)}
                         />
@@ -383,6 +423,7 @@ export default function OsPendentesPage() {
                         <Textarea
                           id="note"
                           value={note}
+                          disabled={busy}
                           onChange={e => setNote(e.target.value)}
                           placeholder="Descreva o que foi ajustado para o Financeiro revisar"
                         />
