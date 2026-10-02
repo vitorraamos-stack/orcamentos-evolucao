@@ -51,15 +51,17 @@ import type { Installation, InstallationTeam, LogisticsOrder } from "../types";
 import { MutationInputDialog } from "@/shared/components/MutationInputDialog";
 import {
   filterAgendaInstallations,
+  filterInstallationsByWeek,
   filterHistoryInstallations,
   formatInstallationTime,
   formatRouteDistance,
   formatRouteDuration,
   getSaoPauloWeekDays,
   getSaoPauloWeekRange,
-  isInstallationToday,
+  getTeamSchedulePresentation,
   isScheduledInstallationOverdue,
   sortWaitingOrders,
+  shiftWeekStart,
   summarizeInstallations,
   type AgendaQuickFilter,
   type HistoryPeriod,
@@ -230,6 +232,10 @@ export default function InstallationsPage() {
     !hubPermissions.normalizedRole ||
     hubPermissions.isManager ||
     isMyInstallation(i, user?.id ?? "", teamIds);
+  const globalActiveInstallations = data.installations.filter(i =>
+    ["SCHEDULED", "IN_PROGRESS"].includes(i.status)
+  );
+  const canInspectGlobalTeamSchedule = hubPermissions.isManager;
   const agenda = data.installations.filter(
     i => ["SCHEDULED", "IN_PROGRESS"].includes(i.status) && visible(i)
   );
@@ -245,6 +251,7 @@ export default function InstallationsPage() {
     grouped = groupInstallationsByDay(filteredAgenda);
   const weekDays = getSaoPauloWeekDays(weekStart),
     weekEnd = weekDays[6];
+  const weekAgenda = filterInstallationsByWeek(filteredAgenda, weekStart);
   const waitingRows = sortWaitingOrders(
     [...waiting, ...legacy].filter(o =>
       `${o.sale_number ?? ""} ${o.client_name} ${o.address ?? ""}`
@@ -514,21 +521,7 @@ export default function InstallationsPage() {
                   size="icon"
                   variant="outline"
                   aria-label="Semana anterior"
-                  onClick={() =>
-                    setWeekStart(
-                      getSaoPauloWeekDays(
-                        new Date(`${weekStart}T12:00:00Z`)
-                          .toISOString()
-                          .slice(0, 10)
-                      )[0] &&
-                        new Date(
-                          new Date(`${weekStart}T12:00:00Z`).getTime() -
-                            7 * 86400000
-                        )
-                          .toISOString()
-                          .slice(0, 10)
-                    )
-                  }
+                  onClick={() => setWeekStart(shiftWeekStart(weekStart, -1))}
                 >
                   <ChevronLeft className="size-4" />
                 </Button>
@@ -546,95 +539,113 @@ export default function InstallationsPage() {
                   size="icon"
                   variant="outline"
                   aria-label="Próxima semana"
-                  onClick={() =>
-                    setWeekStart(
-                      new Date(
-                        new Date(`${weekStart}T12:00:00Z`).getTime() +
-                          7 * 86400000
-                      )
-                        .toISOString()
-                        .slice(0, 10)
-                    )
-                  }
+                  onClick={() => setWeekStart(shiftWeekStart(weekStart, 1))}
                 >
                   <ChevronRight className="size-4" />
                 </Button>
               </div>
-              <div className="overflow-x-auto">
-                <div className="grid min-w-[980px] grid-cols-7 gap-2">
-                  {weekDays.map(day => {
-                    const rows = filteredAgenda.filter(
-                      i => saoPauloDateKey(i.scheduled_start) === day
-                    );
-                    const today =
-                      day === saoPauloDateKey(new Date().toISOString());
-                    return (
-                      <section
-                        key={day}
-                        className={cn(
-                          "min-h-56 rounded-lg border p-2",
-                          today && "border-primary/30 bg-primary/5"
-                        )}
-                      >
-                        <h3 className="mb-2 text-center text-xs font-semibold uppercase">
-                          {new Date(`${day}T12:00:00Z`).toLocaleDateString(
-                            "pt-BR",
-                            { weekday: "short", day: "2-digit" }
+              {weekAgenda.length ? (
+                <div className="overflow-x-auto">
+                  <div className="grid min-w-[980px] grid-cols-7 gap-2">
+                    {weekDays.map(day => {
+                      const rows = weekAgenda.filter(
+                        i => saoPauloDateKey(i.scheduled_start) === day
+                      );
+                      const today =
+                        day === saoPauloDateKey(new Date().toISOString());
+                      return (
+                        <section
+                          key={day}
+                          className={cn(
+                            "min-h-56 rounded-lg border p-2",
+                            today && "border-primary/30 bg-primary/5"
                           )}
-                        </h3>
-                        <div className="space-y-2">
-                          {rows.map(i => (
-                            <div
-                              key={i.id}
-                              className={cn(
-                                "rounded-md border bg-card p-2 text-xs",
-                                i.status === "IN_PROGRESS" && "border-blue-400"
-                              )}
-                            >
-                              <b>{formatInstallationTime(i.scheduled_start)}</b>
-                              <Link
-                                href={`/os/${i.os_id}`}
-                                className="mt-1 block font-semibold text-primary"
+                        >
+                          <h3 className="mb-2 text-center text-xs font-semibold uppercase">
+                            {new Date(`${day}T12:00:00Z`).toLocaleDateString(
+                              "pt-BR",
+                              { weekday: "short", day: "2-digit" }
+                            )}
+                          </h3>
+                          <div className="space-y-2">
+                            {rows.map(i => (
+                              <div
+                                key={i.id}
+                                className={cn(
+                                  "rounded-md border bg-card p-2 text-xs",
+                                  i.status === "IN_PROGRESS" &&
+                                    "border-blue-400"
+                                )}
                               >
-                                OS #{i.order?.sale_number ?? "—"}
-                              </Link>
-                              <p className="truncate">{i.order?.client_name}</p>
-                              <p className="mt-1 text-muted-foreground">
-                                {i.team?.name ?? "Sem equipe"}
-                                {i.vehicle_label && ` · ${i.vehicle_label}`}
-                              </p>
-                              <Badge
-                                className="mt-2"
-                                variant={
-                                  isScheduledInstallationOverdue(i)
-                                    ? "destructive"
-                                    : "secondary"
-                                }
-                              >
-                                {isScheduledInstallationOverdue(i)
-                                  ? "ATRASADA"
-                                  : INSTALLATION_STATUS_LABEL[i.status]}
-                              </Badge>
-                              {hubPermissions.canExecuteInstallations && (
+                                <b>
+                                  {formatInstallationTime(i.scheduled_start)}
+                                </b>
                                 <Link
-                                  className="mt-2 block text-primary underline"
-                                  href={`/instalacoes/execucao/${i.id}`}
+                                  href={`/os/${i.os_id}`}
+                                  className="mt-1 block font-semibold text-primary"
                                 >
-                                  {i.status === "IN_PROGRESS"
-                                    ? "Continuar execução"
-                                    : "Abrir execução"}
+                                  OS #{i.order?.sale_number ?? "—"}
                                 </Link>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-                    );
-                  })}
+                                <p className="truncate">
+                                  {i.order?.client_name}
+                                </p>
+                                <p className="mt-1 text-muted-foreground">
+                                  {i.team?.name ?? "Sem equipe"}
+                                  {i.vehicle_label && ` · ${i.vehicle_label}`}
+                                </p>
+                                <Badge
+                                  className="mt-2"
+                                  variant={
+                                    isScheduledInstallationOverdue(i)
+                                      ? "destructive"
+                                      : "secondary"
+                                  }
+                                >
+                                  {isScheduledInstallationOverdue(i)
+                                    ? "ATRASADA"
+                                    : INSTALLATION_STATUS_LABEL[i.status]}
+                                </Badge>
+                                {hubPermissions.canExecuteInstallations && (
+                                  <Link
+                                    className="mt-2 block text-primary underline"
+                                    href={`/instalacoes/execucao/${i.id}`}
+                                  >
+                                    {i.status === "IN_PROGRESS"
+                                      ? "Continuar execução"
+                                      : "Abrir execução"}
+                                  </Link>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <Empty
+                  title="Nenhuma instalação na agenda"
+                  description={
+                    agendaQuickFilter === "today"
+                      ? "Nenhuma instalação programada para hoje."
+                      : agendaQuickFilter === "overdue"
+                        ? "Nenhuma instalação atrasada."
+                        : agendaQuickFilter === "in_progress"
+                          ? "Nenhuma instalação em execução."
+                          : "Nenhuma instalação programada nesta semana."
+                  }
+                  action={
+                    hubPermissions.canManageInstallations && summary.waiting ? (
+                      <Button onClick={() => goSummary("waiting")}>
+                        Ver OS aguardando agendamento
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              )}
             </>
-          ) : (
+          ) : agendaView === "list" ? (
             <AgendaList
               grouped={grouped}
               canManage={hubPermissions.canManageInstallations}
@@ -645,16 +656,18 @@ export default function InstallationsPage() {
               }}
               onCancel={setCancelling}
             />
-          )}
-          {!filteredAgenda.length && (
+          ) : null}
+          {agendaView === "list" && !filteredAgenda.length && (
             <Empty
               title="Nenhuma instalação na agenda"
               description={
                 agendaQuickFilter === "today"
-                  ? "Não existem instalações programadas para hoje."
+                  ? "Nenhuma instalação programada para hoje."
                   : agendaQuickFilter === "overdue"
-                    ? "Não existem instalações atrasadas."
-                    : "Não existem instalações programadas para este período."
+                    ? "Nenhuma instalação atrasada."
+                    : agendaQuickFilter === "in_progress"
+                      ? "Nenhuma instalação em execução."
+                      : "Nenhuma instalação na agenda."
               }
               action={
                 hubPermissions.canManageInstallations && summary.waiting ? (
@@ -776,19 +789,18 @@ export default function InstallationsPage() {
             {[...data.teams]
               .sort((a, b) => Number(b.active) - Number(a.active))
               .map(t => {
-                const members = data.members.filter(m => m.team_id === t.id),
-                  today = agenda.filter(
-                    i => i.team_id === t.id && isInstallationToday(i)
-                  ),
-                  next = agenda
-                    .filter(
-                      i =>
-                        i.team_id === t.id &&
-                        new Date(i.scheduled_start) >= new Date()
-                    )
-                    .sort((a, b) =>
-                      a.scheduled_start.localeCompare(b.scheduled_start)
-                    )[0];
+                const members = data.members.filter(m => m.team_id === t.id);
+                const teamScheduleSource = canInspectGlobalTeamSchedule
+                  ? globalActiveInstallations
+                  : teamIds.includes(t.id)
+                    ? agenda
+                    : null;
+                const schedule = teamScheduleSource
+                  ? getTeamSchedulePresentation({
+                      teamId: t.id,
+                      installations: teamScheduleSource,
+                    })
+                  : null;
                 const lead = members.find(m => m.is_lead);
                 const name = (id: string) => {
                   const p = data.profiles.find(p => p.id === id);
@@ -818,21 +830,26 @@ export default function InstallationsPage() {
                         <b>Veículo:</b>{" "}
                         {t.default_vehicle_label || "Não definido"}
                       </p>
-                      {t.active && !today.length ? (
-                        <Badge variant="outline">Livre hoje</Badge>
-                      ) : (
+                      {schedule &&
+                        (t.active && schedule.todayCount === 0 ? (
+                          <Badge variant="outline">Livre hoje</Badge>
+                        ) : (
+                          <p className="text-sm">
+                            <b>Hoje:</b> {schedule.todayCount}{" "}
+                            {schedule.todayCount === 1
+                              ? "instalação"
+                              : "instalações"}{" "}
+                            hoje
+                          </p>
+                        ))}
+                      {schedule && (
                         <p className="text-sm">
-                          <b>Hoje:</b> {today.length}{" "}
-                          {today.length === 1 ? "instalação" : "instalações"}{" "}
-                          hoje
+                          <b>Próxima:</b>{" "}
+                          {schedule.nextInstallation
+                            ? `${formatAgendaDate(schedule.nextInstallation.scheduled_start)} · ${schedule.nextInstallation.order?.client_name ?? "Cliente não informado"}`
+                            : "Nenhuma próxima instalação"}
                         </p>
                       )}
-                      <p className="text-sm">
-                        <b>Próxima:</b>{" "}
-                        {next
-                          ? `${formatAgendaDate(next.scheduled_start)} · ${next.order?.client_name ?? "Cliente não informado"}`
-                          : "Nenhuma próxima instalação"}
-                      </p>
                       {hubPermissions.canManageInstallations && (
                         <Button
                           size="sm"

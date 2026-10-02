@@ -13,6 +13,9 @@ const addDays = (key: string, amount: number) => {
   return date.toISOString().slice(0, 10);
 };
 
+export const shiftWeekStart = (weekStart: string, weeks: number) =>
+  addDays(weekStart, weeks * 7);
+
 export function getSaoPauloWeekRange(now = new Date()) {
   const today = saoPauloDateKey(now.toISOString());
   const day = keyDate(today).getUTCDay();
@@ -22,6 +25,36 @@ export function getSaoPauloWeekRange(now = new Date()) {
 
 export const getSaoPauloWeekDays = (start: string) =>
   Array.from({ length: 7 }, (_, index) => addDays(start, index));
+
+export const filterInstallationsByWeek = (
+  rows: Installation[],
+  weekStart: string
+) => {
+  const weekEnd = addDays(weekStart, 6);
+  return rows.filter(row => {
+    const key = saoPauloDateKey(row.scheduled_start);
+    return key >= weekStart && key <= weekEnd;
+  });
+};
+
+export function getTeamSchedulePresentation({
+  teamId,
+  installations,
+  now = new Date(),
+}: {
+  teamId: string;
+  installations: Installation[];
+  now?: Date;
+}) {
+  const teamInstallations = installations.filter(row => row.team_id === teamId);
+  return {
+    todayCount: teamInstallations.filter(row => isInstallationToday(row, now))
+      .length,
+    nextInstallation: teamInstallations
+      .filter(row => new Date(row.scheduled_start) >= now)
+      .sort((a, b) => a.scheduled_start.localeCompare(b.scheduled_start))[0],
+  };
+}
 
 export const isInstallationToday = (row: Installation, now = new Date()) =>
   ["SCHEDULED", "IN_PROGRESS"].includes(row.status) &&
