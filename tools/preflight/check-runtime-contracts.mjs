@@ -8,10 +8,13 @@ export const REQUIRED_CONTRACTS = {
     'hub_os_move_order_secure',
     'hub_os_archive_order_secure',
     'hub_os_delete_order_secure',
+    'hub_os_delete_order_preview_secure',
+    'hub_os_delete_order_secure_v2',
+    'hub_os_mark_order_delete_cleanup_secure',
     'update_os_order_consultor',
     'set_user_modules',
   ],
-  tables: ['os_orders', 'os_orders_event', 'user_module_access', 'profiles'],
+  tables: ['os_orders', 'os_orders_event', 'os_order_deletion_audit', 'user_module_access', 'profiles'],
 };
 
 export const parseArgs = (argv) => {

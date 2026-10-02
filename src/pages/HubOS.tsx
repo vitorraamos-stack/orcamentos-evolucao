@@ -35,7 +35,6 @@ import type {
 import {
   archiveOrder,
   createOrderEvent,
-  deleteOrder,
   fetchInstallationFeedbacks,
   fetchOrdersPage,
   markInstallationFeedbackReviewed,
@@ -940,6 +939,7 @@ export default function HubOS() {
     try {
       await archiveOrder(
         order.id,
+        "Arquivamento solicitado no Hub OS legado",
         user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null
       );
       toast.success("Card arquivado.");
@@ -950,28 +950,7 @@ export default function HubOS() {
     }
   };
 
-  const handleDelete = async (orderId: string) => {
-    if (!isAdmin) {
-      toast.error("Você não tem permissão para excluir.");
-      return;
-    }
-    const order = orders.find(item => item.id === orderId);
-    if (!order) return;
-    const previous = orders;
-    setOrders(prev => prev.filter(item => item.id !== order.id));
-
-    try {
-      await deleteOrder(
-        order.id,
-        user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null
-      );
-      toast.success("Card excluído.");
-    } catch (error) {
-      console.error(error);
-      setOrders(previous);
-      toast.error("Não foi possível excluir o card.");
-    }
-  };
+  const handleDelete = (orderId: string) => setLocation(`/os/${orderId}`);
 
   const moveOrderToArtStatus = async (
     order: OsOrder,

@@ -16,6 +16,7 @@ import {
 type DeletePayload = {
   keys: string[];
   bucket?: string;
+  deletionAuditId?: string;
 };
 
 const SCOPE = 'r2-delete-objects';
@@ -64,13 +65,26 @@ Deno.serve(async (request) => {
     }
 
     try {
-      const scopeCheck = await authorizeR2OrderScope(auth.authClient, orderIds);
+      if (payload.deletionAuditId) {
+        const { data: profile, error: profileError } = await auth.authClient.from('profiles').select('role').eq('id', auth.user?.id).single();
+        if (profileError || !['admin', 'gerente'].includes(profile?.role)) {
+          return errorResponse(403, 'forbidden', 'Somente gerente/admin pode limpar arquivos de uma OS excluída.');
+        }
+        const { data: audit, error: auditError } = await auth.authClient.from('os_order_deletion_audit').select('original_os_id,r2_keys').eq('id', payload.deletionAuditId).single();
+        if (auditError || !audit) return errorResponse(403, 'forbidden', 'Auditoria de exclusão inválida.');
+        const allowedKeys = new Set<string>(audit.r2_keys ?? []);
+        if (keys.some((key) => !allowedKeys.has(key)) || orderIds.some((id) => id !== audit.original_os_id)) {
+          return errorResponse(403, 'forbidden', 'Uma ou mais chaves não pertencem à auditoria informada.');
+        }
+      } else {
+        const scopeCheck = await authorizeR2OrderScope(auth.authClient, orderIds);
       if (!scopeCheck.ok) {
         infoLog(SCOPE, 'order_scope_forbidden', {
           userId: auth.user?.id,
           unauthorizedOrderIds: scopeCheck.unauthorizedOrderIds,
         });
         return errorResponse(403, 'forbidden', 'Sem permissão para excluir um ou mais objetos solicitados.');
+      }
       }
     } catch (error) {
       errorLog(SCOPE, 'order_scope_query_error', {
@@ -130,6 +144,17 @@ Deno.serve(async (request) => {
         message: error.Message,
       })) ?? [];
 
+    let auditUpdateSucceeded = true;
+    if (payload.deletionAuditId) {
+      const { error: auditUpdateError } = await auth.authClient.rpc('hub_os_mark_order_delete_cleanup_secure', {
+        p_audit_id: payload.deletionAuditId,
+        p_deleted_count: deletedCount,
+        p_errors: errors,
+      });
+      auditUpdateSucceeded = !auditUpdateError;
+      if (auditUpdateError) errorLog(SCOPE, 'audit_update_failed', { auditId: payload.deletionAuditId, message: auditUpdateError.message });
+    }
+
     infoLog(SCOPE, 'delete_ok', {
       userId: auth.user?.id,
       requested: keys.length,
@@ -140,9 +165,11 @@ Deno.serve(async (request) => {
 
     return jsonResponse(200, {
       ok: true,
-      data: { deleted: deletedCount, errors },
+      data: { deleted: deletedCount, errors, storageDeleteSucceeded: true, auditUpdateSucceeded },
       deleted: deletedCount,
       errors,
+      storageDeleteSucceeded: true,
+      auditUpdateSucceeded,
     });
   } catch (error) {
     errorLog(SCOPE, 'unexpected_error', {

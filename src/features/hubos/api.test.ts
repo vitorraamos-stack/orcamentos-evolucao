@@ -28,11 +28,11 @@ describe("src/features/hubos/api secure mutation contracts", () => {
       error: null,
     });
 
-    await archiveOrder("os-1", "Gerente");
+    await archiveOrder("os-1", "Duplicidade real", "Gerente");
 
     expect(rpc).toHaveBeenCalledWith("hub_os_archive_order_secure", {
       p_os_id: "os-1",
-      p_reason: "manual_archive",
+      p_reason: "Duplicidade real",
       p_payload: { actor_name: "Gerente" },
     });
   });

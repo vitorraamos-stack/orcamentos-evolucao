@@ -523,25 +523,15 @@ export const moveOrder = async (
   return data as OsOrder;
 };
 
-export const archiveOrder = async (id: string, actorName?: string | null) => {
+export const archiveOrder = async (id: string, reason: string, actorName?: string | null) => {
   const { data, error } = await supabase.rpc("hub_os_archive_order_secure", {
     p_os_id: id,
-    p_reason: "manual_archive",
+    p_reason: reason,
     p_payload: actorName ? { actor_name: actorName } : {},
   });
 
   if (error) throw new Error(error.message);
   return data as OsOrder;
-};
-
-export const deleteOrder = async (id: string, actorName?: string | null) => {
-  const { error } = await supabase.rpc("hub_os_delete_order_secure", {
-    p_os_id: id,
-    p_reason: "manual_delete",
-    p_payload: actorName ? { actor_name: actorName } : {},
-  });
-
-  if (error) throw new Error(error.message);
 };
 
 export const createOrderEvent = async (payload: Partial<OsOrderEvent>) => {
