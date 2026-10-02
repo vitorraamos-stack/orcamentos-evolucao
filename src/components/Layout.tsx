@@ -42,6 +42,7 @@ export default function Layout({ children }: LayoutProps) {
   const isCreateOrderPage = location.startsWith("/os/novo");
   const isOrdersCentralPage = location === "/os";
   const isInstallationsCentralPage = location === "/instalacoes";
+  const isDeliveriesCentralPage = location === "/entregas";
   const operationalNav = getOperationalNavState(location);
 
   useEffect(() => {
@@ -351,7 +352,9 @@ export default function Layout({ children }: LayoutProps) {
           <div
             className={cn(
               "mx-auto flex w-full min-h-0 flex-col",
-              isOrdersCentralPage || isInstallationsCentralPage
+              isOrdersCentralPage ||
+                isInstallationsCentralPage ||
+                isDeliveriesCentralPage
                 ? "max-w-none"
                 : "max-w-6xl",
               isCreateOrderPage ? "h-auto" : "h-full"
