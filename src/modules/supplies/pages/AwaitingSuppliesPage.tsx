@@ -43,6 +43,7 @@ import {
   type SuppliesSortMode,
 } from "../presentation/awaitingSuppliesPresentation";
 import { listAwaitingSuppliesOrders } from "../repositories/suppliesRepository";
+import { runPendingReloadCycle } from "./pendingReloadCycle";
 
 const formatDate = (value?: string | null) =>
   value
@@ -230,6 +231,8 @@ export default function AwaitingSuppliesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selectedIdRef = useRef<string | null>(null);
   const loadingRef = useRef(false);
+  const reloadPendingRef = useRef(false);
+  const activeLoadPromiseRef = useRef<Promise<void> | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<SuppliesFilter>("all");
   const [sortMode, setSortMode] = useState<SuppliesSortMode>("priority");
@@ -240,6 +243,7 @@ export default function AwaitingSuppliesPage() {
   const [notes, setNotes] = useState("");
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const busy = resolvingId !== null;
+  const interactionLocked = busy || loading;
 
   const selectOrder = useCallback((id: string | null) => {
     if (selectedIdRef.current === id) return;
@@ -249,27 +253,54 @@ export default function AwaitingSuppliesPage() {
     setNotes("");
   }, []);
 
-  const load = useCallback(async (silent = false) => {
-    if (loadingRef.current) return;
-    loadingRef.current = true;
-    if (!silent) setLoading(true);
-    try {
-      const next = await listAwaitingSuppliesOrders();
-      setOrders(next);
-      setLoadError(null);
-      setLastUpdatedAt(new Date());
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Não foi possível carregar os insumos.";
-      setLoadError(message);
-      toast.error(message);
-    } finally {
-      loadingRef.current = false;
-      setLoading(false);
-    }
+  const fetchOrdersOnce = useCallback(async () => {
+    const next = await listAwaitingSuppliesOrders();
+    setOrders(next);
+    setLastUpdatedAt(new Date());
   }, []);
+
+  const load = useCallback(
+    (silent = false): Promise<void> => {
+      if (loadingRef.current) {
+        reloadPendingRef.current = true;
+        return activeLoadPromiseRef.current ?? Promise.resolve();
+      }
+
+      loadingRef.current = true;
+      if (!silent) setLoading(true);
+
+      const promise = (async () => {
+        try {
+          const lastError = await runPendingReloadCycle(
+            fetchOrdersOnce,
+            () => {
+              reloadPendingRef.current = false;
+            },
+            () => reloadPendingRef.current
+          );
+
+          if (lastError) {
+            const message =
+              lastError instanceof Error
+                ? lastError.message
+                : "Não foi possível carregar os insumos.";
+            setLoadError(message);
+            toast.error(message);
+          } else {
+            setLoadError(null);
+          }
+        } finally {
+          loadingRef.current = false;
+          activeLoadPromiseRef.current = null;
+          setLoading(false);
+        }
+      })();
+
+      activeLoadPromiseRef.current = promise;
+      return promise;
+    },
+    [fetchOrdersOnce]
+  );
 
   useEffect(() => {
     void load();
@@ -317,7 +348,13 @@ export default function AwaitingSuppliesPage() {
   const selected = visible.find(order => order.id === selectedId) ?? null;
 
   const resolve = async () => {
-    if (!selected || notes.trim().length < 3 || resolvingId) return;
+    if (
+      !selected ||
+      notes.trim().length < 3 ||
+      interactionLocked ||
+      loadingRef.current
+    )
+      return;
     const orderId = selected.id;
     const resolutionNotes = notes.trim();
     setResolvingId(orderId);
@@ -339,7 +376,7 @@ export default function AwaitingSuppliesPage() {
   };
 
   const clearViewFilters = () => {
-    if (busy) return;
+    if (interactionLocked) return;
     setFilter("all");
     setSearch("");
     setSortMode("priority");
@@ -399,7 +436,7 @@ export default function AwaitingSuppliesPage() {
           <SummaryCards
             summary={summary}
             filter={filter}
-            disabled={busy}
+            disabled={interactionLocked}
             onFilter={setFilter}
           />
           <div className="grid gap-4 lg:grid-cols-[minmax(360px,0.8fr)_minmax(0,1.2fr)]">
@@ -415,7 +452,7 @@ export default function AwaitingSuppliesPage() {
                       size="sm"
                       variant={filter === option.value ? "default" : "outline"}
                       aria-pressed={filter === option.value}
-                      disabled={busy}
+                      disabled={interactionLocked}
                       onClick={() => setFilter(option.value)}
                     >
                       {option.label === "Aguardando" ? "Todas" : option.label}{" "}
@@ -431,7 +468,7 @@ export default function AwaitingSuppliesPage() {
                     />
                     <Input
                       className="pl-9"
-                      disabled={busy}
+                      disabled={interactionLocked}
                       placeholder="Buscar por OS, cliente ou material..."
                       value={search}
                       onChange={event => setSearch(event.target.value)}
@@ -443,7 +480,7 @@ export default function AwaitingSuppliesPage() {
                   <select
                     id="supplies-sort"
                     aria-label="Ordenar por"
-                    disabled={busy}
+                    disabled={interactionLocked}
                     value={sortMode}
                     onChange={event =>
                       setSortMode(event.target.value as SuppliesSortMode)
@@ -466,7 +503,7 @@ export default function AwaitingSuppliesPage() {
                         className="mt-3"
                         size="sm"
                         variant="outline"
-                        disabled={busy}
+                        disabled={interactionLocked}
                         onClick={clearViewFilters}
                       >
                         Limpar busca e filtros
@@ -482,7 +519,7 @@ export default function AwaitingSuppliesPage() {
                         <button
                           type="button"
                           key={order.id}
-                          disabled={busy}
+                          disabled={interactionLocked}
                           onClick={() => selectOrder(order.id)}
                           className={`relative w-full overflow-hidden rounded-lg border p-3 pl-4 text-left transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 ${selectedId === order.id ? "border-primary bg-primary/5" : ""}`}
                         >
@@ -638,7 +675,7 @@ export default function AwaitingSuppliesPage() {
                     <SupplyTimeline order={selected} />
                     {hubPermissions.canMoveProducaoBoard && (
                       <Button
-                        disabled={busy}
+                        disabled={interactionLocked}
                         onClick={() => setDialogOpen(true)}
                       >
                         Marcar insumo como resolvido
