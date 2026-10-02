@@ -77,6 +77,57 @@ const initialData: Workspace = {
   flow: [],
   profiles: [],
 };
+
+type MutableRef<T> = { current: T };
+type DeliveryLoadCycleOptions = {
+  activeLoadPromiseRef: MutableRef<Promise<void> | null>;
+  reloadPendingRef: MutableRef<boolean>;
+  loadingRef: MutableRef<boolean>;
+  fetchWorkspaceOnce: () => Promise<void>;
+  onStart: () => void;
+  onFinalError: (cause: unknown) => void;
+  onFinish: () => void;
+};
+
+export function requestDeliveryWorkspaceLoad({
+  activeLoadPromiseRef,
+  reloadPendingRef,
+  loadingRef,
+  fetchWorkspaceOnce,
+  onStart,
+  onFinalError,
+  onFinish,
+}: DeliveryLoadCycleOptions): Promise<void> {
+  if (activeLoadPromiseRef.current) {
+    reloadPendingRef.current = true;
+    return activeLoadPromiseRef.current;
+  }
+
+  loadingRef.current = true;
+  onStart();
+  const cycle = (async () => {
+    let finalError: unknown = null;
+    try {
+      do {
+        reloadPendingRef.current = false;
+        try {
+          await fetchWorkspaceOnce();
+          finalError = null;
+        } catch (cause) {
+          finalError = cause;
+        }
+      } while (reloadPendingRef.current);
+
+      if (finalError) onFinalError(finalError);
+    } finally {
+      activeLoadPromiseRef.current = null;
+      loadingRef.current = false;
+      onFinish();
+    }
+  })();
+  activeLoadPromiseRef.current = cycle;
+  return cycle;
+}
 const deadlineTone = (date: string | null) => {
   const label = formatDeliveryDeadline(date);
   return label === "Prazo vencido"
@@ -141,31 +192,39 @@ export default function DeliveriesPage() {
     [deliveryBusyId, setDeliveryBusyId] = useState<string | null>(null),
     [pickupBusyId, setPickupBusyId] = useState<string | null>(null);
   const loadingRef = useRef(false),
+    reloadPendingRef = useRef(false),
+    activeLoadPromiseRef = useRef<Promise<void> | null>(null),
     pickupBusyRef = useRef<string | null>(null),
     refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null),
     hasDataRef = useRef(false);
-  const load = useCallback(async () => {
-    if (loadingRef.current) return;
-    loadingRef.current = true;
-    setRefreshing(true);
-    try {
+  const load = useCallback(() => {
+    async function fetchWorkspaceOnce() {
       const workspace = await loadDeliveryWorkspace();
       setData(workspace);
       hasDataRef.current = true;
       setLastUpdatedAt(new Date());
       setLoadError(null);
-    } catch (cause) {
-      const message =
-        cause instanceof Error
-          ? cause.message
-          : "Não foi possível carregar Entregas.";
-      if (!hasDataRef.current) setLoadError(message);
-      else toast.error(message);
-    } finally {
-      loadingRef.current = false;
-      setRefreshing(false);
-      setInitialLoading(false);
     }
+
+    return requestDeliveryWorkspaceLoad({
+      activeLoadPromiseRef,
+      reloadPendingRef,
+      loadingRef,
+      fetchWorkspaceOnce,
+      onStart: () => setRefreshing(true),
+      onFinalError: cause => {
+        const message =
+          cause instanceof Error
+            ? cause.message
+            : "Não foi possível carregar Entregas.";
+        if (!hasDataRef.current) setLoadError(message);
+        else toast.error(message);
+      },
+      onFinish: () => {
+        setRefreshing(false);
+        setInitialLoading(false);
+      },
+    });
   }, []);
   useEffect(() => {
     void load();

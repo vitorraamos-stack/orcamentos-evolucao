@@ -37,6 +37,25 @@ const dateKey = (value: string | Date, timeZone = DELIVERY_TIME_ZONE) => {
   return `${get("year")}-${get("month")}-${get("day")}`;
 };
 
+export const dateKeyToUtcDate = (key: string) => {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+};
+
+export const utcDateToDateKey = (date: Date) =>
+  [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0"),
+  ].join("-");
+
+export const getWeekStartKey = (todayKey: string) => {
+  const date = dateKeyToUtcDate(todayKey);
+  const offset = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - offset);
+  return utcDateToDateKey(date);
+};
+
 const text = (value: unknown) => String(value ?? "").toLocaleLowerCase("pt-BR");
 const orderText = (order?: LogisticsOrder | null) =>
   text([order?.sale_number, order?.client_name, order?.address].join(" "));
@@ -216,9 +235,7 @@ export function filterCompletedLogistics(
 ) {
   const q = text(query.trim()),
     today = dateKey(now);
-  const nowDate = new Date(`${today}T12:00:00-03:00`);
-  const monday = new Date(nowDate);
-  monday.setDate(nowDate.getDate() - ((nowDate.getDay() + 6) % 7));
+  const weekStart = getWeekStartKey(today);
   return entries.filter(entry => {
     const order =
       entry.kind === "delivery" ? entry.delivery.order : entry.order;
@@ -232,9 +249,7 @@ export function filterCompletedLogistics(
       period === "all" ||
       (period === "today" && key === today) ||
       (period === "month" && key.slice(0, 7) === today.slice(0, 7)) ||
-      (period === "week" &&
-        new Date(`${key}T12:00:00-03:00`) >= monday &&
-        new Date(`${key}T12:00:00-03:00`) <= nowDate);
+      (period === "week" && key >= weekStart && key <= today);
     return typeMatch && periodMatch && (!q || orderText(order).includes(q));
   });
 }
