@@ -32,7 +32,6 @@ import type { ProductionTag } from "@/features/hubos/types";
 import { getValidOrderTransitions } from "@/modules/orders/services/orderTransitions";
 import { BoardCard } from "./BoardCard";
 import { BoardColumn } from "./BoardColumn";
-import { BoardFilters } from "./BoardFilters";
 import {
   applyArtworkPreset,
   applyProductionPreset,
@@ -53,11 +52,23 @@ import {
   type BoardStatus,
 } from "./types";
 import { useBoardRealtime } from "./useBoardRealtime";
-import { ArtworkFilters, clearArtworkFilters } from "@/modules/artwork/components/ArtworkFilters";
+import {
+  ArtworkFilters,
+  clearArtworkFilters,
+} from "@/modules/artwork/components/ArtworkFilters";
 import { ArtworkSummaryCards } from "@/modules/artwork/components/ArtworkSummaryCards";
 import { ArtworkQuickView } from "@/modules/artwork/components/ArtworkQuickView";
-import { getArtworkQueuePositions, getBoardColumnDomId, sortArtworkCards } from "@/modules/artwork/presentation/artworkPresentation";
-import type { ArtStatus } from "@/features/hubos/types";
+import {
+  getArtworkQueuePositions,
+  sortArtworkCards,
+} from "@/modules/artwork/presentation/artworkPresentation";
+import {
+  ProductionFilters,
+  clearProductionFilters,
+} from "@/modules/production/components/ProductionFilters";
+import { ProductionSummaryCards } from "@/modules/production/components/ProductionSummaryCards";
+import { ProductionQuickView } from "@/modules/production/components/ProductionQuickView";
+import { getBoardColumnDomId } from "./boardPresentation";
 
 export function OperationalBoard({
   board,
@@ -92,10 +103,12 @@ export function OperationalBoard({
     [error, setError] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null),
     [tagCard, setTagCard] = useState<BoardCardModel | null>(null);
-  const [focusedColumn, setFocusedColumn] = useState<ArtStatus | null>(null);
+  const [focusedColumn, setFocusedColumn] = useState<BoardStatus | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [activeDragCardId, setActiveDragCardId] = useState<string | null>(null);
-  const [dragOverStatus, setDragOverStatus] = useState<BoardStatus | null>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<BoardStatus | null>(
+    null
+  );
   const boardScrollRef = useRef<HTMLDivElement>(null);
   const [tag, setTag] = useState<ProductionTag>("EM_PRODUCAO"),
     [insumos, setInsumos] = useState("");
@@ -155,7 +168,13 @@ export function OperationalBoard({
     [presetCards, filters, user?.id]
   );
   const grouped = useMemo(
-    () => groupBoardCards(board === "art" ? sortArtworkCards(visible) : visible, board, columns, board === "art"),
+    () =>
+      groupBoardCards(
+        board === "art" ? sortArtworkCards(visible) : visible,
+        board,
+        columns,
+        board === "art"
+      ),
     [visible, board, columns]
   );
   const boardMoves = (card: BoardCardModel) =>
@@ -169,13 +188,26 @@ export function OperationalBoard({
     () => calculateBoardMetrics(cards, board),
     [cards, board]
   );
-  const queuePositions = useMemo(() => getArtworkQueuePositions(presetCards), [presetCards]);
-  const selectedCard = cards.find(card => card.order.id === selectedCardId) ?? null;
-  useEffect(() => { if (selectedCardId && !selectedCard) setSelectedCardId(null); }, [selectedCardId, selectedCard]);
-  const focusColumn = (status: ArtStatus) => {
+  const queuePositions = useMemo(
+    () => getArtworkQueuePositions(presetCards),
+    [presetCards]
+  );
+  const selectedCard =
+    cards.find(card => card.order.id === selectedCardId) ?? null;
+  useEffect(() => {
+    if (selectedCardId && !selectedCard) setSelectedCardId(null);
+  }, [selectedCardId, selectedCard]);
+  const focusColumn = (status: BoardStatus) => {
     const next = focusedColumn === status ? null : status;
     setFocusedColumn(next);
-    if (next) requestAnimationFrame(() => document.getElementById(getBoardColumnDomId(next))?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" }));
+    if (next)
+      requestAnimationFrame(() =>
+        document.getElementById(getBoardColumnDomId(next))?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "center",
+        })
+      );
   };
   const performMove = async (card: BoardCardModel, to: BoardStatus) => {
     const previous = cards;
@@ -242,7 +274,11 @@ export function OperationalBoard({
     if (!card || cardStatus(card, board) === to) return;
     const moves = boardMoves(card);
     if (!moves.includes(to))
-      return toast.error(board === "art" ? "Movimento não permitido pelo fluxo da Arte para esta OS." : "Movimento não permitido pelo fluxo operacional.");
+      return toast.error(
+        board === "art"
+          ? "Movimento não permitido pelo fluxo da Arte para esta OS."
+          : "Movimento não permitido pelo fluxo operacional."
+      );
     requestMove(card, to);
   };
   const saveTag = async () => {
@@ -277,8 +313,15 @@ export function OperationalBoard({
     return (
       <div className="space-y-4">
         <div className="h-24 animate-pulse rounded-xl bg-muted" />
-        {board === "art" && <div className="grid grid-cols-2 gap-2 md:grid-cols-5">{Array.from({ length: 5 }, (_, index) => <div key={index} className="h-[72px] animate-pulse rounded-xl bg-muted" />)}</div>}
-        {board === "art" && <div className="h-16 animate-pulse rounded-xl bg-muted" />}
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+          {Array.from({ length: 5 }, (_, index) => (
+            <div
+              key={index}
+              className="h-[72px] animate-pulse rounded-xl bg-muted"
+            />
+          ))}
+        </div>
+        <div className="h-16 animate-pulse rounded-xl bg-muted" />
         <div className="flex gap-4 overflow-hidden">
           {columns.map(column => (
             <div
@@ -300,8 +343,10 @@ export function OperationalBoard({
     );
   const activeCard = cards.find(card => card.order.id === activeDragCardId);
   const validDragMoves = activeCard ? boardMoves(activeCard) : [];
-  const dragStart = ({ active }: DragStartEvent) => board === "art" && setActiveDragCardId(String(active.id));
-  const dragOver = ({ over }: DragOverEvent) => board === "art" && setDragOverStatus(over ? String(over.id) as BoardStatus : null);
+  const dragStart = ({ active }: DragStartEvent) =>
+    setActiveDragCardId(String(active.id));
+  const dragOver = ({ over }: DragOverEvent) =>
+    setDragOverStatus(over ? (String(over.id) as BoardStatus) : null);
   return (
     <div className="space-y-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
@@ -309,10 +354,22 @@ export function OperationalBoard({
           <h1 className="text-2xl font-semibold">
             {presetTitles[preset] ?? presetTitles.all}
           </h1>
-          <p className="text-sm text-muted-foreground">{board === "art" ? "Acompanhe criação, ajustes e aprovações do setor." : updatedAt ? `Atualizado às ${updatedAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : "Projeção operacional das OS"}</p>
+          <p className="text-sm text-muted-foreground">
+            {board === "art"
+              ? "Acompanhe criação, ajustes e aprovações do setor."
+              : "Acompanhe produção, acabamento, bloqueios e materiais prontos."}
+          </p>
         </div>
         <div className="flex gap-2">
-          {board === "art" && updatedAt && <span className="hidden self-center text-xs text-muted-foreground sm:inline">Atualizado às {updatedAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>}
+          {updatedAt && (
+            <span className="hidden self-center text-xs text-muted-foreground sm:inline">
+              Atualizado às{" "}
+              {updatedAt.toLocaleTimeString("pt-BR", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          )}
           {preset !== "all" && (
             <Button asChild variant="outline" size="sm">
               <Link href={board === "art" ? "/os/arte" : "/os/producao"}>
@@ -326,79 +383,197 @@ export function OperationalBoard({
           </Button>
         </div>
       </header>
-      {board === "art" ? <ArtworkSummaryCards metrics={metrics} focusedColumn={focusedColumn} urgent={filters.urgent} overdue={filters.overdue} onFocus={focusColumn} onUrgent={() => setFilters(value => ({ ...value, urgent: !value.urgent }))} onOverdue={() => setFilters(value => ({ ...value, overdue: !value.overdue }))}/> : <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-        {metrics.map(metric => (
-          <div key={metric.label} className="rounded-lg bg-muted/55 px-3 py-2">
-            <p className="text-xs text-muted-foreground">{metric.label}</p>
-            <p className="text-xl font-semibold">{metric.count}</p>
-          </div>
-        ))}
-      </div>}
-      {board === "art" ? <ArtworkFilters value={filters} assignees={assignees} onChange={setFilters}/> : <BoardFilters
-        board={board}
-        value={filters}
-        assignees={assignees}
-        onChange={setFilters}
-      />}
+      {board === "art" ? (
+        <ArtworkSummaryCards
+          metrics={metrics}
+          focusedColumn={focusedColumn}
+          urgent={filters.urgent}
+          overdue={filters.overdue}
+          onFocus={focusColumn}
+          onUrgent={() =>
+            setFilters(value => ({ ...value, urgent: !value.urgent }))
+          }
+          onOverdue={() =>
+            setFilters(value => ({ ...value, overdue: !value.overdue }))
+          }
+        />
+      ) : (
+        <ProductionSummaryCards
+          metrics={metrics}
+          focusedColumn={focusedColumn}
+          awaitingSupplies={filters.awaitingSupplies}
+          overdue={filters.overdue}
+          onFocus={focusColumn}
+          onAwaitingSupplies={() =>
+            setFilters(value => ({
+              ...value,
+              awaitingSupplies: !value.awaitingSupplies,
+            }))
+          }
+          onOverdue={() =>
+            setFilters(value => ({ ...value, overdue: !value.overdue }))
+          }
+        />
+      )}
+      {board === "art" ? (
+        <ArtworkFilters
+          value={filters}
+          assignees={assignees}
+          onChange={setFilters}
+        />
+      ) : (
+        <ProductionFilters
+          value={filters}
+          assignees={assignees}
+          onChange={setFilters}
+        />
+      )}
       {visible.length === 0 && cards.length > 0 ? (
-        <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground"><SearchX className="mx-auto mb-2 h-6 w-6"/><strong className="block text-foreground">Nenhuma OS encontrada</strong><p className="mb-3">Revise ou limpe os filtros aplicados.</p>{board === "art" && <Button variant="outline" onClick={() => setFilters(clearArtworkFilters(filters))}>Limpar filtros</Button>}</div>
+        <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground">
+          <SearchX className="mx-auto mb-2 h-6 w-6" />
+          <strong className="block text-foreground">
+            Nenhuma OS encontrada
+          </strong>
+          <p className="mb-3">Revise ou limpe os filtros aplicados.</p>
+          <Button
+            variant="outline"
+            onClick={() =>
+              setFilters(
+                board === "art"
+                  ? clearArtworkFilters(filters)
+                  : clearProductionFilters(filters)
+              )
+            }
+          >
+            Limpar filtros
+          </Button>
+        </div>
       ) : null}
-      <DndContext sensors={sensors} onDragStart={dragStart} onDragOver={dragOver} onDragCancel={() => { setActiveDragCardId(null); setDragOverStatus(null); }} onDragEnd={event => { dragEnd(event); setActiveDragCardId(null); setDragOverStatus(null); }}>
-        <div className="relative"><Button aria-label="Rolar quadro para a esquerda" variant="secondary" size="icon" className="absolute left-1 top-1/2 z-20 hidden rounded-full shadow md:flex" onClick={() => boardScrollRef.current?.scrollBy({ left: -320, behavior: "smooth" })}><ChevronLeft/></Button><Button aria-label="Rolar quadro para a direita" variant="secondary" size="icon" className="absolute right-1 top-1/2 z-20 hidden rounded-full shadow md:flex" onClick={() => boardScrollRef.current?.scrollBy({ left: 320, behavior: "smooth" })}><ChevronRight/></Button>
-        <div ref={boardScrollRef} className="flex gap-4 overflow-x-auto pb-4">
-          {columns.map(column => (
-            <BoardColumn
-              key={column}
-              status={column}
-              count={grouped.get(column)?.length ?? 0}
-              variant={board === "art" ? "art-modern" : "default"}
-              focused={focusedColumn === column}
-              dropAllowed={board === "art" && dragOverStatus === column ? validDragMoves.includes(column) : null}
-            >
-              {grouped.get(column)?.map(card => (
-                <BoardCard
-                  key={card.order.id}
-                  card={card}
-                  board={board}
-                  canMove={canMove}
-                  isManager={hubPermissions.isManager}
-                  moves={boardMoves(card)}
-                  onMove={to => requestMove(card, to)}
-                  onOpenDetails={board === "art" ? () => setSelectedCardId(card.order.id) : undefined}
-                  queuePosition={board === "art" ? queuePositions.get(card.order.id) : undefined}
-                  onTag={
-                    board === "production" && canMove
-                      ? () => {
-                          setTag(card.order.production_tag ?? "EM_PRODUCAO");
-                          setInsumos(card.order.insumos_details ?? "");
-                          setTagCard(card);
-                        }
-                      : undefined
-                  }
-                  onReturn={
-                    board === "production" && hubPermissions.isManager
-                      ? async () => {
-                          try {
-                            await returnOrderToArt(card.order.id);
-                            toast.success("OS devolvida para Arte.");
-                            await load(true);
-                          } catch (cause) {
-                            toast.error(
-                              cause instanceof Error
-                                ? cause.message
-                                : "Falha ao voltar para Arte."
-                            );
+      <DndContext
+        sensors={sensors}
+        onDragStart={dragStart}
+        onDragOver={dragOver}
+        onDragCancel={() => {
+          setActiveDragCardId(null);
+          setDragOverStatus(null);
+        }}
+        onDragEnd={event => {
+          dragEnd(event);
+          setActiveDragCardId(null);
+          setDragOverStatus(null);
+        }}
+      >
+        <div className="relative">
+          <Button
+            aria-label="Rolar quadro para a esquerda"
+            variant="secondary"
+            size="icon"
+            className="absolute left-1 top-1/2 z-20 hidden rounded-full shadow md:flex"
+            onClick={() =>
+              boardScrollRef.current?.scrollBy({
+                left: -320,
+                behavior: "smooth",
+              })
+            }
+          >
+            <ChevronLeft />
+          </Button>
+          <Button
+            aria-label="Rolar quadro para a direita"
+            variant="secondary"
+            size="icon"
+            className="absolute right-1 top-1/2 z-20 hidden rounded-full shadow md:flex"
+            onClick={() =>
+              boardScrollRef.current?.scrollBy({
+                left: 320,
+                behavior: "smooth",
+              })
+            }
+          >
+            <ChevronRight />
+          </Button>
+          <div ref={boardScrollRef} className="flex gap-4 overflow-x-auto pb-4">
+            {columns.map(column => (
+              <BoardColumn
+                key={column}
+                status={column}
+                count={grouped.get(column)?.length ?? 0}
+                variant="modern"
+                focused={focusedColumn === column}
+                dropAllowed={
+                  dragOverStatus === column
+                    ? validDragMoves.includes(column)
+                    : null
+                }
+              >
+                {grouped.get(column)?.map(card => (
+                  <BoardCard
+                    key={card.order.id}
+                    card={card}
+                    board={board}
+                    canMove={canMove}
+                    isManager={hubPermissions.isManager}
+                    moves={boardMoves(card)}
+                    onMove={to => requestMove(card, to)}
+                    onOpenDetails={() => setSelectedCardId(card.order.id)}
+                    queuePosition={
+                      board === "art"
+                        ? queuePositions.get(card.order.id)
+                        : undefined
+                    }
+                    onTag={
+                      board === "production" && canMove
+                        ? () => {
+                            setTag(card.order.production_tag ?? "EM_PRODUCAO");
+                            setInsumos(card.order.insumos_details ?? "");
+                            setTagCard(card);
                           }
-                        }
-                      : undefined
-                  }
-                />
-              ))}
-            </BoardColumn>
-          ))}
-        </div></div>
+                        : undefined
+                    }
+                    onReturn={
+                      board === "production" && hubPermissions.isManager
+                        ? async () => {
+                            try {
+                              await returnOrderToArt(card.order.id);
+                              toast.success("OS devolvida para Arte.");
+                              await load(true);
+                            } catch (cause) {
+                              toast.error(
+                                cause instanceof Error
+                                  ? cause.message
+                                  : "Falha ao voltar para Arte."
+                              );
+                            }
+                          }
+                        : undefined
+                    }
+                  />
+                ))}
+              </BoardColumn>
+            ))}
+          </div>
+        </div>
       </DndContext>
-      {board === "art" && <ArtworkQuickView card={selectedCard} open={Boolean(selectedCard)} canMove={canMove} moves={selectedCard ? boardMoves(selectedCard) : []} onOpenChange={open => !open && setSelectedCardId(null)} onMove={to => selectedCard && requestMove(selectedCard, to)}/>}
+      {board === "art" && (
+        <ArtworkQuickView
+          card={selectedCard}
+          open={Boolean(selectedCard)}
+          canMove={canMove}
+          moves={selectedCard ? boardMoves(selectedCard) : []}
+          onOpenChange={open => !open && setSelectedCardId(null)}
+          onMove={to => selectedCard && requestMove(selectedCard, to)}
+        />
+      )}
+      {board === "production" && (
+        <ProductionQuickView
+          card={selectedCard}
+          open={Boolean(selectedCard)}
+          canMove={canMove}
+          moves={selectedCard ? boardMoves(selectedCard) : []}
+          onOpenChange={open => !open && setSelectedCardId(null)}
+          onMove={to => selectedCard && requestMove(selectedCard, to)}
+        />
+      )}
       <ProductionTagDialog
         card={tagCard}
         tag={tag}

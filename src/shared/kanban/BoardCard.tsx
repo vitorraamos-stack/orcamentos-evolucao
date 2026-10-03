@@ -29,7 +29,10 @@ import { isOrderOverdue } from "@/modules/orders/risk";
 import { getOperationalStatusLabel } from "./statusLabels";
 import { WORK_CENTER_LABELS } from "@/modules/production/operations";
 import { isOrderUrgent } from "@/features/hubos/orderUrgency";
-import { formatArtworkDeadline, getArtworkCardDeadline } from "@/modules/artwork/presentation/artworkPresentation";
+import {
+  formatArtworkDeadline,
+  getArtworkCardDeadline,
+} from "@/modules/artwork/presentation/artworkPresentation";
 
 const TAGS: Record<string, string> = {
   URGENTE: "Urgente",
@@ -54,8 +57,21 @@ export function shouldOpenArtworkQuickView({
 }) {
   return (
     board === "art" &&
-    !isDragging &&
-    (!interactiveTarget || interactiveTarget === currentTarget)
+    shouldOpenBoardQuickView({ isDragging, interactiveTarget, currentTarget })
+  );
+}
+
+export function shouldOpenBoardQuickView({
+  isDragging,
+  interactiveTarget,
+  currentTarget,
+}: {
+  isDragging: boolean;
+  interactiveTarget: EventTarget | null;
+  currentTarget: EventTarget;
+}) {
+  return (
+    !isDragging && (!interactiveTarget || interactiveTarget === currentTarget)
   );
 }
 
@@ -123,15 +139,12 @@ export function BoardCard({
       {...drag.listeners}
       {...drag.attributes}
       onClick={event => {
-        if (board !== "art" || drag.isDragging) return;
-
         const interactiveTarget = (event.target as HTMLElement).closest(
           "a,button,[role=button],[role=menuitem]"
         );
 
         if (
-          shouldOpenArtworkQuickView({
-            board,
+          shouldOpenBoardQuickView({
             isDragging: drag.isDragging,
             interactiveTarget,
             currentTarget: event.currentTarget,
@@ -140,13 +153,17 @@ export function BoardCard({
           onOpenDetails?.();
         }
       }}
-      className={`space-y-3 p-3 shadow-sm transition hover:border-primary/40 ${board === "art" ? `cursor-pointer py-3 ${overdue ? "border-l-2 border-l-destructive" : isOrderUrgent(card.order) ? "border-l-2 border-l-primary" : ""}` : ""}`}
+      className={`cursor-pointer space-y-3 p-3 py-3 shadow-sm transition hover:border-primary/40 ${overdue ? "border-l-2 border-l-destructive" : isOrderUrgent(card.order) ? "border-l-2 border-l-primary" : ""}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-medium text-muted-foreground">
             OS #{card.order.os_number ?? card.order.sale_number}
-            {board === "art" && queuePosition && <span className="ml-2 font-semibold text-primary">#{queuePosition} na fila</span>}
+            {board === "art" && queuePosition && (
+              <span className="ml-2 font-semibold text-primary">
+                #{queuePosition} na fila
+              </span>
+            )}
           </p>
           <Link href={`/os/${card.order.id}`}>
             <a className="block truncate font-semibold hover:underline">
@@ -177,7 +194,11 @@ export function BoardCard({
                 Tag de Produção
               </DropdownMenuItem>
             )}
-            {board === "art" && onOpenDetails && <DropdownMenuItem onClick={onOpenDetails}>Ver detalhes</DropdownMenuItem>}
+            {onOpenDetails && (
+              <DropdownMenuItem onClick={onOpenDetails}>
+                Ver detalhes
+              </DropdownMenuItem>
+            )}
             {board === "production" && isManager && onReturn && (
               <DropdownMenuItem onClick={onReturn}>
                 Voltar para Arte
@@ -233,23 +254,27 @@ export function BoardCard({
           )}
         <span className="flex items-center gap-1">
           <CalendarDays className="h-3.5 w-3.5" />
-          {board === "art" ? formatArtworkDeadline(getArtworkCardDeadline(card)) : deadline
-            ? `Etapa ${formatDatePtBr(deadline.dueDate)}`
-            : `Prazo ${formatDatePtBr(card.order.delivery_date)}`}
+          {board === "art"
+            ? formatArtworkDeadline(getArtworkCardDeadline(card))
+            : deadline
+              ? `Etapa ${formatDatePtBr(deadline.dueDate)}`
+              : `Prazo ${formatDatePtBr(card.order.delivery_date)}`}
         </span>
         <span className="flex items-center gap-1">
           <UserRound className="h-3.5 w-3.5" />
           {card.assignee?.name ?? "Sem responsável"}
         </span>
-        {(board === "production" || card.itemsTotal > 0) && <span>
-          {card.itemsReady}/{card.itemsTotal} itens prontos{" "}
-          {card.commentsTotal > 0 && (
-            <>
-              <MessageSquare className="ml-2 inline h-3.5 w-3.5" />{" "}
-              {card.commentsTotal}
-            </>
-          )}
-        </span>}
+        {(board === "production" || card.itemsTotal > 0) && (
+          <span>
+            {card.itemsReady}/{card.itemsTotal} itens prontos{" "}
+            {card.commentsTotal > 0 && (
+              <>
+                <MessageSquare className="ml-2 inline h-3.5 w-3.5" />{" "}
+                {card.commentsTotal}
+              </>
+            )}
+          </span>
+        )}
       </div>
       {canMove && moves.length > 0 && (
         <Select onValueChange={value => onMove(value as BoardStatus)}>

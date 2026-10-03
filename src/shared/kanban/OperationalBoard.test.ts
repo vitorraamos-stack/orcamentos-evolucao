@@ -26,4 +26,17 @@ describe("OperationalBoard focused views", () => {
     expect(source).toContain("Ver quadro completo");
     expect(source).toContain('board === "art" ? "/os/arte" : "/os/producao"');
   });
+  it("usa componentes especializados e colunas modernas nos dois quadros", () => {
+    [
+      "ArtworkSummaryCards",
+      "ArtworkFilters",
+      "ArtworkQuickView",
+      "ProductionSummaryCards",
+      "ProductionFilters",
+      "ProductionQuickView",
+    ].forEach(component => expect(source).toContain(component));
+    expect(source).toContain('variant="modern"');
+    expect(source).toContain('board === "production" && canMove');
+    expect(source).toContain("queuePositions.get(card.order.id)");
+  });
 });

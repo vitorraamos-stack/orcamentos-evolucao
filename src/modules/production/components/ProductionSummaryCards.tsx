@@ -1,43 +1,54 @@
-import { Clock3, Palette, Pencil, TriangleAlert, Zap } from "lucide-react";
+import {
+  ClipboardCheck,
+  Factory,
+  PackageCheck,
+  PackageX,
+  TriangleAlert,
+} from "lucide-react";
 import type { BoardStatus } from "@/shared/kanban/types";
 
-export function ArtworkSummaryCards({
+export function ProductionSummaryCards({
   metrics,
   focusedColumn,
-  urgent,
+  awaitingSupplies,
   overdue,
   onFocus,
-  onUrgent,
+  onAwaitingSupplies,
   onOverdue,
 }: {
   metrics: { label: string; count: number }[];
   focusedColumn: BoardStatus | null;
-  urgent: boolean;
+  awaitingSupplies: boolean;
   overdue: boolean;
   onFocus: (status: BoardStatus) => void;
-  onUrgent: () => void;
+  onAwaitingSupplies: () => void;
   onOverdue: () => void;
 }) {
   const config = [
     {
-      label: "Em Arte",
-      icon: Palette,
-      active: focusedColumn === "Em Criação",
-      click: () => onFocus("Em Criação"),
+      label: "Em Produção",
+      icon: Factory,
+      active: focusedColumn === "Produção",
+      click: () => onFocus("Produção"),
     },
     {
-      label: "Aguardando Aprovação",
-      icon: Clock3,
-      active: focusedColumn === "Para Aprovação",
-      click: () => onFocus("Para Aprovação"),
+      label: "Acabamento / Conferência",
+      icon: ClipboardCheck,
+      active: focusedColumn === "Em Acabamento",
+      click: () => onFocus("Em Acabamento"),
     },
     {
-      label: "Ajustes",
-      icon: Pencil,
-      active: focusedColumn === "Ajustes",
-      click: () => onFocus("Ajustes"),
+      label: "Aguardando insumos",
+      icon: PackageX,
+      active: awaitingSupplies,
+      click: onAwaitingSupplies,
     },
-    { label: "Urgentes", icon: Zap, active: urgent, click: onUrgent },
+    {
+      label: "Material Pronto",
+      icon: PackageCheck,
+      active: focusedColumn === "Pronto / Avisar Cliente",
+      click: () => onFocus("Pronto / Avisar Cliente"),
+    },
     {
       label: "Atrasadas",
       icon: TriangleAlert,

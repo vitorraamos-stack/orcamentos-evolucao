@@ -40,6 +40,7 @@ export default function Layout({ children }: LayoutProps) {
   const isCreateOrderPage = location.startsWith("/os/novo");
   const isOrdersCentralPage = location === "/os";
   const isArtworkCentralPage = location.startsWith("/os/arte");
+  const isProductionCentralPage = location.startsWith("/os/producao");
   const isInstallationsCentralPage = location === "/instalacoes";
   const isDeliveriesCentralPage = location === "/entregas";
   const operationalNav = getOperationalNavState(location);
@@ -352,7 +353,8 @@ export default function Layout({ children }: LayoutProps) {
               isOrdersCentralPage ||
                 isInstallationsCentralPage ||
                 isDeliveriesCentralPage ||
-                isArtworkCentralPage
+                isArtworkCentralPage ||
+                isProductionCentralPage
                 ? "max-w-none"
                 : "max-w-6xl",
               isCreateOrderPage ? "h-auto" : "h-full"
