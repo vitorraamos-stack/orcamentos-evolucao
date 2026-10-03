@@ -14,6 +14,12 @@ export function countProductionAdvancedFilters(filters: BoardFiltersState) {
   );
 }
 
+export function formatBlockedOperations(count: number) {
+  return count === 1
+    ? "1 operação bloqueada"
+    : `${count} operações bloqueadas`;
+}
+
 export function getProductionCardDeadline(card: BoardCardModel) {
   return (
     card.deadlines.find(deadline =>
