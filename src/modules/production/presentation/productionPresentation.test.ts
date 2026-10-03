@@ -5,11 +5,18 @@ import {
 } from "@/shared/kanban/types";
 import {
   countProductionAdvancedFilters,
+  formatBlockedOperations,
   formatProductionDeadline,
   getProductionCardDeadline,
 } from "./productionPresentation";
 
 describe("productionPresentation", () => {
+  it("formata operações bloqueadas no singular e no plural", () => {
+    expect(formatBlockedOperations(1)).toBe("1 operação bloqueada");
+    expect(formatBlockedOperations(2)).toBe("2 operações bloqueadas");
+    expect(formatBlockedOperations(5)).toBe("5 operações bloqueadas");
+  });
+
   it("conta somente os nove filtros avançados", () => {
     expect(countProductionAdvancedFilters(EMPTY_BOARD_FILTERS)).toBe(0);
     expect(

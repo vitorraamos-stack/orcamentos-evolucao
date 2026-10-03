@@ -23,6 +23,7 @@ import { WORK_CENTER_LABELS } from "@/modules/production/operations";
 import type { BoardCardModel, BoardStatus } from "@/shared/kanban/types";
 import { getOperationalStatusLabel } from "@/shared/kanban/statusLabels";
 import {
+  formatBlockedOperations,
   formatProductionDeadline,
   getProductionCardDeadline,
 } from "../presentation/productionPresentation";
@@ -52,10 +53,10 @@ export function ProductionQuickView({
     : [];
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-md">
+      <SheetContent className="w-full overflow-hidden sm:max-w-md">
         {card && (
           <>
-            <SheetHeader>
+            <SheetHeader className="shrink-0">
               <SheetTitle>
                 OS #{card.order.os_number ?? card.order.sale_number}
               </SheetTitle>
@@ -63,7 +64,7 @@ export function ProductionQuickView({
                 {card.order.client_name} · {card.order.title || "Sem título"}
               </SheetDescription>
             </SheetHeader>
-            <div className="space-y-5 px-4">
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4">
               <div className="flex flex-wrap gap-2">
                 <Badge>
                   {getOperationalStatusLabel(
@@ -116,10 +117,9 @@ export function ProductionQuickView({
                   </dd>
                   {(card.productionOperationsBlocked ?? 0) > 0 && (
                     <dd className="text-destructive">
-                      {card.productionOperationsBlocked} operação
-                      {card.productionOperationsBlocked === 1 ? "" : "ões"}{" "}
-                      bloqueada
-                      {card.productionOperationsBlocked === 1 ? "" : "s"}
+                      {formatBlockedOperations(
+                        card.productionOperationsBlocked ?? 0
+                      )}
                     </dd>
                   )}
                 </div>
@@ -183,7 +183,7 @@ export function ProductionQuickView({
                 </div>
               )}
             </div>
-            <SheetFooter>
+            <SheetFooter className="shrink-0">
               <Button asChild>
                 <Link href={`/os/${card.order.id}`}>Abrir OS completa</Link>
               </Button>
