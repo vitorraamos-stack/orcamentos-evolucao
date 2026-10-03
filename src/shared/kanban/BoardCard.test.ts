@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { shouldOpenArtworkQuickView } from "./BoardCard";
+import {
+  shouldOpenArtworkQuickView,
+  shouldOpenBoardQuickView,
+} from "./BoardCard";
 
 describe("BoardCard variants", () => {
   const source = readFileSync("src/shared/kanban/BoardCard.tsx", "utf8");
@@ -61,6 +64,41 @@ describe("BoardCard variants", () => {
           board: "production",
           isDragging: false,
           interactiveTarget: null,
+          currentTarget: root,
+        })
+      ).toBe(false);
+    });
+  });
+  describe("abertura do Quick View da Produção", () => {
+    const root = {} as EventTarget;
+    it("abre no corpo e no próprio root", () => {
+      expect(
+        shouldOpenBoardQuickView({
+          isDragging: false,
+          interactiveTarget: null,
+          currentTarget: root,
+        })
+      ).toBe(true);
+      expect(
+        shouldOpenBoardQuickView({
+          isDragging: false,
+          interactiveTarget: root,
+          currentTarget: root,
+        })
+      ).toBe(true);
+    });
+    it("não abre em links, botões descendentes ou drag", () => {
+      expect(
+        shouldOpenBoardQuickView({
+          isDragging: false,
+          interactiveTarget: {} as EventTarget,
+          currentTarget: root,
+        })
+      ).toBe(false);
+      expect(
+        shouldOpenBoardQuickView({
+          isDragging: true,
+          interactiveTarget: root,
           currentTarget: root,
         })
       ).toBe(false);
