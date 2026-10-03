@@ -7,6 +7,11 @@ export const RESERVED_ENGINE_KEYS = [
   "system",
 ] as const;
 export const RESERVED_ENGINE_PREFIXES = ["system_", "engine_"] as const;
+export const DANGEROUS_OBJECT_KEYS = [
+  "__proto__",
+  "prototype",
+  "constructor",
+] as const;
 
 /** Reserved checks are exact and case-sensitive; invalid casing is rejected separately. */
 export function isReservedEngineKey(key: string): boolean {
@@ -22,6 +27,10 @@ export const configurableKeySchema = z
   .refine(
     key => !isReservedEngineKey(key),
     "Key belongs to the reserved engine namespace"
+  )
+  .refine(
+    key => !(DANGEROUS_OBJECT_KEYS as readonly string[]).includes(key),
+    "Key is unsafe in object-backed contexts"
   );
 
 export type ConfigurableKey = z.infer<typeof configurableKeySchema>;

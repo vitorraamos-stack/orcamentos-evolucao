@@ -31,3 +31,11 @@ export const minDecimal = (left: DecimalString, right: DecimalString) =>
   compareDecimal(left, right) <= 0 ? left : right;
 export const maxDecimal = (left: DecimalString, right: DecimalString) =>
   compareDecimal(left, right) >= 0 ? left : right;
+export const negateDecimal = (value: DecimalString) =>
+  serializeDecimal(decimalFrom(value).negated());
+export const roundDecimal = (value: DecimalString, decimalPlaces: number) =>
+  serializeDecimal(decimalFrom(value).toDecimalPlaces(decimalPlaces));
+export const ceilDecimal = (value: DecimalString) =>
+  serializeDecimal(decimalFrom(value).ceil());
+export const floorDecimal = (value: DecimalString) =>
+  serializeDecimal(decimalFrom(value).floor());
