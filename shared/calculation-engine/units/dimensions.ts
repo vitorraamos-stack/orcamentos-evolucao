@@ -34,3 +34,33 @@ export const DIMENSIONS = {
   currency: dimension({ currency: 1 }),
   count: dimension({ count: 1 }),
 } as const satisfies Record<string, Dimension>;
+
+export function addDimensionExponents(
+  left: Dimension,
+  right: Dimension
+): Dimension {
+  return dimension(
+    Object.fromEntries(
+      DIMENSION_AXES.map(axis => [axis, left[axis] + right[axis]])
+    )
+  );
+}
+
+export function subtractDimensionExponents(
+  left: Dimension,
+  right: Dimension
+): Dimension {
+  return dimension(
+    Object.fromEntries(
+      DIMENSION_AXES.map(axis => [axis, left[axis] - right[axis]])
+    )
+  );
+}
+
+export function dimensionsEqual(left: Dimension, right: Dimension): boolean {
+  return DIMENSION_AXES.every(axis => left[axis] === right[axis]);
+}
+
+export function isScalarDimension(value: Dimension): boolean {
+  return dimensionsEqual(value, DIMENSIONS.scalar);
+}
