@@ -36,7 +36,7 @@ export function decimalFrom(value: DecimalString): EngineDecimalValue {
 
   try {
     const result = new EngineDecimal(value);
-    if (Math.abs(result.exponent()) > MAX_DECIMAL_MAGNITUDE) {
+    if (Math.abs(result.e) > MAX_DECIMAL_MAGNITUDE) {
       throw invalidDecimal(
         value,
         "Decimal magnitude exceeds the operational limit"
@@ -51,7 +51,7 @@ export function decimalFrom(value: DecimalString): EngineDecimalValue {
 
 /** Canonical, non-exponential serialization; negative zero is normalized to zero. */
 export function serializeDecimal(value: EngineDecimalValue): DecimalString {
-  if (Math.abs(value.exponent()) > MAX_DECIMAL_MAGNITUDE) {
+  if (Math.abs(value.e) > MAX_DECIMAL_MAGNITUDE) {
     throw invalidDecimal(
       value.toString(),
       "Result magnitude exceeds the operational limit"

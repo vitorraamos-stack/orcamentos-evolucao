@@ -66,6 +66,16 @@ describe("decimal arithmetic", () => {
     expectEngineError(() => divideDecimal(d("10"), d("0")), "DIVISION_BY_ZERO");
   });
 
+  it("enforces the decimal magnitude limit", () => {
+    expect(serializeDecimal(decimalFrom(d(`1${"0".repeat(1_000)}`)))).toBe(
+      `1${"0".repeat(1_000)}`
+    );
+    expectEngineError(
+      () => decimalFrom(d(`1${"0".repeat(1_001)}`)),
+      "INVALID_DECIMAL"
+    );
+  });
+
   it.each([
     ["0.0000001", "0.0000001"],
     ["10000000000", "10000000000"],
