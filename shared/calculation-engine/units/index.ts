@@ -177,3 +177,6 @@ export function getUniversalConversion(
     conversion => conversion.from === from && conversion.to === to
   );
 }
+
+export * from "./conversion";
+export * from "./dimensionalValue";
