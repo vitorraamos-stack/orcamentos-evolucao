@@ -17,7 +17,7 @@ export const productVariableSchema = z
   .strict()
   .superRefine((variable, context) => {
     if (
-      variable.expectedUnit != null &&
+      Object.hasOwn(variable, "expectedUnit") &&
       variable.expectedValueType !== "DECIMAL"
     )
       context.addIssue({

@@ -1,6 +1,6 @@
 import type { ProductVersion, ProductVersionStatus } from "./productVersion";
 import { ProductEngineeringError } from "./errors";
-import type { EngineeringValidationResult } from "./validation";
+import type { PublicationValidationResult } from "./validation";
 
 const transitions: Readonly<
   Record<ProductVersionStatus, readonly ProductVersionStatus[]>
@@ -22,12 +22,22 @@ export function assertProductVersionTransition(
     );
 }
 export function assertValidatedProductVersionTransition(
+  from: "DRAFT",
+  to: "VALIDATING",
+  validation: PublicationValidationResult
+): void;
+export function assertValidatedProductVersionTransition(
+  from: "VALIDATING",
+  to: "PUBLISHED",
+  validation: PublicationValidationResult
+): void;
+export function assertValidatedProductVersionTransition(
   from: ProductVersionStatus,
   to: ProductVersionStatus,
-  validation: EngineeringValidationResult
+  validation: PublicationValidationResult
 ): void {
   assertProductVersionTransition(from, to);
-  if ((to === "VALIDATING" || to === "PUBLISHED") && !validation.valid)
+  if (!validation.valid)
     throw new ProductEngineeringError(
       "PUBLICATION_VALIDATION_FAILED",
       `Product version cannot enter ${to} with validation errors`,

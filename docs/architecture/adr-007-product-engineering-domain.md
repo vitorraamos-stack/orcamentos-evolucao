@@ -22,7 +22,7 @@ Uma definição de versão é um snapshot JSON-safe composto pela versão, input
 
 A validação estrutural protege UUIDs, schemas strict, namespaces, chaves duplicadas e colisões mesmo em drafts. A validação semântica usa o grafo e a inferência do Calculation Engine para relatar referências desconhecidas, ciclos, tipos e incompatibilidades dimensionais.
 
-Um draft estruturalmente íntegro pode ser salvo com referências ainda não resolvidas, apresentadas como issues. Entrar em `VALIDATING` ou `PUBLISHED` exige zero erros. Conditions devem retornar boolean; quantidades devem retornar decimal compatível dimensional e semanticamente com `quantityUnit`. A não negatividade do resultado de consumo é uma invariante de runtime futura; esta modelagem não tenta provar estaticamente expressões arbitrárias.
+Um draft estruturalmente íntegro pode ser salvo com referências ainda não resolvidas, apresentadas como issues. O resultado de validação de draft responde se o snapshot é persistível e é um tipo distinto do resultado de publicação. Entrar em `VALIDATING` ou `PUBLISHED` exige explicitamente um resultado de publicação sem erros; retornar de `VALIDATING` para `DRAFT` e retirar uma versão publicada não executam esse gate. Conditions devem retornar boolean; quantidades devem retornar decimal compatível dimensional e semanticamente com `quantityUnit`. A não negatividade do resultado de consumo é uma invariante de runtime futura; esta modelagem não tenta provar estaticamente expressões arbitrárias.
 
 ## Limites deliberados
 

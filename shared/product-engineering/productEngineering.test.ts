@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { decimalString } from "../calculation-engine/decimal";
 import type { Expression } from "../calculation-engine/expressions";
 import {
@@ -8,10 +8,13 @@ import {
   assertValidatedProductVersionTransition,
   nextRevision,
   productInputSchema,
+  productVariableSchema,
   productVersionDefinitionSchema,
+  productVersionSchema,
   validateProductVersionDraft,
   validateProductVersionForPublication,
   type ProductVersionDefinition,
+  type PublicationValidationResult,
 } from ".";
 
 const ids = {
@@ -168,6 +171,7 @@ describe("product engineering validation", () => {
     const definition = goldenDefinition();
     expect(JSON.stringify(definition)).not.toContain("commercial_quantity");
     expect(validateProductVersionForPublication(definition)).toEqual({
+      kind: "PUBLICATION",
       valid: true,
       issues: [],
     });
@@ -179,11 +183,20 @@ describe("product engineering validation", () => {
       ref("missing_height")
     );
     const draft = validateProductVersionDraft(definition);
-    expect(draft.valid).toBe(true);
+    expect(draft).toMatchObject({ kind: "DRAFT", persistable: true });
     expect(draft.issues.some(issue => issue.code === "UNKNOWN_REFERENCE")).toBe(
       true
     );
     expect(validateProductVersionForPublication(definition).valid).toBe(false);
+  });
+  it("rejects duplicate ids within each aggregate collection", () => {
+    for (const collection of ["inputs", "variables", "components"] as const) {
+      const definition = goldenDefinition();
+      definition[collection][1].id = definition[collection][0].id;
+      expect(productVersionDefinitionSchema.safeParse(definition).success).toBe(
+        false
+      );
+    }
   });
   it("reports cycles and input-variable collisions", () => {
     const cyclic = goldenDefinition();
@@ -262,6 +275,79 @@ describe("product engineering validation", () => {
   });
 });
 
+describe("field invariants", () => {
+  const variable = {
+    id: ids.area,
+    key: "area",
+    label: "Área",
+    expression: ref("width"),
+    sortOrder: 0,
+  };
+  it.each([
+    [{ expectedValueType: "DECIMAL", expectedUnit: "m2" }, true],
+    [{ expectedValueType: "DECIMAL", expectedUnit: null }, true],
+    [{ expectedValueType: "BOOLEAN", expectedUnit: null }, false],
+    [{ expectedValueType: "STRING", expectedUnit: "m" }, false],
+  ] as const)("validates expectedUnit presence for %#", (expected, valid) => {
+    expect(
+      productVariableSchema.safeParse({ ...variable, ...expected }).success
+    ).toBe(valid);
+  });
+
+  const version = {
+    id: ids.version,
+    productId: ids.product,
+    versionNumber: 1,
+    revision: 1,
+    createdAt: "2026-10-03T12:00:00Z",
+    createdBy: ids.user,
+  };
+  it.each([
+    ["DRAFT", null, null, true],
+    ["VALIDATING", null, null, true],
+    ["DRAFT", "2026-10-03T13:00:00Z", ids.user, false],
+    ["VALIDATING", "2026-10-03T13:00:00Z", ids.user, false],
+    ["PUBLISHED", null, null, false],
+    ["PUBLISHED", "2026-10-03T13:00:00Z", ids.user, true],
+    ["RETIRED", null, null, false],
+    ["RETIRED", "2026-10-03T13:00:00Z", ids.user, true],
+  ] as const)(
+    "validates publication metadata for %s (%#)",
+    (status, publishedAt, publishedBy, valid) => {
+      expect(
+        productVersionSchema.safeParse({
+          ...version,
+          status,
+          publishedAt,
+          publishedBy,
+        }).success
+      ).toBe(valid);
+    }
+  );
+
+  const decimalInput = {
+    id: ids.width,
+    key: "width",
+    label: "Largura",
+    required: true,
+    sortOrder: 0,
+    type: "DECIMAL",
+    unit: "m",
+  } as const;
+  it.each([
+    [{ min: "0.1", max: "0.2" }, true],
+    [{ min: "0.2", max: "0.2" }, true],
+    [{ min: "0.2", max: "0.1" }, false],
+    [{ min: "0", max: "10", defaultValue: "5" }, true],
+    [{ min: "0.1", max: "10", defaultValue: "0.01" }, false],
+    [{ min: "0", max: "0.2", defaultValue: "0.21" }, false],
+  ] as const)("validates decimal bounds for %#", (bounds, valid) => {
+    expect(
+      productInputSchema.safeParse({ ...decimalInput, ...bounds }).success
+    ).toBe(valid);
+  });
+});
+
 describe("lifecycle and optimistic locking", () => {
   it.each([
     ["DRAFT", "VALIDATING"],
@@ -289,11 +375,15 @@ describe("lifecycle and optimistic locking", () => {
       )
   );
   it("keeps DRAFT editable and gates review transitions on validation", () => {
+    expectTypeOf(assertValidatedProductVersionTransition)
+      .parameter(2)
+      .toEqualTypeOf<PublicationValidationResult>();
     expect(() =>
       assertProductVersionEditable({ status: "DRAFT" })
     ).not.toThrow();
     expect(() =>
       assertValidatedProductVersionTransition("DRAFT", "VALIDATING", {
+        kind: "PUBLICATION",
         valid: false,
         issues: [],
       })
@@ -302,6 +392,7 @@ describe("lifecycle and optimistic locking", () => {
     );
     expect(() =>
       assertValidatedProductVersionTransition("DRAFT", "VALIDATING", {
+        kind: "PUBLICATION",
         valid: true,
         issues: [],
       })

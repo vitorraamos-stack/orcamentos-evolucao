@@ -30,14 +30,25 @@ export const productVersionSchema = z
   })
   .strict()
   .superRefine((version, context) => {
+    const hasPublicationMetadata =
+      version.publishedAt !== null && version.publishedBy !== null;
     if ((version.publishedAt === null) !== (version.publishedBy === null))
       context.addIssue({
         code: "custom",
         message: "publishedAt and publishedBy must both be set or null",
       });
     if (
+      ["DRAFT", "VALIDATING"].includes(version.status) &&
+      hasPublicationMetadata
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["publishedAt"],
+        message: `${version.status} versions cannot have publication metadata`,
+      });
+    if (
       ["PUBLISHED", "RETIRED"].includes(version.status) &&
-      version.publishedAt === null
+      !hasPublicationMetadata
     )
       context.addIssue({
         code: "custom",

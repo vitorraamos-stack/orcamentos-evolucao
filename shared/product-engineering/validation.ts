@@ -29,6 +29,24 @@ export const productVersionDefinitionSchema = z
   })
   .strict()
   .superRefine((definition, context) => {
+    const reportDuplicateIds = (
+      collection: readonly { readonly id: string }[],
+      path: "inputs" | "variables" | "components"
+    ): void => {
+      const ids = new Set<string>();
+      collection.forEach((item, index) => {
+        if (ids.has(item.id))
+          context.addIssue({
+            code: "custom",
+            path: [path, index, "id"],
+            message: `DUPLICATE_${path.slice(0, -1).toUpperCase()}_ID: ${item.id}`,
+          });
+        ids.add(item.id);
+      });
+    };
+    reportDuplicateIds(definition.inputs, "inputs");
+    reportDuplicateIds(definition.variables, "variables");
+    reportDuplicateIds(definition.components, "components");
     const inputKeys = new Set<string>();
     definition.inputs.forEach((input, index) => {
       if (inputKeys.has(input.key))
@@ -66,9 +84,16 @@ export interface EngineeringValidationIssue {
   readonly message: string;
   readonly severity: "ERROR" | "WARNING";
 }
-export interface EngineeringValidationResult {
-  readonly valid: boolean;
+interface ValidationResultBase {
   readonly issues: readonly EngineeringValidationIssue[];
+}
+export interface DraftValidationResult extends ValidationResultBase {
+  readonly kind: "DRAFT";
+  readonly persistable: boolean;
+}
+export interface PublicationValidationResult extends ValidationResultBase {
+  readonly kind: "PUBLICATION";
+  readonly valid: boolean;
 }
 
 const inputType = (input: ProductInput): InferredType => {
@@ -244,20 +269,36 @@ const structuralIssues = (error: z.ZodError): EngineeringValidationIssue[] =>
 /** Drafts require structural integrity, while unresolved expression references are reported for progressive editing. */
 export function validateProductVersionDraft(
   input: unknown
-): EngineeringValidationResult {
+): DraftValidationResult {
   const parsed = productVersionDefinitionSchema.safeParse(input);
   if (!parsed.success)
-    return { valid: false, issues: structuralIssues(parsed.error) };
-  return { valid: true, issues: semanticIssues(parsed.data) };
+    return {
+      kind: "DRAFT",
+      persistable: false,
+      issues: structuralIssues(parsed.error),
+    };
+  return {
+    kind: "DRAFT",
+    persistable: true,
+    issues: semanticIssues(parsed.data),
+  };
 }
 
 /** Publication/review gates require structural integrity and zero semantic errors. */
 export function validateProductVersionForPublication(
   input: unknown
-): EngineeringValidationResult {
+): PublicationValidationResult {
   const parsed = productVersionDefinitionSchema.safeParse(input);
   if (!parsed.success)
-    return { valid: false, issues: structuralIssues(parsed.error) };
+    return {
+      kind: "PUBLICATION",
+      valid: false,
+      issues: structuralIssues(parsed.error),
+    };
   const issues = semanticIssues(parsed.data);
-  return { valid: !issues.some(issue => issue.severity === "ERROR"), issues };
+  return {
+    kind: "PUBLICATION",
+    valid: !issues.some(issue => issue.severity === "ERROR"),
+    issues,
+  };
 }

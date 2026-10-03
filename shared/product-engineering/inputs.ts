@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { configurableKeySchema } from "../calculation-engine/contracts";
-import { decimalStringSchema } from "../calculation-engine/decimal";
+import {
+  compareDecimal,
+  decimalStringSchema,
+} from "../calculation-engine/decimal";
 import { UNIT_IDS } from "../calculation-engine/units";
 
 export const inputIdSchema = z.string().uuid().brand<"ProductInputId">();
@@ -21,7 +24,39 @@ const decimalInputSchema = z
     min: decimalStringSchema.optional(),
     max: decimalStringSchema.optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((input, context) => {
+    if (
+      input.min !== undefined &&
+      input.max !== undefined &&
+      compareDecimal(input.min, input.max) > 0
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["max"],
+        message: "Maximum must be greater than or equal to minimum",
+      });
+    if (
+      input.defaultValue !== undefined &&
+      input.min !== undefined &&
+      compareDecimal(input.defaultValue, input.min) < 0
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["defaultValue"],
+        message: "Default must be greater than or equal to minimum",
+      });
+    if (
+      input.defaultValue !== undefined &&
+      input.max !== undefined &&
+      compareDecimal(input.defaultValue, input.max) > 0
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["defaultValue"],
+        message: "Default must be less than or equal to maximum",
+      });
+  });
 const booleanInputSchema = z
   .object({
     ...base,
