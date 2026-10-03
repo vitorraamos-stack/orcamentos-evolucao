@@ -41,6 +41,24 @@ const TAGS: Record<string, string> = {
   PRONTO: "Pronto",
 };
 
+export function shouldOpenArtworkQuickView({
+  board,
+  isDragging,
+  interactiveTarget,
+  currentTarget,
+}: {
+  board: BoardKind;
+  isDragging: boolean;
+  interactiveTarget: EventTarget | null;
+  currentTarget: EventTarget;
+}) {
+  return (
+    board === "art" &&
+    !isDragging &&
+    (!interactiveTarget || interactiveTarget === currentTarget)
+  );
+}
+
 export function BoardCard({
   card,
   board,
@@ -105,7 +123,22 @@ export function BoardCard({
       {...drag.listeners}
       {...drag.attributes}
       onClick={event => {
-        if (board === "art" && !drag.isDragging && !(event.target as HTMLElement).closest("a,button,[role=button],[role=menuitem]")) onOpenDetails?.();
+        if (board !== "art" || drag.isDragging) return;
+
+        const interactiveTarget = (event.target as HTMLElement).closest(
+          "a,button,[role=button],[role=menuitem]"
+        );
+
+        if (
+          shouldOpenArtworkQuickView({
+            board,
+            isDragging: drag.isDragging,
+            interactiveTarget,
+            currentTarget: event.currentTarget,
+          })
+        ) {
+          onOpenDetails?.();
+        }
       }}
       className={`space-y-3 p-3 shadow-sm transition hover:border-primary/40 ${board === "art" ? `cursor-pointer py-3 ${overdue ? "border-l-2 border-l-destructive" : isOrderUrgent(card.order) ? "border-l-2 border-l-primary" : ""}` : ""}`}
     >
