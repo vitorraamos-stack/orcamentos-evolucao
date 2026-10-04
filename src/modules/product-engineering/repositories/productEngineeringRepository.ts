@@ -48,6 +48,10 @@ export const productEngineeringRepository = {
       { action: "CREATE_PRODUCT" }
     >["product"]
   ) => mutate({ action: "CREATE_PRODUCT", product }),
+  createNewProductVersion: (
+    sourceVersionId: string,
+    expectedRevision: number
+  ) => mutate({ action: "CREATE_VERSION", sourceVersionId, expectedRevision }),
   saveProductVersionDraft: (
     payload: Omit<
       Extract<ProductEngineeringMutation, { action: "SAVE_DRAFT" }>,

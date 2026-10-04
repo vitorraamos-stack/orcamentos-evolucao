@@ -21,6 +21,13 @@ export const productEngineeringMutationSchema = z.discriminatedUnion("action", [
     .strict(),
   z
     .object({
+      action: z.literal("CREATE_VERSION"),
+      sourceVersionId: uuid,
+      expectedRevision,
+    })
+    .strict(),
+  z
+    .object({
       action: z.literal("SAVE_DRAFT"),
       versionId: uuid,
       expectedRevision,
@@ -73,6 +80,16 @@ export const createProductResultSchema = z
   })
   .strict();
 export type CreateProductResult = z.infer<typeof createProductResultSchema>;
+export const createVersionResultSchema = z
+  .object({
+    productId: uuid,
+    sourceVersionId: uuid,
+    versionId: uuid,
+    versionNumber: expectedRevision,
+    revision: z.literal(1),
+  })
+  .strict();
+export type CreateVersionResult = z.infer<typeof createVersionResultSchema>;
 export type SaveDraftResult = { revision: number; issues: readonly unknown[] };
 export type LifecycleTransitionResult = {
   version: import("./productVersion.js").ProductVersion;

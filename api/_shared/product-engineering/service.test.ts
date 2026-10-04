@@ -14,8 +14,12 @@ const dto = (status = "DRAFT", revision = 1) => ({
     notes: null,
     created_at: "2026-10-04T00:00:00Z",
     created_by: id(3),
-    published_at: null,
-    published_by: null,
+    published_at:
+      status === "PUBLISHED" || status === "RETIRED"
+        ? "2026-10-04T01:00:00Z"
+        : null,
+    published_by:
+      status === "PUBLISHED" || status === "RETIRED" ? id(9) : null,
   },
   inputs: [],
   variables: [],
@@ -36,6 +40,81 @@ const versionRow = (status: string, published = false) => ({
     : {}),
 });
 describe("ProductEngineeringService", () => {
+  it("clones a published source and maps the result with the authenticated actor", async () => {
+    const source = dto("PUBLISHED", 3);
+    const mock: any = db(source);
+    mock.rpc.mockImplementation(async (name: string) =>
+      name.includes("get_version")
+        ? { data: source, error: null }
+        : {
+            data: {
+              product_id: id(2),
+              source_version_id: id(1),
+              version_id: id(8),
+              version_number: 2,
+              revision: 1,
+            },
+            error: null,
+          }
+    );
+
+    const result: any = await new ProductEngineeringService(mock).execute(
+      {
+        action: "CREATE_VERSION",
+        sourceVersionId: id(1),
+        expectedRevision: 3,
+      },
+      id(7)
+    );
+
+    expect(mock.rpc).toHaveBeenLastCalledWith(
+      "product_engineering_create_version_secure",
+      {
+        p_source_version_id: id(1),
+        p_expected_revision: 3,
+        p_actor_id: id(7),
+      }
+    );
+    expect(result).toEqual({
+      productId: id(2),
+      sourceVersionId: id(1),
+      versionId: id(8),
+      versionNumber: 2,
+      revision: 1,
+    });
+    expect(result).not.toHaveProperty("source_version_id");
+  });
+  it.each(["DRAFT", "VALIDATING", "RETIRED"])(
+    "rejects cloning a %s source before mutation",
+    async status => {
+      const mock = db(dto(status));
+      await expect(
+        new ProductEngineeringService(mock).execute(
+          {
+            action: "CREATE_VERSION",
+            sourceVersionId: id(1),
+            expectedRevision: 1,
+          },
+          id(3)
+        )
+      ).rejects.toMatchObject({ status: 409, code: "STATE_CONFLICT" });
+      expect(mock.rpc).toHaveBeenCalledTimes(1);
+    }
+  );
+  it("rejects stale clone revisions before mutation", async () => {
+    const mock = db(dto("PUBLISHED", 2));
+    await expect(
+      new ProductEngineeringService(mock).execute(
+        {
+          action: "CREATE_VERSION",
+          sourceVersionId: id(1),
+          expectedRevision: 1,
+        },
+        id(3)
+      )
+    ).rejects.toMatchObject({ status: 409, code: "REVISION_CONFLICT" });
+    expect(mock.rpc).toHaveBeenCalledTimes(1);
+  });
   it("allows persistable drafts with semantic issues and returns them", async () => {
     const d = dto();
     d.inputs = [

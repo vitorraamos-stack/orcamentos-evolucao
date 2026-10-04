@@ -12,6 +12,7 @@ import {
   componentToRow,
   inputToRow,
   mapCreateProductResult,
+  mapCreateVersionResult,
   mapDefinition,
   mapVersion,
   variableToRow,
@@ -33,6 +34,8 @@ const rpcError = (error: any): never => {
     throw new ServiceError(409, "REVISION_CONFLICT", message);
   if (/current published version changed/i.test(message))
     throw new ServiceError(409, "PUBLICATION_CONFLICT", message);
+  if (/version number conflict/i.test(message))
+    throw new ServiceError(409, "VERSION_CONFLICT", message);
   if (/status|transition|DRAFT|VALIDATING/i.test(message))
     throw new ServiceError(409, "STATE_CONFLICT", message);
   if (/not found/i.test(message))
@@ -72,7 +75,11 @@ export class ProductEngineeringService {
       if (error) rpcError(error);
       return mapCreateProductResult(data);
     }
-    const definition = await this.loadDefinition(command.versionId);
+    const versionId =
+      command.action === "CREATE_VERSION"
+        ? command.sourceVersionId
+        : command.versionId;
+    const definition = await this.loadDefinition(versionId);
     try {
       assertExpectedRevision(
         definition.version.revision,
@@ -84,6 +91,24 @@ export class ProductEngineeringService {
         "REVISION_CONFLICT",
         "Version revision changed."
       );
+    }
+    if (command.action === "CREATE_VERSION") {
+      if (definition.version.status !== "PUBLISHED")
+        throw new ServiceError(
+          409,
+          "STATE_CONFLICT",
+          "Only PUBLISHED versions can be cloned."
+        );
+      const { data, error } = await this.db.rpc(
+        "product_engineering_create_version_secure",
+        {
+          p_source_version_id: command.sourceVersionId,
+          p_expected_revision: command.expectedRevision,
+          p_actor_id: actorId,
+        }
+      );
+      if (error) rpcError(error);
+      return mapCreateVersionResult(data);
     }
     if (command.action === "SAVE_DRAFT") {
       if (definition.version.status !== "DRAFT")
