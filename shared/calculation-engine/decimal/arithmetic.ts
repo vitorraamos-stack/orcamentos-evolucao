@@ -1,6 +1,6 @@
-import type { DecimalString } from "./index";
-import { CalculationEngineError } from "../errors";
-import { decimalFrom, serializeDecimal } from "./engineDecimal";
+import type { DecimalString } from "./index.js";
+import { CalculationEngineError } from "../errors/index.js";
+import { decimalFrom, serializeDecimal } from "./engineDecimal.js";
 
 export const addDecimal = (left: DecimalString, right: DecimalString) =>
   serializeDecimal(decimalFrom(left).plus(decimalFrom(right)));

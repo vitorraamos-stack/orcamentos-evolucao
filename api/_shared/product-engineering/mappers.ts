@@ -7,9 +7,9 @@ import {
   productVersionSchema,
   PRODUCT_ENGINEERING_SCHEMA_VERSION,
   createProductResultSchema,
-} from "../../../shared/product-engineering";
-import { EXPRESSION_AST_VERSION } from "../../../shared/calculation-engine/expressions";
-import { decimalStringSchema } from "../../../shared/calculation-engine/decimal";
+} from "../../../shared/product-engineering/index.js";
+import { EXPRESSION_AST_VERSION } from "../../../shared/calculation-engine/expressions/index.js";
+import { decimalStringSchema } from "../../../shared/calculation-engine/decimal/index.js";
 
 export class CompatibilityError extends Error {
   constructor(

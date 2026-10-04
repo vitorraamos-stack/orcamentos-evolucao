@@ -1,15 +1,15 @@
-import { CalculationEngineError } from "../errors";
-import { UNIT_CATALOG } from "../units";
+import { CalculationEngineError } from "../errors/index.js";
+import { UNIT_CATALOG } from "../units/index.js";
 import {
   addDimensionExponents,
   dimensionsEqual,
   isScalarDimension,
   subtractDimensionExponents,
-} from "../units/dimensions";
-import type { Expression } from "./ast";
-import { assertExpressionLimits, MAX_AST_DEPTH, MAX_AST_NODES } from "./limits";
-import { expressionSchema } from "./schema";
-import type { InferredType, SymbolTable } from "./types";
+} from "../units/dimensions.js";
+import type { Expression } from "./ast.js";
+import { assertExpressionLimits, MAX_AST_DEPTH, MAX_AST_NODES } from "./limits.js";
+import { expressionSchema } from "./schema.js";
+import type { InferredType, SymbolTable } from "./types.js";
 
 const fail = (
   code:

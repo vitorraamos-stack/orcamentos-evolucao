@@ -1,6 +1,6 @@
 import Decimal from "decimal.js";
-import { CalculationEngineError } from "../errors";
-import { decimalString, type DecimalString } from "./index";
+import { CalculationEngineError } from "../errors/index.js";
+import { decimalString, type DecimalString } from "./index.js";
 
 export const ENGINE_DECIMAL_PRECISION = 50;
 export const MAX_DECIMAL_TEXT_LENGTH = 1_024;

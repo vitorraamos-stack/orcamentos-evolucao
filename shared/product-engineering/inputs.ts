@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { configurableKeySchema } from "../calculation-engine/contracts";
+import { configurableKeySchema } from "../calculation-engine/contracts/index.js";
 import {
   compareDecimal,
   decimalStringSchema,
-} from "../calculation-engine/decimal";
-import { UNIT_IDS } from "../calculation-engine/units";
+} from "../calculation-engine/decimal/index.js";
+import { UNIT_IDS } from "../calculation-engine/units/index.js";
 
 export const inputIdSchema = z.string().uuid().brand<"ProductInputId">();
 const base = {

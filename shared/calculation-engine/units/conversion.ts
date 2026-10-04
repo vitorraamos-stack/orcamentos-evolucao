@@ -1,7 +1,7 @@
-import { divideDecimal, multiplyDecimal, type DecimalString } from "../decimal";
-import { CalculationEngineError } from "../errors";
-import { getUniversalConversion, UNIT_CATALOG, type UnitId } from "./index";
-import { dimensionsEqual } from "./dimensions";
+import { divideDecimal, multiplyDecimal, type DecimalString } from "../decimal/index.js";
+import { CalculationEngineError } from "../errors/index.js";
+import { getUniversalConversion, UNIT_CATALOG, type UnitId } from "./index.js";
+import { dimensionsEqual } from "./dimensions.js";
 
 export function convertUnit(
   value: DecimalString,

@@ -1,6 +1,6 @@
-import type { ProductVersion, ProductVersionStatus } from "./productVersion";
-import { ProductEngineeringError } from "./errors";
-import type { PublicationValidationResult } from "./validation";
+import type { ProductVersion, ProductVersionStatus } from "./productVersion.js";
+import { ProductEngineeringError } from "./errors.js";
+import type { PublicationValidationResult } from "./validation.js";
 
 const transitions: Readonly<
   Record<ProductVersionStatus, readonly ProductVersionStatus[]>

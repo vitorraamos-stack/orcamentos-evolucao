@@ -1,15 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { productEngineeringMutationSchema } from "../shared/product-engineering/api";
+import { productEngineeringMutationSchema } from "../shared/product-engineering/api.js";
 import {
   mapProduct,
   mapVersion,
   CompatibilityError,
-} from "./_shared/product-engineering/mappers";
+} from "./_shared/product-engineering/mappers.js";
 import {
   ProductEngineeringService,
   ServiceError,
-} from "./_shared/product-engineering/service";
+} from "./_shared/product-engineering/service.js";
 
 const send = (res: any, status: number, payload: any) =>
   res.status(status).json(payload);

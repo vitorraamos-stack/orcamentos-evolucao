@@ -6,8 +6,8 @@ import {
   validateProductVersionDraft,
   validateProductVersionForPublication,
   type ProductEngineeringMutation,
-} from "../../../shared/product-engineering";
-import { EXPRESSION_AST_VERSION } from "../../../shared/calculation-engine/expressions";
+} from "../../../shared/product-engineering/index.js";
+import { EXPRESSION_AST_VERSION } from "../../../shared/calculation-engine/expressions/index.js";
 import {
   componentToRow,
   inputToRow,
@@ -15,7 +15,7 @@ import {
   mapDefinition,
   mapVersion,
   variableToRow,
-} from "./mappers";
+} from "./mappers.js";
 
 export class ServiceError extends Error {
   constructor(
