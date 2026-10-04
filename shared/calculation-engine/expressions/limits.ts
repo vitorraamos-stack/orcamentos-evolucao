@@ -1,5 +1,5 @@
-import { CalculationEngineError } from "../errors";
-import type { Expression } from "./ast";
+import { CalculationEngineError } from "../errors/index.js";
+import type { Expression } from "./ast.js";
 
 export const MAX_AST_DEPTH = 64;
 export const MAX_AST_NODES = 1_000;

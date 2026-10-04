@@ -1,5 +1,5 @@
-import type { DecimalString } from "../decimal";
-import type { UnitId } from "../units";
+import type { DecimalString } from "../decimal/index.js";
+import type { UnitId } from "../units/index.js";
 
 export const EXPRESSION_AST_VERSION = "1.0" as const;
 export const UNARY_OPERATORS = ["NOT", "NEGATE"] as const;

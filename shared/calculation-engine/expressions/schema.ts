@@ -1,13 +1,13 @@
 import { z } from "zod";
-import { configurableKeySchema } from "../contracts";
-import { decimalStringSchema } from "../decimal";
-import { UNIT_IDS } from "../units";
+import { configurableKeySchema } from "../contracts/index.js";
+import { decimalStringSchema } from "../decimal/index.js";
+import { UNIT_IDS } from "../units/index.js";
 import {
   BINARY_OPERATORS,
   EXPRESSION_FUNCTIONS,
   UNARY_OPERATORS,
   type Expression,
-} from "./ast";
+} from "./ast.js";
 
 const unitSchema = z.enum(UNIT_IDS);
 export const expressionSchema: z.ZodType<Expression> = z.lazy(() =>

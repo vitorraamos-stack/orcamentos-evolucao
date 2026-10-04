@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { decimalStringSchema, type DecimalString } from "../decimal";
-import { UNIT_IDS, type UnitId } from "../units";
-import { configurableKeySchema } from "./namespace";
+import { decimalStringSchema, type DecimalString } from "../decimal/index.js";
+import { UNIT_IDS, type UnitId } from "../units/index.js";
+import { configurableKeySchema } from "./namespace.js";
 
 export const moneySchema = z.object({
   currency: z.literal("BRL"),
@@ -57,4 +57,4 @@ export const calculationRequestSchema = z
   .strict();
 export type CalculationRequest = z.infer<typeof calculationRequestSchema>;
 
-export * from "./namespace";
+export * from "./namespace.js";

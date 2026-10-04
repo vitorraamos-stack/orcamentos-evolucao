@@ -7,8 +7,8 @@ import {
   floorDecimal,
   negateDecimal,
   roundDecimal,
-} from "../decimal";
-import { CalculationEngineError } from "../errors";
+} from "../decimal/index.js";
+import { CalculationEngineError } from "../errors/index.js";
 import {
   addDimensionalValues,
   compareDimensionalValues,
@@ -18,15 +18,15 @@ import {
   scalarValue,
   subtractDimensionalValues,
   type DimensionalDecimalValue,
-} from "../units";
-import type { Expression } from "./ast";
-import { validateExpression } from "./validate";
+} from "../units/index.js";
+import type { Expression } from "./ast.js";
+import { validateExpression } from "./validate.js";
 import {
   typeFromValue,
   type EvaluationContext,
   type ExpressionValue,
   type SymbolTable,
-} from "./types";
+} from "./types.js";
 
 const invalid = (message: string): never => {
   throw new CalculationEngineError("INVALID_OPERAND_TYPE", message);

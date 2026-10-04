@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { productIdSchema } from "./product";
+import { productIdSchema } from "./product.js";
 
 export const productVersionIdSchema = z
   .string()

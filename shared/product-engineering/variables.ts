@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { configurableKeySchema } from "../calculation-engine/contracts";
-import { expressionSchema } from "../calculation-engine/expressions";
-import { UNIT_IDS } from "../calculation-engine/units";
+import { configurableKeySchema } from "../calculation-engine/contracts/index.js";
+import { expressionSchema } from "../calculation-engine/expressions/index.js";
+import { UNIT_IDS } from "../calculation-engine/units/index.js";
 
 export const variableIdSchema = z.string().uuid().brand<"ProductVariableId">();
 export const productVariableSchema = z

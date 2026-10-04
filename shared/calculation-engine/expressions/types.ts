@@ -1,10 +1,10 @@
-import type { BooleanValue, StringValue } from "../contracts";
+import type { BooleanValue, StringValue } from "../contracts/index.js";
 import type {
   DimensionalDecimalValue,
   DimensionalSemantic,
   UnitId,
-} from "../units";
-import type { Dimension } from "../units/dimensions";
+} from "../units/index.js";
+import type { Dimension } from "../units/dimensions.js";
 
 export type ExpressionValue =
   | DimensionalDecimalValue

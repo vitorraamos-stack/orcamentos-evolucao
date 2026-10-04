@@ -1,22 +1,22 @@
 import { z } from "zod";
-import { CalculationEngineError } from "../calculation-engine/errors";
+import { CalculationEngineError } from "../calculation-engine/errors/index.js";
 import {
   inferExpressionType,
   topologicallySortVariables,
   type InferredType,
   type SymbolDefinition,
   type SymbolTable,
-} from "../calculation-engine/expressions";
-import { UNIT_CATALOG } from "../calculation-engine/units";
+} from "../calculation-engine/expressions/index.js";
+import { UNIT_CATALOG } from "../calculation-engine/units/index.js";
 import {
   DIMENSIONS,
   dimensionsEqual,
-} from "../calculation-engine/units/dimensions";
-import type { ProductInput } from "./inputs";
-import { productInputSchema } from "./inputs";
-import { productComponentSchema } from "./components";
-import { productVersionSchema } from "./productVersion";
-import { productVariableSchema } from "./variables";
+} from "../calculation-engine/units/dimensions.js";
+import type { ProductInput } from "./inputs.js";
+import { productInputSchema } from "./inputs.js";
+import { productComponentSchema } from "./components.js";
+import { productVersionSchema } from "./productVersion.js";
+import { productVariableSchema } from "./variables.js";
 
 export const PRODUCT_ENGINEERING_SCHEMA_VERSION = "1.0" as const;
 export const productVersionDefinitionSchema = z

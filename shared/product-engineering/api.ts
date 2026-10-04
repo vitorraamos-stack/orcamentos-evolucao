@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { productComponentSchema } from "./components";
-import { productInputSchema } from "./inputs";
-import { productVariableSchema } from "./variables";
+import { productComponentSchema } from "./components.js";
+import { productInputSchema } from "./inputs.js";
+import { productVariableSchema } from "./variables.js";
 
 const uuid = z.string().uuid();
 const expectedRevision = z.number().int().positive();
@@ -75,7 +75,7 @@ export const createProductResultSchema = z
 export type CreateProductResult = z.infer<typeof createProductResultSchema>;
 export type SaveDraftResult = { revision: number; issues: readonly unknown[] };
 export type LifecycleTransitionResult = {
-  version: import("./productVersion").ProductVersion;
+  version: import("./productVersion.js").ProductVersion;
 };
 export type StartValidationResult = LifecycleTransitionResult & {
   issues: readonly unknown[];

@@ -6,10 +6,10 @@ import {
   multiplyDecimal,
   subtractDecimal,
   type DecimalString,
-} from "../decimal";
-import { CalculationEngineError } from "../errors";
-import { UNIT_CATALOG, type UnitId, type UnitSemantic } from "./index";
-import { convertUnit } from "./conversion";
+} from "../decimal/index.js";
+import { CalculationEngineError } from "../errors/index.js";
+import { UNIT_CATALOG, type UnitId, type UnitSemantic } from "./index.js";
+import { convertUnit } from "./conversion.js";
 import {
   addDimensionExponents,
   DIMENSIONS,
@@ -17,7 +17,7 @@ import {
   isScalarDimension,
   subtractDimensionExponents,
   type Dimension,
-} from "./dimensions";
+} from "./dimensions.js";
 
 export type DimensionalSemantic = UnitSemantic | "scalar" | "derived";
 

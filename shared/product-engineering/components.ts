@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { quantityScopeSchema } from "../calculation-engine/contracts";
-import { expressionSchema } from "../calculation-engine/expressions";
-import { UNIT_IDS } from "../calculation-engine/units";
+import { quantityScopeSchema } from "../calculation-engine/contracts/index.js";
+import { expressionSchema } from "../calculation-engine/expressions/index.js";
+import { UNIT_IDS } from "../calculation-engine/units/index.js";
 
 export const componentIdSchema = z.string().uuid().brand<"ComponentId">();
 export type ComponentId = z.infer<typeof componentIdSchema>;

@@ -1,6 +1,6 @@
-import type { DecimalString } from "../decimal";
-import { decimalString } from "../decimal";
-import { DIMENSIONS, type Dimension } from "./dimensions";
+import type { DecimalString } from "../decimal/index.js";
+import { decimalString } from "../decimal/index.js";
+import { DIMENSIONS, type Dimension } from "./dimensions.js";
 
 export const UNIT_IDS = [
   "mm",
@@ -178,5 +178,5 @@ export function getUniversalConversion(
   );
 }
 
-export * from "./conversion";
-export * from "./dimensionalValue";
+export * from "./conversion.js";
+export * from "./dimensionalValue.js";

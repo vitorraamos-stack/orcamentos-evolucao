@@ -1,11 +1,11 @@
-import { configurableKeySchema } from "../contracts";
-import { CalculationEngineError } from "../errors";
-import type { Expression } from "./ast";
-import { evaluateExpression } from "./evaluate";
-import { assertExpressionLimits } from "./limits";
-import type { ExpressionValue, SymbolDefinition, SymbolTable } from "./types";
-import { typeFromValue } from "./types";
-import { inferExpressionType } from "./validate";
+import { configurableKeySchema } from "../contracts/index.js";
+import { CalculationEngineError } from "../errors/index.js";
+import type { Expression } from "./ast.js";
+import { evaluateExpression } from "./evaluate.js";
+import { assertExpressionLimits } from "./limits.js";
+import type { ExpressionValue, SymbolDefinition, SymbolTable } from "./types.js";
+import { typeFromValue } from "./types.js";
+import { inferExpressionType } from "./validate.js";
 
 export interface VariableDefinition {
   readonly key: string;
