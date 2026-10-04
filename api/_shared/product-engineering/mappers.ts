@@ -7,6 +7,7 @@ import {
   productVersionSchema,
   PRODUCT_ENGINEERING_SCHEMA_VERSION,
   createProductResultSchema,
+  createVersionResultSchema,
 } from "../../../shared/product-engineering/index.js";
 import { EXPRESSION_AST_VERSION } from "../../../shared/calculation-engine/expressions/index.js";
 import { decimalStringSchema } from "../../../shared/calculation-engine/decimal/index.js";
@@ -140,6 +141,15 @@ export const mapCreateProductResult = (r: any) =>
   createProductResultSchema.parse({
     productId: r.product_id,
     versionId: r.version_id,
+    revision: r.revision,
+  });
+
+export const mapCreateVersionResult = (r: any) =>
+  createVersionResultSchema.parse({
+    productId: r.product_id,
+    sourceVersionId: r.source_version_id,
+    versionId: r.version_id,
+    versionNumber: r.version_number,
     revision: r.revision,
   });
 
