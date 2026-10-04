@@ -86,6 +86,13 @@ sempre sujeitos aos triggers de lifecycle. Essas regras permanecem adicionais à
 autorização, de modo que nem managers podem alterar snapshots congelados ou
 imutáveis.
 
+Os privilégios padrão de `authenticated` são explicitamente removidos antes da
+concessão do conjunto mínimo necessário. `products` não concede `DELETE` nem
+`TRUNCATE`; as tabelas de versões e children não concedem `TRUNCATE`. Para evitar
+avaliações repetidas por linha, as policies usam `(select auth.uid())`. As FKs de
+auditoria `product_versions.created_by` e `product_versions.published_by` possuem
+índices, sendo o último parcial para valores não nulos.
+
 ## Consequências
 
 Esta migration cria somente a fundação de persistência. Ela não altera Hub OS,
