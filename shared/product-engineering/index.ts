@@ -6,3 +6,4 @@ export * from "./product";
 export * from "./productVersion";
 export * from "./validation";
 export * from "./variables";
+export * from "./api";
