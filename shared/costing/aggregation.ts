@@ -5,6 +5,7 @@ import {
 import {
   addDecimal,
   compareDecimal,
+  decimalString,
   multiplyDecimal,
   type DecimalString,
 } from "../calculation-engine/decimal/index.js";
@@ -17,12 +18,12 @@ import {
 } from "../calculation-engine/expressions/index.js";
 import { convertUnit } from "../calculation-engine/units/index.js";
 import {
-  productVersionDefinitionSchema,
   validateProductVersionForPublication,
   type ProductComponent,
 } from "../product-engineering/index.js";
 import {
   COSTING_AGGREGATION_VERSION,
+  costingAggregationInputSchema,
   type ComponentCostResult,
   type CostingAggregateResult,
   type CostingAggregationInput,
@@ -35,8 +36,8 @@ import type { ResourceDefinition } from "./resources.js";
 import { costableUnitIdSchema, convertCostQuantity } from "./units.js";
 import { assertResourceAvailableForNewCosting } from "./validation.js";
 
-const ZERO = "0" as DecimalString;
-const ONE = "1" as DecimalString;
+const ZERO = decimalString("0");
+const ONE = decimalString("1");
 const money = (amount: DecimalString): Money => ({ currency: "BRL", amount });
 const componentReference = (component: ProductComponent) => ({
   type: component.type,
@@ -98,31 +99,40 @@ function resourceFor(
 export function aggregateCosting(
   input: CostingAggregationInput
 ): CostingAggregateResult {
-  const parsed = productVersionDefinitionSchema.safeParse(
-    input.productDefinition
-  );
-  if (
-    !parsed.success ||
-    !validateProductVersionForPublication(input.productDefinition).valid
-  )
+  const parsedInput = costingAggregationInputSchema.safeParse(input);
+  if (!parsedInput.success) {
+    const invalidProductDefinition = parsedInput.error.issues.some(
+      issue => issue.path[0] === "productDefinition"
+    );
+    throw new CostingDomainError(
+      invalidProductDefinition
+        ? "INVALID_PRODUCT_VERSION_DEFINITION"
+        : "INVALID_COSTING_AGGREGATION_INPUT",
+      invalidProductDefinition
+        ? "Product version definition is not structurally valid"
+        : "Costing aggregation input is not structurally valid"
+    );
+  }
+  const parsed = parsedInput.data;
+  if (!validateProductVersionForPublication(parsed.productDefinition).valid)
     throw new CostingDomainError(
       "INVALID_PRODUCT_VERSION_DEFINITION",
       "Product version definition is not publication-valid"
     );
-  const definition = parsed.data;
+  const definition = parsed.productDefinition;
   if (definition.version.status !== "PUBLISHED")
     throw new CostingDomainError(
       "PRODUCT_VERSION_NOT_PUBLISHED",
       "A new official costing requires a PUBLISHED product version"
     );
-  if (compareDecimal(input.request.commercialQuantity, ZERO) <= 0)
+  if (compareDecimal(parsed.request.commercialQuantity, ZERO) <= 0)
     throw new CostingDomainError(
       "INVALID_COMMERCIAL_QUANTITY",
       "Commercial quantity must be greater than zero"
     );
 
   const bundleKeys = new Set<string>();
-  for (const bundle of input.resources) {
+  for (const bundle of parsed.resources) {
     const key = `${bundle.definition.type}:${bundle.definition.id}`;
     if (bundleKeys.has(key))
       throw new CostingDomainError(
@@ -134,7 +144,7 @@ export function aggregateCosting(
   }
   const resolved = resolveTechnicalInputs(
     definition.inputs,
-    input.request.technicalInputs
+    parsed.request.technicalInputs
   );
   for (const variable of definition.variables)
     ensureAvailableReferences(variable.expression, resolved.missingOptional);
@@ -225,12 +235,12 @@ export function aggregateCosting(
         "Component quantity cannot be negative",
         { componentId: component.id }
       );
-    const bundle = resourceFor(component, input.resources);
+    const bundle = resourceFor(component, parsed.resources);
     assertResourceAvailableForNewCosting(bundle.definition);
     const rate = resolveEffectiveCostRate(
       bundle.definition,
       bundle.rates,
-      input.effectiveCostAt
+      parsed.effectiveCostAt
     );
     const costAmount = convertCostQuantity(
       engineeringAmount,
@@ -243,7 +253,7 @@ export function aggregateCosting(
       component.quantityScope === "PER_QUOTE_ITEM" ? baseAmount : ZERO;
     const multiplier =
       component.quantityScope === "PER_UNIT"
-        ? input.request.commercialQuantity
+        ? parsed.request.commercialQuantity
         : ONE;
     const total = multiplyDecimal(baseAmount, multiplier);
     unitVariable = addDecimal(unitVariable, perUnit);
@@ -267,7 +277,7 @@ export function aggregateCosting(
       expansion: {
         owner: QUANTITY_EXPANSION_OWNER,
         multiplier,
-        commercialQuantity: input.request.commercialQuantity,
+        commercialQuantity: parsed.request.commercialQuantity,
       },
       expandedCostQuantity: {
         amount: multiplyDecimal(costAmount, multiplier),
@@ -280,7 +290,7 @@ export function aggregateCosting(
     });
   }
   const total = addDecimal(
-    multiplyDecimal(unitVariable, input.request.commercialQuantity),
+    multiplyDecimal(unitVariable, parsed.request.commercialQuantity),
     fixed
   );
   if (compareDecimal(total, contributionTotal) !== 0)
@@ -294,8 +304,8 @@ export function aggregateCosting(
     productVersionId: definition.version.id,
     productVersionNumber: definition.version.versionNumber,
     productVersionRevision: definition.version.revision,
-    effectiveCostAt: input.effectiveCostAt,
-    commercialQuantity: input.request.commercialQuantity,
+    effectiveCostAt: parsed.effectiveCostAt,
+    commercialQuantity: parsed.request.commercialQuantity,
     resolvedInputs: resolved.resolvedInputs,
     components,
     unitVariableCost: money(unitVariable),
