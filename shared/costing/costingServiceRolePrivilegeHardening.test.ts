@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const migrationPath = fileURLToPath(
   new URL(
-    "../../supabase/migrations/20261005151201_costing_service_role_privilege_hardening.sql",
+    "../../supabase/migrations/20261005152511_costing_service_role_privilege_hardening.sql",
     import.meta.url
   )
 );
