@@ -1,17 +1,13 @@
 import { z } from "zod";
 import {
   calculationRequestSchema,
-  type CalculationRequest,
   type Money,
   type QuantityScope,
   type TechnicalInputValue,
 } from "../calculation-engine/contracts/index.js";
 import type { DecimalString } from "../calculation-engine/decimal/index.js";
 import type { UnitId } from "../calculation-engine/units/index.js";
-import {
-  productVersionDefinitionSchema,
-  type ProductVersionDefinition,
-} from "../product-engineering/index.js";
+import { productVersionDefinitionSchema } from "../product-engineering/index.js";
 import {
   costRateSchema,
   costTimestampSchema,
@@ -32,10 +28,7 @@ export const costingResourceBundleSchema = z
     rates: z.array(costRateSchema).readonly(),
   })
   .strict();
-export interface CostingResourceBundle {
-  readonly definition: ResourceDefinition;
-  readonly rates: readonly CostRate[];
-}
+export type CostingResourceBundle = z.infer<typeof costingResourceBundleSchema>;
 
 /** `effectiveCostAt` is supplied by a future authoritative server layer, never by browser input. */
 export const costingAggregationInputSchema = z
@@ -46,12 +39,9 @@ export const costingAggregationInputSchema = z
     effectiveCostAt: costTimestampSchema,
   })
   .strict();
-export interface CostingAggregationInput {
-  readonly productDefinition: ProductVersionDefinition;
-  readonly request: CalculationRequest;
-  readonly resources: readonly CostingResourceBundle[];
-  readonly effectiveCostAt: CostTimestamp;
-}
+export type CostingAggregationInput = z.infer<
+  typeof costingAggregationInputSchema
+>;
 
 export interface ResolvedInput {
   readonly key: string;
