@@ -11,6 +11,7 @@ vi.mock("../_shared/costing/calculationService.js", () => ({
   },
 }));
 import handler from "./calculate.js";
+import { CostingDomainError } from "../../shared/costing/index.js";
 
 const requestBody = {
   productVersionId: "10000000-0000-4000-8000-000000000001",
@@ -104,10 +105,53 @@ describe("POST /api/costing/calculate", () => {
       { ...requestBody, effectiveCostAt: "2026-10-05T12:00:00Z" },
     ],
     ["client resources", { ...requestBody, resources: [] }],
+    ["client rates", { ...requestBody, rates: [] }],
+    ["client productDefinition", { ...requestBody, productDefinition: {} }],
   ])("rejects %s as INVALID_PAYLOAD", async (_label, body) => {
     const res = await invoke({ body });
     expect(res.statusCode).toBe(400);
     expect(res.payload.error.code).toBe("INVALID_PAYLOAD");
     expect(state.calculate).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "INVALID_TECHNICAL_INPUT",
+    "MISSING_TECHNICAL_INPUT",
+    "TECHNICAL_INPUT_OUT_OF_RANGE",
+    "PRODUCT_VERSION_NOT_PUBLISHED",
+    "MISSING_COST_RATE",
+  ] as const)("maps domain error %s to 422", async code => {
+    state.calculate.mockRejectedValue(
+      new CostingDomainError(code, "Semantic costing input is invalid.")
+    );
+
+    const res = await invoke();
+
+    expect(res.statusCode).toBe(422);
+    expect(res.payload).toEqual({
+      ok: false,
+      error: { code, message: "Semantic costing input is invalid." },
+    });
+    expect(state.calculate).toHaveBeenCalledWith(requestBody);
+  });
+
+  it.each([
+    "INVALID_PRODUCT_VERSION_DEFINITION",
+    "INVALID_COSTING_AGGREGATION_INPUT",
+  ] as const)("maps server-side domain error %s to a safe 500", async code => {
+    state.calculate.mockRejectedValue(
+      new CostingDomainError(code, "Private server-side failure.", {
+        internal: "Private authoritative data.",
+      })
+    );
+
+    const res = await invoke();
+
+    expect(res.statusCode).toBe(500);
+    expect(res.payload).toEqual({
+      ok: false,
+      error: { code, message: "Official costing could not be calculated." },
+    });
+    expect(state.calculate).toHaveBeenCalledWith(requestBody);
   });
 });
