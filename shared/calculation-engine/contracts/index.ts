@@ -13,7 +13,8 @@ export type Money = z.infer<typeof moneySchema>;
 export interface TechnicalDecimalInput {
   readonly kind: "decimal";
   readonly value: DecimalString;
-  readonly unit: UnitId;
+  /** `null` explicitly identifies a dimensionless scalar. */
+  readonly unit: UnitId | null;
 }
 export interface BooleanValue {
   readonly kind: "boolean";
@@ -41,7 +42,7 @@ export const technicalInputValueSchema = z.discriminatedUnion("kind", [
     .object({
       kind: z.literal("decimal"),
       value: decimalStringSchema,
-      unit: unitIdSchema,
+      unit: unitIdSchema.nullable(),
     })
     .strict(),
   z.object({ kind: z.literal("boolean"), value: z.boolean() }).strict(),
