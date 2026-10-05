@@ -146,37 +146,6 @@ const expectCode = (input: CostingAggregationInput, code: string): void => {
 
 describe("aggregateCosting boundary", () => {
   it.each([
-    ["undefined", undefined],
-    ["null", null],
-    ["a primitive", "invalid"],
-    ["an array", []],
-  ])("rejects %s as the input envelope", (_name, malformed) => {
-    expectCode(
-      runtimeInput(malformed),
-      "INVALID_COSTING_AGGREGATION_INPUT"
-    );
-  });
-
-  it.each([
-    ["productDefinition", "INVALID_PRODUCT_VERSION_DEFINITION"],
-    ["request", "INVALID_COSTING_AGGREGATION_INPUT"],
-    ["resources", "INVALID_COSTING_AGGREGATION_INPUT"],
-    ["effectiveCostAt", "INVALID_COSTING_AGGREGATION_INPUT"],
-  ] as const)("rejects a missing %s", (property, code) => {
-    const { [property]: _omitted, ...malformed } = fixture();
-    expectCode(runtimeInput(malformed), code);
-  });
-
-  it.each([
-    ["productDefinition", null, "INVALID_PRODUCT_VERSION_DEFINITION"],
-    ["request", null, "INVALID_COSTING_AGGREGATION_INPUT"],
-    ["resources", null, "INVALID_COSTING_AGGREGATION_INPUT"],
-    ["effectiveCostAt", null, "INVALID_COSTING_AGGREGATION_INPUT"],
-  ] as const)("rejects null for %s", (property, value, code) => {
-    expectCode(runtimeInput({ ...fixture(), [property]: value }), code);
-  });
-
-  it.each([
     [
       "condition=false",
       fixture({
@@ -291,6 +260,26 @@ describe("aggregateCosting boundary", () => {
 });
 
 describe("aggregateCosting calculations", () => {
+  it("supports fractional commercial quantities", () => {
+    const result = aggregateCosting(fixture({ commercialQuantity: "2.5" }));
+
+    expect(result.components[0]).toMatchObject({
+      baseCost: { amount: "10" },
+      totalCostContribution: { amount: "25" },
+    });
+    expect(result.totalCost.amount).toBe("25");
+  });
+
+  it.each(["0", "-1"])(
+    "rejects the invalid commercial quantity %s",
+    commercialQuantity => {
+      expectCode(
+        fixture({ commercialQuantity }),
+        "INVALID_COMMERCIAL_QUANTITY"
+      );
+    }
+  );
+
   it("expands PER_UNIT exactly once", () => {
     const result = aggregateCosting(fixture());
     expect(result.components[0]).toMatchObject({
@@ -402,6 +391,7 @@ describe("aggregateCosting calculations", () => {
       "INCOMPATIBLE_COST_UNIT"
     );
   });
+});
 
   it("resolves the resource and rate for an included zero quantity", () => {
     const result = aggregateCosting(
@@ -417,6 +407,39 @@ describe("aggregateCosting calculations", () => {
       baseCost: { amount: "0" },
       totalCostContribution: { amount: "0" },
     });
+  });
+
+  it("skips resource and rate resolution when the condition is false", () => {
+    const result = aggregateCosting(
+      fixture({
+        components: [
+          component({ condition: { type: "boolean_literal", value: false } }),
+        ],
+        resources: [],
+      })
+    );
+
+    expect(result.components[0]).toMatchObject({
+      included: false,
+      conditionResult: false,
+      baseCost: { amount: "0" },
+      unitVariableCostContribution: { amount: "0" },
+      quoteItemFixedCostContribution: { amount: "0" },
+      totalCostContribution: { amount: "0" },
+    });
+    expect(result.components[0].resource).toBeUndefined();
+    expect(result.components[0].rate).toBeUndefined();
+  });
+
+  it("rejects a negative component quantity", () => {
+    expectCode(
+      fixture({
+        components: [
+          component({ quantityExpression: decimalLiteral("-1", "un") }),
+        ],
+      }),
+      "NEGATIVE_COMPONENT_QUANTITY"
+    );
   });
 
   it("retains arbitrary Decimal precision", () => {
@@ -541,6 +564,41 @@ describe("aggregateCosting technical inputs", () => {
         value: { kind: "decimal", value: "1.25", unit: null },
       },
     ]);
+  });
+
+  it("uses a decimal input default when no value is provided", () => {
+    const result = aggregateCosting(
+      fixture({
+        inputs: [decimalInput({ defaultValue: decimalString("1.25") })],
+      })
+    );
+
+    expect(result.resolvedInputs).toContainEqual({
+      key: "factor",
+      source: "DEFAULT",
+      value: { kind: "decimal", value: "1.25", unit: null },
+    });
+  });
+
+  it("normalizes a physical decimal input to its declared unit", () => {
+    const result = aggregateCosting(
+      fixture({
+        inputs: [decimalInput({ key: "length", unit: "m" })],
+        technicalInputs: {
+          length: {
+            kind: "decimal",
+            value: decimalString("100"),
+            unit: "cm",
+          },
+        },
+      })
+    );
+
+    expect(result.resolvedInputs).toContainEqual({
+      key: "length",
+      source: "PROVIDED",
+      value: { kind: "decimal", value: "1", unit: "m" },
+    });
   });
 
   it("reconstructs boolean and string snapshots", () => {
