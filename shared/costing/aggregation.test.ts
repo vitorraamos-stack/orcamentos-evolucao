@@ -146,6 +146,37 @@ const expectCode = (input: CostingAggregationInput, code: string): void => {
 
 describe("aggregateCosting boundary", () => {
   it.each([
+    ["undefined", undefined],
+    ["null", null],
+    ["a primitive", "invalid"],
+    ["an array", []],
+  ])("rejects %s as the input envelope", (_name, malformed) => {
+    expectCode(
+      runtimeInput(malformed),
+      "INVALID_COSTING_AGGREGATION_INPUT"
+    );
+  });
+
+  it.each([
+    ["productDefinition", "INVALID_PRODUCT_VERSION_DEFINITION"],
+    ["request", "INVALID_COSTING_AGGREGATION_INPUT"],
+    ["resources", "INVALID_COSTING_AGGREGATION_INPUT"],
+    ["effectiveCostAt", "INVALID_COSTING_AGGREGATION_INPUT"],
+  ] as const)("rejects a missing %s", (property, code) => {
+    const { [property]: _omitted, ...malformed } = fixture();
+    expectCode(runtimeInput(malformed), code);
+  });
+
+  it.each([
+    ["productDefinition", null, "INVALID_PRODUCT_VERSION_DEFINITION"],
+    ["request", null, "INVALID_COSTING_AGGREGATION_INPUT"],
+    ["resources", null, "INVALID_COSTING_AGGREGATION_INPUT"],
+    ["effectiveCostAt", null, "INVALID_COSTING_AGGREGATION_INPUT"],
+  ] as const)("rejects null for %s", (property, value, code) => {
+    expectCode(runtimeInput({ ...fixture(), [property]: value }), code);
+  });
+
+  it.each([
     [
       "condition=false",
       fixture({
@@ -391,7 +422,6 @@ describe("aggregateCosting calculations", () => {
       "INCOMPATIBLE_COST_UNIT"
     );
   });
-});
 
   it("resolves the resource and rate for an included zero quantity", () => {
     const result = aggregateCosting(
