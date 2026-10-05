@@ -1,5 +1,9 @@
 export { COSTING_SCHEMA_VERSION } from "./version.js";
-export { aggregateCosting } from "./aggregation.js";
+export {
+  aggregateCosting,
+  getComponentCostResourceReference,
+} from "./aggregation.js";
+export * from "./officialCalculation.js";
 export * from "./aggregationContracts.js";
 export {
   COSTING_ERROR_CODES,

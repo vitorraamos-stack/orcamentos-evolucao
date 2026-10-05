@@ -39,7 +39,9 @@ import { assertResourceAvailableForNewCosting } from "./validation.js";
 const ZERO = decimalString("0");
 const ONE = decimalString("1");
 const money = (amount: DecimalString): Money => ({ currency: "BRL", amount });
-const componentReference = (component: ProductComponent) => ({
+export const getComponentCostResourceReference = (
+  component: ProductComponent
+) => ({
   type: component.type,
   id:
     component.type === "MATERIAL"
@@ -70,7 +72,7 @@ function resourceFor(
   component: ProductComponent,
   bundles: readonly CostingResourceBundle[]
 ): CostingResourceBundle {
-  const reference = componentReference(component);
+  const reference = getComponentCostResourceReference(component);
   const exact = bundles.filter(
     bundle =>
       bundle.definition.type === reference.type &&
@@ -164,7 +166,7 @@ export function aggregateCosting(
   for (const component of [...definition.components].sort(
     (a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)
   )) {
-    const reference = componentReference(component);
+    const reference = getComponentCostResourceReference(component);
     let conditionResult = true;
     if (component.condition != null) {
       ensureAvailableReferences(component.condition, resolved.missingOptional);
