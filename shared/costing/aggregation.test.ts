@@ -391,6 +391,7 @@ describe("aggregateCosting calculations", () => {
       "INCOMPATIBLE_COST_UNIT"
     );
   });
+});
 
   it("resolves the resource and rate for an included zero quantity", () => {
     const result = aggregateCosting(
