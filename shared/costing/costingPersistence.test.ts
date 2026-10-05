@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const migrationPath = fileURLToPath(
   new URL(
-    "../../supabase/migrations/20261005143201_costing_persistence_foundation.sql",
+    "../../supabase/migrations/20261005150129_costing_persistence_foundation.sql",
     import.meta.url
   )
 );
