@@ -1,4 +1,6 @@
 export { COSTING_SCHEMA_VERSION } from "./version.js";
+export { aggregateCosting } from "./aggregation.js";
+export * from "./aggregationContracts.js";
 export {
   COSTING_ERROR_CODES,
   CostingDomainError,
