@@ -54,7 +54,8 @@ function normalize(
   if (input.type === "BOOLEAN") {
     if (supplied.kind !== "boolean")
       return fail("INVALID_TECHNICAL_INPUT", input.key);
-    return { snapshot: supplied, expression: supplied };
+    const value = { kind: "boolean" as const, value: supplied.value };
+    return { snapshot: value, expression: value };
   }
   if (supplied.kind !== "string")
     return fail("INVALID_TECHNICAL_INPUT", input.key);
@@ -69,7 +70,8 @@ function normalize(
     supplied.value.length > input.maxLength
   )
     return fail("INVALID_TECHNICAL_INPUT", input.key);
-  return { snapshot: supplied, expression: supplied };
+  const value = { kind: "string" as const, value: supplied.value };
+  return { snapshot: value, expression: value };
 }
 
 export function resolveTechnicalInputs(
