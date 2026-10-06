@@ -206,6 +206,21 @@ describe("PricingPersistenceService", () => {
     mock.rpc
       .mockResolvedValueOnce({
         data: {
+          id: id(1),
+          code: "STANDARD",
+          name: "Standard",
+          description: null,
+          status: "ACTIVE",
+          revision: 1,
+          created_at: now,
+          created_by: id(9),
+          updated_at: now,
+          updated_by: id(9),
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
           product_id: id(4),
           pricing_policy_id: id(1),
           minimum_selling_price: "250.00",
@@ -249,11 +264,16 @@ describe("PricingPersistenceService", () => {
     expect(term).toMatchObject({ rate: "0.055" });
     expect(mock.rpc).toHaveBeenNthCalledWith(
       1,
+      "pricing_get_policy_secure",
+      { p_policy_id: id(1) }
+    );
+    expect(mock.rpc).toHaveBeenNthCalledWith(
+      2,
       "pricing_set_product_settings_secure",
       expect.objectContaining({ p_minimum_selling_price: "250.00" })
     );
     expect(mock.rpc).toHaveBeenNthCalledWith(
-      2,
+      3,
       "pricing_set_payment_term_secure",
       expect.objectContaining({ p_rate: "0.055" })
     );
