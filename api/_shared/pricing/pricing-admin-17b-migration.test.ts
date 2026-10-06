@@ -30,7 +30,7 @@ describe("17B configurable parameters migration", () => {
 
   it("keeps admin RPCs unavailable to browser roles", () => {
     expect(sql).toMatch(
-      /revoke execute on function public\.costing_set_product_parameter_secure[\s\S]*from public, anon, authenticated/i
+      /revoke execute on function public\.costing_upsert_product_parameter_secure[\s\S]*from public, anon, authenticated/i
     );
     expect(sql).toMatch(
       /revoke execute on function public\.pricing_set_installation_settings_secure[\s\S]*from public, anon, authenticated/i
@@ -41,10 +41,12 @@ describe("17B configurable parameters migration", () => {
     expect(sql).not.toMatch(/grant[^;]*(?:delete|truncate|references|trigger|maintain)[^;]*to service_role/i);
   });
 
-  it("seeds only the approved LETREIRO_PVC pilot values", () => {
-    expect(sql).toContain("where p.code = 'LETREIRO_PVC'");
-    expect(sql).toContain("'paint_coats'");
-    expect(sql).toContain("'paint_yield_m2_per_can_per_coat'");
-    expect(sql).toMatch(/select 1, 1, 150, 2, 180, 200, 375, 4/);
+  it("supports first-write configuration without product-dependent seeds", () => {
+    expect(sql).toContain("costing_upsert_product_parameter_secure");
+    expect(sql).toContain("if p_expected_revision is not null then");
+    expect(sql).toContain("CREATE_PRODUCT_PARAMETER");
+    expect(sql).toContain("CREATE_INSTALLATION_SETTINGS");
+    expect(sql).toContain("Business values are intentionally not seeded here.");
+    expect(sql).not.toContain("where p.code = 'LETREIRO_PVC'");
   });
 });
