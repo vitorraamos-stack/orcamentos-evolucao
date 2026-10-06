@@ -76,18 +76,26 @@ function normalize(
 
 export function resolveTechnicalInputs(
   inputs: readonly ProductInput[],
-  provided: Readonly<Record<string, TechnicalInputValue>>
+  provided: Readonly<Record<string, TechnicalInputValue>>,
+  authoritative: Readonly<Record<string, TechnicalInputValue>> = {}
 ): {
   resolvedInputs: readonly ResolvedInput[];
   values: Readonly<Record<string, ExpressionValue>>;
   missingOptional: ReadonlySet<string>;
 } {
   const definitions = new Map(inputs.map(input => [input.key, input]));
-  for (const key of Object.keys(provided))
+  for (const key of [...Object.keys(provided), ...Object.keys(authoritative)])
     if (!definitions.has(key))
       throw new CostingDomainError(
         "UNKNOWN_TECHNICAL_INPUT",
         `Unknown technical input: ${key}`,
+        { key }
+      );
+  for (const key of Object.keys(authoritative))
+    if (Object.hasOwn(provided, key))
+      throw new CostingDomainError(
+        "SERVER_MANAGED_TECHNICAL_INPUT",
+        `Technical input is managed by the server: ${key}`,
         { key }
       );
   const resolvedInputs: ResolvedInput[] = [],
@@ -96,8 +104,11 @@ export function resolveTechnicalInputs(
   for (const input of [...inputs].sort(
     (a, b) => a.sortOrder - b.sortOrder || a.key.localeCompare(b.key)
   )) {
-    let raw = provided[input.key],
-      source: ResolvedInput["source"] = "PROVIDED";
+    let raw = authoritative[input.key] ?? provided[input.key],
+      source: ResolvedInput["source"] =
+        authoritative[input.key] !== undefined
+          ? "SERVER_PARAMETER"
+          : "PROVIDED";
     if (raw === undefined && input.defaultValue !== undefined) {
       source = "DEFAULT";
       raw =
