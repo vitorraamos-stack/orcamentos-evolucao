@@ -115,3 +115,5 @@ export type {
   OfficialPricingApiRequest,
   OfficialPricingPublicResult,
 } from "./officialCalculation.js";
+
+export * from "./installationSettings.js";
