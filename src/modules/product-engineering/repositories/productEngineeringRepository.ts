@@ -4,6 +4,10 @@ import type {
   ProductVersion,
   ProductVersionDefinition,
   ProductEngineeringMutation,
+  CreateVersionResult,
+  SaveDraftResult,
+  StartValidationResult,
+  PublishVersionResult,
 } from "@shared/product-engineering";
 
 async function token() {
@@ -51,21 +55,35 @@ export const productEngineeringRepository = {
   createNewProductVersion: (
     sourceVersionId: string,
     expectedRevision: number
-  ) => mutate({ action: "CREATE_VERSION", sourceVersionId, expectedRevision }),
+  ) =>
+    mutate<CreateVersionResult>({
+      action: "CREATE_VERSION",
+      sourceVersionId,
+      expectedRevision,
+    }),
   saveProductVersionDraft: (
     payload: Omit<
       Extract<ProductEngineeringMutation, { action: "SAVE_DRAFT" }>,
       "action"
     >
-  ) => mutate({ action: "SAVE_DRAFT", ...payload }),
+  ) => mutate<SaveDraftResult>({ action: "SAVE_DRAFT", ...payload }),
   startProductVersionValidation: (
     versionId: string,
     expectedRevision: number
-  ) => mutate({ action: "START_VALIDATION", versionId, expectedRevision }),
+  ) =>
+    mutate<StartValidationResult>({
+      action: "START_VALIDATION",
+      versionId,
+      expectedRevision,
+    }),
   returnProductVersionToDraft: (versionId: string, expectedRevision: number) =>
     mutate({ action: "RETURN_TO_DRAFT", versionId, expectedRevision }),
   publishProductVersion: (versionId: string, expectedRevision: number) =>
-    mutate({ action: "PUBLISH_VERSION", versionId, expectedRevision }),
+    mutate<PublishVersionResult>({
+      action: "PUBLISH_VERSION",
+      versionId,
+      expectedRevision,
+    }),
   publishConfigurationInputDefault: async (
     sourceDefinition: ProductVersionDefinition,
     inputKey: string,
