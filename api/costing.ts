@@ -82,13 +82,21 @@ export default async function handler(req: any, res: any) {
           "Invalid Costing query.",
           parsed.error.issues
         );
-      const data = parsed.data.resourceId
-        ? await service.loadResource(parsed.data.type, parsed.data.resourceId)
-        : await service.listResources(parsed.data.type);
-      log("resources_read", {
-        resourceType: parsed.data.type,
-        resourceId: parsed.data.resourceId,
-      });
+      const data =
+        "productId" in parsed.data
+          ? await service.loadProductParameters(parsed.data.productId)
+          : parsed.data.resourceId
+            ? await service.loadResource(parsed.data.type, parsed.data.resourceId)
+            : await service.listResources(parsed.data.type);
+      log(
+        "productId" in parsed.data ? "product_parameters_read" : "resources_read",
+        "productId" in parsed.data
+          ? { productId: parsed.data.productId }
+          : {
+              resourceType: parsed.data.type,
+              resourceId: parsed.data.resourceId,
+            }
+      );
       return send(res, 200, { ok: true, data });
     }
     if (req.method !== "POST")
@@ -110,7 +118,9 @@ export default async function handler(req: any, res: any) {
         ? parsed.data.resource.type
         : parsed.data.action === "UPDATE_RESOURCE"
           ? parsed.data.resource.type
-          : parsed.data.type;
+          : parsed.data.action === "SET_CURRENT_RATE"
+            ? parsed.data.type
+            : undefined;
     const resourceId =
       parsed.data.action === "UPDATE_RESOURCE"
         ? parsed.data.resource.id
@@ -121,6 +131,14 @@ export default async function handler(req: any, res: any) {
       action: parsed.data.action,
       resourceType,
       resourceId,
+      productId:
+        parsed.data.action === "SET_PRODUCT_PARAMETER"
+          ? parsed.data.productId
+          : undefined,
+      parameterKey:
+        parsed.data.action === "SET_PRODUCT_PARAMETER"
+          ? parsed.data.key
+          : undefined,
     });
     return send(res, 200, { ok: true, data });
   } catch (error) {
