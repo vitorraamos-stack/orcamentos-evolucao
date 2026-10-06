@@ -82,14 +82,14 @@ export const costingRepository = {
       amount: payload.amount,
       effectiveFrom: payload.effectiveFrom,
     }),
-  setProductCostingParameter: (
+  upsertProductCostingParameter: (
     payload: Omit<
-      Extract<CostingMutation, { action: "SET_PRODUCT_PARAMETER" }>,
+      Extract<CostingMutation, { action: "UPSERT_PRODUCT_PARAMETER" }>,
       "action"
     >
   ) =>
     mutate<ProductCostingParameter>({
-      action: "SET_PRODUCT_PARAMETER",
+      action: "UPSERT_PRODUCT_PARAMETER",
       ...payload,
     }),
 };
