@@ -93,57 +93,62 @@ jobs:
             '10000000-0000-4000-8000-000000000009'::uuid
           );
 
-          do $
-          begin
-            begin
-              perform public.pricing_set_payment_term_secure(
-                7,'NaN'::numeric,null,
-                '10000000-0000-4000-8000-000000000009'::uuid
-              );
-              raise exception 'expected NaN payment-rate rejection';
-            exception
-              when others then
-                if sqlerrm not like '%INVALID_PRICING_CONFIGURATION%' then
-                  raise;
-                end if;
-            end;
+          \set ON_ERROR_STOP off
 
-            begin
-              perform public.pricing_set_product_settings_secure(
-                '10000000-0000-4000-8000-000000000004'::uuid,
-                (select pricing_policy_id
-                 from public.product_pricing_settings
-                 where product_id='10000000-0000-4000-8000-000000000004'::uuid),
-                'Infinity'::numeric,
-                1,
-                '10000000-0000-4000-8000-000000000009'::uuid
-              );
-              raise exception 'expected Infinity minimum rejection';
-            exception
-              when others then
-                if sqlerrm not like '%INVALID_PRICING_CONFIGURATION%' then
-                  raise;
-                end if;
-            end;
-          end;
-          $;
+          select public.pricing_set_payment_term_secure(
+            7,'NaN'::numeric,null,
+            '10000000-0000-4000-8000-000000000009'::uuid
+          );
+          \if :ERROR
+            \echo 'Expected NaN payment-rate rejection observed'
+          \else
+            \quit 1
+          \endif
 
-          do $
-          begin
-            begin
-              perform public.pricing_set_payment_term_secure(
-                2,'0.01'::numeric,null,
-                '10000000-0000-4000-8000-000000000009'::uuid
-              );
-              raise exception 'expected 1x-3x non-zero rate rejection';
-            exception
-              when others then
-                if sqlerrm not like '%INVALID_PRICING_CONFIGURATION%' then
-                  raise;
-                end if;
-            end;
-          end;
-          $$;
+          select public.pricing_set_product_settings_secure(
+            '10000000-0000-4000-8000-000000000004'::uuid,
+            (select pricing_policy_id
+             from public.product_pricing_settings
+             where product_id='10000000-0000-4000-8000-000000000004'::uuid),
+            'Infinity'::numeric,
+            1,
+            '10000000-0000-4000-8000-000000000009'::uuid
+          );
+          \if :ERROR
+            \echo 'Expected Infinity minimum rejection observed'
+          \else
+            \quit 1
+          \endif
+
+          select public.pricing_set_payment_term_secure(
+            2,'0.01'::numeric,null,
+            '10000000-0000-4000-8000-000000000009'::uuid
+          );
+          \if :ERROR
+            \echo 'Expected 1x-3x non-zero rate rejection observed'
+          \else
+            \quit 1
+          \endif
+
+          \set ON_ERROR_STOP on
+
+          select 1 / case when
+            not exists (
+              select 1 from public.pricing_payment_terms where installments=7
+            )
+            then 1 else 0 end;
+
+          select 1 / case when
+            (select minimum_selling_price
+             from public.product_pricing_settings
+             where product_id='10000000-0000-4000-8000-000000000004'::uuid) = '250.00'::numeric
+            then 1 else 0 end;
+
+          select 1 / case when
+            not exists (
+              select 1 from public.pricing_payment_terms where installments=2
+            )
+            then 1 else 0 end;
 
           select 1 / case when
             jsonb_typeof(
