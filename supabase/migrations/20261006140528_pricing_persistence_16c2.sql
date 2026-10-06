@@ -175,7 +175,7 @@ returns trigger
 language plpgsql
 security invoker
 set search_path = pg_catalog, public
-as $
+as $$
 declare
   v_policy_status text;
 begin
@@ -274,7 +274,7 @@ returns trigger
 language plpgsql
 security invoker
 set search_path = pg_catalog, public
-as $
+as $$
 declare
   v_policy_status text;
 begin
