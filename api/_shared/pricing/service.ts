@@ -33,6 +33,7 @@ export function mapPricingPersistenceError(error: any): never {
   const message = String(error?.message ?? "");
   const mappings: Array<[RegExp, number, string, string]> = [
     [/PRICING_POLICY_NOT_FOUND/, 404, "PRICING_POLICY_NOT_FOUND", "Pricing policy not found."],
+    [/PRICING_PRODUCT_NOT_FOUND/, 404, "PRICING_PRODUCT_NOT_FOUND", "Product not found."],
     [/PRICING_VERSION_NOT_FOUND/, 404, "PRICING_VERSION_NOT_FOUND", "Pricing policy version not found."],
     [/PRODUCT_PRICING_SETTINGS_NOT_FOUND/, 404, "PRODUCT_PRICING_SETTINGS_NOT_FOUND", "Product Pricing settings not found."],
     [/PRICING_PAYMENT_TERM_NOT_FOUND/, 404, "PRICING_PAYMENT_TERM_NOT_FOUND", "Pricing payment term not found."],
