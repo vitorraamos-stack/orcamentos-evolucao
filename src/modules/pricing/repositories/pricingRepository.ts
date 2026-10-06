@@ -72,6 +72,20 @@ export const pricingRepository = {
   loadInstallationSettings: () =>
     request<PricingInstallationSettings>("?installationSettings=1"),
 
+  tryLoadInstallationSettings: async () => {
+    try {
+      return await pricingRepository.loadInstallationSettings();
+    } catch (error) {
+      const apiError = error as ApiError;
+      if (
+        apiError.status === 404 &&
+        apiError.code === "PRICING_INSTALLATION_SETTINGS_NOT_FOUND"
+      )
+        return null;
+      throw error;
+    }
+  },
+
   loadPaymentTerm: (installments: number) =>
     request<PricingPaymentTerm>(
       `?installments=${encodeURIComponent(String(installments))}`
@@ -120,7 +134,7 @@ export const pricingRepository = {
     tier3Price: string;
     munckHourlyPrice: string;
     munckMinimumHours: string;
-    expectedRevision: number;
+    expectedRevision: number | null;
   }) =>
     mutate<PricingInstallationSettings>({
       action: "SET_INSTALLATION_SETTINGS",
