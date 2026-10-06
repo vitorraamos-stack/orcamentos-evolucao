@@ -75,6 +75,12 @@ export function mapCostingPersistenceError(error: any): never {
       "Cost rate is invalid.",
     ],
     [
+      /COSTING_PRODUCT_NOT_FOUND/,
+      404,
+      "COSTING_PRODUCT_NOT_FOUND",
+      "Product not found.",
+    ],
+    [
       /COSTING_PARAMETER_NOT_FOUND/,
       404,
       "COSTING_PARAMETER_NOT_FOUND",
@@ -188,13 +194,18 @@ export class CostingService {
       if (error) mapCostingPersistenceError(error);
       return mapResourceResult(data);
     }
-    if (command.action === "SET_PRODUCT_PARAMETER") {
+    if (command.action === "UPSERT_PRODUCT_PARAMETER") {
       const { data, error } = await this.db.rpc(
-        "costing_set_product_parameter_secure",
+        "costing_upsert_product_parameter_secure",
         {
           p_product_id: command.productId,
           p_key: command.key,
+          p_label: command.label,
+          p_description: command.description,
           p_value: command.value,
+          p_unit: command.unit,
+          p_min_value: command.minValue,
+          p_max_value: command.maxValue,
           p_expected_revision: command.expectedRevision,
           p_actor_id: actorId,
         }
