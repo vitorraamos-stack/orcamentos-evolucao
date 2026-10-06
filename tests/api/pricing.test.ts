@@ -429,6 +429,41 @@ describe("Pricing API manager authority", () => {
     });
   });
 
+  it("returns 422 when a caller tries to override a manager configuration input", async () => {
+    state.officialCalculate.mockRejectedValueOnce(
+      new CostingDomainError(
+        "CONFIGURATION_INPUT_OVERRIDE_FORBIDDEN",
+        "Configuration input cannot be supplied by the request: paint_coats"
+      )
+    );
+    state.client = client({ id: id(9) }, "consultor_vendas");
+    const res = response();
+
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer valid" },
+        body: {
+          action: "CALCULATE",
+          productVersionId: id(5),
+          request: {
+            commercialQuantity: "1",
+            technicalInputs: {
+              paint_coats: { kind: "decimal", value: "99", unit: null },
+            },
+          },
+          installments: 3,
+        },
+      },
+      res
+    );
+
+    expect(res.statusCode).toBe(422);
+    expect(res.payload.error.code).toBe(
+      "CONFIGURATION_INPUT_OVERRIDE_FORBIDDEN"
+    );
+  });
+
   it("does not allow consultants to use manager Pricing mutations", async () => {
     state.client = client({ id: id(9) }, "consultor_vendas");
     const res = response();
