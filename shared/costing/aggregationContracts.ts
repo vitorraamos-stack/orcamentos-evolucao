@@ -1,6 +1,8 @@
 import { z } from "zod";
 import {
   calculationRequestSchema,
+  configurableKeySchema,
+  technicalInputValueSchema,
   type Money,
   type QuantityScope,
   type TechnicalInputValue,
@@ -35,6 +37,9 @@ export const costingAggregationInputSchema = z
   .object({
     productDefinition: productVersionDefinitionSchema,
     request: calculationRequestSchema,
+    authoritativeTechnicalInputs: z
+      .record(configurableKeySchema, technicalInputValueSchema)
+      .default({}),
     resources: z.array(costingResourceBundleSchema).readonly(),
     effectiveCostAt: costTimestampSchema,
   })
@@ -46,7 +51,7 @@ export type CostingAggregationInput = z.infer<
 export interface ResolvedInput {
   readonly key: string;
   readonly value: TechnicalInputValue;
-  readonly source: "PROVIDED" | "DEFAULT";
+  readonly source: "PROVIDED" | "DEFAULT" | "SERVER_PARAMETER";
 }
 export interface QuantitySnapshot {
   readonly amount: DecimalString;
