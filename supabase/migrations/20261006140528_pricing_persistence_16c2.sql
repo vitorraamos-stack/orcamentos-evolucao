@@ -175,8 +175,20 @@ returns trigger
 language plpgsql
 security invoker
 set search_path = pg_catalog, public
-as $$
+as $
+declare
+  v_policy_status text;
 begin
+  if tg_op <> 'DELETE' then
+    select status into v_policy_status
+    from public.pricing_policies
+    where id = new.pricing_policy_id;
+
+    if v_policy_status = 'ARCHIVED' then
+      raise exception 'PRICING_STATE_CONFLICT';
+    end if;
+  end if;
+
   if tg_op = 'INSERT' then
     if new.status <> 'DRAFT'
       or new.revision <> 1
@@ -262,8 +274,20 @@ returns trigger
 language plpgsql
 security invoker
 set search_path = pg_catalog, public
-as $$
+as $
+declare
+  v_policy_status text;
 begin
+  if tg_op <> 'DELETE' then
+    select status into v_policy_status
+    from public.pricing_policies
+    where id = new.pricing_policy_id;
+
+    if v_policy_status = 'ARCHIVED' then
+      raise exception 'PRICING_STATE_CONFLICT';
+    end if;
+  end if;
+
   if tg_op = 'INSERT' then
     if new.revision <> 1 then raise exception 'PRICING_REVISION_CONFLICT'; end if;
     return new;
@@ -611,6 +635,7 @@ set search_path = pg_catalog, public
 as $$
 declare
   v_policy_id uuid;
+  v_policy_status text;
   v_source public.pricing_policy_versions;
   v_new public.pricing_policy_versions;
   v_next integer;
@@ -621,9 +646,12 @@ begin
 
   if not found then raise exception 'PRICING_VERSION_NOT_FOUND'; end if;
 
-  perform id from public.pricing_policies
+  select status into v_policy_status
+  from public.pricing_policies
   where id=v_policy_id
   for update;
+
+  if v_policy_status = 'ARCHIVED' then raise exception 'PRICING_STATE_CONFLICT'; end if;
 
   select * into v_source
   from public.pricing_policy_versions
@@ -693,6 +721,7 @@ set search_path = pg_catalog, public
 as $$
 declare
   v_policy_id uuid;
+  v_policy_status text;
   v_before public.pricing_policy_versions;
   v_after public.pricing_policy_versions;
 begin
@@ -702,9 +731,12 @@ begin
 
   if not found then raise exception 'PRICING_VERSION_NOT_FOUND'; end if;
 
-  perform id from public.pricing_policies
+  select status into v_policy_status
+  from public.pricing_policies
   where id=v_policy_id
   for update;
+
+  if v_policy_status = 'ARCHIVED' then raise exception 'PRICING_STATE_CONFLICT'; end if;
 
   select * into v_before
   from public.pricing_policy_versions
@@ -759,6 +791,7 @@ set search_path = pg_catalog, public
 as $$
 declare
   v_policy_id uuid;
+  v_policy_status text;
   v_before public.pricing_policy_versions;
   v_after public.pricing_policy_versions;
 begin
@@ -768,9 +801,12 @@ begin
 
   if not found then raise exception 'PRICING_VERSION_NOT_FOUND'; end if;
 
-  perform id from public.pricing_policies
+  select status into v_policy_status
+  from public.pricing_policies
   where id=v_policy_id
   for update;
+
+  if v_policy_status = 'ARCHIVED' then raise exception 'PRICING_STATE_CONFLICT'; end if;
 
   select * into v_before
   from public.pricing_policy_versions
@@ -905,6 +941,7 @@ security invoker
 set search_path = pg_catalog, public
 as $$
 declare
+  v_policy_status text;
   v_before public.product_pricing_settings;
   v_after public.product_pricing_settings;
 begin
@@ -912,10 +949,12 @@ begin
     raise exception 'INVALID_PRICING_CONFIGURATION';
   end if;
 
-  perform id from public.pricing_policies
+  select status into v_policy_status
+  from public.pricing_policies
   where id=p_pricing_policy_id
   for update;
   if not found then raise exception 'PRICING_POLICY_NOT_FOUND'; end if;
+  if v_policy_status = 'ARCHIVED' then raise exception 'PRICING_STATE_CONFLICT'; end if;
 
   perform id from public.products
   where id=p_product_id;

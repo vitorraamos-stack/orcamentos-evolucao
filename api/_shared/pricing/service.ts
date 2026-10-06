@@ -168,6 +168,13 @@ export class PricingPersistenceService {
     }
 
     if (command.action === "SET_PRODUCT_PRICING") {
+      const policy = await this.loadPolicy(command.pricingPolicyId);
+      if (policy.status === "ARCHIVED")
+        throw new PricingPersistenceServiceError(
+          409,
+          "PRICING_STATE_CONFLICT",
+          "Archived Pricing policies cannot be assigned."
+        );
       const data = await this.rpc("pricing_set_product_settings_secure", {
         p_product_id: command.productId,
         p_pricing_policy_id: command.pricingPolicyId,
@@ -193,6 +200,12 @@ export class PricingPersistenceService {
         ? command.sourceVersionId
         : command.versionId;
     const aggregate = await this.loadAggregate(sourceVersionId);
+    if (aggregate.policy.status === "ARCHIVED")
+      throw new PricingPersistenceServiceError(
+        409,
+        "PRICING_STATE_CONFLICT",
+        "Archived Pricing policies cannot be modified."
+      );
     revisionMatches(
       aggregate.definition.version.revision,
       command.expectedRevision

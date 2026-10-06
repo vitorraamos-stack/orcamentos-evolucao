@@ -106,6 +106,27 @@ describe("PricingPersistenceService", () => {
     expect(mock.rpc).toHaveBeenCalledTimes(1);
   });
 
+  it("rejects all version mutations under an archived policy", async () => {
+    const archived = aggregate("DRAFT");
+    archived.policy.status = "ARCHIVED";
+    const mock = db(archived);
+    await expect(
+      new PricingPersistenceService(mock).execute(
+        {
+          action: "SAVE_DRAFT",
+          versionId: id(2),
+          expectedRevision: 1,
+          markup: "1.1",
+        },
+        id(9)
+      )
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "PRICING_STATE_CONFLICT",
+    });
+    expect(mock.rpc).toHaveBeenCalledTimes(1);
+  });
+
   it("clones only a PUBLISHED source", async () => {
     const mock = db(aggregate("DRAFT"));
     await expect(
