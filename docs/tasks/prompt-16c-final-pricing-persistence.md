@@ -33,7 +33,7 @@ Base técnica aprovada:
 18. Preço mínimo é específico por produto.
 19. Somente gerente configura o preço mínimo.
 20. Preço mínimo é aplicado depois do markup e antes da taxa financeira.
-21. O resultado comercial é apresentado com duas casas decimais; não existe arredondamento para múltiplos de R$ 5/R$ 10/etc.
+21. O resultado comercial é apresentado com duas casas decimais usando arredondamento comercial `ROUND_HALF_UP`; não existe arredondamento para múltiplos de R$ 5/R$ 10/etc.
 22. Consultor não altera preço calculado e não concede desconto.
 23. Gerente pode ajustar o preço final/conceder desconto no futuro Quotes.
 24. Gerente pode excepcionalmente vender abaixo do mínimo somente por override explícito com justificativa obrigatória.
@@ -41,13 +41,16 @@ Base técnica aprovada:
 26. Orçamentos emitidos são snapshots imutáveis; mudanças futuras de policy, mínimo ou taxa não recalculam orçamentos anteriores.
 27. Alteração de orçamento emitido cria nova revisão no futuro bounded context Quotes.
 
-### Decisão residual que NÃO bloqueia a persistência
+### Arredondamento comercial aprovado
 
-A política comercial de arredondamento já definiu **duas casas decimais**, porém o desempate exato de meio centavo ainda não foi formalmente aprovado (`HALF_UP`, `HALF_EVEN`, etc.). Portanto:
-- 16C não persiste uma regra de arredondamento;
-- não inventar o tie-break em migration/service;
-- a decisão deve ser fechada antes da camada de preço comercial final/Quotes;
+A política comercial final é:
+- duas casas decimais;
+- modo `ROUND_HALF_UP`;
+- exemplo: `10.004 -> 10.00`, `10.005 -> 10.01`, `10.006 -> 10.01`;
+- sem arredondamento automático para múltiplos de R$ 5/R$ 10/etc.;
 - a precisão técnica interna do engine continua sendo `DECIMAL_50_HALF_EVEN_V1` e não deve ser confundida com arredondamento comercial.
+
+A futura camada de preço comercial deve versionar/identificar essa regra no snapshot de Quote para preservar auditabilidade.
 
 ## 2. Separação de responsabilidades
 
@@ -94,7 +97,7 @@ Para 4x–12x, usar a taxa global configurada, exceto quando existir futuro over
 
 ### Arredondamento comercial
 
-Depois de `P_fin`, a futura camada comercial converte para duas casas decimais com o tie-break ainda pendente.
+Depois de `P_fin`, a futura camada comercial converte para duas casas decimais usando `ROUND_HALF_UP`.
 
 ### Negociação / desconto
 
@@ -390,7 +393,7 @@ A futura camada `OfficialPricingCalculationService` deve resolver no servidor:
 9. condição de pagamento;
 10. taxa global ou override gerencial autorizado;
 11. ajuste financeiro exato;
-12. arredondamento comercial de duas casas (tie-break pendente);
+12. arredondamento comercial de duas casas usando `ROUND_HALF_UP`;
 13. DTO público sanitizado.
 
 Browser de consultor pode enviar futuramente:
@@ -595,4 +598,4 @@ Antes de aplicar persistência remotamente:
 
 Criar 16C.2 em branch isolada a partir do `main`, implementar somente persistência + service boundary administrativo + testes, sem UI e sem tocar o Supabase remoto.
 
-A única decisão comercial residual fora da persistência é o tie-break do arredondamento de meio centavo, a ser fechada antes da camada de preço comercial final/Quotes.
+Não há decisão comercial residual pendente para a arquitetura de persistência 16C v1.
