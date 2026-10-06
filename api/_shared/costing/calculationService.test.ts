@@ -103,6 +103,7 @@ const setup = (
       resource: bundle.definition,
       rates: bundle.rates,
     })),
+    loadProductParameters: vi.fn(async () => []),
   };
   return {
     service: new OfficialCostingCalculationService(engineering, costing, clock),
@@ -232,6 +233,7 @@ describe("OfficialCostingCalculationService", () => {
         },
         rates: [],
       })),
+      loadProductParameters: vi.fn(async () => []),
     };
     const service = new OfficialCostingCalculationService(
       { loadDefinition: vi.fn(async () => product) },
