@@ -8,6 +8,7 @@ import Galeria from "@/pages/Galeria";
 // IMPORTANTE: Agora estamos importando o componente real!
 import Materiais from "@/pages/Materiais";
 import Configuracoes from "@/pages/Configuracoes";
+import PricingAdminPage from "@/modules/pricing-admin/pages/PricingAdminPage";
 import ArtworkBoardPage from "@/modules/artwork/pages/ArtworkBoardPage";
 import ProductionBoardPage from "@/modules/production/pages/ProductionBoardPage";
 import OsDetailPage from "@/modules/hub-os/pages/OsDetailPage";
@@ -132,6 +133,18 @@ function Router() {
           <RequireModule moduleKey="materiais">
             {canAccessMateriais(authzContext) ? (
               <Materiais />
+            ) : (
+              <Redirect to="/" />
+            )}
+          </RequireModule>
+        </Layout>
+      </Route>
+
+      <Route path="/configuracoes/precos">
+        <Layout>
+          <RequireModule moduleKey="configuracoes">
+            {canAccessConfiguracoes(authzContext) ? (
+              <PricingAdminPage />
             ) : (
               <Redirect to="/" />
             )}

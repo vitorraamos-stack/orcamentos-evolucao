@@ -15,6 +15,7 @@ import {
   LogOut,
   Menu,
   Settings,
+  SlidersHorizontal,
   BadgeDollarSign,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -229,6 +230,22 @@ export default function Layout({ children }: LayoutProps) {
 
       {canViewConfiguracoes && (
         <div className="mt-3 border-t border-sidebar-border/50 pt-3">
+          <SectionLabel>Administração</SectionLabel>
+          <Link href="/configuracoes/precos">
+            <Button
+              variant={
+                location === "/configuracoes/precos" ? "secondary" : "ghost"
+              }
+              className={cn(
+                "w-full justify-start",
+                location === "/configuracoes/precos" &&
+                  "bg-sidebar-accent text-sidebar-accent-foreground"
+              )}
+            >
+              <SlidersHorizontal className="mr-2 h-4 w-4" />
+              Preços e Custos
+            </Button>
+          </Link>
           <Link href="/configuracoes">
             <Button
               variant={location === "/configuracoes" ? "secondary" : "ghost"}
@@ -239,7 +256,7 @@ export default function Layout({ children }: LayoutProps) {
               )}
             >
               <Settings className="mr-2 h-4 w-4" />
-              Configurações
+              Usuários
             </Button>
           </Link>
         </div>
