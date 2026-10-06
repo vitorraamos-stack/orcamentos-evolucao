@@ -76,3 +76,20 @@ export {
   assertPricingPolicyVersionPublished,
 } from "./validation.js";
 export { calculatePricing } from "./engine.js";
+
+export {
+  pricingNonNegativeAmountSchema,
+  pricingPolicyAdminSchema,
+  productPricingSettingsSchema,
+  pricingPaymentTermSchema,
+  pricingPersistenceMutationSchema,
+  pricingCreatePolicyResultSchema,
+  pricingCreateVersionResultSchema,
+  pricingRevisionResultSchema,
+} from "./persistence.js";
+export type {
+  PricingPolicyAdmin,
+  ProductPricingSettings,
+  PricingPaymentTerm,
+  PricingPersistenceMutation,
+} from "./persistence.js";
