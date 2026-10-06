@@ -66,4 +66,57 @@ export const productEngineeringRepository = {
     mutate({ action: "RETURN_TO_DRAFT", versionId, expectedRevision }),
   publishProductVersion: (versionId: string, expectedRevision: number) =>
     mutate({ action: "PUBLISH_VERSION", versionId, expectedRevision }),
+  publishConfigurationInputDefault: async (
+    sourceDefinition: ProductVersionDefinition,
+    inputKey: string,
+    defaultValue: string | boolean
+  ) => {
+    if (sourceDefinition.version.status !== "PUBLISHED")
+      throw new Error("Somente uma versão publicada pode originar a alteração.");
+
+    const sourceInput = sourceDefinition.inputs.find(
+      input => input.key === inputKey
+    );
+    if (!sourceInput || sourceInput.scope !== "CONFIGURATION")
+      throw new Error("Parâmetro de configuração não encontrado.");
+
+    const created = await productEngineeringRepository.createNewProductVersion(
+      sourceDefinition.version.id,
+      sourceDefinition.version.revision
+    );
+    const draft =
+      await productEngineeringRepository.loadProductVersionDefinition(
+        created.versionId
+      );
+
+    const draftInput = draft.inputs.find(input => input.key === inputKey);
+    if (!draftInput || draftInput.scope !== "CONFIGURATION")
+      throw new Error("Parâmetro de configuração não foi clonado corretamente.");
+
+    const inputs = draft.inputs.map(input =>
+      input.key === inputKey
+        ? ({ ...input, defaultValue } as typeof input)
+        : input
+    );
+
+    const saved = await productEngineeringRepository.saveProductVersionDraft({
+      versionId: draft.version.id,
+      expectedRevision: draft.version.revision,
+      notes: `Parâmetro ${sourceInput.label} atualizado pelo painel administrativo.`,
+      inputs,
+      variables: draft.variables,
+      components: draft.components,
+    });
+
+    const validating =
+      await productEngineeringRepository.startProductVersionValidation(
+        draft.version.id,
+        saved.revision
+      );
+
+    return productEngineeringRepository.publishProductVersion(
+      draft.version.id,
+      validating.version.revision
+    );
+  },
 };
