@@ -132,11 +132,11 @@ export default async function handler(req: any, res: any) {
       resourceType,
       resourceId,
       productId:
-        parsed.data.action === "SET_PRODUCT_PARAMETER"
+        parsed.data.action === "UPSERT_PRODUCT_PARAMETER"
           ? parsed.data.productId
           : undefined,
       parameterKey:
-        parsed.data.action === "SET_PRODUCT_PARAMETER"
+        parsed.data.action === "UPSERT_PRODUCT_PARAMETER"
           ? parsed.data.key
           : undefined,
     });
