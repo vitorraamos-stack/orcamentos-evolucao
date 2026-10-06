@@ -57,6 +57,7 @@ export const mapInput = (r: any) => {
     label: r.label,
     description: r.description,
     required: r.required,
+    scope: r.input_scope ?? "REQUEST",
     sortOrder: r.sort_order,
     type: r.type,
   };
@@ -160,6 +161,7 @@ export const inputToRow = (i: any) => ({
   description: i.description ?? null,
   type: i.type,
   required: i.required,
+  input_scope: i.scope,
   sort_order: i.sortOrder,
   unit: i.type === "DECIMAL" ? i.unit : null,
   decimal_default: i.type === "DECIMAL" ? (i.defaultValue ?? null) : null,
