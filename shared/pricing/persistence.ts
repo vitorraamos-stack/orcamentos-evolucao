@@ -97,7 +97,7 @@ const updatePolicyCommandSchema = z
   .object({
     action: z.literal("UPDATE_POLICY"),
     policyId: pricingPolicyIdSchema,
-    expectedRevision: revisionSchema,
+    expectedRevision: nullableExpectedRevisionSchema,
     policy: z
       .object({
         code: pricingPolicyCodeSchema,
