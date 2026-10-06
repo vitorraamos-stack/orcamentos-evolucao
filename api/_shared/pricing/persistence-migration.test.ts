@@ -8,7 +8,7 @@ const sql = readFileSync(
 
 describe("Pricing persistence migration contract", () => {
   it("uses complete PL/pgSQL dollar delimiters", () => {
-    expect(sql).not.toMatch(/^as \$/m);
+    expect(sql).not.toMatch(/^as \$$/m);
     const opens = (sql.match(/^as \$\$/gm) ?? []).length;
     const closes = (sql.match(/^\$\$;$/gm) ?? []).length;
     expect(opens).toBe(closes);
