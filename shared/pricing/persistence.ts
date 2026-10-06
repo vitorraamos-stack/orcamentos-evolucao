@@ -160,17 +160,10 @@ const setPaymentTermCommandSchema = z
     rate: pricingRateSchema,
     expectedRevision: nullableExpectedRevisionSchema,
   })
-  .strict()
-  .superRefine((command, ctx) => {
-    if (command.installments <= 3 && !decimalFrom(command.rate).isZero())
-      ctx.addIssue({
-        code: "custom",
-        path: ["rate"],
-        message: "Installments from 1 to 3 must have zero financial rate",
-      });
-  });
+  .strict();
 
-export const pricingPersistenceMutationSchema = z.discriminatedUnion("action", [
+export const pricingPersistenceMutationSchema = z
+  .discriminatedUnion("action", [
   createPolicyCommandSchema,
   updatePolicyCommandSchema,
   archivePolicyCommandSchema,
@@ -179,9 +172,21 @@ export const pricingPersistenceMutationSchema = z.discriminatedUnion("action", [
   lifecycleCommand("START_VALIDATION"),
   lifecycleCommand("RETURN_TO_DRAFT"),
   lifecycleCommand("PUBLISH_VERSION"),
-  setProductPricingCommandSchema,
-  setPaymentTermCommandSchema,
-]);
+    setProductPricingCommandSchema,
+    setPaymentTermCommandSchema,
+  ])
+  .superRefine((command, ctx) => {
+    if (
+      command.action === "SET_PAYMENT_TERM" &&
+      command.installments <= 3 &&
+      !decimalFrom(command.rate).isZero()
+    )
+      ctx.addIssue({
+        code: "custom",
+        path: ["rate"],
+        message: "Installments from 1 to 3 must have zero financial rate",
+      });
+  });
 export type PricingPersistenceMutation = z.infer<
   typeof pricingPersistenceMutationSchema
 >;
