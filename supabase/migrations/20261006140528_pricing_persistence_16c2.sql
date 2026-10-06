@@ -865,7 +865,7 @@ begin
     'published_by',v_after.published_by
   );
 end;
-$;
+$$;
 
 create function public.pricing_publish_version_secure(
   p_version_id uuid,
@@ -962,7 +962,7 @@ begin
     'published_by',v_target.published_by
   );
 end;
-$;
+$$;
 
 create function public.pricing_set_product_settings_secure(
   p_product_id uuid,
