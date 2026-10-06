@@ -199,17 +199,17 @@ jobs:
             then 1 else 0 end;
 
           set role service_role;
-          set ON_ERROR_STOP off
+          \\set ON_ERROR_STOP off
 
           select public.pricing_get_official_calculation_context_secure(
             '10000000-0000-4000-8000-000000000004',7
           );
-          if :ERROR
-            echo 'Expected missing 7x payment term rejection observed'
-          else
-            quit 1
-          endif
+          \\if :ERROR
+            \\echo 'Expected missing 7x payment term rejection observed'
+          \\else
+            \\quit 1
+          \\endif
 
-          set ON_ERROR_STOP on
+          \\set ON_ERROR_STOP on
           reset role;
           SQL
