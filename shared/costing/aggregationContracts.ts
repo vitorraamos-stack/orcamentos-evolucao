@@ -46,7 +46,7 @@ export type CostingAggregationInput = z.infer<
 export interface ResolvedInput {
   readonly key: string;
   readonly value: TechnicalInputValue;
-  readonly source: "PROVIDED" | "DEFAULT";
+  readonly source: "PROVIDED" | "DEFAULT" | "CONFIGURATION";
 }
 export interface QuantitySnapshot {
   readonly amount: DecimalString;
