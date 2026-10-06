@@ -83,23 +83,32 @@ export function resolveTechnicalInputs(
   missingOptional: ReadonlySet<string>;
 } {
   const definitions = new Map(inputs.map(input => [input.key, input]));
-  for (const key of Object.keys(provided))
-    if (!definitions.has(key))
+  for (const key of Object.keys(provided)) {
+    const definition = definitions.get(key);
+    if (!definition)
       throw new CostingDomainError(
         "UNKNOWN_TECHNICAL_INPUT",
         `Unknown technical input: ${key}`,
         { key }
       );
+    if (definition.scope === "CONFIGURATION")
+      throw new CostingDomainError(
+        "CONFIGURATION_INPUT_OVERRIDE_FORBIDDEN",
+        `Configuration input cannot be supplied by the request: ${key}`,
+        { key }
+      );
+  }
   const resolvedInputs: ResolvedInput[] = [],
     values: Record<string, ExpressionValue> = {},
     missingOptional = new Set<string>();
   for (const input of [...inputs].sort(
     (a, b) => a.sortOrder - b.sortOrder || a.key.localeCompare(b.key)
   )) {
-    let raw = provided[input.key],
-      source: ResolvedInput["source"] = "PROVIDED";
+    let raw = input.scope === "CONFIGURATION" ? undefined : provided[input.key],
+      source: ResolvedInput["source"] =
+        input.scope === "CONFIGURATION" ? "CONFIGURATION" : "PROVIDED";
     if (raw === undefined && input.defaultValue !== undefined) {
-      source = "DEFAULT";
+      if (input.scope !== "CONFIGURATION") source = "DEFAULT";
       raw =
         input.type === "DECIMAL"
           ? { kind: "decimal", value: input.defaultValue, unit: input.unit }
