@@ -5,6 +5,8 @@ import {
   costResourceTypeSchema,
   resourceDefinitionSchema,
 } from "./resources.js";
+import { productIdSchema } from "../product-engineering/product.js";
+import { configurableKeySchema } from "../calculation-engine/contracts/index.js";
 import { costableUnitIdSchema } from "./units.js";
 
 const uuidSchema = z.string().uuid();
@@ -41,11 +43,28 @@ export const costingMutationSchema = z.discriminatedUnion("action", [
       effectiveFrom: costTimestampSchema,
     })
     .strict(),
+  z
+    .object({
+      action: z.literal("SET_PRODUCT_PARAMETER"),
+      productId: productIdSchema,
+      key: configurableKeySchema,
+      value: decimalStringSchema,
+      expectedRevision: z.number().int().positive(),
+    })
+    .strict(),
 ]);
 
-export const costingQuerySchema = z
-  .object({ type: costResourceTypeSchema, resourceId: uuidSchema.optional() })
-  .strict();
+export const costingQuerySchema = z.union([
+  z
+    .object({ type: costResourceTypeSchema, resourceId: uuidSchema.optional() })
+    .strict(),
+  z
+    .object({
+      productId: productIdSchema,
+      scope: z.literal("PRODUCT_PARAMETERS"),
+    })
+    .strict(),
+]);
 
 export type CostingMutation = z.infer<typeof costingMutationSchema>;
 export type CostingQuery = z.infer<typeof costingQuerySchema>;
