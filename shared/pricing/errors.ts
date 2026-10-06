@@ -16,6 +16,8 @@ export const PRICING_ERROR_CODES = [
   "INVALID_PRICING_DENOMINATOR",
   "PRICING_NUMERIC_LIMIT_EXCEEDED",
   "INVALID_PRICING_ENGINE_RESULT",
+  "INVALID_COMMERCIAL_PRICING_INPUT",
+  "INVALID_COMMERCIAL_PRICING_RESULT",
 ] as const;
 export type PricingErrorCode = (typeof PRICING_ERROR_CODES)[number];
 export class PricingDomainError extends Error {
