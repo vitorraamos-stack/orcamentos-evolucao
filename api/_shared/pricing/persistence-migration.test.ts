@@ -45,6 +45,24 @@ describe("Pricing persistence migration contract", () => {
     expect(sql).toMatch(/installments > 3 or rate = 0/i);
   });
 
+  it("rejects PostgreSQL special numeric values at the persistence boundary", () => {
+    expect(sql).toContain("markup::text not in ('NaN','Infinity','-Infinity')");
+    expect(sql).toContain("minimum_selling_price::text not in ('NaN','Infinity','-Infinity')");
+    expect(sql).toContain("rate::text not in ('NaN','Infinity','-Infinity')");
+  });
+
+  it("keeps lifecycle RPC payloads free of numeric financial fields", () => {
+    const transitionStart = sql.indexOf("create function public.pricing_transition_version_secure");
+    const publishStart = sql.indexOf("create function public.pricing_publish_version_secure");
+    const productStart = sql.indexOf("create function public.pricing_set_product_settings_secure");
+    const transition = sql.slice(transitionStart, publishStart);
+    const publish = sql.slice(publishStart, productStart);
+    expect(transition).not.toContain("return to_jsonb(v_after)");
+    expect(publish).not.toContain("return to_jsonb(v_target)");
+    expect(transition).not.toMatch(/'markup'\s*,/i);
+    expect(publish).not.toMatch(/'markup'\s*,/i);
+  });
+
   it("casts every persisted financial value to text in RPC output/audit", () => {
     expect(sql).toContain("'markup', v.markup::text");
     expect(sql).toContain("'minimum_selling_price', s.minimum_selling_price::text");

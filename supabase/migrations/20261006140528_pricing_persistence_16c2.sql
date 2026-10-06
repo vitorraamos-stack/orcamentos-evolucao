@@ -45,6 +45,9 @@ create table public.pricing_policy_versions (
   constraint pricing_policy_versions_strategy_v1 check (strategy_type = 'MARKUP_ON_COST'),
   constraint pricing_policy_versions_markup_base_v1 check (markup_base = 'TOTAL_COST'),
   constraint pricing_policy_versions_markup_nonnegative check (markup >= 0),
+  constraint pricing_policy_versions_markup_finite check (
+    markup::text not in ('NaN','Infinity','-Infinity')
+  ),
   constraint pricing_policy_versions_markup_scale check (scale(markup) <= 500),
   constraint pricing_policy_versions_markup_text_limit check (length(markup::text) <= 1024),
   constraint pricing_policy_versions_markup_magnitude check (
@@ -73,6 +76,9 @@ create table public.product_pricing_settings (
   updated_at timestamptz not null default now(),
   updated_by uuid not null references public.profiles(id) on delete restrict,
   constraint product_pricing_settings_minimum_nonnegative check (minimum_selling_price >= 0),
+  constraint product_pricing_settings_minimum_finite check (
+    minimum_selling_price::text not in ('NaN','Infinity','-Infinity')
+  ),
   constraint product_pricing_settings_minimum_scale check (scale(minimum_selling_price) <= 500),
   constraint product_pricing_settings_minimum_text_limit check (
     length(minimum_selling_price::text) <= 1024
@@ -94,6 +100,9 @@ create table public.pricing_payment_terms (
   updated_by uuid not null references public.profiles(id) on delete restrict,
   constraint pricing_payment_terms_installments_range check (installments between 1 and 12),
   constraint pricing_payment_terms_rate_range check (rate >= 0 and rate < 1),
+  constraint pricing_payment_terms_rate_finite check (
+    rate::text not in ('NaN','Infinity','-Infinity')
+  ),
   constraint pricing_payment_terms_rate_scale check (scale(rate) <= 500),
   constraint pricing_payment_terms_rate_text_limit check (length(rate::text) <= 1024),
   constraint pricing_payment_terms_free_1_to_3 check (
@@ -476,6 +485,7 @@ begin
     or p_strategy_type <> 'MARKUP_ON_COST'
     or p_markup_base <> 'TOTAL_COST'
     or p_markup < 0
+    or p_markup::text in ('NaN','Infinity','-Infinity')
     or p_code !~ '^[A-Z][A-Z0-9_]*$'
     or btrim(p_name) = '' then
     raise exception 'INVALID_PRICING_CONFIGURATION';
@@ -750,7 +760,10 @@ begin
   if v_before.status <> 'DRAFT' then
     raise exception 'PRICING_STATE_CONFLICT';
   end if;
-  if p_markup < 0 then raise exception 'INVALID_PRICING_CONFIGURATION'; end if;
+  if p_markup < 0
+    or p_markup::text in ('NaN','Infinity','-Infinity') then
+    raise exception 'INVALID_PRICING_CONFIGURATION';
+  end if;
 
   update public.pricing_policy_versions
   set markup=p_markup,
@@ -839,9 +852,20 @@ begin
     jsonb_build_object('status',v_after.status,'revision',v_after.revision)
   );
 
-  return to_jsonb(v_after);
+  return jsonb_build_object(
+    'id',v_after.id,
+    'pricing_policy_id',v_after.pricing_policy_id,
+    'version_number',v_after.version_number,
+    'revision',v_after.revision,
+    'status',v_after.status,
+    'notes',v_after.notes,
+    'created_at',v_after.created_at,
+    'created_by',v_after.created_by,
+    'published_at',v_after.published_at,
+    'published_by',v_after.published_by
+  );
 end;
-$$;
+$;
 
 create function public.pricing_publish_version_secure(
   p_version_id uuid,
@@ -925,9 +949,20 @@ begin
     )
   );
 
-  return to_jsonb(v_target);
+  return jsonb_build_object(
+    'id',v_target.id,
+    'pricing_policy_id',v_target.pricing_policy_id,
+    'version_number',v_target.version_number,
+    'revision',v_target.revision,
+    'status',v_target.status,
+    'notes',v_target.notes,
+    'created_at',v_target.created_at,
+    'created_by',v_target.created_by,
+    'published_at',v_target.published_at,
+    'published_by',v_target.published_by
+  );
 end;
-$$;
+$;
 
 create function public.pricing_set_product_settings_secure(
   p_product_id uuid,
@@ -945,7 +980,8 @@ declare
   v_before public.product_pricing_settings;
   v_after public.product_pricing_settings;
 begin
-  if p_minimum_selling_price < 0 then
+  if p_minimum_selling_price < 0
+    or p_minimum_selling_price::text in ('NaN','Infinity','-Infinity') then
     raise exception 'INVALID_PRICING_CONFIGURATION';
   end if;
 
@@ -1038,6 +1074,7 @@ declare
 begin
   if p_installments < 1 or p_installments > 12
     or p_rate < 0 or p_rate >= 1
+    or p_rate::text in ('NaN','Infinity','-Infinity')
     or (p_installments <= 3 and p_rate <> 0) then
     raise exception 'INVALID_PRICING_CONFIGURATION';
   end if;
