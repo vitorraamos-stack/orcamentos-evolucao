@@ -14,13 +14,17 @@ export interface ExactRational {
 }
 
 const MAX_RATIONAL_DIGITS = 4_096;
+const BIGINT_ZERO = BigInt(0);
+const BIGINT_ONE = BigInt(1);
+const BIGINT_TWO = BigInt(2);
+const BIGINT_TEN = BigInt(10);
 
 function numericLimit(message: string): never {
   throw new PricingDomainError("PRICING_NUMERIC_LIMIT_EXCEEDED", message);
 }
 
 function bigintDigits(value: bigint): number {
-  const absolute = value < 0n ? -value : value;
+  const absolute = value < BIGINT_ZERO ? -value : value;
   return absolute.toString().length;
 }
 
@@ -34,24 +38,25 @@ function assertRationalLimit(value: ExactRational): ExactRational {
 }
 
 function gcd(left: bigint, right: bigint): bigint {
-  let a = left < 0n ? -left : left;
-  let b = right < 0n ? -right : right;
-  while (b !== 0n) {
+  let a = left < BIGINT_ZERO ? -left : left;
+  let b = right < BIGINT_ZERO ? -right : right;
+  while (b !== BIGINT_ZERO) {
     const remainder = a % b;
     a = b;
     b = remainder;
   }
-  return a === 0n ? 1n : a;
+  return a === BIGINT_ZERO ? BIGINT_ONE : a;
 }
 
 function normalize(numerator: bigint, denominator: bigint): ExactRational {
-  if (denominator === 0n)
+  if (denominator === BIGINT_ZERO)
     throw new PricingDomainError(
       "INVALID_PRICING_DENOMINATOR",
       "Pricing denominator must be greater than zero"
     );
-  if (numerator === 0n) return { numerator: 0n, denominator: 1n };
-  const sign = denominator < 0n ? -1n : 1n;
+  if (numerator === BIGINT_ZERO)
+    return { numerator: BIGINT_ZERO, denominator: BIGINT_ONE };
+  const sign = denominator < BIGINT_ZERO ? -BIGINT_ONE : BIGINT_ONE;
   const signedNumerator = numerator * sign;
   const positiveDenominator = denominator * sign;
   const divisor = gcd(signedNumerator, positiveDenominator);
@@ -62,9 +67,21 @@ function normalize(numerator: bigint, denominator: bigint): ExactRational {
 }
 
 function pow10(exponent: number): bigint {
-  if (!Number.isInteger(exponent) || exponent < 0 || exponent > MAX_RATIONAL_DIGITS)
+  if (
+    !Number.isInteger(exponent) ||
+    exponent < 0 ||
+    exponent > MAX_RATIONAL_DIGITS
+  )
     numericLimit("Pricing decimal scale exceeds the technical limit");
-  return 10n ** BigInt(exponent);
+  let result = BIGINT_ONE;
+  let base = BIGINT_TEN;
+  let remaining = exponent;
+  while (remaining > 0) {
+    if (remaining % 2 === 1) result *= base;
+    remaining = Math.floor(remaining / 2);
+    if (remaining > 0) base *= base;
+  }
+  return result;
 }
 
 export function rationalFromDecimal(value: DecimalString): ExactRational {
@@ -72,17 +89,17 @@ export function rationalFromDecimal(value: DecimalString): ExactRational {
   const unsigned = negative ? value.slice(1) : value;
   const [integer, fraction = ""] = unsigned.split(".");
   const digits = `${integer}${fraction}`;
-  const numerator = BigInt(digits) * (negative ? -1n : 1n);
+  const numerator = BigInt(digits) * (negative ? -BIGINT_ONE : BIGINT_ONE);
   return normalize(numerator, pow10(fraction.length));
 }
 
 export const rationalZero = (): ExactRational => ({
-  numerator: 0n,
-  denominator: 1n,
+  numerator: BIGINT_ZERO,
+  denominator: BIGINT_ONE,
 });
 export const rationalOne = (): ExactRational => ({
-  numerator: 1n,
-  denominator: 1n,
+  numerator: BIGINT_ONE,
+  denominator: BIGINT_ONE,
 });
 
 export function addRational(
@@ -119,7 +136,7 @@ export function divideRational(
   left: ExactRational,
   right: ExactRational
 ): ExactRational {
-  if (right.numerator === 0n)
+  if (right.numerator === BIGINT_ZERO)
     throw new PricingDomainError(
       "INVALID_PRICING_DENOMINATOR",
       "Pricing denominator must be greater than zero"
@@ -136,11 +153,12 @@ export function compareRational(
 ): number {
   const delta =
     left.numerator * right.denominator - right.numerator * left.denominator;
-  return delta < 0n ? -1 : delta > 0n ? 1 : 0;
+  return delta < BIGINT_ZERO ? -1 : delta > BIGINT_ZERO ? 1 : 0;
 }
 
 function decimalExponent(value: ExactRational): number {
-  const numerator = value.numerator < 0n ? -value.numerator : value.numerator;
+  const numerator =
+    value.numerator < BIGINT_ZERO ? -value.numerator : value.numerator;
   const denominator = value.denominator;
   let exponent = bigintDigits(numerator) - bigintDigits(denominator);
   if (exponent >= 0) {
@@ -161,8 +179,8 @@ function fixedFromScaledInteger(value: bigint, decimalPlaces: number): string {
 
 /** 50 significant digits, half-even, fixed notation. This is computational serialization only. */
 export function serializeRational(value: ExactRational): DecimalString {
-  if (value.numerator === 0n) return decimalString("0");
-  const negative = value.numerator < 0n;
+  if (value.numerator === BIGINT_ZERO) return decimalString("0");
+  const negative = value.numerator < BIGINT_ZERO;
   const absolute = normalize(
     negative ? -value.numerator : value.numerator,
     value.denominator
@@ -176,12 +194,13 @@ export function serializeRational(value: ExactRational): DecimalString {
 
   let quotient = scaledNumerator / scaledDenominator;
   const remainder = scaledNumerator % scaledDenominator;
-  const twiceRemainder = remainder * 2n;
+  const twiceRemainder = remainder * BIGINT_TWO;
   if (
     twiceRemainder > scaledDenominator ||
-    (twiceRemainder === scaledDenominator && quotient % 2n !== 0n)
+    (twiceRemainder === scaledDenominator &&
+      quotient % BIGINT_TWO !== BIGINT_ZERO)
   )
-    quotient += 1n;
+    quotient += BIGINT_ONE;
 
   const unsigned = fixedFromScaledInteger(quotient, decimalPlaces);
   const serialized = `${negative ? "-" : ""}${unsigned}`;
