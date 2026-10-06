@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
+import { pricingPersistenceMutationSchema } from "@shared/pricing";
 import type {
   PricingPaymentTerm,
-  pricingPersistenceMutationSchema,
   PricingPolicy,
   PricingPolicyVersionDefinition,
   ProductPricingSettings,
