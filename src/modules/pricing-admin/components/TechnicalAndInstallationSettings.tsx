@@ -72,7 +72,7 @@ export default function TechnicalAndInstallationSettings() {
         }))
       );
       setProductParameters(rows.filter(row => row.parameters.length > 0));
-      setInstallation(await pricingRepository.loadInstallationSettings());
+      setInstallation(await pricingRepository.tryLoadInstallationSettings());
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -98,10 +98,15 @@ export default function TechnicalAndInstallationSettings() {
     setSaving(true);
     try {
       const value = decimalStringSchema.parse(decimalInput(parameterValue).toString());
-      await costingRepository.setProductCostingParameter({
+      await costingRepository.upsertProductCostingParameter({
         productId: parameterTarget.product.id,
         key: parameterTarget.parameter.key,
+        label: parameterTarget.parameter.label,
+        description: parameterTarget.parameter.description,
         value,
+        unit: parameterTarget.parameter.unit,
+        minValue: parameterTarget.parameter.minValue,
+        maxValue: parameterTarget.parameter.maxValue,
         expectedRevision: parameterTarget.parameter.revision,
       });
       toast.success("Parâmetro técnico atualizado.");
@@ -115,21 +120,31 @@ export default function TechnicalAndInstallationSettings() {
   };
 
   const openInstallation = () => {
-    if (!installation) return;
-    setInstallationForm({
-      tier1MaxAreaM2: installation.tier1MaxAreaM2,
-      tier1Price: installation.tier1Price,
-      tier2MaxAreaM2: installation.tier2MaxAreaM2,
-      tier2Price: installation.tier2Price,
-      tier3Price: installation.tier3Price,
-      munckHourlyPrice: installation.munckHourlyPrice,
-      munckMinimumHours: installation.munckMinimumHours,
-    });
+    setInstallationForm(
+      installation
+        ? {
+            tier1MaxAreaM2: installation.tier1MaxAreaM2,
+            tier1Price: installation.tier1Price,
+            tier2MaxAreaM2: installation.tier2MaxAreaM2,
+            tier2Price: installation.tier2Price,
+            tier3Price: installation.tier3Price,
+            munckHourlyPrice: installation.munckHourlyPrice,
+            munckMinimumHours: installation.munckMinimumHours,
+          }
+        : {
+            tier1MaxAreaM2: "",
+            tier1Price: "",
+            tier2MaxAreaM2: "",
+            tier2Price: "",
+            tier3Price: "",
+            munckHourlyPrice: "",
+            munckMinimumHours: "",
+          }
+    );
     setInstallationOpen(true);
   };
 
   const saveInstallation = async () => {
-    if (!installation) return;
     setSaving(true);
     try {
       const tier1MaxAreaM2 = decimalInput(installationForm.tier1MaxAreaM2).toString();
@@ -148,7 +163,7 @@ export default function TechnicalAndInstallationSettings() {
         tier3Price: nonNegativeAmount(installationForm.tier3Price),
         munckHourlyPrice: nonNegativeAmount(installationForm.munckHourlyPrice),
         munckMinimumHours,
-        expectedRevision: installation.revision,
+        expectedRevision: installation?.revision ?? null,
       });
       toast.success("Regras de instalação atualizadas.");
       setInstallationOpen(false);
@@ -228,8 +243,8 @@ export default function TechnicalAndInstallationSettings() {
               Regras comerciais globais usadas pelos adicionais do orçamento. O munck é repassado sem markup.
             </CardDescription>
           </div>
-          <Button variant="outline" onClick={openInstallation} disabled={!installation || loading}>
-            Alterar regras
+          <Button variant="outline" onClick={openInstallation} disabled={loading}>
+            {installation ? "Alterar regras" : "Configurar regras"}
           </Button>
         </CardHeader>
         <CardContent>
