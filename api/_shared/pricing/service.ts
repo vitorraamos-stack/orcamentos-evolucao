@@ -16,6 +16,7 @@ import {
   mapPricingRevisionResult,
   mapProductPricingSettings,
 } from "./mappers.js";
+import { mapOfficialPricingContext } from "./calculationContext.js";
 
 export class PricingPersistenceServiceError extends Error {
   constructor(
@@ -33,6 +34,8 @@ export function mapPricingPersistenceError(error: any): never {
   const message = String(error?.message ?? "");
   const mappings: Array<[RegExp, number, string, string]> = [
     [/PRICING_POLICY_NOT_FOUND/, 404, "PRICING_POLICY_NOT_FOUND", "Pricing policy not found."],
+    [/PRICING_POLICY_NOT_ACTIVE/, 409, "PRICING_POLICY_NOT_ACTIVE", "Pricing policy is not active."],
+    [/PRICING_PUBLISHED_VERSION_NOT_FOUND/, 404, "PRICING_PUBLISHED_VERSION_NOT_FOUND", "Published Pricing version not found."],
     [/PRICING_PRODUCT_NOT_FOUND/, 404, "PRICING_PRODUCT_NOT_FOUND", "Product not found."],
     [/PRICING_VERSION_NOT_FOUND/, 404, "PRICING_VERSION_NOT_FOUND", "Pricing policy version not found."],
     [/PRODUCT_PRICING_SETTINGS_NOT_FOUND/, 404, "PRODUCT_PRICING_SETTINGS_NOT_FOUND", "Product Pricing settings not found."],
@@ -123,6 +126,20 @@ export class PricingPersistenceService {
         "Pricing payment term not found."
       );
     return mapPricingPaymentTerm(data);
+  }
+
+  async loadOfficialCalculationContext(productId: string, installments: number) {
+    const data = await this.rpc("pricing_get_official_calculation_context_secure", {
+      p_product_id: productId,
+      p_installments: installments,
+    });
+    if (!data)
+      throw new PricingPersistenceServiceError(
+        500,
+        "PRICING_PERSISTENCE_ERROR",
+        "Pricing calculation context is unavailable."
+      );
+    return mapOfficialPricingContext(data);
   }
 
   async execute(input: PricingPersistenceMutation, actorId: string) {

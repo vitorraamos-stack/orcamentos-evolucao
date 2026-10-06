@@ -1,7 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ client: null as any }));
+const state = vi.hoisted(() => ({
+  client: null as any,
+  officialCalculate: vi.fn(),
+}));
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => state.client }));
+vi.mock("../../api/_shared/pricing/calculationService.js", () => ({
+  OfficialPricingCalculationError: class OfficialPricingCalculationError extends Error {
+    status: number;
+    code: string;
+    constructor(status: number, code: string, message: string) {
+      super(message);
+      this.status = status;
+      this.code = code;
+    }
+  },
+  OfficialPricingCalculationService: class OfficialPricingCalculationService {
+    async calculate(input: unknown) {
+      return state.officialCalculate(input);
+    }
+  },
+}));
+import { CostingDomainError } from "../../shared/costing/index.js";
+import { CostingServiceError } from "../../api/_shared/costing/service.js";
 import handler from "../../api/pricing";
 
 const id = (n: number) =>
@@ -72,6 +93,7 @@ describe("Pricing API manager authority", () => {
   beforeEach(() => {
     process.env.SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "server-secret";
+    state.officialCalculate.mockReset();
   });
 
   it("returns 401 without bearer or with an invalid token", async () => {
@@ -159,6 +181,215 @@ describe("Pricing API manager authority", () => {
       expect(res.payload.error.code).toBe("INVALID_QUERY");
       expect(state.client.rpc).not.toHaveBeenCalled();
     }
+  });
+
+
+  it.each(["consultor_vendas", "consultor", "gerente", "admin"])(
+    "allows %s to request sanitized official Pricing",
+    async role => {
+      const publicResult = {
+        calculationVersion: "1.0",
+        productId: id(4),
+        productVersionId: id(5),
+        productVersionNumber: 2,
+        productVersionRevision: 3,
+        commercialQuantity: "1",
+        installments: 3,
+        roundingRule: "BRL_2DP_HALF_UP_V1",
+        totalSellingPrice: { currency: "BRL", amount: "250.00" },
+      };
+      state.officialCalculate.mockResolvedValueOnce({ publicResult });
+      state.client = client({ id: id(9) }, role);
+      const res = response();
+
+      await handler(
+        {
+          method: "POST",
+          headers: { authorization: "Bearer valid" },
+          body: {
+            action: "CALCULATE",
+            productVersionId: id(5),
+            request: { commercialQuantity: "1", technicalInputs: {} },
+            installments: 3,
+          },
+        },
+        res
+      );
+
+      expect(res.statusCode).toBe(200);
+      expect(res.payload).toEqual({ ok: true, data: publicResult });
+      expect(state.officialCalculate).toHaveBeenCalledWith({
+        productVersionId: id(5),
+        request: { commercialQuantity: "1", technicalInputs: {} },
+        installments: 3,
+      });
+      expect(res.payload.data).not.toHaveProperty("totalCost");
+      expect(res.payload.data).not.toHaveProperty("markup");
+      expect(res.payload.data).not.toHaveProperty("financialRate");
+    }
+  );
+
+  it.each(["arte_finalista", "producao", "instalador"])(
+    "rejects non-commercial role %s from official Pricing",
+    async role => {
+      state.client = client({ id: id(9) }, role);
+      const res = response();
+      await handler(
+        {
+          method: "POST",
+          headers: { authorization: "Bearer valid" },
+          body: {
+            action: "CALCULATE",
+            productVersionId: id(5),
+            request: { commercialQuantity: "1", technicalInputs: {} },
+            installments: 3,
+          },
+        },
+        res
+      );
+      expect(res.statusCode).toBe(403);
+      expect(state.officialCalculate).not.toHaveBeenCalled();
+    }
+  );
+
+  it("keeps unexpected Costing persistence failures as server errors", async () => {
+    state.officialCalculate.mockRejectedValueOnce(
+      new CostingServiceError(
+        500,
+        "PERSISTENCE_ERROR",
+        "Costing persistence failed."
+      )
+    );
+    state.client = client({ id: id(9) }, "consultor_vendas");
+    const res = response();
+
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer valid" },
+        body: {
+          action: "CALCULATE",
+          productVersionId: id(5),
+          request: { commercialQuantity: "1", technicalInputs: {} },
+          installments: 3,
+        },
+      },
+      res
+    );
+
+    expect(res.statusCode).toBe(500);
+    expect(res.payload).toEqual({
+      ok: false,
+      error: {
+        code: "COSTING_SERVICE_ERROR",
+        message: "Official Pricing could not be calculated.",
+      },
+    });
+  });
+
+  it("maps only known missing Costing resources to configuration errors", async () => {
+    state.officialCalculate.mockRejectedValueOnce(
+      new CostingServiceError(
+        404,
+        "RESOURCE_NOT_FOUND",
+        "Cost resource not found."
+      )
+    );
+    state.client = client({ id: id(9) }, "consultor_vendas");
+    const res = response();
+
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer valid" },
+        body: {
+          action: "CALCULATE",
+          productVersionId: id(5),
+          request: { commercialQuantity: "1", technicalInputs: {} },
+          installments: 3,
+        },
+      },
+      res
+    );
+
+    expect(res.statusCode).toBe(422);
+    expect(res.payload.error).toEqual({
+      code: "COSTING_NOT_CONFIGURED",
+      message: "Costing is not configured for this product.",
+    });
+  });
+
+  it("returns a client error for unpublished product versions", async () => {
+    state.officialCalculate.mockRejectedValueOnce(
+      new CostingDomainError(
+        "PRODUCT_VERSION_NOT_PUBLISHED",
+        "A new official costing requires a PUBLISHED product version"
+      )
+    );
+    state.client = client({ id: id(9) }, "consultor_vendas");
+    const res = response();
+
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer valid" },
+        body: {
+          action: "CALCULATE",
+          productVersionId: id(5),
+          request: { commercialQuantity: "1", technicalInputs: {} },
+          installments: 3,
+        },
+      },
+      res
+    );
+
+    expect(res.statusCode).toBe(422);
+    expect(res.payload.error).toEqual({
+      code: "PRODUCT_VERSION_NOT_PUBLISHED",
+      message:
+        "The selected product version is not available for official Pricing.",
+    });
+  });
+
+  it("does not allow consultants to use manager Pricing mutations", async () => {
+    state.client = client({ id: id(9) }, "consultor_vendas");
+    const res = response();
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer valid" },
+        body: {
+          action: "SET_PAYMENT_TERM",
+          installments: 6,
+          rate: "0.05",
+          expectedRevision: null,
+        },
+      },
+      res
+    );
+    expect(res.statusCode).toBe(403);
+    expect(state.client.rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects authority fields in CALCULATE before invoking the service", async () => {
+    state.client = client({ id: id(9) }, "consultor_vendas");
+    const res = response();
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer valid" },
+        body: {
+          action: "CALCULATE",
+          productVersionId: id(5),
+          request: { commercialQuantity: "1", technicalInputs: {} },
+          installments: 3,
+          markup: "2",
+        },
+      },
+      res
+    );
+    expect(res.statusCode).toBe(400);
+    expect(state.officialCalculate).not.toHaveBeenCalled();
   });
 
   it("requires explicit publication CAS state from the caller", async () => {
