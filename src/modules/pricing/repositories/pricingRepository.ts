@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { pricingPersistenceMutationSchema } from "@shared/pricing";
 import type {
+  PricingInstallationSettings,
   PricingPaymentTerm,
   PricingPolicy,
   PricingPolicyVersionDefinition,
@@ -68,6 +69,9 @@ export const pricingRepository = {
       `?contextProductId=${encodeURIComponent(productId)}`
     ),
 
+  loadInstallationSettings: () =>
+    request<PricingInstallationSettings>("?installationSettings=1"),
+
   loadPaymentTerm: (installments: number) =>
     request<PricingPaymentTerm>(
       `?installments=${encodeURIComponent(String(installments))}`
@@ -105,6 +109,21 @@ export const pricingRepository = {
   }) =>
     mutate<PricingPaymentTerm>({
       action: "SET_PAYMENT_TERM",
+      ...payload,
+    }),
+
+  setInstallationSettings: (payload: {
+    tier1MaxAreaM2: string;
+    tier1Price: string;
+    tier2MaxAreaM2: string;
+    tier2Price: string;
+    tier3Price: string;
+    munckHourlyPrice: string;
+    munckMinimumHours: string;
+    expectedRevision: number;
+  }) =>
+    mutate<PricingInstallationSettings>({
+      action: "SET_INSTALLATION_SETTINGS",
       ...payload,
     }),
 
