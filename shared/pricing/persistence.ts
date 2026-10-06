@@ -97,7 +97,7 @@ const updatePolicyCommandSchema = z
   .object({
     action: z.literal("UPDATE_POLICY"),
     policyId: pricingPolicyIdSchema,
-    expectedRevision: nullableExpectedRevisionSchema,
+    expectedRevision: revisionSchema,
     policy: z
       .object({
         code: pricingPolicyCodeSchema,
@@ -189,7 +189,7 @@ const setInstallationSettingsCommandSchema = z
     tier3Price: pricingInstallationSettingsSchema.shape.tier3Price,
     munckHourlyPrice: pricingInstallationSettingsSchema.shape.munckHourlyPrice,
     munckMinimumHours: pricingInstallationSettingsSchema.shape.munckMinimumHours,
-    expectedRevision: revisionSchema,
+    expectedRevision: nullableExpectedRevisionSchema,
   })
   .strict();
 
