@@ -307,15 +307,30 @@ export default async function handler(req: any, res: any) {
         );
       }
 
-      if (error instanceof CostingServiceError)
+      if (error instanceof CostingServiceError) {
+        if (error.code === "RESOURCE_NOT_FOUND")
+          return fail(
+            res,
+            422,
+            "COSTING_NOT_CONFIGURED",
+            "Costing is not configured for this product."
+          );
         return fail(
           res,
-          422,
-          "COSTING_NOT_CONFIGURED",
-          "Costing is not configured for this product."
+          500,
+          "COSTING_SERVICE_ERROR",
+          "Official Pricing could not be calculated."
         );
+      }
 
       if (error instanceof CostingDomainError) {
+        if (error.code === "PRODUCT_VERSION_NOT_PUBLISHED")
+          return fail(
+            res,
+            422,
+            "PRODUCT_VERSION_NOT_PUBLISHED",
+            "The selected product version is not available for official Pricing."
+          );
         if (consultantInputCodes.has(error.code))
           return fail(res, 422, error.code, error.message);
         if (costingConfigurationCodes.has(error.code))
