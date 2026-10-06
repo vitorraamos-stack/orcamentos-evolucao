@@ -54,6 +54,7 @@ const adminQuerySchema = z.union([
   z.object({ versionId: uuid }).strict(),
   z.object({ productId: uuid }).strict(),
   z.object({ contextProductId: uuid }).strict(),
+  z.object({ installationSettings: z.literal("1") }).strict(),
   z.object({ installments: z.string().regex(/^(?:[1-9]|1[0-2])$/) }).strict(),
 ]);
 
@@ -206,7 +207,9 @@ export default async function handler(req: any, res: any) {
                     query.contextProductId,
                     1
                   )
-                : await pricing.loadPaymentTerm(Number(query.installments));
+                : "installationSettings" in query
+                  ? await pricing.loadInstallationSettings()
+                  : await pricing.loadPaymentTerm(Number(query.installments));
       return send(res, 200, { ok: true, data });
     }
 
