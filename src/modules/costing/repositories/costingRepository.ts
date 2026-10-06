@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { CostingMutation } from "@shared/costing/api";
+import type { ProductCostingParameter } from "@shared/costing/productParameters";
 import type { CostRate, CostTimestamp } from "@shared/costing/rates";
 import type {
   CostResourceType,
@@ -45,6 +46,10 @@ const mutate = <T>(command: CostingMutation) =>
 export const costingRepository = {
   listCostResources: (type: CostResourceType) =>
     request<CostResourceRecord[]>(`?type=${encodeURIComponent(type)}`),
+  listProductCostingParameters: (productId: string) =>
+    request<ProductCostingParameter[]>(
+      `?productId=${encodeURIComponent(productId)}&scope=PRODUCT_PARAMETERS`
+    ),
   loadCostResource: (type: CostResourceType, resourceId: string) =>
     request<CostResourceRecord & { rates: CostRate[] }>(
       `?type=${encodeURIComponent(type)}&resourceId=${encodeURIComponent(resourceId)}`
@@ -76,5 +81,15 @@ export const costingRepository = {
       resourceId: payload.resourceId,
       amount: payload.amount,
       effectiveFrom: payload.effectiveFrom,
+    }),
+  setProductCostingParameter: (
+    payload: Omit<
+      Extract<CostingMutation, { action: "SET_PRODUCT_PARAMETER" }>,
+      "action"
+    >
+  ) =>
+    mutate<ProductCostingParameter>({
+      action: "SET_PRODUCT_PARAMETER",
+      ...payload,
     }),
 };
