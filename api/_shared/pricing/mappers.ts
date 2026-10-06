@@ -90,7 +90,7 @@ export function mapPricingAggregate(dto: any) {
     );
   if (dto?.strategy_type !== "MARKUP_ON_COST" || dto?.markup_base !== "TOTAL_COST")
     return incompatible();
-  if (dto?.charges !== undefined && (!Array.isArray(dto.charges) || dto.charges.length !== 0))
+  if (!Array.isArray(dto?.charges) || dto.charges.length !== 0)
     return incompatible();
 
   const policyResult = pricingPolicySchema.safeParse({

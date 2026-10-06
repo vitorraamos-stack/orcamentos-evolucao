@@ -57,6 +57,13 @@ describe("Pricing persistence mappers", () => {
     );
   });
 
+  it("fails closed when the persisted charges field is missing", () => {
+    const { charges: _charges, ...withoutCharges } = aggregate();
+    expect(() => mapPricingAggregate(withoutCharges)).toThrow(
+      PricingPersistenceCompatibilityError
+    );
+  });
+
   it("rejects non-v1 strategies and persisted charges", () => {
     expect(() =>
       mapPricingAggregate({ ...aggregate(), strategy_type: "GROSS_UP" })
