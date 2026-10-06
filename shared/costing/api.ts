@@ -8,6 +8,7 @@ import {
 import { productIdSchema } from "../product-engineering/product.js";
 import { configurableKeySchema } from "../calculation-engine/contracts/index.js";
 import { costableUnitIdSchema } from "./units.js";
+import { productCostingParameterSchema } from "./productParameters.js";
 
 const uuidSchema = z.string().uuid();
 const createResourceSchema = z
@@ -45,11 +46,16 @@ export const costingMutationSchema = z.discriminatedUnion("action", [
     .strict(),
   z
     .object({
-      action: z.literal("SET_PRODUCT_PARAMETER"),
+      action: z.literal("UPSERT_PRODUCT_PARAMETER"),
       productId: productIdSchema,
       key: configurableKeySchema,
+      label: productCostingParameterSchema.shape.label,
+      description: productCostingParameterSchema.shape.description,
       value: decimalStringSchema,
-      expectedRevision: z.number().int().positive(),
+      unit: productCostingParameterSchema.shape.unit,
+      minValue: productCostingParameterSchema.shape.minValue,
+      maxValue: productCostingParameterSchema.shape.maxValue,
+      expectedRevision: z.number().int().positive().nullable(),
     })
     .strict(),
 ]);
