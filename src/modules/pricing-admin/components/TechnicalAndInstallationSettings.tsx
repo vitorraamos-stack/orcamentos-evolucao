@@ -16,6 +16,7 @@ import { costingRepository } from "@/modules/costing/repositories/costingReposit
 import { productEngineeringRepository } from "@/modules/product-engineering/repositories/productEngineeringRepository";
 import { pricingRepository } from "@/modules/pricing/repositories/pricingRepository";
 import { decimalInput, nonNegativeAmount } from "../pricingAdminMath";
+import { decimalStringSchema } from "@shared/calculation-engine/decimal";
 import type { ProductCostingParameter } from "@shared/costing/productParameters";
 import type { PricingInstallationSettings } from "@shared/pricing";
 import type { Product } from "@shared/product-engineering";
@@ -96,7 +97,7 @@ export default function TechnicalAndInstallationSettings() {
     if (!parameterTarget) return;
     setSaving(true);
     try {
-      const value = decimalInput(parameterValue).toString();
+      const value = decimalStringSchema.parse(decimalInput(parameterValue).toString());
       await costingRepository.setProductCostingParameter({
         productId: parameterTarget.product.id,
         key: parameterTarget.parameter.key,
