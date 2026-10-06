@@ -610,6 +610,31 @@ describe("aggregateCosting technical inputs", () => {
     });
   });
 
+  it("uses configuration defaults and forbids request-time overrides", () => {
+    const input = decimalInput({
+      required: false,
+      scope: "CONFIGURATION",
+      defaultValue: decimalString("2"),
+    });
+    const result = aggregateCosting(fixture({ inputs: [input] }));
+
+    expect(result.resolvedInputs).toContainEqual({
+      key: "factor",
+      source: "CONFIGURATION",
+      value: { kind: "decimal", value: "2", unit: null },
+    });
+
+    expectCode(
+      fixture({
+        inputs: [input],
+        technicalInputs: {
+          factor: { kind: "decimal", value: decimalString("99"), unit: null },
+        },
+      }),
+      "CONFIGURATION_INPUT_OVERRIDE_FORBIDDEN"
+    );
+  });
+
   it("normalizes a physical decimal input to its declared unit", () => {
     const result = aggregateCosting(
       fixture({
