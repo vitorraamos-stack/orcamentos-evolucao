@@ -1085,6 +1085,12 @@ revoke execute on function public.pricing_guard_product_settings() from public, 
 revoke execute on function public.pricing_guard_payment_term() from public, anon, authenticated, service_role;
 revoke execute on function public.pricing_guard_audit_event() from public, anon, authenticated, service_role;
 
+grant execute on function public.pricing_guard_policy() to service_role;
+grant execute on function public.pricing_guard_policy_version() to service_role;
+grant execute on function public.pricing_guard_product_settings() to service_role;
+grant execute on function public.pricing_guard_payment_term() to service_role;
+grant execute on function public.pricing_guard_audit_event() to service_role;
+
 revoke execute on function public.pricing_get_policy_secure(uuid) from public, anon, authenticated;
 revoke execute on function public.pricing_get_version_definition_secure(uuid) from public, anon, authenticated;
 revoke execute on function public.pricing_get_product_settings_secure(uuid) from public, anon, authenticated;

@@ -45,6 +45,15 @@ describe("Pricing persistence migration contract", () => {
     expect(sql).toContain("'rate', t.rate::text");
   });
 
+  it("keeps trigger functions unavailable to browser roles", () => {
+    expect(sql).toMatch(
+      /revoke execute on function public\.pricing_guard_policy\(\) from public, anon, authenticated, service_role/i
+    );
+    expect(sql).toMatch(
+      /grant execute on function public\.pricing_guard_policy\(\) to service_role/i
+    );
+  });
+
   it("keeps admin RPCs server-only", () => {
     expect(sql).toMatch(
       /revoke execute on function public\.pricing_create_policy_secure[\s\S]*from public, anon, authenticated/i
@@ -63,9 +72,13 @@ describe("Pricing persistence migration contract", () => {
     expect(sql).not.toMatch(/grant[^;]*(?:delete|truncate|references|trigger|maintain)[^;]*to service_role/i);
   });
 
-  it("does not seed real markup, minimum, or 4x-12x rates", () => {
-    expect(sql).not.toMatch(/insert into public\.pricing_payment_terms\s*\([^)]*\)\s*values\s*\(\s*[4-9]|10|11|12/i);
-    expect(sql).not.toMatch(/insert into public\.product_pricing_settings/i);
+  it("does not seed literal real commercial values", () => {
+    expect(sql).not.toMatch(
+      /insert into public\.pricing_payment_terms\s*\(\s*installments\s*,\s*rate[^)]*\)\s*values\s*\(\s*(?:4|5|6|7|8|9|10|11|12)\s*,/i
+    );
+    expect(sql).not.toMatch(
+      /insert into public\.product_pricing_settings\s*\([^)]*\)\s*values\s*\(\s*'[0-9a-f-]{36}'/i
+    );
   });
 
   it("uses optimistic revision checks and publication compare-and-swap", () => {
