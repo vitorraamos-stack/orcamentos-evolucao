@@ -32,7 +32,11 @@ import type { CostRate } from "@shared/costing/rates";
 import { costTimestampSchema } from "@shared/costing/rates";
 import type { CostResourceType } from "@shared/costing/resources";
 import type { PricingPaymentTerm } from "@shared/pricing";
-import type { Product } from "@shared/product-engineering";
+import type {
+  Product,
+  ProductInput,
+  ProductVersionDefinition,
+} from "@shared/product-engineering";
 import { RefreshCcw, Save, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 
@@ -53,6 +57,7 @@ const COST_TYPE_LABEL: Record<CostResourceType, string> = {
 type ProductRow = {
   product: Product;
   context: ProductPricingContext | null;
+  engineeringDefinition: ProductVersionDefinition | null;
 };
 
 type CostRow = CostResourceRecord & {
@@ -92,6 +97,11 @@ export default function PricingAdminPage() {
   const [costInput, setCostInput] = useState("");
   const [paymentTarget, setPaymentTarget] = useState<PaymentRow | null>(null);
   const [paymentInput, setPaymentInput] = useState("");
+  const [parameterTarget, setParameterTarget] = useState<{
+    row: ProductRow;
+    input: ProductInput;
+  } | null>(null);
+  const [parameterInput, setParameterInput] = useState("");
 
   const loadAll = async () => {
     setLoading(true);
@@ -99,21 +109,29 @@ export default function PricingAdminPage() {
       const productList = await productEngineeringRepository.listProducts();
       const productRows = await Promise.all(
         productList.map(async product => {
+          let context: ProductPricingContext | null = null;
           try {
-            return {
-              product,
-              context: await pricingRepository.loadProductContext(product.id),
-            };
+            context = await pricingRepository.loadProductContext(product.id);
           } catch (error) {
             const apiError = error as ApiLikeError;
             if (
-              apiError.status === 404 ||
-              apiError.code === "PRODUCT_PRICING_SETTINGS_NOT_FOUND" ||
-              apiError.code === "PRICING_PUBLISHED_VERSION_NOT_FOUND"
+              apiError.status !== 404 &&
+              apiError.code !== "PRODUCT_PRICING_SETTINGS_NOT_FOUND" &&
+              apiError.code !== "PRICING_PUBLISHED_VERSION_NOT_FOUND"
             )
-              return { product, context: null };
-            throw error;
+              throw error;
           }
+
+          const versions =
+            await productEngineeringRepository.listProductVersions(product.id);
+          const published = versions.find(version => version.status === "PUBLISHED");
+          const engineeringDefinition = published
+            ? await productEngineeringRepository.loadProductVersionDefinition(
+                published.id
+              )
+            : null;
+
+          return { product, context, engineeringDefinition };
         })
       );
 
@@ -166,6 +184,16 @@ export default function PricingAdminPage() {
 
   const configuredProducts = useMemo(
     () => products.filter(row => row.context !== null),
+    [products]
+  );
+
+  const configurationInputs = useMemo(
+    () =>
+      products.flatMap(row =>
+        (row.engineeringDefinition?.inputs ?? [])
+          .filter(input => input.scope === "CONFIGURATION")
+          .map(input => ({ row, input }))
+      ),
     [products]
   );
 
@@ -277,6 +305,42 @@ export default function PricingAdminPage() {
     }
   };
 
+  const openParameter = (row: ProductRow, input: ProductInput) => {
+    if (input.type !== "DECIMAL") {
+      toast.error("Esta versão do painel edita parâmetros decimais.");
+      return;
+    }
+    setParameterTarget({ row, input });
+    setParameterInput(input.defaultValue ?? "");
+  };
+
+  const saveParameter = async () => {
+    if (!parameterTarget?.row.engineeringDefinition) return;
+    if (parameterTarget.input.type !== "DECIMAL") return;
+    setSaving(true);
+    try {
+      const value = decimalStringSchema.parse(nonNegativeAmount(parameterInput));
+      await productEngineeringRepository.publishConfigurationInputDefault(
+        parameterTarget.row.engineeringDefinition,
+        parameterTarget.input.key,
+        value
+      );
+      toast.success(
+        `${parameterTarget.input.label} atualizado e nova versão do produto publicada.`
+      );
+      setParameterTarget(null);
+      await loadAll();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Erro ao atualizar parâmetro técnico."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!hubPermissions.isManager) {
     return (
       <div className="space-y-2">
@@ -307,8 +371,9 @@ export default function PricingAdminPage() {
       </div>
 
       <Tabs defaultValue="products">
-        <TabsList className="grid w-full grid-cols-3 md:w-[560px]">
+        <TabsList className="grid w-full grid-cols-4 md:w-[760px]">
           <TabsTrigger value="products">Produtos e margem</TabsTrigger>
+          <TabsTrigger value="parameters">Parâmetros técnicos</TabsTrigger>
           <TabsTrigger value="costs">Custos</TabsTrigger>
           <TabsTrigger value="payments">Parcelamento</TabsTrigger>
         </TabsList>
@@ -386,13 +451,79 @@ export default function PricingAdminPage() {
             </CardContent>
           </Card>
 
+        </TabsContent>
+
+        <TabsContent value="parameters" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle>Parâmetros técnicos e serviços adicionais</CardTitle>
+              <CardTitle>Parâmetros técnicos do cálculo</CardTitle>
               <CardDescription>
-                Rendimento de tinta, número padrão de demãos e regras de instalação/munck serão gerenciados na fase 17B. Eles não serão fixados no frontend.
+                Estes valores são definidos pelo gerente e nunca podem ser enviados ou alterados pelo orçamento. Cada mudança publica uma nova versão do produto e preserva a versão anterior.
               </CardDescription>
             </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Produto</TableHead>
+                    <TableHead>Parâmetro</TableHead>
+                    <TableHead>Valor atual</TableHead>
+                    <TableHead>Unidade</TableHead>
+                    <TableHead>Versão</TableHead>
+                    <TableHead className="text-right">Ação</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                        Carregando...
+                      </TableCell>
+                    </TableRow>
+                  ) : configurationInputs.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                        Nenhum parâmetro técnico gerenciável foi publicado ainda.
+                      </TableCell>
+                    </TableRow>
+                  ) : configurationInputs.map(({ row, input }) => (
+                    <TableRow key={`${row.product.id}:${input.key}`}>
+                      <TableCell>
+                        <div className="font-medium">{row.product.name}</div>
+                        <div className="text-xs text-muted-foreground">{row.product.code}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium">{input.label}</div>
+                        <div className="text-xs text-muted-foreground">{input.key}</div>
+                      </TableCell>
+                      <TableCell>
+                        {input.defaultValue === undefined
+                          ? "—"
+                          : String(input.defaultValue)}
+                      </TableCell>
+                      <TableCell>
+                        {input.type === "DECIMAL" ? input.unit ?? "—" : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {row.engineeringDefinition
+                          ? `v${row.engineeringDefinition.version.versionNumber}`
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={input.type !== "DECIMAL"}
+                          onClick={() => openParameter(row, input)}
+                        >
+                          Alterar
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
           </Card>
         </TabsContent>
 
@@ -554,6 +685,42 @@ export default function PricingAdminPage() {
             <Button variant="outline" onClick={() => setCostTarget(null)}>Cancelar</Button>
             <Button disabled={saving} onClick={() => void saveCost()}>
               {saving ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!parameterTarget}
+        onOpenChange={open => !open && setParameterTarget(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar parâmetro técnico</DialogTitle>
+            <DialogDescription>
+              {parameterTarget?.row.product.name} — {parameterTarget?.input.label}. A alteração criará e publicará uma nova versão do produto.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Novo valor
+              {parameterTarget?.input.type === "DECIMAL" &&
+              parameterTarget.input.unit
+                ? ` (${parameterTarget.input.unit})`
+                : ""}
+            </label>
+            <Input
+              value={parameterInput}
+              onChange={event => setParameterInput(event.target.value)}
+              inputMode="decimal"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setParameterTarget(null)}>
+              Cancelar
+            </Button>
+            <Button disabled={saving} onClick={() => void saveParameter()}>
+              {saving ? "Publicando..." : "Salvar e publicar"}
             </Button>
           </DialogFooter>
         </DialogContent>
