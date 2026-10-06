@@ -85,6 +85,51 @@ const client = (user: any, role: string | null, authError: unknown = null) => ({
         },
         error: null,
       };
+    if (name === "pricing_get_official_calculation_context_secure")
+      return {
+        data: {
+          policy: {
+            id: id(1),
+            code: "STANDARD",
+            name: "Standard",
+            description: null,
+            status: "ACTIVE",
+          },
+          version: {
+            id: id(2),
+            pricing_policy_id: id(1),
+            version_number: 1,
+            revision: 1,
+            status: "PUBLISHED",
+            notes: null,
+            created_at: now,
+            created_by: id(9),
+            published_at: now,
+            published_by: id(9),
+          },
+          schema_version: "1.0",
+          engine_version: "1.0",
+          strategy_type: "MARKUP_ON_COST",
+          markup: "2",
+          markup_base: "TOTAL_COST",
+          charges: [],
+          product_settings: {
+            product_id: id(4),
+            pricing_policy_id: id(1),
+            minimum_selling_price: "700",
+            revision: 1,
+            updated_at: now,
+            updated_by: id(9),
+          },
+          payment_term: {
+            source: "SYSTEM_ZERO",
+            installments: 1,
+            rate: "0",
+            revision: null,
+          },
+        },
+        error: null,
+      };
     return { data: null, error: null };
   }),
 });
@@ -158,6 +203,39 @@ describe("Pricing API manager authority", () => {
       });
     }
   );
+
+  it("loads the official manager context for a configured product", async () => {
+    state.client = client({ id: id(9) }, "gerente");
+    const res = response();
+
+    await handler(
+      {
+        method: "GET",
+        headers: { authorization: "Bearer valid" },
+        query: { contextProductId: id(4) },
+      },
+      res
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(res.payload.data).toMatchObject({
+      productSettings: {
+        productId: id(4),
+        pricingPolicyId: id(1),
+        minimumSellingPrice: "700",
+      },
+      policy: { id: id(1), code: "STANDARD" },
+      definition: {
+        version: { id: id(2), status: "PUBLISHED" },
+        strategy: { type: "MARKUP_ON_COST", markup: "2" },
+      },
+      payment: { installments: 1, rate: "0", source: "SYSTEM_ZERO" },
+    });
+    expect(state.client.rpc).toHaveBeenCalledWith(
+      "pricing_get_official_calculation_context_secure",
+      { p_product_id: id(4), p_installments: 1 }
+    );
+  });
 
   it("rejects unknown, empty, or ambiguous administration queries", async () => {
     for (const query of [
