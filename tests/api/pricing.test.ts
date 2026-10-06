@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({ client: null as any }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => state.client }));
-import handler from "./pricing";
+import handler from "../../api/pricing";
 
 const id = (n: number) =>
   `10000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
