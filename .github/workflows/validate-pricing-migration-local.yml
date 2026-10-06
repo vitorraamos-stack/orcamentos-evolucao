@@ -110,43 +110,43 @@ jobs:
           end;
           $$;
 
-          do $$
-          declare payload jsonb;
-          begin
-            payload := public.pricing_get_version_definition_secure(:'version_id'::uuid);
-            if jsonb_typeof(payload->'markup') <> 'string' then
-              raise exception 'markup must cross JSON boundary as text';
-            end if;
-            payload := public.pricing_get_product_settings_secure(
-              '10000000-0000-4000-8000-000000000004'::uuid
-            );
-            if jsonb_typeof(payload->'minimum_selling_price') <> 'string' then
-              raise exception 'minimum must cross JSON boundary as text';
-            end if;
-            payload := public.pricing_get_payment_term_secure(6);
-            if jsonb_typeof(payload->'rate') <> 'string' then
-              raise exception 'rate must cross JSON boundary as text';
-            end if;
-          end;
-          $$;
+          select 1 / case when
+            jsonb_typeof(
+              public.pricing_get_version_definition_secure(:'version_id'::uuid)->'markup'
+            ) = 'string'
+            then 1 else 0 end;
+
+          select 1 / case when
+            jsonb_typeof(
+              public.pricing_get_product_settings_secure(
+                '10000000-0000-4000-8000-000000000004'::uuid
+              )->'minimum_selling_price'
+            ) = 'string'
+            then 1 else 0 end;
+
+          select 1 / case when
+            jsonb_typeof(public.pricing_get_payment_term_secure(6)->'rate') = 'string'
+            then 1 else 0 end;
 
           reset role;
 
-          do $$
-          begin
-            if has_table_privilege('authenticated','public.pricing_policies','SELECT') then
-              raise exception 'authenticated must not read pricing tables directly';
-            end if;
-            if has_function_privilege(
+          select 1 / case when
+            not has_table_privilege(
+              'authenticated','public.pricing_policies','SELECT'
+            )
+            then 1 else 0 end;
+
+          select 1 / case when
+            not has_function_privilege(
               'authenticated',
               'public.pricing_create_policy_secure(text,text,text,text,numeric,text,uuid,text,text,text,text)',
               'EXECUTE'
-            ) then
-              raise exception 'authenticated must not execute pricing admin RPC';
-            end if;
-            if has_table_privilege('service_role','public.pricing_policies','DELETE') then
-              raise exception 'service_role must not have DELETE';
-            end if;
-          end;
-          $$;
+            )
+            then 1 else 0 end;
+
+          select 1 / case when
+            not has_table_privilege(
+              'service_role','public.pricing_policies','DELETE'
+            )
+            then 1 else 0 end;
           SQL
