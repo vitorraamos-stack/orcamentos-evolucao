@@ -7,12 +7,17 @@ import {
 import { UNIT_IDS } from "../calculation-engine/units/index.js";
 
 export const inputIdSchema = z.string().uuid().brand<"ProductInputId">();
+export const PRODUCT_INPUT_SCOPES = ["REQUEST", "CONFIGURATION"] as const;
+export const productInputScopeSchema = z.enum(PRODUCT_INPUT_SCOPES);
+export type ProductInputScope = z.infer<typeof productInputScopeSchema>;
+
 const base = {
   id: inputIdSchema,
   key: configurableKeySchema,
   label: z.string().trim().min(1),
   description: z.string().nullable().optional(),
   required: z.boolean(),
+  scope: productInputScopeSchema.default("REQUEST"),
   sortOrder: z.number().int().nonnegative(),
 };
 const decimalInputSchema = z
@@ -113,10 +118,26 @@ const textInputSchema = z
         message: "Default exceeds maxLength",
       });
   });
-export const productInputSchema = z.discriminatedUnion("type", [
-  decimalInputSchema,
-  booleanInputSchema,
-  selectInputSchema,
-  textInputSchema,
-]);
+export const productInputSchema = z
+  .discriminatedUnion("type", [
+    decimalInputSchema,
+    booleanInputSchema,
+    selectInputSchema,
+    textInputSchema,
+  ])
+  .superRefine((input, context) => {
+    if (input.scope !== "CONFIGURATION") return;
+    if (input.required)
+      context.addIssue({
+        code: "custom",
+        path: ["required"],
+        message: "Configuration inputs cannot require request-time values",
+      });
+    if (input.defaultValue === undefined)
+      context.addIssue({
+        code: "custom",
+        path: ["defaultValue"],
+        message: "Configuration inputs require a default value",
+      });
+  });
 export type ProductInput = z.infer<typeof productInputSchema>;
