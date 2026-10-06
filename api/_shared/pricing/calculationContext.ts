@@ -1,6 +1,6 @@
 import { z } from "zod";
+import { decimalFrom } from "../../../shared/calculation-engine/decimal/index.js";
 import {
-  decimalFrom,
   pricingRateSchema,
   type PricingPolicy,
   type PricingPolicyVersionDefinition,
