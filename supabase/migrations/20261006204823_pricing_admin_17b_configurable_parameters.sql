@@ -227,10 +227,15 @@ as $$
   where p.product_id = p_product_id;
 $$;
 
-create function public.costing_set_product_parameter_secure(
+create function public.costing_upsert_product_parameter_secure(
   p_product_id uuid,
   p_key text,
+  p_label text,
+  p_description text,
   p_value numeric,
+  p_unit text,
+  p_min_value numeric,
+  p_max_value numeric,
   p_expected_revision integer,
   p_actor_id uuid
 ) returns jsonb
@@ -242,46 +247,73 @@ declare
   v_before public.product_costing_parameters;
   v_after public.product_costing_parameters;
 begin
+  if p_key !~ '^[a-z][a-z0-9_]*$'
+    or btrim(p_label) = ''
+    or p_value::text in ('NaN','Infinity','-Infinity')
+    or (p_min_value is not null and p_min_value::text in ('NaN','Infinity','-Infinity'))
+    or (p_max_value is not null and p_max_value::text in ('NaN','Infinity','-Infinity'))
+    or (p_min_value is not null and p_value < p_min_value)
+    or (p_max_value is not null and p_value > p_max_value)
+    or (p_min_value is not null and p_max_value is not null and p_min_value > p_max_value)
+    or (p_unit is not null and p_unit not in (
+      'mm','cm','m','m2','linear_m','un','sheet','g','kg','min','h','BRL'
+    )) then
+    raise exception 'INVALID_COSTING_PARAMETER';
+  end if;
+
+  perform 1 from public.products where id = p_product_id;
+  if not found then raise exception 'COSTING_PRODUCT_NOT_FOUND'; end if;
+
   select * into v_before
   from public.product_costing_parameters
   where product_id = p_product_id and key = p_key
   for update;
 
-  if not found then raise exception 'COSTING_PARAMETER_NOT_FOUND'; end if;
-  if v_before.revision <> p_expected_revision then
-    raise exception 'COSTING_PARAMETER_REVISION_CONFLICT';
-  end if;
-  if p_value::text in ('NaN','Infinity','-Infinity')
-    or (v_before.min_value is not null and p_value < v_before.min_value)
-    or (v_before.max_value is not null and p_value > v_before.max_value) then
-    raise exception 'INVALID_COSTING_PARAMETER';
-  end if;
+  if not found then
+    if p_expected_revision is not null then
+      raise exception 'COSTING_PARAMETER_REVISION_CONFLICT';
+    end if;
 
-  update public.product_costing_parameters
-  set value = p_value,
-      revision = revision + 1,
-      updated_at = now(),
-      updated_by = p_actor_id
-  where product_id = p_product_id and key = p_key
-  returning * into v_after;
-
-  insert into public.costing_configuration_audit_events(
-    product_id, parameter_key, action, actor_id, before_state, after_state
-  ) values (
-    p_product_id, p_key, 'SET_PRODUCT_PARAMETER', p_actor_id,
-    jsonb_build_object(
-      'value', v_before.value::text,
-      'revision', v_before.revision,
-      'updated_at', v_before.updated_at,
-      'updated_by', v_before.updated_by
-    ),
-    jsonb_build_object(
-      'value', v_after.value::text,
-      'revision', v_after.revision,
-      'updated_at', v_after.updated_at,
-      'updated_by', v_after.updated_by
+    insert into public.product_costing_parameters(
+      product_id,key,label,description,value,unit,min_value,max_value,revision,updated_by
+    ) values (
+      p_product_id,p_key,p_label,p_description,p_value,p_unit,p_min_value,p_max_value,1,p_actor_id
     )
-  );
+    returning * into v_after;
+
+    insert into public.costing_configuration_audit_events(
+      product_id, parameter_key, action, actor_id, before_state, after_state
+    ) values (
+      p_product_id, p_key, 'CREATE_PRODUCT_PARAMETER', p_actor_id, null,
+      to_jsonb(v_after)
+    );
+  else
+    if p_expected_revision is null or v_before.revision <> p_expected_revision then
+      raise exception 'COSTING_PARAMETER_REVISION_CONFLICT';
+    end if;
+    if v_before.label is distinct from p_label
+      or v_before.description is distinct from p_description
+      or v_before.unit is distinct from p_unit
+      or v_before.min_value is distinct from p_min_value
+      or v_before.max_value is distinct from p_max_value then
+      raise exception 'COSTING_PARAMETER_STATE_CONFLICT';
+    end if;
+
+    update public.product_costing_parameters
+    set value = p_value,
+        revision = revision + 1,
+        updated_at = now(),
+        updated_by = p_actor_id
+    where product_id = p_product_id and key = p_key
+    returning * into v_after;
+
+    insert into public.costing_configuration_audit_events(
+      product_id, parameter_key, action, actor_id, before_state, after_state
+    ) values (
+      p_product_id, p_key, 'SET_PRODUCT_PARAMETER', p_actor_id,
+      to_jsonb(v_before), to_jsonb(v_after)
+    );
+  end if;
 
   return jsonb_build_object(
     'product_id', v_after.product_id,
@@ -341,45 +373,74 @@ declare
   v_before public.pricing_installation_settings;
   v_after public.pricing_installation_settings;
 begin
-  select * into v_before
-  from public.pricing_installation_settings
-  where id = 1
-  for update;
-
-  if not found then raise exception 'PRICING_INSTALLATION_SETTINGS_NOT_FOUND'; end if;
-  if v_before.revision <> p_expected_revision then
-    raise exception 'PRICING_REVISION_CONFLICT';
-  end if;
   if p_tier_1_max_area_m2 <= 0
     or p_tier_2_max_area_m2 <= p_tier_1_max_area_m2
     or p_tier_1_price < 0
     or p_tier_2_price < 0
     or p_tier_3_price < 0
     or p_munck_hourly_price < 0
-    or p_munck_minimum_hours <= 0 then
+    or p_munck_minimum_hours <= 0
+    or p_tier_1_max_area_m2::text in ('NaN','Infinity','-Infinity')
+    or p_tier_1_price::text in ('NaN','Infinity','-Infinity')
+    or p_tier_2_max_area_m2::text in ('NaN','Infinity','-Infinity')
+    or p_tier_2_price::text in ('NaN','Infinity','-Infinity')
+    or p_tier_3_price::text in ('NaN','Infinity','-Infinity')
+    or p_munck_hourly_price::text in ('NaN','Infinity','-Infinity')
+    or p_munck_minimum_hours::text in ('NaN','Infinity','-Infinity') then
     raise exception 'INVALID_PRICING_CONFIGURATION';
   end if;
 
-  update public.pricing_installation_settings
-  set tier_1_max_area_m2 = p_tier_1_max_area_m2,
-      tier_1_price = p_tier_1_price,
-      tier_2_max_area_m2 = p_tier_2_max_area_m2,
-      tier_2_price = p_tier_2_price,
-      tier_3_price = p_tier_3_price,
-      munck_hourly_price = p_munck_hourly_price,
-      munck_minimum_hours = p_munck_minimum_hours,
-      revision = revision + 1,
-      updated_at = now(),
-      updated_by = p_actor_id
+  select * into v_before
+  from public.pricing_installation_settings
   where id = 1
-  returning * into v_after;
+  for update;
 
-  insert into public.pricing_audit_events(
-    entity_type, entity_key, action, actor_id, before_state, after_state
-  ) values (
-    'INSTALLATION_SETTINGS', 'GLOBAL', 'SET_INSTALLATION_SETTINGS', p_actor_id,
-    to_jsonb(v_before), to_jsonb(v_after)
-  );
+  if not found then
+    if p_expected_revision is not null then
+      raise exception 'PRICING_REVISION_CONFLICT';
+    end if;
+
+    insert into public.pricing_installation_settings(
+      id,tier_1_max_area_m2,tier_1_price,tier_2_max_area_m2,tier_2_price,
+      tier_3_price,munck_hourly_price,munck_minimum_hours,revision,updated_by
+    ) values (
+      1,p_tier_1_max_area_m2,p_tier_1_price,p_tier_2_max_area_m2,p_tier_2_price,
+      p_tier_3_price,p_munck_hourly_price,p_munck_minimum_hours,1,p_actor_id
+    )
+    returning * into v_after;
+
+    insert into public.pricing_audit_events(
+      entity_type, entity_key, action, actor_id, before_state, after_state
+    ) values (
+      'INSTALLATION_SETTINGS', 'GLOBAL', 'CREATE_INSTALLATION_SETTINGS', p_actor_id,
+      null, to_jsonb(v_after)
+    );
+  else
+    if p_expected_revision is null or v_before.revision <> p_expected_revision then
+      raise exception 'PRICING_REVISION_CONFLICT';
+    end if;
+
+    update public.pricing_installation_settings
+    set tier_1_max_area_m2 = p_tier_1_max_area_m2,
+        tier_1_price = p_tier_1_price,
+        tier_2_max_area_m2 = p_tier_2_max_area_m2,
+        tier_2_price = p_tier_2_price,
+        tier_3_price = p_tier_3_price,
+        munck_hourly_price = p_munck_hourly_price,
+        munck_minimum_hours = p_munck_minimum_hours,
+        revision = revision + 1,
+        updated_at = now(),
+        updated_by = p_actor_id
+    where id = 1
+    returning * into v_after;
+
+    insert into public.pricing_audit_events(
+      entity_type, entity_key, action, actor_id, before_state, after_state
+    ) values (
+      'INSTALLATION_SETTINGS', 'GLOBAL', 'SET_INSTALLATION_SETTINGS', p_actor_id,
+      to_jsonb(v_before), to_jsonb(v_after)
+    );
+  end if;
 
   return public.pricing_get_installation_settings_secure();
 end;
@@ -391,13 +452,13 @@ revoke all on table
   public.pricing_installation_settings
 from public, anon, authenticated, service_role;
 
-grant select, update on table public.product_costing_parameters to service_role;
+grant select, insert, update on table public.product_costing_parameters to service_role;
 grant select, insert on table public.costing_configuration_audit_events to service_role;
-grant select, update on table public.pricing_installation_settings to service_role;
+grant select, insert, update on table public.pricing_installation_settings to service_role;
 
 revoke execute on function public.costing_get_product_parameters_secure(uuid)
   from public, anon, authenticated;
-revoke execute on function public.costing_set_product_parameter_secure(uuid,text,numeric,integer,uuid)
+revoke execute on function public.costing_upsert_product_parameter_secure(uuid,text,text,text,numeric,text,numeric,numeric,integer,uuid)
   from public, anon, authenticated;
 revoke execute on function public.pricing_get_installation_settings_secure()
   from public, anon, authenticated;
@@ -407,7 +468,7 @@ revoke execute on function public.pricing_set_installation_settings_secure(
 
 grant execute on function public.costing_get_product_parameters_secure(uuid)
   to service_role;
-grant execute on function public.costing_set_product_parameter_secure(uuid,text,numeric,integer,uuid)
+grant execute on function public.costing_upsert_product_parameter_secure(uuid,text,text,text,numeric,text,numeric,numeric,integer,uuid)
   to service_role;
 grant execute on function public.pricing_get_installation_settings_secure()
   to service_role;
@@ -415,70 +476,7 @@ grant execute on function public.pricing_set_installation_settings_secure(
   numeric,numeric,numeric,numeric,numeric,numeric,numeric,integer,uuid
 ) to service_role;
 
-with pilot as (
-  select p.id as product_id, v.published_by as actor_id
-  from public.products p
-  join public.product_versions v
-    on v.product_id = p.id and v.status = 'PUBLISHED'
-  where p.code = 'LETREIRO_PVC'
-  limit 1
-),
-seed_values(key,label,description,value,unit,min_value,max_value) as (
-  values
-    (
-      'paint_coats',
-      'Demãos padrão',
-      'Quantidade padrão de demãos usadas no cálculo de tinta.',
-      2::numeric,
-      null::text,
-      1::numeric,
-      5::numeric
-    ),
-    (
-      'paint_yield_m2_per_can_per_coat',
-      'Rendimento da tinta',
-      'Área de referência coberta por uma lata em uma demão.',
-      6.4::numeric,
-      'm2'::text,
-      0.1::numeric,
-      null::numeric
-    )
-)
-insert into public.product_costing_parameters(
-  product_id,key,label,description,value,unit,min_value,max_value,updated_by
-)
-select
-  pilot.product_id,
-  seed_values.key,
-  seed_values.label,
-  seed_values.description,
-  seed_values.value,
-  seed_values.unit,
-  seed_values.min_value,
-  seed_values.max_value,
-  pilot.actor_id
-from pilot cross join seed_values
-on conflict (product_id,key) do nothing;
 
-with actor as (
-  select v.published_by as actor_id
-  from public.products p
-  join public.product_versions v
-    on v.product_id = p.id and v.status = 'PUBLISHED'
-  where p.code = 'LETREIRO_PVC'
-  limit 1
-)
-insert into public.pricing_installation_settings(
-  id,
-  tier_1_max_area_m2,
-  tier_1_price,
-  tier_2_max_area_m2,
-  tier_2_price,
-  tier_3_price,
-  munck_hourly_price,
-  munck_minimum_hours,
-  updated_by
-)
-select 1, 1, 150, 2, 180, 200, 375, 4, actor.actor_id
-from actor
-on conflict (id) do nothing;
+-- Business values are intentionally not seeded here.
+-- They are created after migration through the audited server-only RPCs so this
+-- migration remains valid for fresh databases where the pilot product does not yet exist.
