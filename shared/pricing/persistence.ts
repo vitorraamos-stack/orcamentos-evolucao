@@ -134,7 +134,7 @@ const saveDraftCommandSchema = z
   })
   .strict();
 
-const lifecycleCommand = (action: "START_VALIDATION" | "RETURN_TO_DRAFT" | "PUBLISH_VERSION") =>
+const lifecycleCommand = (action: "START_VALIDATION" | "RETURN_TO_DRAFT") =>
   z
     .object({
       action: z.literal(action),
@@ -142,6 +142,15 @@ const lifecycleCommand = (action: "START_VALIDATION" | "RETURN_TO_DRAFT" | "PUBL
       expectedRevision: revisionSchema,
     })
     .strict();
+
+const publishVersionCommandSchema = z
+  .object({
+    action: z.literal("PUBLISH_VERSION"),
+    versionId: pricingPolicyVersionIdSchema,
+    expectedRevision: revisionSchema,
+    expectedCurrentPublishedVersionId: pricingPolicyVersionIdSchema.nullable(),
+  })
+  .strict();
 
 const setProductPricingCommandSchema = z
   .object({
@@ -171,7 +180,7 @@ export const pricingPersistenceMutationSchema = z
   saveDraftCommandSchema,
   lifecycleCommand("START_VALIDATION"),
   lifecycleCommand("RETURN_TO_DRAFT"),
-  lifecycleCommand("PUBLISH_VERSION"),
+  publishVersionCommandSchema,
     setProductPricingCommandSchema,
     setPaymentTermCommandSchema,
   ])

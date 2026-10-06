@@ -311,13 +311,11 @@ export class PricingPersistenceService {
         "Pricing version is not VALIDATING."
       );
     }
-    const current = await this.rpc("pricing_get_current_published_version_id_secure", {
-      p_policy_id: aggregate.policy.id,
-    });
     const data = await this.rpc("pricing_publish_version_secure", {
       p_version_id: command.versionId,
       p_expected_revision: command.expectedRevision,
-      p_expected_current_published_version_id: current?.id ?? current ?? null,
+      p_expected_current_published_version_id:
+        command.expectedCurrentPublishedVersionId,
       p_actor_id: actorId,
     });
     return { version: mapPricingPolicyVersionRow(data), issues: readiness.issues };

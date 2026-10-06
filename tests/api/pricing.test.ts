@@ -161,6 +161,26 @@ describe("Pricing API manager authority", () => {
     }
   });
 
+  it("requires explicit publication CAS state from the caller", async () => {
+    state.client = client({ id: id(9) }, "gerente");
+    const res = response();
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer valid" },
+        body: {
+          action: "PUBLISH_VERSION",
+          versionId: id(2),
+          expectedRevision: 1,
+        },
+      },
+      res
+    );
+    expect(res.statusCode).toBe(400);
+    expect(res.payload.error.code).toBe("INVALID_PAYLOAD");
+    expect(state.client.rpc).not.toHaveBeenCalled();
+  });
+
   it("rejects browser-supplied actor and publication metadata", async () => {
     state.client = client({ id: id(9) }, "gerente");
     const res = response();

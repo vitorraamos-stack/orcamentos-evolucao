@@ -43,8 +43,6 @@ const db = (definition: any = aggregate()) => ({
   rpc: vi.fn(async (name: string) => {
     if (name === "pricing_get_version_definition_secure")
       return { data: definition, error: null };
-    if (name === "pricing_get_current_published_version_id_secure")
-      return { data: null, error: null };
     return { data: { revision: 2 }, error: null };
   }),
 });
@@ -170,7 +168,7 @@ describe("PricingPersistenceService", () => {
     expect(result.version.status).toBe("VALIDATING");
   });
 
-  it("publishes with the server-observed current version", async () => {
+  it("preserves the caller-observed published version through the CAS", async () => {
     const validating = aggregate("VALIDATING");
     const publishedRow = {
       ...aggregate("PUBLISHED").version,
@@ -181,16 +179,17 @@ describe("PricingPersistenceService", () => {
     const mock: any = db(validating);
     mock.rpc
       .mockResolvedValueOnce({ data: validating, error: null })
-      .mockResolvedValueOnce({ data: { id: id(8) }, error: null })
       .mockResolvedValueOnce({ data: publishedRow, error: null });
     const result: any = await new PricingPersistenceService(mock).execute(
       {
         action: "PUBLISH_VERSION",
         versionId: id(2),
         expectedRevision: 1,
+        expectedCurrentPublishedVersionId: id(8),
       },
       id(9)
     );
+    expect(mock.rpc).toHaveBeenCalledTimes(2);
     expect(mock.rpc).toHaveBeenLastCalledWith(
       "pricing_publish_version_secure",
       expect.objectContaining({
@@ -198,7 +197,42 @@ describe("PricingPersistenceService", () => {
         p_actor_id: id(9),
       })
     );
+    expect(
+      mock.rpc.mock.calls.some(
+        ([name]: [string]) =>
+          name === "pricing_get_current_published_version_id_secure"
+      )
+    ).toBe(false);
     expect(result.version.status).toBe("PUBLISHED");
+  });
+
+  it("supports first publication by preserving an explicit null expectation", async () => {
+    const validating = aggregate("VALIDATING");
+    const publishedRow = {
+      ...aggregate("PUBLISHED").version,
+      status: "PUBLISHED",
+      published_at: now,
+      published_by: id(9),
+    };
+    const mock: any = db(validating);
+    mock.rpc
+      .mockResolvedValueOnce({ data: validating, error: null })
+      .mockResolvedValueOnce({ data: publishedRow, error: null });
+    await new PricingPersistenceService(mock).execute(
+      {
+        action: "PUBLISH_VERSION",
+        versionId: id(2),
+        expectedRevision: 1,
+        expectedCurrentPublishedVersionId: null,
+      },
+      id(9)
+    );
+    expect(mock.rpc).toHaveBeenLastCalledWith(
+      "pricing_publish_version_secure",
+      expect.objectContaining({
+        p_expected_current_published_version_id: null,
+      })
+    );
   });
 
   it("sends product minimum and payment rates as decimal text", async () => {

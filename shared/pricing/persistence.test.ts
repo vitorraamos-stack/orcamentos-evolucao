@@ -95,6 +95,33 @@ describe("Pricing persistence contracts", () => {
     ).toBe(false);
   });
 
+
+  it("requires the caller-observed published version for publication CAS", () => {
+    const base = {
+      action: "PUBLISH_VERSION",
+      versionId: id(2),
+      expectedRevision: 1,
+    } as const;
+
+    expect(
+      pricingPersistenceMutationSchema.safeParse(base).success
+    ).toBe(false);
+
+    expect(
+      pricingPersistenceMutationSchema.safeParse({
+        ...base,
+        expectedCurrentPublishedVersionId: null,
+      }).success
+    ).toBe(true);
+
+    expect(
+      pricingPersistenceMutationSchema.safeParse({
+        ...base,
+        expectedCurrentPublishedVersionId: id(8),
+      }).success
+    ).toBe(true);
+  });
+
   it("keeps commands strict and requires explicit optimistic-lock intent", () => {
     expect(
       pricingPersistenceMutationSchema.safeParse({
