@@ -6,6 +6,7 @@ import {
   type CostResourceType,
   resourceDefinitionSchema,
 } from "../../../shared/costing/resources.js";
+import { productCostingParameterSchema } from "../../../shared/costing/productParameters.js";
 
 export class CostingCompatibilityError extends Error {
   readonly code = "COSTING_COMPATIBILITY_ERROR";
@@ -55,4 +56,27 @@ export function mapRate(value: unknown) {
 export function mapRateSeries(value: unknown) {
   if (!Array.isArray(value)) return invalid();
   return value.map(mapRate);
+}
+
+export function mapProductCostingParameter(value: any) {
+  const parsed = productCostingParameterSchema.safeParse({
+    productId: value?.product_id,
+    key: value?.key,
+    label: value?.label,
+    description: value?.description ?? null,
+    value: value?.value,
+    unit: value?.unit ?? null,
+    minValue: value?.min_value ?? null,
+    maxValue: value?.max_value ?? null,
+    revision: value?.revision,
+    updatedAt: value?.updated_at,
+    updatedBy: value?.updated_by,
+  });
+  if (!parsed.success) return invalid();
+  return parsed.data;
+}
+
+export function mapProductCostingParameters(value: unknown) {
+  if (!Array.isArray(value)) return invalid();
+  return value.map(mapProductCostingParameter);
 }
