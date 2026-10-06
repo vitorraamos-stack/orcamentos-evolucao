@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import type {
   PricingPaymentTerm,
-  PricingPersistenceMutation,
+  pricingPersistenceMutationSchema,
   PricingPolicy,
   PricingPolicyVersionDefinition,
   ProductPricingSettings,
@@ -56,8 +56,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return result.data;
 }
 
-const mutate = <T>(command: PricingPersistenceMutation) =>
-  request<T>("", { method: "POST", body: JSON.stringify(command) });
+const mutate = <T>(command: unknown) =>
+  request<T>("", {
+    method: "POST",
+    body: JSON.stringify(pricingPersistenceMutationSchema.parse(command)),
+  });
 
 export const pricingRepository = {
   loadProductContext: (productId: string) =>
@@ -84,23 +87,22 @@ export const pricingRepository = {
     }
   },
 
-  setProductPricing: (
-    payload: Omit<
-      Extract<PricingPersistenceMutation, { action: "SET_PRODUCT_PRICING" }>,
-      "action"
-    >
-  ) =>
+  setProductPricing: (payload: {
+    productId: string;
+    pricingPolicyId: string;
+    minimumSellingPrice: string;
+    expectedRevision: number | null;
+  }) =>
     mutate<ProductPricingSettings>({
       action: "SET_PRODUCT_PRICING",
       ...payload,
     }),
 
-  setPaymentTerm: (
-    payload: Omit<
-      Extract<PricingPersistenceMutation, { action: "SET_PAYMENT_TERM" }>,
-      "action"
-    >
-  ) =>
+  setPaymentTerm: (payload: {
+    installments: number;
+    rate: string;
+    expectedRevision: number | null;
+  }) =>
     mutate<PricingPaymentTerm>({
       action: "SET_PAYMENT_TERM",
       ...payload,
