@@ -39,7 +39,7 @@ export const costingAggregationInputSchema = z
     request: calculationRequestSchema,
     authoritativeTechnicalInputs: z
       .record(configurableKeySchema, technicalInputValueSchema)
-      .default({}),
+      .optional(),
     resources: z.array(costingResourceBundleSchema).readonly(),
     effectiveCostAt: costTimestampSchema,
   })
