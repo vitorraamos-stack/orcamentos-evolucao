@@ -4,6 +4,8 @@ import {
 } from "../../../shared/costing/api.js";
 import type { CostResourceType } from "../../../shared/costing/resources.js";
 import {
+  mapProductCostingParameter,
+  mapProductCostingParameters,
   mapRate,
   mapRateSeries,
   mapResourceResult,
@@ -72,6 +74,30 @@ export function mapCostingPersistenceError(error: any): never {
       "INVALID_COST_RATE",
       "Cost rate is invalid.",
     ],
+    [
+      /COSTING_PARAMETER_NOT_FOUND/,
+      404,
+      "COSTING_PARAMETER_NOT_FOUND",
+      "Product Costing parameter not found.",
+    ],
+    [
+      /COSTING_PARAMETER_REVISION_CONFLICT/,
+      409,
+      "COSTING_PARAMETER_REVISION_CONFLICT",
+      "Product Costing parameter changed since it was loaded.",
+    ],
+    [
+      /COSTING_PARAMETER_STATE_CONFLICT/,
+      409,
+      "COSTING_PARAMETER_STATE_CONFLICT",
+      "Product Costing parameter cannot be changed in this way.",
+    ],
+    [
+      /INVALID_COSTING_PARAMETER/,
+      400,
+      "INVALID_COSTING_PARAMETER",
+      "Product Costing parameter is invalid.",
+    ],
   ];
   for (const [pattern, status, code, safe] of mappings)
     if (pattern.test(message))
@@ -117,6 +143,15 @@ export class CostingService {
     return { ...mapped, rates: mapRateSeries(series.data) };
   }
 
+  async loadProductParameters(productId: string) {
+    const { data, error } = await this.db.rpc(
+      "costing_get_product_parameters_secure",
+      { p_product_id: productId }
+    );
+    if (error) mapCostingPersistenceError(error);
+    return mapProductCostingParameters(data);
+  }
+
   async execute(input: CostingMutation, actorId: string) {
     const command = costingMutationSchema.parse(input);
     if (command.action === "CREATE_RESOURCE") {
@@ -152,6 +187,20 @@ export class CostingService {
       );
       if (error) mapCostingPersistenceError(error);
       return mapResourceResult(data);
+    }
+    if (command.action === "SET_PRODUCT_PARAMETER") {
+      const { data, error } = await this.db.rpc(
+        "costing_set_product_parameter_secure",
+        {
+          p_product_id: command.productId,
+          p_key: command.key,
+          p_value: command.value,
+          p_expected_revision: command.expectedRevision,
+          p_actor_id: actorId,
+        }
+      );
+      if (error) mapCostingPersistenceError(error);
+      return mapProductCostingParameter(data);
     }
     const { data, error } = await this.db.rpc(
       "costing_set_current_rate_secure",
