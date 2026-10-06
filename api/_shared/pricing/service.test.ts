@@ -142,6 +142,37 @@ describe("PricingPersistenceService", () => {
     });
   });
 
+  it("returns VALIDATING to DRAFT with a new revision", async () => {
+    const validating = aggregate("VALIDATING", 4);
+    const draftRow = {
+      ...aggregate("DRAFT", 5).version,
+      status: "DRAFT",
+      revision: 5,
+    };
+    const mock: any = db(validating);
+    mock.rpc
+      .mockResolvedValueOnce({ data: validating, error: null })
+      .mockResolvedValueOnce({ data: draftRow, error: null });
+
+    const result: any = await new PricingPersistenceService(mock).execute(
+      {
+        action: "RETURN_TO_DRAFT",
+        versionId: id(2),
+        expectedRevision: 4,
+      },
+      id(9)
+    );
+
+    expect(mock.rpc).toHaveBeenLastCalledWith(
+      "pricing_transition_version_secure",
+      expect.objectContaining({
+        p_expected_revision: 4,
+        p_target_status: "DRAFT",
+      })
+    );
+    expect(result.version).toMatchObject({ status: "DRAFT", revision: 5 });
+  });
+
   it("starts validation only after readiness succeeds", async () => {
     const mock: any = db(aggregate("DRAFT"));
     mock.rpc

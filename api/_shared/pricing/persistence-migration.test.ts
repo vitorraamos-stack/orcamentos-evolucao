@@ -105,6 +105,15 @@ describe("Pricing persistence migration contract", () => {
     );
   });
 
+  it("advances revision on VALIDATING to DRAFT to prevent ABA stale writes", () => {
+    const start = sql.indexOf("create function public.pricing_transition_version_secure");
+    const end = sql.indexOf("create function public.pricing_publish_version_secure");
+    const transition = sql.slice(start, end);
+    expect(transition).toContain("when v_before.status='VALIDATING' and p_target_status='DRAFT'");
+    expect(transition).toContain("then revision+1");
+    expect(sql).toContain("new.revision <> old.revision + 1");
+  });
+
   it("uses optimistic revision checks and publication compare-and-swap", () => {
     expect(sql).toContain("PRICING_REVISION_CONFLICT");
     expect(sql).toContain("PRICING_PUBLICATION_CONFLICT");

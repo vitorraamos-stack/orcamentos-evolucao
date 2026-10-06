@@ -246,16 +246,18 @@ begin
     if new.status not in ('DRAFT','PUBLISHED') then
       raise exception 'PRICING_STATE_CONFLICT';
     end if;
-    if new.revision <> old.revision
-      or new.markup is distinct from old.markup
+    if new.markup is distinct from old.markup
       or new.notes is distinct from old.notes then
       raise exception 'PRICING_STATE_CONFLICT';
     end if;
-    if new.status = 'DRAFT' and (
-      new.published_at is distinct from old.published_at
-      or new.published_by is distinct from old.published_by
-    ) then
-      raise exception 'PRICING_STATE_CONFLICT';
+    if new.status = 'DRAFT' then
+      if new.revision <> old.revision + 1
+        or new.published_at is distinct from old.published_at
+        or new.published_by is distinct from old.published_by then
+        raise exception 'PRICING_REVISION_CONFLICT';
+      end if;
+    elsif new.revision <> old.revision then
+      raise exception 'PRICING_REVISION_CONFLICT';
     end if;
   elsif old.status = 'PUBLISHED' then
     if new.status <> 'RETIRED'
@@ -840,7 +842,12 @@ begin
   end if;
 
   update public.pricing_policy_versions
-  set status=p_target_status
+  set status=p_target_status,
+      revision=case
+        when v_before.status='VALIDATING' and p_target_status='DRAFT'
+          then revision+1
+        else revision
+      end
   where id=p_version_id
   returning * into v_after;
 
