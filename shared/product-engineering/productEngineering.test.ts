@@ -334,6 +334,32 @@ describe("field invariants", () => {
     type: "DECIMAL",
     unit: "m",
   } as const;
+  it("requires defaults and request-independence for configuration inputs", () => {
+    expect(
+      productInputSchema.safeParse({
+        ...decimalInput,
+        required: false,
+        scope: "CONFIGURATION",
+        defaultValue: "2",
+      }).success
+    ).toBe(true);
+    expect(
+      productInputSchema.safeParse({
+        ...decimalInput,
+        required: true,
+        scope: "CONFIGURATION",
+        defaultValue: "2",
+      }).success
+    ).toBe(false);
+    expect(
+      productInputSchema.safeParse({
+        ...decimalInput,
+        required: false,
+        scope: "CONFIGURATION",
+      }).success
+    ).toBe(false);
+  });
+
   it.each([
     [{ min: "0.1", max: "0.2" }, true],
     [{ min: "0.2", max: "0.2" }, true],
