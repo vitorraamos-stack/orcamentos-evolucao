@@ -308,7 +308,7 @@ export default function PricingAdminPage() {
       </div>
 
       <Tabs defaultValue="products">
-        <TabsList className="grid w-full grid-cols-2 md:w-[780px] md:grid-cols-4">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 md:h-9 md:w-[780px] md:grid-cols-4">
           <TabsTrigger value="products">Produtos e margem</TabsTrigger>
           <TabsTrigger value="costs">Custos</TabsTrigger>
           <TabsTrigger value="payments">Parcelamento</TabsTrigger>
