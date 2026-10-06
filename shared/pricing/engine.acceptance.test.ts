@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { decimalFrom } from "../calculation-engine/decimal/index.js";
 import {
   MAX_PRICING_CHARGES,
   PRICING_CHARGE_KINDS,
@@ -608,9 +609,11 @@ describe("Pricing 16B acceptance — algebraic invariants", () => {
     const higher = calculatePricing(
       fixture({ definition: grossUp("0.2") })
     );
-    expect(Number(higher.unroundedTotalSellingPrice.amount)).toBeGreaterThan(
-      Number(lower.unroundedTotalSellingPrice.amount)
-    );
+    expect(
+      decimalFrom(higher.unroundedTotalSellingPrice.amount).comparedTo(
+        decimalFrom(lower.unroundedTotalSellingPrice.amount)
+      )
+    ).toBeGreaterThan(0);
   });
 
   it("is monotonic in markup", () => {
@@ -620,9 +623,11 @@ describe("Pricing 16B acceptance — algebraic invariants", () => {
     const higher = calculatePricing(
       fixture({ definition: markup("0.2") })
     );
-    expect(Number(higher.unroundedTotalSellingPrice.amount)).toBeGreaterThan(
-      Number(lower.unroundedTotalSellingPrice.amount)
-    );
+    expect(
+      decimalFrom(higher.unroundedTotalSellingPrice.amount).comparedTo(
+        decimalFrom(lower.unroundedTotalSellingPrice.amount)
+      )
+    ).toBeGreaterThan(0);
   });
 
   it("treats a zero-rate charge as neutral", () => {
