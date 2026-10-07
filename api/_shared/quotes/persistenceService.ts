@@ -23,6 +23,7 @@ export class QuotePersistenceServiceError extends Error {
     readonly status: number,
     readonly code:
       | "QUOTE_NOT_FOUND"
+      | "QUOTE_FORBIDDEN"
       | "QUOTE_REVISION_CONFLICT"
       | "QUOTE_STATE_CONFLICT"
       | "QUOTE_VERSION_CONFLICT"
@@ -105,6 +106,37 @@ export class OfficialQuotePersistenceService {
     return data;
   }
 
+  private assertOwnerAccess(
+    data: any,
+    actorId: string,
+    isManager: boolean
+  ) {
+    if (!data)
+      throw new QuotePersistenceServiceError(
+        404,
+        "QUOTE_NOT_FOUND",
+        "Quote not found."
+      );
+    if (!isManager && data?.quote?.created_by !== actorId)
+      throw new QuotePersistenceServiceError(
+        403,
+        "QUOTE_FORBIDDEN",
+        "Quote access is not authorized."
+      );
+  }
+
+  private async loadAuthorizedRaw(
+    quoteId: string,
+    actorId: string,
+    isManager: boolean
+  ) {
+    const data = await this.rpc("quote_get_current_secure", {
+      p_quote_id: quoteId,
+    });
+    this.assertOwnerAccess(data, actorId, isManager);
+    return data;
+  }
+
   private snapshotArgs(
     calculation: OfficialQuoteCalculationResult,
     request: ReturnType<typeof quoteSaveRequestSchema.parse>,
@@ -156,7 +188,11 @@ export class OfficialQuotePersistenceService {
     };
   }
 
-  async save(input: unknown, actorId: string): Promise<QuoteSavePublicResult> {
+  async save(
+    input: unknown,
+    actorId: string,
+    isManager = false
+  ): Promise<QuoteSavePublicResult> {
     const parsed = quoteSaveRequestSchema.safeParse(input);
     if (!parsed.success)
       throw new QuotePersistenceServiceError(
@@ -166,6 +202,9 @@ export class OfficialQuotePersistenceService {
       );
 
     const request = parsed.data;
+    if (request.quoteId !== null)
+      await this.loadAuthorizedRaw(request.quoteId, actorId, isManager);
+
     const calculation = await this.calculator.calculate({
       productVersionId: request.productVersionId,
       request: request.request,
@@ -198,7 +237,11 @@ export class OfficialQuotePersistenceService {
     });
   }
 
-  async load(input: unknown): Promise<QuoteCurrentPublicResult> {
+  async load(
+    input: unknown,
+    actorId: string,
+    isManager = false
+  ): Promise<QuoteCurrentPublicResult> {
     const parsed = quoteGetApiRequestSchema.safeParse(input);
     if (!parsed.success)
       throw new QuotePersistenceServiceError(
@@ -207,15 +250,11 @@ export class OfficialQuotePersistenceService {
         "Quote load request is invalid."
       );
 
-    const data = await this.rpc("quote_get_current_secure", {
-      p_quote_id: parsed.data.quoteId,
-    });
-    if (!data)
-      throw new QuotePersistenceServiceError(
-        404,
-        "QUOTE_NOT_FOUND",
-        "Quote not found."
-      );
+    const data = await this.loadAuthorizedRaw(
+      parsed.data.quoteId,
+      actorId,
+      isManager
+    );
 
     const snapshot = data?.snapshot;
     const result = quoteCurrentPublicResultSchema.safeParse({
@@ -240,7 +279,8 @@ export class OfficialQuotePersistenceService {
 
   async transition(
     input: unknown,
-    actorId: string
+    actorId: string,
+    isManager = false
   ): Promise<QuoteTransitionResult> {
     const parsed = quoteTransitionApiRequestSchema.safeParse(input);
     if (!parsed.success)
@@ -249,6 +289,8 @@ export class OfficialQuotePersistenceService {
         "INVALID_QUOTE_CONFIGURATION",
         "Quote transition request is invalid."
       );
+
+    await this.loadAuthorizedRaw(parsed.data.quoteId, actorId, isManager);
 
     const data = await this.rpc("quote_transition_status_secure", {
       p_quote_id: parsed.data.quoteId,
