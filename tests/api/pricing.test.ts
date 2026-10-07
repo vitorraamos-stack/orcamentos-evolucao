@@ -52,14 +52,14 @@ vi.mock("../../api/_shared/quotes/persistenceService.js", () => ({
     }
   },
   OfficialQuotePersistenceService: class OfficialQuotePersistenceService {
-    async save(input: unknown, actorId: string) {
-      return state.officialQuoteSave(input, actorId);
+    async save(input: unknown, actorId: string, isManager: boolean) {
+      return state.officialQuoteSave(input, actorId, isManager);
     }
-    async load(input: unknown) {
-      return state.officialQuoteLoad(input);
+    async load(input: unknown, actorId: string, isManager: boolean) {
+      return state.officialQuoteLoad(input, actorId, isManager);
     }
-    async transition(input: unknown, actorId: string) {
-      return state.officialQuoteTransition(input, actorId);
+    async transition(input: unknown, actorId: string, isManager: boolean) {
+      return state.officialQuoteTransition(input, actorId, isManager);
     }
   },
 }));
@@ -512,7 +512,11 @@ describe("Pricing API manager authority", () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.payload).toEqual({ ok: true, data: saved });
-      expect(state.officialQuoteSave).toHaveBeenCalledWith(request, id(9));
+      expect(state.officialQuoteSave).toHaveBeenCalledWith(
+        request,
+        id(9),
+        role === "gerente" || role === "admin"
+      );
       expect(res.payload.data).not.toHaveProperty("privateSnapshot");
       expect(res.payload.data).not.toHaveProperty("costing");
       expect(res.payload.data).not.toHaveProperty("pricingEngine");
@@ -600,10 +604,14 @@ describe("Pricing API manager authority", () => {
     );
     expect(res.statusCode).toBe(200);
     expect(res.payload.data).toEqual(loaded);
-    expect(state.officialQuoteLoad).toHaveBeenCalledWith({
-      action: "GET_QUOTE",
-      quoteId: id(10),
-    });
+    expect(state.officialQuoteLoad).toHaveBeenCalledWith(
+      {
+        action: "GET_QUOTE",
+        quoteId: id(10),
+      },
+      id(9),
+      false
+    );
   });
 
   it("transitions a Quote with the authenticated actor", async () => {
@@ -638,7 +646,8 @@ describe("Pricing API manager authority", () => {
         expectedRevision: 2,
         targetStatus: "SENT",
       },
-      id(9)
+      id(9),
+      false
     );
   });
 
