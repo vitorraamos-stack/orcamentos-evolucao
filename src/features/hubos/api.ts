@@ -371,7 +371,7 @@ export const findOrderByQuoteId = async (quoteId: string) => {
   const { data, error } = await supabase
     .from("os_orders")
     .select(
-      "id,os_number,sale_number,client_name,title,quote_id,quote_snapshot_id,quote_total,customer_phone"
+      "id,os_number,sale_number,client_name,title,quote_id,quote_snapshot_id,customer_phone"
     )
     .eq("quote_id", quoteId)
     .limit(1)
@@ -387,7 +387,6 @@ export const findOrderByQuoteId = async (quoteId: string) => {
     | "title"
     | "quote_id"
     | "quote_snapshot_id"
-    | "quote_total"
     | "customer_phone"
   > | null;
 };
