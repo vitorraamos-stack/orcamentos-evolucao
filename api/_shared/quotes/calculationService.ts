@@ -9,6 +9,7 @@ import {
   multiplyDecimal,
   type DecimalString,
 } from "../../../shared/calculation-engine/decimal/index.js";
+import { convertUnit } from "../../../shared/calculation-engine/units/index.js";
 import type { PricingInstallationSettings } from "../../../shared/pricing/index.js";
 import type {
   OfficialPricingCalculationResult,
@@ -44,14 +45,22 @@ function resolvedMeterInput(
   if (
     !input ||
     input.value.kind !== "decimal" ||
-    input.value.unit !== "m"
+    input.value.unit === null
   )
     throw new OfficialQuoteCalculationError(
       422,
       "INSTALLATION_AREA_UNAVAILABLE",
       "Installation area cannot be derived from this product."
     );
-  return input.value.value;
+  try {
+    return convertUnit(input.value.value, input.value.unit, "m");
+  } catch {
+    throw new OfficialQuoteCalculationError(
+      422,
+      "INSTALLATION_AREA_UNAVAILABLE",
+      "Installation area cannot be derived from this product."
+    );
+  }
 }
 
 function installationAreaM2(
