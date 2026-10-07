@@ -150,6 +150,37 @@ describe("OfficialQuoteCalculationService", () => {
     expect(result.publicResult.totalSellingPrice.amount).toBe("2200.00");
   });
 
+  it("normalizes compatible length units before deriving installation area", async () => {
+    const original = pricingResult();
+    const mixedUnits = {
+      ...original,
+      costing: {
+        ...original.costing,
+        commercialQuantity: "1",
+        resolvedInputs: [
+          {
+            key: "width",
+            value: { kind: "decimal", value: "100", unit: "cm" },
+            source: "PROVIDED",
+          },
+          {
+            key: "height",
+            value: { kind: "decimal", value: "750", unit: "mm" },
+            source: "PROVIDED",
+          },
+        ],
+      },
+    } as OfficialPricingCalculationResult;
+
+    const result = await new OfficialQuoteCalculationService(
+      { calculate: async () => mixedUnits },
+      { loadInstallationSettings: async () => settings }
+    ).calculate({ ...request, request: { ...request.request, commercialQuantity: "1" } });
+
+    expect(result.publicResult.installation.areaM2).toBe("0.75");
+    expect(result.publicResult.installation.tier).toBe("TIER_1");
+  });
+
   it("fails closed when installation area cannot be derived", async () => {
     const original = pricingResult();
     const missingHeight = {
