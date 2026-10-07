@@ -81,7 +81,7 @@ export const quoteCommercialInputSchema = z
     installationRequested: z.boolean(),
     installationAreaM2: positiveDecimalSchema.nullable(),
     munckRequestedHours: positiveDecimalSchema.nullable(),
-    settings: pricingInstallationSettingsSchema,
+    settings: pricingInstallationSettingsSchema.nullable(),
   })
   .strict()
   .superRefine((value, ctx) => {
@@ -90,6 +90,15 @@ export const quoteCommercialInputSchema = z
         code: "custom",
         path: ["installationAreaM2"],
         message: "Installation area is required when installation is requested",
+      });
+    if (
+      (value.installationRequested || value.munckRequestedHours !== null) &&
+      value.settings === null
+    )
+      ctx.addIssue({
+        code: "custom",
+        path: ["settings"],
+        message: "Additional settings are required when additions are requested",
       });
   });
 
@@ -144,20 +153,21 @@ export function calculateQuoteCommercial(
   let installationPrice = zero;
 
   if (parsed.installationRequested) {
+    const settings = parsed.settings!;
     installationAreaM2 = parsed.installationAreaM2!;
     if (
-      compareDecimal(installationAreaM2, parsed.settings.tier1MaxAreaM2) <= 0
+      compareDecimal(installationAreaM2, settings.tier1MaxAreaM2) <= 0
     ) {
       installationTier = "TIER_1";
-      installationPrice = parsed.settings.tier1Price;
+      installationPrice = settings.tier1Price;
     } else if (
-      compareDecimal(installationAreaM2, parsed.settings.tier2MaxAreaM2) <= 0
+      compareDecimal(installationAreaM2, settings.tier2MaxAreaM2) <= 0
     ) {
       installationTier = "TIER_2";
-      installationPrice = parsed.settings.tier2Price;
+      installationPrice = settings.tier2Price;
     } else {
       installationTier = "TIER_3";
-      installationPrice = parsed.settings.tier3Price;
+      installationPrice = settings.tier3Price;
     }
   }
 
@@ -165,13 +175,13 @@ export function calculateQuoteCommercial(
   const munckBilledHours = munckRequested
     ? maxDecimal(
         parsed.munckRequestedHours!,
-        parsed.settings.munckMinimumHours
+        parsed.settings!.munckMinimumHours
       )
     : null;
   const munckPrice =
     munckBilledHours === null
       ? zero
-      : multiplyDecimal(munckBilledHours, parsed.settings.munckHourlyPrice);
+      : multiplyDecimal(munckBilledHours, parsed.settings!.munckHourlyPrice);
 
   const subtotal = addDecimal(
     addDecimal(parsed.productSellingPrice, installationPrice),
