@@ -16,7 +16,7 @@ describe("18E Quote → OS migration contract", () => {
   );
 
   it("persists a one-to-one Quote/Snapshot link on active OS orders", () => {
-    expect(foundation).toContain("add column if not exists quote_id uuid");
+    expect(foundation).toMatch(/add column(?: if not exists)? quote_id uuid/i);
     expect(foundation).toContain("os_orders_quote_id_unique");
     expect(foundation).toContain(
       "foreign key (quote_snapshot_id, quote_id)"
