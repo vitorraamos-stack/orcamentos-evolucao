@@ -79,17 +79,20 @@ function installationAreaM2(
   );
 }
 
+export interface OfficialQuoteCalculationResult {
+  readonly publicResult: OfficialQuotePublicResult;
+  readonly pricing: OfficialPricingCalculationResult;
+  readonly installationSettingsRevision: number | null;
+  readonly installationSettings: PricingInstallationSettings | null;
+}
+
 export class OfficialQuoteCalculationService {
   constructor(
     private readonly pricing: OfficialPricingCalculator,
     private readonly installationSettings: QuoteInstallationSettingsLoader
   ) {}
 
-  async calculate(input: unknown): Promise<{
-    publicResult: OfficialQuotePublicResult;
-    pricing: OfficialPricingCalculationResult;
-    installationSettingsRevision: number | null;
-  }> {
+  async calculate(input: unknown): Promise<OfficialQuoteCalculationResult> {
     const parsed = officialQuoteRequestSchema.safeParse(input);
     if (!parsed.success)
       throw new OfficialQuoteCalculationError(
@@ -153,6 +156,7 @@ export class OfficialQuoteCalculationService {
       publicResult: publicResult.data,
       pricing,
       installationSettingsRevision: settings?.revision ?? null,
+      installationSettings: settings,
     };
   }
 }
