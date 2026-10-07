@@ -66,6 +66,95 @@ export function initialQuoteFields(inputs: readonly ProductInput[]): {
   return { values, units };
 }
 
+const canonicalize = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === "object")
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, canonicalize(entry)])
+    );
+  return value;
+};
+
+export const quoteFingerprint = (value: unknown) =>
+  JSON.stringify(canonicalize(value));
+
+export type QuoteEditableStateFingerprintInput = {
+  productVersionId: string;
+  fieldValues: QuoteFieldValues;
+  fieldUnits: QuoteFieldUnits;
+  quantity: string;
+  installments: string;
+  installationRequested: boolean;
+  munckRequested: boolean;
+  munckHours: string;
+  commercial: {
+    customerName: string;
+    customerPhone: string | null;
+    title: string;
+  };
+};
+
+export const quoteEditableStateFingerprint = (
+  input: QuoteEditableStateFingerprintInput
+) =>
+  quoteFingerprint({
+    productVersionId: input.productVersionId,
+    fieldValues: Object.fromEntries(
+      Object.entries(input.fieldValues).map(([key, value]) => [
+        key,
+        typeof value === "string" ? value.trim() : value,
+      ])
+    ),
+    fieldUnits: input.fieldUnits,
+    quantity: input.quantity.trim(),
+    installments: input.installments,
+    installationRequested: input.installationRequested,
+    munckRequested: input.munckRequested,
+    munckHours: input.munckRequested ? input.munckHours.trim() : null,
+    commercial: {
+      customerName: input.commercial.customerName.trim(),
+      customerPhone: input.commercial.customerPhone?.trim() || null,
+      title: input.commercial.title.trim(),
+    },
+  });
+
+export function hydrateQuoteFields(
+  inputs: readonly ProductInput[],
+  technicalInputs: Record<string, TechnicalInputValue>
+): {
+  values: QuoteFieldValues;
+  units: QuoteFieldUnits;
+} {
+  const hydrated = initialQuoteFields(inputs);
+
+  for (const input of inputs) {
+    const value = technicalInputs[input.key];
+    if (!value) continue;
+
+    if (input.type === "BOOLEAN" && value.kind === "boolean") {
+      hydrated.values[input.key] = value.value;
+      continue;
+    }
+
+    if (input.type === "DECIMAL" && value.kind === "decimal") {
+      hydrated.values[input.key] = value.value;
+      hydrated.units[input.key] = value.unit;
+      continue;
+    }
+
+    if (
+      (input.type === "TEXT" || input.type === "SELECT") &&
+      value.kind === "string"
+    ) {
+      hydrated.values[input.key] = value.value;
+    }
+  }
+
+  return hydrated;
+}
+
 export function buildTechnicalInputs(
   inputs: readonly ProductInput[],
   values: QuoteFieldValues,

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation, useSearch } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,17 +28,25 @@ import {
 } from "../repositories/quoteRepository";
 import {
   buildTechnicalInputs,
+  hydrateQuoteFields,
   initialQuoteFields,
   isDimensionField,
   positiveUserDecimal,
+  quoteEditableStateFingerprint,
+  quoteFingerprint,
   type QuoteFieldUnits,
   type QuoteFieldValues,
 } from "../quoteForm";
 import type { UnitId } from "@shared/calculation-engine/units";
+import {
+  quoteCommercialDetailsSchema,
+  quoteIdSchema,
+} from "@shared/quotes";
 import type {
   OfficialQuotePublicResult,
   OfficialQuoteRequest,
   QuoteFormDefinition,
+  QuoteCommercialDetails,
   QuoteFormProduct,
   QuoteSavePublicResult,
   QuoteStatus,
@@ -81,8 +90,10 @@ const statusVariant = (status: QuoteStatus) => {
 };
 
 export default function QuoteCalculatorPage() {
+  const search = useSearch();
+  const [, setLocation] = useLocation();
   const [definition, setDefinition] = useState<QuoteFormDefinition | null>(null);
-  const [productId, setProductId] = useState("");
+  const [productVersionId, setProductVersionId] = useState("");
   const [fieldValues, setFieldValues] = useState<QuoteFieldValues>({});
   const [fieldUnits, setFieldUnits] = useState<QuoteFieldUnits>({});
   const [quantity, setQuantity] = useState("1");
@@ -90,19 +101,28 @@ export default function QuoteCalculatorPage() {
   const [installationRequested, setInstallationRequested] = useState(false);
   const [munckRequested, setMunckRequested] = useState(false);
   const [munckHours, setMunckHours] = useState("4");
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [title, setTitle] = useState("");
   const [result, setResult] = useState<OfficialQuotePublicResult | null>(null);
   const [calculatedFingerprint, setCalculatedFingerprint] = useState<string | null>(null);
   const [saved, setSaved] = useState<QuoteSavePublicResult | null>(null);
   const [savedFingerprint, setSavedFingerprint] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
   const product = useMemo(
-    () => definition?.products.find(item => item.productId === productId) ?? null,
-    [definition, productId]
+    () =>
+      definition?.products.find(
+        item => item.productVersionId === productVersionId
+      ) ?? null,
+    [definition, productVersionId]
   );
 
-  const editable = !saved || saved.status === "DRAFT";
+  const editable =
+    (!saved || saved.status === "DRAFT") &&
+    (product?.calculationAvailable ?? true);
 
   const resetForProduct = (next: QuoteFormProduct | null) => {
     const initial = initialQuoteFields(next?.inputs ?? []);
@@ -117,32 +137,146 @@ export default function QuoteCalculatorPage() {
     setMunckHours("4");
   };
 
-  const selectProduct = (nextId: string, source = definition) => {
-    setProductId(nextId);
-    const next = source?.products.find(item => item.productId === nextId) ?? null;
+  const selectProduct = (nextVersionId: string, source = definition) => {
+    setProductVersionId(nextVersionId);
+    const next =
+      source?.products.find(
+        item => item.productVersionId === nextVersionId
+      ) ?? null;
     resetForProduct(next);
   };
 
   useEffect(() => {
+    let cancelled = false;
+    const quoteParam = new URLSearchParams(search).get("quote");
+
+    setLoading(true);
+    setLoadError(null);
+    setSaved(null);
+    setSavedFingerprint(null);
+    setResult(null);
+    setCalculatedFingerprint(null);
+    setProductVersionId("");
+    setFieldValues({});
+    setFieldUnits({});
+    setQuantity("1");
+    setInstallments("1");
+    setInstallationRequested(false);
+    setMunckRequested(false);
+    setMunckHours("4");
+    setCustomerName("");
+    setCustomerPhone("");
+    setTitle("");
+
     void (async () => {
       try {
-        const loaded = await quoteRepository.loadForm();
+        const existing = quoteParam
+          ? await quoteRepository.load(quoteIdSchema.parse(quoteParam))
+          : null;
+        const loaded = await quoteRepository.loadForm(
+          existing?.request.productVersionId ?? null
+        );
+        if (cancelled) return;
+
         setDefinition(loaded);
-        const first = loaded.products[0] ?? null;
-        if (first) {
-          setProductId(first.productId);
-          const initial = initialQuoteFields(first.inputs);
-          setFieldValues(initial.values);
-          setFieldUnits(initial.units);
+
+        if (existing) {
+          const existingProduct =
+            loaded.products.find(
+              item => item.productVersionId === existing.request.productVersionId
+            ) ?? null;
+          if (!existingProduct)
+            throw new Error(
+              "A versão do produto deste orçamento não está disponível."
+            );
+
+          const hydrated = hydrateQuoteFields(
+            existingProduct.inputs,
+            existing.request.request.technicalInputs
+          );
+          const loadedMunckHours = existing.request.munck.requested
+            ? existing.request.munck.hours
+            : "4";
+
+          setProductVersionId(existingProduct.productVersionId);
+          setFieldValues(hydrated.values);
+          setFieldUnits(hydrated.units);
+          setQuantity(existing.request.request.commercialQuantity);
+          setInstallments(String(existing.request.installments));
+          setInstallationRequested(existing.request.installation.requested);
+          setMunckRequested(existing.request.munck.requested);
+          setMunckHours(loadedMunckHours);
+          setCustomerName(existing.commercial.customerName);
+          setCustomerPhone(existing.commercial.customerPhone ?? "");
+          setTitle(existing.commercial.title);
+          setResult(existing.publicResult);
+
+          const requestFingerprint = quoteFingerprint(existing.request);
+          setCalculatedFingerprint(requestFingerprint);
+          setSavedFingerprint(
+            quoteEditableStateFingerprint({
+              productVersionId: existingProduct.productVersionId,
+              fieldValues: hydrated.values,
+              fieldUnits: hydrated.units,
+              quantity: existing.request.request.commercialQuantity,
+              installments: String(existing.request.installments),
+              installationRequested: existing.request.installation.requested,
+              munckRequested: existing.request.munck.requested,
+              munckHours: loadedMunckHours,
+              commercial: existing.commercial,
+            })
+          );
+          setSaved({
+            quoteId: existing.quoteId,
+            quoteNumber: existing.quoteNumber,
+            status: existing.status,
+            revision: existing.revision,
+            snapshotId: existing.snapshotId,
+            snapshotVersion: existing.snapshotVersion,
+            savedAt: existing.savedAt,
+            commercial: existing.commercial,
+            publicResult: existing.publicResult,
+          });
+          return;
         }
+
+        const first =
+          loaded.products.find(item => item.calculationAvailable) ?? null;
+        setProductVersionId(first?.productVersionId ?? "");
+        setQuantity("1");
         setInstallments(String(loaded.availableInstallments[0] ?? 1));
+        setCustomerName("");
+        setCustomerPhone("");
+        setTitle("");
+        resetForProduct(first);
       } catch (error) {
-        toast.error(friendlyError(error));
+        if (!cancelled) {
+          const message = friendlyError(error);
+          setLoadError(message);
+          toast.error(message);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [search]);
+
+  const buildCommercial = (): QuoteCommercialDetails => {
+    const normalized = {
+      customerName: customerName.trim(),
+      customerPhone: customerPhone.trim() || null,
+      title: title.trim(),
+    };
+    if (!normalized.customerName) throw new Error("Preencha o cliente.");
+    if (!normalized.title) throw new Error("Preencha o título do orçamento.");
+    if (normalized.customerPhone && normalized.customerPhone.length < 3)
+      throw new Error("Informe um telefone válido.");
+    return quoteCommercialDetailsSchema.parse(normalized);
+  };
 
   const buildRequest = (): OfficialQuoteRequest => {
     if (!product) throw new Error("Selecione um produto.");
@@ -174,7 +308,7 @@ export default function QuoteCalculatorPage() {
 
   const currentFingerprint = useMemo(() => {
     try {
-      return JSON.stringify(buildRequest());
+      return quoteFingerprint(buildRequest());
     } catch {
       return null;
     }
@@ -190,14 +324,33 @@ export default function QuoteCalculatorPage() {
     definition,
   ]);
 
-  const freshResult =
-    result !== null &&
-    currentFingerprint !== null &&
-    currentFingerprint === calculatedFingerprint;
+  const currentCommercial = {
+    customerName: customerName.trim(),
+    customerPhone: customerPhone.trim() || null,
+    title: title.trim(),
+  };
+  const currentEditableFingerprint = quoteEditableStateFingerprint({
+    productVersionId,
+    fieldValues,
+    fieldUnits,
+    quantity,
+    installments,
+    installationRequested,
+    munckRequested,
+    munckHours,
+    commercial: currentCommercial,
+  });
   const persistedStateIsCurrent =
     saved !== null &&
     savedFingerprint !== null &&
-    currentFingerprint === savedFingerprint;
+    currentEditableFingerprint === savedFingerprint;
+  const freshResult =
+    result !== null &&
+    ((saved !== null && persistedStateIsCurrent) ||
+      (currentFingerprint !== null &&
+        currentFingerprint === calculatedFingerprint));
+  const displayedResult =
+    saved !== null && persistedStateIsCurrent ? saved.publicResult : result;
 
   const calculate = async () => {
     setWorking(true);
@@ -205,7 +358,7 @@ export default function QuoteCalculatorPage() {
       const request = buildRequest();
       const calculated = await quoteRepository.calculate(request);
       setResult(calculated);
-      setCalculatedFingerprint(JSON.stringify(request));
+      setCalculatedFingerprint(quoteFingerprint(request));
       toast.success("Orçamento calculado com os valores oficiais.");
     } catch (error) {
       toast.error(friendlyError(error));
@@ -218,18 +371,35 @@ export default function QuoteCalculatorPage() {
     setWorking(true);
     try {
       const request = buildRequest();
-      if (JSON.stringify(request) !== calculatedFingerprint)
+      if (quoteFingerprint(request) !== calculatedFingerprint)
         throw new Error("Recalcule o orçamento antes de salvar.");
+      const commercial = buildCommercial();
       const persisted = await quoteRepository.save({
         quoteId: saved?.quoteId ?? null,
         expectedRevision: saved?.revision ?? null,
+        commercial,
         ...request,
       });
-      const fingerprint = JSON.stringify(request);
+      const fingerprint = quoteFingerprint(request);
       setSaved(persisted);
-      setSavedFingerprint(fingerprint);
+      setSavedFingerprint(
+        quoteEditableStateFingerprint({
+          productVersionId,
+          fieldValues,
+          fieldUnits,
+          quantity,
+          installments,
+          installationRequested,
+          munckRequested,
+          munckHours,
+          commercial,
+        })
+      );
       setResult(persisted.publicResult);
       setCalculatedFingerprint(fingerprint);
+      const url = new URL(window.location.href);
+      url.searchParams.set("quote", persisted.quoteId);
+      window.history.replaceState(window.history.state, "", url);
       toast.success(
         saved
           ? `Nova versão salva no orçamento #${persisted.quoteNumber}.`
@@ -269,32 +439,48 @@ export default function QuoteCalculatorPage() {
   };
 
   const newQuote = () => {
+    const next =
+      definition?.products.find(item => item.calculationAvailable) ?? null;
+    if (!next) {
+      toast.error("Nenhum produto está disponível para um novo orçamento.");
+      return;
+    }
+
+    setProductVersionId(next.productVersionId);
     setQuantity("1");
     setInstallments(String(definition?.availableInstallments[0] ?? 1));
-    resetForProduct(product);
+    setCustomerName("");
+    setCustomerPhone("");
+    setTitle("");
+    resetForProduct(next);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("quote");
+    window.history.replaceState(window.history.state, "", url);
   };
 
   const copySummary = async () => {
-    if (!result || !product || !freshResult) return;
+    if (!displayedResult || !product || !freshResult) return;
     const lines = [
       saved && persistedStateIsCurrent
         ? `Orçamento #${saved.quoteNumber}`
         : saved
           ? `Simulação sobre orçamento #${saved.quoteNumber} (não salva)`
           : "Simulação de orçamento",
+      `Cliente: ${customerName.trim() || "Não informado"}`,
+      `Referência: ${title.trim() || "Sem título"}`,
       `Produto: ${product.name}`,
-      `Quantidade: ${result.commercialQuantity}`,
-      `Produto: ${formatBrl(result.productSellingPrice.amount)}`,
+      `Quantidade: ${displayedResult.commercialQuantity}`,
+      `Produto: ${formatBrl(displayedResult.productSellingPrice.amount)}`,
     ];
-    if (result.installation.requested)
-      lines.push(`Instalação: ${formatBrl(result.installation.price.amount)}`);
-    if (result.munck.requested)
+    if (displayedResult.installation.requested)
+      lines.push(`Instalação: ${formatBrl(displayedResult.installation.price.amount)}`);
+    if (displayedResult.munck.requested)
       lines.push(
-        `Munck: ${result.munck.billedHours}h — ${formatBrl(result.munck.price.amount)}`
+        `Munck: ${displayedResult.munck.billedHours}h — ${formatBrl(displayedResult.munck.price.amount)}`
       );
     lines.push(
-      `Pagamento: ${result.installments}x`,
-      `TOTAL: ${formatBrl(result.totalSellingPrice.amount)}`
+      `Pagamento: ${displayedResult.installments}x`,
+      `TOTAL: ${formatBrl(displayedResult.totalSellingPrice.amount)}`
     );
     await navigator.clipboard.writeText(lines.join("\n"));
     toast.success("Resumo copiado.");
@@ -305,6 +491,21 @@ export default function QuoteCalculatorPage() {
       <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground">
         Carregando Orçamentista...
       </div>
+    );
+
+  if (loadError)
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Não foi possível abrir o orçamento</CardTitle>
+          <CardDescription>{loadError}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" onClick={() => setLocation("/orcamentos")}>
+            Voltar para orçamentos
+          </Button>
+        </CardContent>
+      </Card>
     );
 
   if (!definition || definition.products.length === 0)
@@ -350,6 +551,54 @@ export default function QuoteCalculatorPage() {
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
         <div className="space-y-5 lg:col-span-7">
+          {saved && !product?.calculationAvailable && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+              Esta versão do produto não está mais disponível para novo cálculo.
+              O orçamento permanece acessível em modo leitura com o snapshot oficial salvo.
+            </div>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Cliente e referência</CardTitle>
+              <CardDescription>
+                Estes dados identificam o orçamento e serão reutilizados na futura OS.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Cliente</Label>
+                <Input
+                  value={customerName}
+                  disabled={!editable || working}
+                  maxLength={160}
+                  placeholder="Nome ou razão social"
+                  onChange={event => setCustomerName(event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Telefone</Label>
+                <Input
+                  value={customerPhone}
+                  disabled={!editable || working}
+                  maxLength={40}
+                  placeholder="Opcional"
+                  onChange={event => setCustomerPhone(event.target.value)}
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Título / referência</Label>
+                <Input
+                  value={title}
+                  disabled={!editable || working}
+                  maxLength={200}
+                  placeholder="Ex.: Letreiro recepção · Unidade Kobrasol"
+                  onChange={event => setTitle(event.target.value)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Produto e medidas</CardTitle>
@@ -361,7 +610,7 @@ export default function QuoteCalculatorPage() {
               <div className="space-y-2">
                 <Label>Produto</Label>
                 <Select
-                  value={productId}
+                  value={productVersionId}
                   disabled={!!saved || !editable || working}
                   onValueChange={value => selectProduct(value)}
                 >
@@ -370,7 +619,10 @@ export default function QuoteCalculatorPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {definition.products.map(item => (
-                      <SelectItem key={item.productId} value={item.productId}>
+                      <SelectItem
+                        key={item.productVersionId}
+                        value={item.productVersionId}
+                      >
                         {item.name} · v{item.productVersionNumber}
                       </SelectItem>
                     ))}
@@ -633,7 +885,7 @@ export default function QuoteCalculatorPage() {
             <CardHeader>
               <CardTitle className="flex items-center justify-between gap-3">
                 Resultado
-                {result && freshResult && (
+                {displayedResult && freshResult && (
                   <Badge variant="outline" className="gap-1">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     Atualizado
@@ -645,7 +897,7 @@ export default function QuoteCalculatorPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {!result ? (
+              {!displayedResult ? (
                 <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
                   Preencha os dados e calcule para ver o valor oficial.
                 </div>
@@ -660,26 +912,26 @@ export default function QuoteCalculatorPage() {
                     <div className="flex justify-between gap-4">
                       <span className="text-muted-foreground">Produto</span>
                       <span className="font-medium">
-                        {formatBrl(result.productSellingPrice.amount)}
+                        {formatBrl(displayedResult.productSellingPrice.amount)}
                       </span>
                     </div>
-                    {result.installation.requested && (
+                    {displayedResult.installation.requested && (
                       <div className="flex justify-between gap-4">
                         <span className="text-muted-foreground">
-                          Instalação · {result.installation.areaM2} m²
+                          Instalação · {displayedResult.installation.areaM2} m²
                         </span>
                         <span className="font-medium">
-                          {formatBrl(result.installation.price.amount)}
+                          {formatBrl(displayedResult.installation.price.amount)}
                         </span>
                       </div>
                     )}
-                    {result.munck.requested && (
+                    {displayedResult.munck.requested && (
                       <div className="flex justify-between gap-4">
                         <span className="text-muted-foreground">
-                          Munck · {result.munck.billedHours}h faturadas
+                          Munck · {displayedResult.munck.billedHours}h faturadas
                         </span>
                         <span className="font-medium">
-                          {formatBrl(result.munck.price.amount)}
+                          {formatBrl(displayedResult.munck.price.amount)}
                         </span>
                       </div>
                     )}
@@ -688,12 +940,12 @@ export default function QuoteCalculatorPage() {
                         Subtotal antes do financeiro
                       </span>
                       <span>
-                        {formatBrl(result.subtotalBeforeFinancialRate.amount)}
+                        {formatBrl(displayedResult.subtotalBeforeFinancialRate.amount)}
                       </span>
                     </div>
                     <div className="flex justify-between gap-4">
                       <span className="text-muted-foreground">Pagamento</span>
-                      <span>{result.installments}x</span>
+                      <span>{displayedResult.installments}x</span>
                     </div>
                   </div>
 
@@ -702,7 +954,7 @@ export default function QuoteCalculatorPage() {
                       Total a cobrar
                     </p>
                     <p className="mt-1 text-4xl font-bold tracking-tight text-primary">
-                      {formatBrl(result.totalSellingPrice.amount)}
+                      {formatBrl(displayedResult.totalSellingPrice.amount)}
                     </p>
                   </div>
 

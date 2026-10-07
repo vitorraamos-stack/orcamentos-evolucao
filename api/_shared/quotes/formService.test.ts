@@ -83,6 +83,7 @@ describe("OfficialQuoteFormService", () => {
       productVersionNumber: 2,
       installationAvailable: true,
       munckAvailable: true,
+      calculationAvailable: true,
     });
     expect(result.products[0].inputs.map(input => input.key)).toEqual([
       "width",
@@ -108,6 +109,118 @@ describe("OfficialQuoteFormService", () => {
     expect(result.products[0].inputs.map(input => input.key)).not.toContain(
       "width"
     );
+  });
+
+  it("includes a requested historical product version in read-only mode", async () => {
+    const historicalDb = {
+      from: (table: string) => {
+        if (table === "products") {
+          let idLookup = false;
+          const chain: any = {
+            select: () => chain,
+            eq: (column: string) => {
+              if (column === "id") idLookup = true;
+              return chain;
+            },
+            order: () => chain,
+            maybeSingle: async () =>
+              idLookup
+                ? {
+                    data: {
+                      id: id(1),
+                      code: "LETREIRO_PVC",
+                      name: "Letreiro em PVC",
+                      status: "ACTIVE",
+                    },
+                    error: null,
+                  }
+                : { data: null, error: null },
+            then: (resolve: (value: unknown) => void) =>
+              resolve(
+                idLookup
+                  ? { data: null, error: null }
+                  : { data: [], error: null }
+              ),
+          };
+          return chain;
+        }
+        if (table === "product_versions") {
+          let directLookup = false;
+          const chain: any = {
+            select: () => chain,
+            eq: (column: string) => {
+              if (column === "id") directLookup = true;
+              return chain;
+            },
+            order: () => chain,
+            limit: () => chain,
+            in: () => chain,
+            maybeSingle: async () =>
+              directLookup
+                ? {
+                    data: {
+                      id: id(7),
+                      product_id: id(1),
+                      version_number: 1,
+                      status: "RETIRED",
+                    },
+                    error: null,
+                  }
+                : { data: null, error: null },
+          };
+          return chain;
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    };
+
+    const result = await new OfficialQuoteFormService(
+      historicalDb,
+      { loadDefinition: async () => definition } as any,
+      { loadProductParameters: async () => [] } as any,
+      pricing as any
+    ).load(id(7));
+
+    expect(result.products).toHaveLength(1);
+    expect(result.products[0]).toMatchObject({
+      productVersionId: id(7),
+      productVersionNumber: 1,
+      calculationAvailable: false,
+    });
+  });
+
+  it("restricts direct historical lookup to versions that were published", async () => {
+    let requestedStatuses: string[] | null = null;
+    const restrictedDb = {
+      from: (table: string) => {
+        if (table === "products") return query({ data: [], error: null });
+        if (table === "product_versions") {
+          const chain: any = {
+            select: () => chain,
+            eq: () => chain,
+            in: (column: string, values: string[]) => {
+              if (column === "status") requestedStatuses = values;
+              return chain;
+            },
+            order: () => chain,
+            limit: () => chain,
+            maybeSingle: async () => ({ data: null, error: null }),
+          };
+          return chain;
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    };
+
+    const result = await new OfficialQuoteFormService(
+      restrictedDb,
+      { loadDefinition: async () => definition } as any,
+      { loadProductParameters: async () => [] } as any,
+      pricing as any
+    ).load(id(8));
+
+    expect(requestedStatuses).toEqual(["PUBLISHED", "RETIRED"]);
+    expect(result.products).toEqual([]);
   });
 
   it("does not advertise a product whose Pricing cannot calculate", async () => {

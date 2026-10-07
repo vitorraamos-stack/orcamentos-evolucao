@@ -116,6 +116,11 @@ const calculation = (): OfficialQuoteCalculationResult =>
 const request = {
   quoteId: null,
   expectedRevision: null,
+  commercial: {
+    customerName: "Cliente Teste",
+    customerPhone: "48999999999",
+    title: "Letreiro recepção",
+  },
   productVersionId: id(2),
   request: {
     commercialQuantity: "1",
@@ -138,6 +143,9 @@ describe("OfficialQuotePersistenceService", () => {
           snapshot_id: id(11),
           snapshot_version: 1,
           saved_at: now,
+          customer_name: "Cliente Teste",
+          customer_phone: "48999999999",
+          title: "Letreiro recepção",
         },
         error: null,
       })),
@@ -156,9 +164,13 @@ describe("OfficialQuotePersistenceService", () => {
       munck: { requested: false },
     });
     expect(db.rpc).toHaveBeenCalledWith(
-      "quote_create_with_snapshot_secure",
+      "quote_create_with_snapshot_v2_secure",
       expect.objectContaining({
         p_actor_id: id(9),
+        p_customer_name: "Cliente Teste",
+        p_customer_phone: "48999999999",
+        p_title: "Letreiro recepção",
+        p_commercial_snapshot: request.commercial,
         p_total_selling_price: "870.00",
         p_pricing_policy_id: id(3),
         p_pricing_policy_version_id: id(4),
@@ -177,6 +189,7 @@ describe("OfficialQuotePersistenceService", () => {
       quoteNumber: 1001,
       revision: 1,
       snapshotVersion: 1,
+      commercial: request.commercial,
       publicResult: { totalSellingPrice: { amount: "870.00" } },
     });
   });
@@ -192,6 +205,9 @@ describe("OfficialQuotePersistenceService", () => {
           snapshot_id: id(12),
           snapshot_version: 2,
           saved_at: now,
+          customer_name: "Cliente Teste",
+          customer_phone: "48999999999",
+          title: "Letreiro recepção",
         },
         error: null,
       })),
@@ -216,6 +232,9 @@ describe("OfficialQuotePersistenceService", () => {
           snapshot_id: id(12),
           snapshot_version: 2,
           saved_at: now,
+          customer_name: "Cliente Teste",
+          customer_phone: "48999999999",
+          title: "Letreiro recepção",
         },
         error: null,
       });
@@ -227,7 +246,7 @@ describe("OfficialQuotePersistenceService", () => {
     );
     expect(db.rpc).toHaveBeenNthCalledWith(
       2,
-      "quote_append_snapshot_secure",
+      "quote_append_snapshot_v2_secure",
       expect.objectContaining({
         p_quote_id: id(10),
         p_expected_revision: 1,
@@ -247,6 +266,9 @@ describe("OfficialQuotePersistenceService", () => {
             created_by: id(9),
             status: "DRAFT",
             revision: 2,
+            customer_name: "Cliente Teste",
+            customer_phone: "48999999999",
+            title: "Letreiro recepção",
           },
           snapshot: {
             id: id(12),
@@ -275,6 +297,7 @@ describe("OfficialQuotePersistenceService", () => {
     );
 
     expect(result.publicResult.totalSellingPrice.amount).toBe("870.00");
+    expect(result.commercial).toEqual(request.commercial);
     expect(result).not.toHaveProperty("private_snapshot");
     expect(result).not.toHaveProperty("privateSnapshot");
   });
@@ -361,6 +384,9 @@ describe("OfficialQuotePersistenceService", () => {
             status: "DRAFT",
             revision: 1,
             created_by: id(8),
+            customer_name: "Outro cliente",
+            customer_phone: null,
+            title: "Fachada",
           },
           snapshot: {
             id: id(11),
@@ -387,6 +413,70 @@ describe("OfficialQuotePersistenceService", () => {
       true
     );
     expect(loaded.quoteId).toBe(id(10));
+  });
+
+  it("lists only the sanitized current Quote summaries", async () => {
+    const db = {
+      rpc: vi.fn(async () => ({
+        data: {
+          total: 1,
+          items: [
+            {
+              quote_id: id(10),
+              quote_number: 1001,
+              status: "DRAFT",
+              revision: 2,
+              customer_name: "Cliente Teste",
+              customer_phone: "48999999999",
+              title: "Letreiro recepção",
+              snapshot_version: 2,
+              total_selling_price: "870.00",
+              installments: 3,
+              product_id: id(1),
+              product_name: "Letreiro em PVC",
+              created_at: now,
+              updated_at: now,
+              created_by: id(9),
+              created_by_email: "consultor@evolucao.test",
+            },
+          ],
+        },
+        error: null,
+      })),
+    };
+    const service = new OfficialQuotePersistenceService(db, {
+      calculate: async () => calculation(),
+    });
+
+    const listed = await service.list(
+      {
+        action: "LIST_QUOTES",
+        page: 1,
+        pageSize: 25,
+        search: "Cliente",
+        status: "DRAFT",
+      },
+      id(9),
+      false
+    );
+
+    expect(db.rpc).toHaveBeenCalledWith("quote_list_secure", {
+      p_actor_id: id(9),
+      p_is_manager: false,
+      p_search: "Cliente",
+      p_status: "DRAFT",
+      p_limit: 25,
+      p_offset: 0,
+    });
+    expect(listed.total).toBe(1);
+    expect(listed.items[0]).toMatchObject({
+      quoteNumber: 1001,
+      commercial: request.commercial,
+      productName: "Letreiro em PVC",
+      totalSellingPrice: { currency: "BRL", amount: "870.00" },
+    });
+    expect(listed.items[0]).not.toHaveProperty("costing");
+    expect(listed.items[0]).not.toHaveProperty("privateSnapshot");
   });
 
   it("sanitizes SQL persistence errors", () => {

@@ -9,7 +9,7 @@ const source = readFileSync(
 describe("QuoteCalculatorPage stale result guard", () => {
   it("blocks copying a result after quote inputs change", () => {
     expect(source).toContain(
-      "if (!result || !product || !freshResult) return;"
+      "if (!displayedResult || !product || !freshResult) return;"
     );
     expect(source).toContain(
       'disabled={!freshResult}\n                    onClick={() => void copySummary()}'

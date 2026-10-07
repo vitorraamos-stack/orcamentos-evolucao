@@ -6,6 +6,7 @@ const state = vi.hoisted(() => ({
   officialQuoteCalculate: vi.fn(),
   officialQuoteSave: vi.fn(),
   officialQuoteLoad: vi.fn(),
+  officialQuoteList: vi.fn(),
   officialQuoteTransition: vi.fn(),
   officialQuoteFormLoad: vi.fn(),
 }));
@@ -74,6 +75,9 @@ vi.mock("../../api/_shared/quotes/persistenceService.js", () => ({
     }
     async load(input: unknown, actorId: string, isManager: boolean) {
       return state.officialQuoteLoad(input, actorId, isManager);
+    }
+    async list(input: unknown, actorId: string, isManager: boolean) {
+      return state.officialQuoteList(input, actorId, isManager);
     }
     async transition(input: unknown, actorId: string, isManager: boolean) {
       return state.officialQuoteTransition(input, actorId, isManager);
@@ -223,6 +227,7 @@ describe("Pricing API manager authority", () => {
     state.officialQuoteCalculate.mockReset();
     state.officialQuoteSave.mockReset();
     state.officialQuoteLoad.mockReset();
+    state.officialQuoteList.mockReset();
     state.officialQuoteTransition.mockReset();
     state.officialQuoteFormLoad.mockReset();
   });
@@ -407,6 +412,7 @@ describe("Pricing API manager authority", () => {
             inputs: [],
             installationAvailable: true,
             munckAvailable: true,
+            calculationAvailable: true,
           },
         ],
         availableInstallments: [1, 2, 3],
@@ -456,6 +462,7 @@ describe("Pricing API manager authority", () => {
     "CALCULATE_QUOTE",
     "SAVE_QUOTE",
     "GET_QUOTE",
+    "LIST_QUOTES",
     "TRANSITION_QUOTE",
   ])(
     "requires the calculadora module server-side for %s",
@@ -490,6 +497,7 @@ describe("Pricing API manager authority", () => {
       expect(state.officialQuoteFormLoad).not.toHaveBeenCalled();
       expect(state.officialQuoteSave).not.toHaveBeenCalled();
       expect(state.officialQuoteLoad).not.toHaveBeenCalled();
+      expect(state.officialQuoteList).not.toHaveBeenCalled();
       expect(state.officialQuoteTransition).not.toHaveBeenCalled();
     }
   );
@@ -603,6 +611,11 @@ describe("Pricing API manager authority", () => {
         snapshotId: id(11),
         snapshotVersion: 1,
         savedAt: now,
+        commercial: {
+          customerName: "Cliente Teste",
+          customerPhone: "48999999999",
+          title: "Letreiro recepção",
+        },
         publicResult: {
           calculationVersion: "1.0",
           productId: id(4),
@@ -635,6 +648,11 @@ describe("Pricing API manager authority", () => {
       const request = {
         quoteId: null,
         expectedRevision: null,
+        commercial: {
+          customerName: "Cliente Teste",
+          customerPhone: "48999999999",
+          title: "Letreiro recepção",
+        },
         productVersionId: id(5),
         request: { commercialQuantity: "1", technicalInputs: {} },
         installments: 3,
@@ -675,6 +693,11 @@ describe("Pricing API manager authority", () => {
           action: "SAVE_QUOTE",
           quoteId: null,
           expectedRevision: null,
+          commercial: {
+            customerName: "Cliente Teste",
+            customerPhone: null,
+            title: "Letreiro",
+          },
           productVersionId: id(5),
           request: { commercialQuantity: "1", technicalInputs: {} },
           installments: 3,
@@ -699,6 +722,11 @@ describe("Pricing API manager authority", () => {
       snapshotId: id(12),
       snapshotVersion: 2,
       savedAt: now,
+      commercial: {
+        customerName: "Cliente Teste",
+        customerPhone: "48999999999",
+        title: "Letreiro recepção",
+      },
       request: {
         productVersionId: id(5),
         request: { commercialQuantity: "1", technicalInputs: {} },
@@ -753,6 +781,70 @@ describe("Pricing API manager authority", () => {
       id(9),
       false
     );
+  });
+
+  it("lists Quotes through the sanitized server-side contract", async () => {
+    const listed = {
+      items: [
+        {
+          quoteId: id(10),
+          quoteNumber: 1001,
+          status: "DRAFT",
+          revision: 2,
+          commercial: {
+            customerName: "Cliente Teste",
+            customerPhone: "48999999999",
+            title: "Letreiro recepção",
+          },
+          snapshotVersion: 2,
+          totalSellingPrice: { currency: "BRL", amount: "870.00" },
+          installments: 3,
+          productId: id(4),
+          productName: "Letreiro em PVC",
+          createdAt: now,
+          updatedAt: now,
+          createdBy: id(9),
+          createdByEmail: "consultor@evolucao.test",
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 25,
+    };
+    state.officialQuoteList.mockResolvedValueOnce(listed);
+    state.client = client({ id: id(9) }, "consultor_vendas");
+    const res = response();
+
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer valid" },
+        body: {
+          action: "LIST_QUOTES",
+          page: 1,
+          pageSize: 25,
+          search: "Cliente",
+          status: "DRAFT",
+        },
+      },
+      res
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(res.payload).toEqual({ ok: true, data: listed });
+    expect(state.officialQuoteList).toHaveBeenCalledWith(
+      {
+        action: "LIST_QUOTES",
+        page: 1,
+        pageSize: 25,
+        search: "Cliente",
+        status: "DRAFT",
+      },
+      id(9),
+      false
+    );
+    expect(res.payload.data.items[0]).not.toHaveProperty("costing");
+    expect(res.payload.data.items[0]).not.toHaveProperty("privateSnapshot");
   });
 
   it("transitions a Quote with the authenticated actor", async () => {

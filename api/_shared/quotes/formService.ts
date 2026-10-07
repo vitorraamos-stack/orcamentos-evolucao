@@ -1,6 +1,7 @@
 import {
   quoteFormDefinitionSchema,
   type QuoteFormDefinition,
+  type QuoteFormProduct,
 } from "../../../shared/quotes/index.js";
 import { CostingService } from "../costing/service.js";
 import {
@@ -101,7 +102,56 @@ export class OfficialQuoteFormService {
     }
   }
 
-  async load(): Promise<QuoteFormDefinition> {
+  private async mapProductVersion(
+    product: { id: string; code: string; name: string },
+    version: { id: string; version_number: number; status?: string },
+    additionsConfigured: boolean,
+    calculationAvailable: boolean
+  ): Promise<QuoteFormProduct> {
+    const [definition, parameters] = await Promise.all([
+      this.productEngineering.loadDefinition(version.id),
+      this.costing.loadProductParameters(product.id),
+    ]);
+    const serverManaged = new Set(parameters.map(parameter => parameter.key));
+    const inputs = definition.inputs
+      .filter(input => !serverManaged.has(input.key))
+      .sort(
+        (left, right) =>
+          left.sortOrder - right.sortOrder || left.key.localeCompare(right.key)
+      );
+    const width = definition.inputs.find(
+      input =>
+        input.key === "width" &&
+        input.type === "DECIMAL" &&
+        input.unit !== null &&
+        physicalLengthUnits.has(input.unit)
+    );
+    const height = definition.inputs.find(
+      input =>
+        input.key === "height" &&
+        input.type === "DECIMAL" &&
+        input.unit !== null &&
+        physicalLengthUnits.has(input.unit)
+    );
+
+    return {
+      productId: product.id as QuoteFormProduct["productId"],
+      code: product.code,
+      name: product.name,
+      productVersionId:
+        version.id as QuoteFormProduct["productVersionId"],
+      productVersionNumber: version.version_number,
+      inputs,
+      installationAvailable:
+        additionsConfigured && Boolean(width) && Boolean(height),
+      munckAvailable: additionsConfigured,
+      calculationAvailable,
+    };
+  }
+
+  async load(
+    includeProductVersionId: string | null = null
+  ): Promise<QuoteFormDefinition> {
     const [productsResult, installments, additionsConfigured] =
       await Promise.all([
         this.db
@@ -127,7 +177,7 @@ export class OfficialQuoteFormService {
 
       const versionResult = await this.db
         .from("product_versions")
-        .select("id,version_number")
+        .select("id,version_number,status")
         .eq("product_id", product.id)
         .eq("status", "PUBLISHED")
         .order("version_number", { ascending: false })
@@ -142,43 +192,66 @@ export class OfficialQuoteFormService {
         );
       if (!versionResult.data) continue;
 
-      const [definition, parameters] = await Promise.all([
-        this.productEngineering.loadDefinition(versionResult.data.id),
-        this.costing.loadProductParameters(product.id),
-      ]);
-      const serverManaged = new Set(parameters.map(parameter => parameter.key));
-      const inputs = definition.inputs
-        .filter(input => !serverManaged.has(input.key))
-        .sort(
-          (left, right) =>
-            left.sortOrder - right.sortOrder || left.key.localeCompare(right.key)
-        );
-      const width = definition.inputs.find(
-        input =>
-          input.key === "width" &&
-          input.type === "DECIMAL" &&
-          input.unit !== null &&
-          physicalLengthUnits.has(input.unit)
+      products.push(
+        await this.mapProductVersion(
+          product,
+          versionResult.data,
+          additionsConfigured,
+          true
+        )
       );
-      const height = definition.inputs.find(
-        input =>
-          input.key === "height" &&
-          input.type === "DECIMAL" &&
-          input.unit !== null &&
-          physicalLengthUnits.has(input.unit)
-      );
+    }
 
-      products.push({
-        productId: product.id,
-        code: product.code,
-        name: product.name,
-        productVersionId: versionResult.data.id,
-        productVersionNumber: versionResult.data.version_number,
-        inputs,
-        installationAvailable:
-          additionsConfigured && Boolean(width) && Boolean(height),
-        munckAvailable: additionsConfigured,
-      });
+    if (
+      includeProductVersionId &&
+      !products.some(
+        item => item.productVersionId === includeProductVersionId
+      )
+    ) {
+      const versionResult = await this.db
+        .from("product_versions")
+        .select("id,product_id,version_number,status")
+        .eq("id", includeProductVersionId)
+        .in("status", ["PUBLISHED", "RETIRED"])
+        .maybeSingle();
+
+      if (versionResult.error)
+        throw new QuoteFormServiceError(
+          500,
+          "QUOTE_FORM_UNAVAILABLE",
+          "Quote form configuration is unavailable."
+        );
+
+      if (versionResult.data) {
+        const productResult = await this.db
+          .from("products")
+          .select("id,code,name,status")
+          .eq("id", versionResult.data.product_id)
+          .maybeSingle();
+
+        if (productResult.error)
+          throw new QuoteFormServiceError(
+            500,
+            "QUOTE_FORM_UNAVAILABLE",
+            "Quote form configuration is unavailable."
+          );
+
+        if (productResult.data) {
+          const pricingAvailable =
+            productResult.data.status === "ACTIVE" &&
+            versionResult.data.status === "PUBLISHED" &&
+            (await this.productHasUsablePricing(productResult.data.id));
+
+          products.push(
+            await this.mapProductVersion(
+              productResult.data,
+              versionResult.data,
+              additionsConfigured,
+              pricingAvailable
+            )
+          );
+        }
+      }
     }
 
     return quoteFormDefinitionSchema.parse({

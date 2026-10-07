@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTechnicalInputs,
+  hydrateQuoteFields,
   initialQuoteFields,
   normalizeUserDecimal,
+  quoteEditableStateFingerprint,
+  quoteFingerprint,
   positiveUserDecimal,
 } from "./quoteForm";
 import type { ProductInput } from "@shared/product-engineering";
@@ -43,6 +46,76 @@ describe("quote form helpers", () => {
     const initial = initialQuoteFields(inputs);
     expect(initial.units.width).toBe("cm");
     expect(initial.values.number_of_colors).toBe("0");
+  });
+
+  it("creates the same fingerprint regardless of object key order", () => {
+    expect(
+      quoteFingerprint({
+        request: {
+          technicalInputs: {
+            width: { kind: "decimal", value: "1", unit: "m" },
+            height: { kind: "decimal", value: "2", unit: "m" },
+          },
+          commercialQuantity: "1",
+        },
+      })
+    ).toBe(
+      quoteFingerprint({
+        request: {
+          commercialQuantity: "1",
+          technicalInputs: {
+            height: { unit: "m", value: "2", kind: "decimal" },
+            width: { unit: "m", value: "1", kind: "decimal" },
+          },
+        },
+      })
+    );
+  });
+
+  it("tracks only the editable Quote state for persisted dirty checks", () => {
+    const base = {
+      productVersionId: id(9),
+      fieldValues: { width: "150.5", number_of_colors: "2" },
+      fieldUnits: { width: "cm" as const, number_of_colors: null },
+      quantity: "1",
+      installments: "3",
+      installationRequested: false,
+      munckRequested: false,
+      munckHours: "4",
+      commercial: {
+        customerName: " Cliente Teste ",
+        customerPhone: " 48999999999 ",
+        title: " Letreiro ",
+      },
+    };
+
+    expect(quoteEditableStateFingerprint(base)).toBe(
+      quoteEditableStateFingerprint({
+        ...base,
+        munckHours: "99",
+        commercial: {
+          customerName: "Cliente Teste",
+          customerPhone: "48999999999",
+          title: "Letreiro",
+        },
+      })
+    );
+    expect(
+      quoteEditableStateFingerprint({
+        ...base,
+        fieldValues: { ...base.fieldValues, width: "151" },
+      })
+    ).not.toBe(quoteEditableStateFingerprint(base));
+  });
+
+  it("hydrates a persisted Quote back into editable fields", () => {
+    const hydrated = hydrateQuoteFields(inputs, {
+      width: { kind: "decimal", value: "150.5", unit: "cm" },
+      number_of_colors: { kind: "decimal", value: "2", unit: null },
+    });
+    expect(hydrated.values.width).toBe("150.5");
+    expect(hydrated.units.width).toBe("cm");
+    expect(hydrated.values.number_of_colors).toBe("2");
   });
 
   it("builds typed technical inputs using the selected unit", () => {

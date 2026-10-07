@@ -12,6 +12,7 @@ import {
   officialQuoteApiRequestSchema,
   quoteFormApiRequestSchema,
   quoteGetApiRequestSchema,
+  quoteListApiRequestSchema,
   quoteSaveApiRequestSchema,
   quoteTransitionApiRequestSchema,
 } from "../shared/quotes/index.js";
@@ -184,6 +185,7 @@ export default async function handler(req: any, res: any) {
   const isQuotePersistenceAction =
     action === "SAVE_QUOTE" ||
     action === "GET_QUOTE" ||
+    action === "LIST_QUOTES" ||
     action === "TRANSITION_QUOTE";
   const requiresCalculatorModule =
     isCalculation || isQuoteFormAction || isQuotePersistenceAction;
@@ -295,7 +297,9 @@ export default async function handler(req: any, res: any) {
           parsed.error.issues
         );
 
-      const data = await new OfficialQuoteFormService(db).load();
+      const data = await new OfficialQuoteFormService(db).load(
+        parsed.data.productVersionId
+      );
       log("quote_form", "form_loaded", {
         products: data.products.length,
         availableInstallments: data.availableInstallments,
@@ -323,6 +327,31 @@ export default async function handler(req: any, res: any) {
         db,
         new OfficialQuoteCalculationService(pricingCalculation, pricing)
       );
+
+      if (action === "LIST_QUOTES") {
+        const parsed = quoteListApiRequestSchema.safeParse(body);
+        if (!parsed.success)
+          return fail(
+            res,
+            400,
+            "INVALID_PAYLOAD",
+            "Invalid Quote list request.",
+            parsed.error.issues
+          );
+        const data = await quotePersistence.list(
+          parsed.data,
+          auth.user.id,
+          isManager
+        );
+        log("quote_persistence", "quotes_listed", {
+          page: data.page,
+          pageSize: data.pageSize,
+          total: data.total,
+          status: parsed.data.status,
+          hasSearch: Boolean(parsed.data.search),
+        });
+        return send(res, 200, { ok: true, data });
+      }
 
       if (action === "SAVE_QUOTE") {
         const parsed = quoteSaveApiRequestSchema.safeParse(body);

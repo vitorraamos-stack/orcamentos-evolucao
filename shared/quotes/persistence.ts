@@ -5,7 +5,11 @@ import {
   quoteInstallationRequestSchema,
   quoteMunckRequestSchema,
 } from "./calculation.js";
-import { calculationRequestSchema } from "../calculation-engine/contracts/index.js";
+import {
+  calculationRequestSchema,
+  moneySchema,
+} from "../calculation-engine/contracts/index.js";
+import { productIdSchema } from "../product-engineering/product.js";
 import { productVersionIdSchema } from "../product-engineering/productVersion.js";
 
 export const QUOTE_STATUSES = [
@@ -25,6 +29,17 @@ export type QuoteId = z.infer<typeof quoteIdSchema>;
 export const quoteSnapshotIdSchema = z.string().uuid().brand<"QuoteSnapshotId">();
 export type QuoteSnapshotId = z.infer<typeof quoteSnapshotIdSchema>;
 
+export const quoteCommercialDetailsSchema = z
+  .object({
+    customerName: z.string().trim().min(1).max(160),
+    customerPhone: z.string().trim().min(3).max(40).nullable(),
+    title: z.string().trim().min(1).max(200),
+  })
+  .strict();
+export type QuoteCommercialDetails = z.infer<
+  typeof quoteCommercialDetailsSchema
+>;
+
 const quoteNumberSchema = z.number().int().positive();
 const quoteRevisionSchema = z.number().int().positive();
 const quoteSnapshotVersionSchema = z.number().int().positive();
@@ -33,6 +48,7 @@ const timestampSchema = z.string().min(1);
 const quoteSaveFields = {
   quoteId: quoteIdSchema.nullable(),
   expectedRevision: quoteRevisionSchema.nullable(),
+  commercial: quoteCommercialDetailsSchema,
   productVersionId: productVersionIdSchema,
   request: calculationRequestSchema,
   installments: z.number().int().min(1).max(12),
@@ -81,6 +97,16 @@ export const quoteGetApiRequestSchema = z
   })
   .strict();
 
+export const quoteListApiRequestSchema = z
+  .object({
+    action: z.literal("LIST_QUOTES"),
+    page: z.number().int().positive(),
+    pageSize: z.number().int().min(10).max(100),
+    search: z.string().trim().max(120).nullable(),
+    status: quoteStatusSchema.nullable(),
+  })
+  .strict();
+
 export const quoteTransitionApiRequestSchema = z
   .object({
     action: z.literal("TRANSITION_QUOTE"),
@@ -99,6 +125,7 @@ export const quotePersistedSummarySchema = z
     snapshotId: quoteSnapshotIdSchema,
     snapshotVersion: quoteSnapshotVersionSchema,
     savedAt: timestampSchema,
+    commercial: quoteCommercialDetailsSchema,
   })
   .strict();
 
@@ -126,6 +153,38 @@ export const quoteCurrentPublicResultSchema = quotePersistedSummarySchema
 export type QuoteCurrentPublicResult = z.infer<
   typeof quoteCurrentPublicResultSchema
 >;
+
+export const quoteListItemSchema = z
+  .object({
+    quoteId: quoteIdSchema,
+    quoteNumber: quoteNumberSchema,
+    status: quoteStatusSchema,
+    revision: quoteRevisionSchema,
+    commercial: quoteCommercialDetailsSchema,
+    snapshotVersion: quoteSnapshotVersionSchema,
+    totalSellingPrice: moneySchema,
+    installments: z.number().int().min(1).max(12),
+    productId: productIdSchema,
+    productName: z.string().trim().min(1),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+    createdBy: z.string().uuid(),
+    createdByEmail: z.string().email().nullable(),
+  })
+  .strict();
+
+export type QuoteListItem = z.infer<typeof quoteListItemSchema>;
+
+export const quoteListResultSchema = z
+  .object({
+    items: z.array(quoteListItemSchema),
+    total: z.number().int().nonnegative(),
+    page: z.number().int().positive(),
+    pageSize: z.number().int().min(10).max(100),
+  })
+  .strict();
+
+export type QuoteListResult = z.infer<typeof quoteListResultSchema>;
 
 export const quoteTransitionResultSchema = z
   .object({
