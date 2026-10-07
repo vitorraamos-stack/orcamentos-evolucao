@@ -8,7 +8,12 @@ import {
   pricingPersistenceMutationSchema,
   PricingDomainError,
 } from "../shared/pricing/index.js";
-import { officialQuoteApiRequestSchema } from "../shared/quotes/index.js";
+import {
+  officialQuoteApiRequestSchema,
+  quoteGetApiRequestSchema,
+  quoteSaveApiRequestSchema,
+  quoteTransitionApiRequestSchema,
+} from "../shared/quotes/index.js";
 import { CostingCompatibilityError } from "./_shared/costing/mappers.js";
 import {
   OfficialCostingCalculationService,
@@ -26,6 +31,10 @@ import {
   OfficialQuoteCalculationError,
   OfficialQuoteCalculationService,
 } from "./_shared/quotes/calculationService.js";
+import {
+  OfficialQuotePersistenceService,
+  QuotePersistenceServiceError,
+} from "./_shared/quotes/persistenceService.js";
 import {
   PricingPersistenceCompatibilityError,
 } from "./_shared/pricing/mappers.js";
@@ -166,9 +175,17 @@ export default async function handler(req: any, res: any) {
   const isPricingCalculation = action === "CALCULATE";
   const isQuoteCalculation = action === "CALCULATE_QUOTE";
   const isCalculation = isPricingCalculation || isQuoteCalculation;
+  const isQuotePersistenceAction =
+    action === "SAVE_QUOTE" ||
+    action === "GET_QUOTE" ||
+    action === "TRANSITION_QUOTE";
 
   const log = (
-    scope: "pricing" | "official_pricing" | "official_quote",
+    scope:
+      | "pricing"
+      | "official_pricing"
+      | "official_quote"
+      | "quote_persistence",
     event: string,
     details: Record<string, unknown>
   ) =>
@@ -222,6 +239,99 @@ export default async function handler(req: any, res: any) {
                 : "installationSettings" in query
                   ? await pricing.loadInstallationSettings()
                   : await pricing.loadPaymentTerm(Number(query.installments));
+      return send(res, 200, { ok: true, data });
+    }
+
+    if (isQuotePersistenceAction) {
+      if (!canCalculate)
+        return fail(
+          res,
+          403,
+          "FORBIDDEN",
+          "Quote persistence is restricted to Sales and managers."
+        );
+
+      const pricingCalculation = new OfficialPricingCalculationService(
+        new OfficialCostingCalculationService(
+          new ProductEngineeringService(db),
+          new CostingService(db)
+        ),
+        pricing
+      );
+      const quotePersistence = new OfficialQuotePersistenceService(
+        db,
+        new OfficialQuoteCalculationService(pricingCalculation, pricing)
+      );
+
+      if (action === "SAVE_QUOTE") {
+        const parsed = quoteSaveApiRequestSchema.safeParse(body);
+        if (!parsed.success)
+          return fail(
+            res,
+            400,
+            "INVALID_PAYLOAD",
+            "Invalid Quote save request.",
+            parsed.error.issues
+          );
+        const { action: _action, ...request } = parsed.data;
+        const data = await quotePersistence.save(
+          request,
+          auth.user.id,
+          isManager
+        );
+        log("quote_persistence", "snapshot_saved", {
+          quoteId: data.quoteId,
+          quoteNumber: data.quoteNumber,
+          revision: data.revision,
+          snapshotVersion: data.snapshotVersion,
+        });
+        return send(res, 200, { ok: true, data });
+      }
+
+      if (action === "GET_QUOTE") {
+        const parsed = quoteGetApiRequestSchema.safeParse(body);
+        if (!parsed.success)
+          return fail(
+            res,
+            400,
+            "INVALID_PAYLOAD",
+            "Invalid Quote load request.",
+            parsed.error.issues
+          );
+        const data = await quotePersistence.load(
+          parsed.data,
+          auth.user.id,
+          isManager
+        );
+        log("quote_persistence", "quote_loaded", {
+          quoteId: data.quoteId,
+          quoteNumber: data.quoteNumber,
+          revision: data.revision,
+          snapshotVersion: data.snapshotVersion,
+        });
+        return send(res, 200, { ok: true, data });
+      }
+
+      const parsed = quoteTransitionApiRequestSchema.safeParse(body);
+      if (!parsed.success)
+        return fail(
+          res,
+          400,
+          "INVALID_PAYLOAD",
+          "Invalid Quote transition request.",
+          parsed.error.issues
+        );
+      const data = await quotePersistence.transition(
+        parsed.data,
+        auth.user.id,
+        isManager
+      );
+      log("quote_persistence", "status_changed", {
+        quoteId: data.quoteId,
+        quoteNumber: data.quoteNumber,
+        revision: data.revision,
+        status: data.status,
+      });
       return send(res, 200, { ok: true, data });
     }
 
@@ -337,9 +447,13 @@ export default async function handler(req: any, res: any) {
     });
     return send(res, 200, { ok: true, data });
   } catch (error) {
-    if (isCalculation) {
+    if (isCalculation || isQuotePersistenceAction) {
       log(
-        isQuoteCalculation ? "official_quote" : "official_pricing",
+        isQuotePersistenceAction
+          ? "quote_persistence"
+          : isQuoteCalculation
+            ? "official_quote"
+            : "official_pricing",
         "calculation_failed",
         {
           code:
@@ -348,6 +462,9 @@ export default async function handler(req: any, res: any) {
               : "INTERNAL_ERROR",
         }
       );
+
+      if (error instanceof QuotePersistenceServiceError)
+        return fail(res, error.status, error.code, error.message);
 
       if (error instanceof PricingPersistenceServiceError) {
         const safe = pricingConfigurationErrors[error.code];

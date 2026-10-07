@@ -4,6 +4,9 @@ const state = vi.hoisted(() => ({
   client: null as any,
   officialCalculate: vi.fn(),
   officialQuoteCalculate: vi.fn(),
+  officialQuoteSave: vi.fn(),
+  officialQuoteLoad: vi.fn(),
+  officialQuoteTransition: vi.fn(),
 }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => state.client }));
 vi.mock("../../api/_shared/pricing/calculationService.js", () => ({
@@ -35,6 +38,28 @@ vi.mock("../../api/_shared/quotes/calculationService.js", () => ({
   OfficialQuoteCalculationService: class OfficialQuoteCalculationService {
     async calculate(input: unknown) {
       return state.officialQuoteCalculate(input);
+    }
+  },
+}));
+vi.mock("../../api/_shared/quotes/persistenceService.js", () => ({
+  QuotePersistenceServiceError: class QuotePersistenceServiceError extends Error {
+    status: number;
+    code: string;
+    constructor(status: number, code: string, message: string) {
+      super(message);
+      this.status = status;
+      this.code = code;
+    }
+  },
+  OfficialQuotePersistenceService: class OfficialQuotePersistenceService {
+    async save(input: unknown, actorId: string, isManager: boolean) {
+      return state.officialQuoteSave(input, actorId, isManager);
+    }
+    async load(input: unknown, actorId: string, isManager: boolean) {
+      return state.officialQuoteLoad(input, actorId, isManager);
+    }
+    async transition(input: unknown, actorId: string, isManager: boolean) {
+      return state.officialQuoteTransition(input, actorId, isManager);
     }
   },
 }));
@@ -157,6 +182,9 @@ describe("Pricing API manager authority", () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY = "server-secret";
     state.officialCalculate.mockReset();
     state.officialQuoteCalculate.mockReset();
+    state.officialQuoteSave.mockReset();
+    state.officialQuoteLoad.mockReset();
+    state.officialQuoteTransition.mockReset();
   });
 
   it("returns 401 without bearer or with an invalid token", async () => {
@@ -421,6 +449,206 @@ describe("Pricing API manager authority", () => {
     );
     expect(res.statusCode).toBe(400);
     expect(state.officialQuoteCalculate).not.toHaveBeenCalled();
+  });
+
+  it.each(["consultor_vendas", "consultor", "gerente", "admin"])(
+    "allows %s to persist an official Quote snapshot",
+    async role => {
+      const saved = {
+        quoteId: id(10),
+        quoteNumber: 1001,
+        status: "DRAFT",
+        revision: 1,
+        snapshotId: id(11),
+        snapshotVersion: 1,
+        savedAt: now,
+        publicResult: {
+          calculationVersion: "1.0",
+          productId: id(4),
+          productVersionId: id(5),
+          productVersionNumber: 2,
+          productVersionRevision: 2,
+          commercialQuantity: "1",
+          installments: 3,
+          productSellingPrice: { currency: "BRL", amount: "720" },
+          installation: {
+            requested: false,
+            areaM2: null,
+            tier: null,
+            price: { currency: "BRL", amount: "0" },
+          },
+          munck: {
+            requested: false,
+            requestedHours: null,
+            billedHours: null,
+            price: { currency: "BRL", amount: "0" },
+          },
+          subtotalBeforeFinancialRate: { currency: "BRL", amount: "720" },
+          roundingRule: "BRL_2DP_HALF_UP_V1",
+          totalSellingPrice: { currency: "BRL", amount: "720.00" },
+        },
+      };
+      state.officialQuoteSave.mockResolvedValueOnce(saved);
+      state.client = client({ id: id(9) }, role);
+      const res = response();
+      const request = {
+        quoteId: null,
+        expectedRevision: null,
+        productVersionId: id(5),
+        request: { commercialQuantity: "1", technicalInputs: {} },
+        installments: 3,
+        installation: { requested: false },
+        munck: { requested: false },
+      };
+
+      await handler(
+        {
+          method: "POST",
+          headers: { authorization: "Bearer valid" },
+          body: { action: "SAVE_QUOTE", ...request },
+        },
+        res
+      );
+
+      expect(res.statusCode).toBe(200);
+      expect(res.payload).toEqual({ ok: true, data: saved });
+      expect(state.officialQuoteSave).toHaveBeenCalledWith(
+        request,
+        id(9),
+        role === "gerente" || role === "admin"
+      );
+      expect(res.payload.data).not.toHaveProperty("privateSnapshot");
+      expect(res.payload.data).not.toHaveProperty("costing");
+      expect(res.payload.data).not.toHaveProperty("pricingEngine");
+    }
+  );
+
+  it("rejects browser-supplied persisted Quote snapshots and prices", async () => {
+    state.client = client({ id: id(9) }, "consultor_vendas");
+    const res = response();
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer valid" },
+        body: {
+          action: "SAVE_QUOTE",
+          quoteId: null,
+          expectedRevision: null,
+          productVersionId: id(5),
+          request: { commercialQuantity: "1", technicalInputs: {} },
+          installments: 3,
+          installation: { requested: false },
+          munck: { requested: false },
+          totalSellingPrice: "1",
+          privateSnapshot: { hacked: true },
+        },
+      },
+      res
+    );
+    expect(res.statusCode).toBe(400);
+    expect(state.officialQuoteSave).not.toHaveBeenCalled();
+  });
+
+  it("loads a persisted Quote through the sanitized public contract", async () => {
+    const loaded = {
+      quoteId: id(10),
+      quoteNumber: 1001,
+      status: "DRAFT",
+      revision: 2,
+      snapshotId: id(12),
+      snapshotVersion: 2,
+      savedAt: now,
+      request: {
+        productVersionId: id(5),
+        request: { commercialQuantity: "1", technicalInputs: {} },
+        installments: 3,
+        installation: { requested: false },
+        munck: { requested: false },
+      },
+      publicResult: {
+        calculationVersion: "1.0",
+        productId: id(4),
+        productVersionId: id(5),
+        productVersionNumber: 2,
+        productVersionRevision: 2,
+        commercialQuantity: "1",
+        installments: 3,
+        productSellingPrice: { currency: "BRL", amount: "720" },
+        installation: {
+          requested: false,
+          areaM2: null,
+          tier: null,
+          price: { currency: "BRL", amount: "0" },
+        },
+        munck: {
+          requested: false,
+          requestedHours: null,
+          billedHours: null,
+          price: { currency: "BRL", amount: "0" },
+        },
+        subtotalBeforeFinancialRate: { currency: "BRL", amount: "720" },
+        roundingRule: "BRL_2DP_HALF_UP_V1",
+        totalSellingPrice: { currency: "BRL", amount: "720.00" },
+      },
+    };
+    state.officialQuoteLoad.mockResolvedValueOnce(loaded);
+    state.client = client({ id: id(9) }, "consultor_vendas");
+    const res = response();
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer valid" },
+        body: { action: "GET_QUOTE", quoteId: id(10) },
+      },
+      res
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.payload.data).toEqual(loaded);
+    expect(state.officialQuoteLoad).toHaveBeenCalledWith(
+      {
+        action: "GET_QUOTE",
+        quoteId: id(10),
+      },
+      id(9),
+      false
+    );
+  });
+
+  it("transitions a Quote with the authenticated actor", async () => {
+    state.officialQuoteTransition.mockResolvedValueOnce({
+      quoteId: id(10),
+      quoteNumber: 1001,
+      status: "SENT",
+      revision: 3,
+      snapshotId: id(12),
+      updatedAt: now,
+    });
+    state.client = client({ id: id(9) }, "consultor_vendas");
+    const res = response();
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer valid" },
+        body: {
+          action: "TRANSITION_QUOTE",
+          quoteId: id(10),
+          expectedRevision: 2,
+          targetStatus: "SENT",
+        },
+      },
+      res
+    );
+    expect(res.statusCode).toBe(200);
+    expect(state.officialQuoteTransition).toHaveBeenCalledWith(
+      {
+        action: "TRANSITION_QUOTE",
+        quoteId: id(10),
+        expectedRevision: 2,
+        targetStatus: "SENT",
+      },
+      id(9),
+      false
+    );
   });
 
   it.each(["arte_finalista", "producao", "instalador"])(
