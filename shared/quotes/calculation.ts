@@ -19,10 +19,7 @@ import {
   calculateCommercialPricing,
 } from "../pricing/commercial.js";
 import { pricingRateSchema } from "../pricing/contracts.js";
-import {
-  pricingInstallationSettingsSchema,
-  type PricingInstallationSettings,
-} from "../pricing/installationSettings.js";
+import { pricingInstallationSettingsSchema } from "../pricing/installationSettings.js";
 
 export const OFFICIAL_QUOTE_CALCULATION_VERSION = "1.0" as const;
 
@@ -228,9 +225,3 @@ export const officialQuotePublicResultSchema = z
 export type OfficialQuotePublicResult = z.infer<
   typeof officialQuotePublicResultSchema
 >;
-
-export function pricingInstallationSettings(
-  value: PricingInstallationSettings
-): PricingInstallationSettings {
-  return pricingInstallationSettingsSchema.parse(value);
-}
