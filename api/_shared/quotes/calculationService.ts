@@ -6,6 +6,8 @@ import {
   type OfficialQuotePublicResult,
 } from "../../../shared/quotes/index.js";
 import {
+  compareDecimal,
+  decimalString,
   multiplyDecimal,
   type DecimalString,
 } from "../../../shared/calculation-engine/decimal/index.js";
@@ -53,7 +55,10 @@ function resolvedMeterInput(
       "Installation area cannot be derived from this product."
     );
   try {
-    return convertUnit(input.value.value, input.value.unit, "m");
+    const normalized = convertUnit(input.value.value, input.value.unit, "m");
+    if (compareDecimal(normalized, decimalString("0")) <= 0)
+      throw new Error("NON_POSITIVE_INSTALLATION_DIMENSION");
+    return normalized;
   } catch {
     throw new OfficialQuoteCalculationError(
       422,
