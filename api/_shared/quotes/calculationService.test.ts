@@ -113,6 +113,24 @@ describe("OfficialQuoteCalculationService", () => {
     expect(result.installationSettingsRevision).toBe(3);
   });
 
+  it("does not load additional settings for a product-only quote", async () => {
+    const pricing = { calculate: vi.fn(async () => pricingResult()) };
+    const installation = {
+      loadInstallationSettings: vi.fn(async () => settings),
+    };
+    const result = await new OfficialQuoteCalculationService(
+      pricing,
+      installation
+    ).calculate({
+      ...request,
+      installation: { requested: false },
+      munck: { requested: false },
+    });
+    expect(installation.loadInstallationSettings).not.toHaveBeenCalled();
+    expect(result.installationSettingsRevision).toBeNull();
+    expect(result.publicResult.totalSellingPrice.amount).toBe("700.00");
+  });
+
   it("does not require dimensions when installation is not requested", async () => {
     const original = pricingResult();
     const withoutDimensions = {
