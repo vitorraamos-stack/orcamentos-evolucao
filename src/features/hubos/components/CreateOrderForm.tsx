@@ -48,7 +48,11 @@ import type {
   LogisticType,
   OsOrder,
 } from "../types";
-import { createOrder, findOrderBySaleNumber } from "../api";
+import {
+  createOrder,
+  createOrderFromQuote,
+  findOrderBySaleNumber,
+} from "../api";
 import { ART_DIRECTION_TAG_CONFIG } from "../artDirectionTagConfig";
 import { ART_DIRECTION_CHOICES } from "../orderUrgency";
 import {
@@ -62,6 +66,7 @@ import {
   normalizeCreateOrderItem,
   toCreateOrderItemPayload,
   type CreateOrderItemDraft,
+  type CreateOrderPrefill,
 } from "../createOrderDomain";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -135,27 +140,40 @@ export default function CreateOrderForm({
   onCompleted,
   onCancel,
   cancelRequestToken = 0,
+  prefill = null,
+  sourceQuoteId = null,
 }: {
   onCompleted: (order: OsOrder) => void;
   onCancel: () => void;
   cancelRequestToken?: number;
+  prefill?: CreateOrderPrefill | null;
+  sourceQuoteId?: string | null;
 }) {
   const { user } = useAuth();
+  const quoteLocked = Boolean(sourceQuoteId);
+  const installationLocked =
+    quoteLocked && prefill?.logisticType === "instalacao";
   const [confirmClose, setConfirmClose] = useState(false);
-  const [saleNumber, setSaleNumber] = useState(""),
-    [clientName, setClientName] = useState(""),
-    [description, setDescription] = useState("");
-  const [deliveryDate, setDeliveryDate] = useState(""),
-    [deadline, setDeadline] = useState<DeliveryDeadlinePreset | null>(null);
-  const [logisticType, setLogisticType] = useState<LogisticType>("retirada"),
-    [address, setAddress] = useState("");
-  const [artDirection, setArtDirection] = useState<ArtDirectionTag | null>(
-      null
+  const [saleNumber, setSaleNumber] = useState(prefill?.saleNumber ?? ""),
+    [clientName, setClientName] = useState(prefill?.clientName ?? ""),
+    [description, setDescription] = useState(prefill?.description ?? "");
+  const [deliveryDate, setDeliveryDate] = useState(prefill?.deliveryDate ?? ""),
+    [deadline, setDeadline] = useState<DeliveryDeadlinePreset | null>(
+      prefill?.deliveryDeadlinePreset ?? null
+    );
+  const [logisticType, setLogisticType] = useState<LogisticType>(
+      prefill?.logisticType ?? "retirada"
     ),
-    [isUrgent, setIsUrgent] = useState(false);
-  const [items, setItems] = useState<CreateOrderItemDraft[]>([
-    emptyOrderItem(),
-  ]);
+    [address, setAddress] = useState(prefill?.address ?? "");
+  const [artDirection, setArtDirection] = useState<ArtDirectionTag | null>(
+      prefill?.selectedArtDirectionTag ?? null
+    ),
+    [isUrgent, setIsUrgent] = useState(prefill?.isUrgent ?? false);
+  const [items, setItems] = useState<CreateOrderItemDraft[]>(
+    prefill?.items?.length
+      ? prefill.items.map(normalizeCreateOrderItem)
+      : [emptyOrderItem()]
+  );
   const [files, setFiles] = useState<File[]>([]),
     [financialDocs, setFinancialDocs] = useState<FinancialDoc[]>([]);
   const [errors, setErrors] = useState<Errors>({}),
@@ -208,6 +226,7 @@ export default function CreateOrderForm({
   );
 
   useEffect(() => {
+    if (prefill) return;
     try {
       const raw = localStorage.getItem(OS_DRAFT_STORAGE_KEY);
       if (!raw) return;
@@ -229,7 +248,7 @@ export default function CreateOrderForm({
     } catch {
       localStorage.removeItem(OS_DRAFT_STORAGE_KEY);
     }
-  }, []);
+  }, [prefill]);
 
   useEffect(() => {
     setExistingOrder(null);
@@ -325,6 +344,13 @@ export default function CreateOrderForm({
   };
 
   const submit = async (draft = false) => {
+    if (draft && sourceQuoteId) {
+      toast.message(
+        "Finalize os campos obrigatórios para criar a OS deste orçamento."
+      );
+      return;
+    }
+
     if (pendingOrder && !draft) {
       try {
         setSaving(true);
@@ -340,7 +366,7 @@ export default function CreateOrderForm({
             docs: financialDocs,
             userId: user?.id ?? null,
           });
-        localStorage.removeItem(OS_DRAFT_STORAGE_KEY);
+        if (!sourceQuoteId) localStorage.removeItem(OS_DRAFT_STORAGE_KEY);
         toast.success("Ordem de Serviço criada com sucesso.");
         const completedOrder = pendingOrder;
         reset();
@@ -384,7 +410,7 @@ export default function CreateOrderForm({
     }
     try {
       setSaving(true);
-      const order = await createOrder({
+      const payload = {
         sale_number: saleNumber.trim() || "Rascunho",
         client_name: clientName.trim() || "Rascunho",
         title: draft ? "Rascunho" : null,
@@ -400,9 +426,12 @@ export default function CreateOrderForm({
         items: validItems.map(toCreateOrderItemPayload),
         reproducao: false,
         letra_caixa: false,
-      });
+      };
+      const order = sourceQuoteId
+        ? await createOrderFromQuote(sourceQuoteId, payload)
+        : await createOrder(payload);
       if (draft) saveLocalDraft();
-      else localStorage.removeItem(OS_DRAFT_STORAGE_KEY);
+      else if (!sourceQuoteId) localStorage.removeItem(OS_DRAFT_STORAGE_KEY);
       if (!draft) {
         try {
           if (files.length)
@@ -509,6 +538,7 @@ export default function CreateOrderForm({
                 <Input
                   id="client-name"
                   value={clientName}
+                  disabled={quoteLocked}
                   onChange={e => setClientName(e.target.value)}
                   aria-invalid={Boolean(errors.clientName)}
                   aria-describedby="client-name-error"
@@ -555,24 +585,27 @@ export default function CreateOrderForm({
               >
                 <div className="flex items-center justify-between">
                   <strong>Item {index + 1}</strong>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      setItems(current => current.filter((_, i) => i !== index))
-                    }
-                    aria-label={`Excluir item ${index + 1}`}
-                  >
+                  {!quoteLocked && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setItems(current => current.filter((_, i) => i !== index))
+                      }
+                      aria-label={`Excluir item ${index + 1}`}
+                    >
                     <Trash2 className="mr-1 h-4 w-4" />
-                    Excluir
-                  </Button>
+                      Excluir
+                    </Button>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor={`item-${index}-name`}>Nome do item *</Label>
                   <Input
                     id={`item-${index}-name`}
                     value={String(item.name)}
+                    disabled={quoteLocked}
                     onChange={e => updateItem(index, { name: e.target.value })}
                     aria-invalid={Boolean(errors[`item-${index}-name`])}
                   />
@@ -589,6 +622,7 @@ export default function CreateOrderForm({
                       min="0.001"
                       step="0.001"
                       value={String(item.quantity)}
+                      disabled={quoteLocked}
                       onChange={e =>
                         updateItem(index, { quantity: e.target.value })
                       }
@@ -604,6 +638,7 @@ export default function CreateOrderForm({
                       type="number"
                       min="0"
                       value={item.width_cm == null ? "" : String(item.width_cm)}
+                      disabled={quoteLocked}
                       onChange={e =>
                         updateItem(index, { width_cm: e.target.value })
                       }
@@ -617,6 +652,7 @@ export default function CreateOrderForm({
                       value={
                         item.height_cm == null ? "" : String(item.height_cm)
                       }
+                      disabled={quoteLocked}
                       onChange={e =>
                         updateItem(index, { height_cm: e.target.value })
                       }
@@ -628,6 +664,7 @@ export default function CreateOrderForm({
                     </Label>
                     <Select
                       value={String(item.measurement_unit)}
+                      disabled={quoteLocked}
                       onValueChange={measurementUnit =>
                         updateItem(index, {
                           measurement_unit: measurementUnit as "cm" | "m",
@@ -658,6 +695,7 @@ export default function CreateOrderForm({
                   <Label>Descrição / especificação</Label>
                   <Textarea
                     value={String(item.description ?? "")}
+                    disabled={quoteLocked}
                     onChange={e =>
                       updateItem(index, { description: e.target.value })
                     }
@@ -667,24 +705,27 @@ export default function CreateOrderForm({
                   <Label>Observações</Label>
                   <Input
                     value={String(item.notes ?? "")}
+                    disabled={quoteLocked}
                     onChange={e => updateItem(index, { notes: e.target.value })}
                   />
                 </div>
               </div>
             ))}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                setItems(current => [
-                  ...current,
-                  { ...emptyOrderItem(), sort_order: current.length },
-                ])
-              }
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Adicionar outro item
-            </Button>
+            {!quoteLocked && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  setItems(current => [
+                    ...current,
+                    { ...emptyOrderItem(), sort_order: current.length },
+                  ])
+                }
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Adicionar outro item
+              </Button>
+            )}
           </Section>
 
           <Section
@@ -839,6 +880,7 @@ export default function CreateOrderForm({
                   type="button"
                   key={value}
                   aria-pressed={logisticType === value}
+                  disabled={installationLocked}
                   onClick={() => setLogisticType(value)}
                   className={`rounded-xl border p-4 font-medium ${logisticType === value ? "border-primary bg-primary/5" : "hover:bg-muted"}`}
                 >
@@ -979,13 +1021,15 @@ export default function CreateOrderForm({
           <Button variant="ghost" onClick={requestClose} disabled={saving}>
             Cancelar
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => void submit(true)}
-            disabled={saving}
-          >
-            Salvar rascunho
-          </Button>
+          {!sourceQuoteId && (
+            <Button
+              variant="outline"
+              onClick={() => void submit(true)}
+              disabled={saving}
+            >
+              Salvar rascunho
+            </Button>
+          )}
           <Button onClick={() => void submit(false)} disabled={saving}>
             {saving
               ? "CRIANDO OS..."
@@ -1005,9 +1049,11 @@ export default function CreateOrderForm({
           </AlertDialogHeader>
           <AlertDialogFooter className="sm:justify-between">
             <AlertDialogCancel>Continuar editando</AlertDialogCancel>
-            <Button variant="outline" onClick={() => void submit(true)}>
-              Salvar rascunho
-            </Button>
+            {!sourceQuoteId && (
+              <Button variant="outline" onClick={() => void submit(true)}>
+                Salvar rascunho
+              </Button>
+            )}
             <AlertDialogAction onClick={close}>
               Descartar e voltar
             </AlertDialogAction>

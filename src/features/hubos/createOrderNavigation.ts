@@ -23,3 +23,16 @@ export function createOrderPath(returnTo: string): string {
   const safeReturnTo = resolveOrderCreationReturnPath(returnTo);
   return `/os/novo?returnTo=${encodeURIComponent(safeReturnTo)}`;
 }
+
+
+export function createOrderFromQuotePath(
+  quoteId: string,
+  returnTo: string
+): string {
+  const safeReturnTo = resolveOrderCreationReturnPath(returnTo);
+  const params = new URLSearchParams({
+    returnTo: safeReturnTo,
+    quote: quoteId,
+  });
+  return `/os/novo?${params.toString()}`;
+}

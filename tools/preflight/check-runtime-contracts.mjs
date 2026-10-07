@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 export const REQUIRED_CONTRACTS = {
   rpc: [
     'hub_os_create_order_secure',
+    'hub_os_create_from_quote_secure',
     'hub_os_update_order_secure',
     'hub_os_move_order_secure',
     'hub_os_archive_order_secure',
