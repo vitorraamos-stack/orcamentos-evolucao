@@ -74,7 +74,7 @@ export class OfficialQuoteCalculationService {
   async calculate(input: unknown): Promise<{
     publicResult: OfficialQuotePublicResult;
     pricing: OfficialPricingCalculationResult;
-    installationSettingsRevision: number;
+    installationSettingsRevision: number | null;
   }> {
     const parsed = officialQuoteRequestSchema.safeParse(input);
     if (!parsed.success)
@@ -91,7 +91,11 @@ export class OfficialQuoteCalculationService {
       installments: request.installments,
     });
 
-    const settings = await this.installationSettings.loadInstallationSettings();
+    const needsAdditionalSettings =
+      request.installation.requested || request.munck.requested;
+    const settings = needsAdditionalSettings
+      ? await this.installationSettings.loadInstallationSettings()
+      : null;
     const areaM2 = request.installation.requested
       ? installationAreaM2(pricing)
       : null;
@@ -134,7 +138,7 @@ export class OfficialQuoteCalculationService {
     return {
       publicResult: publicResult.data,
       pricing,
-      installationSettingsRevision: settings.revision,
+      installationSettingsRevision: settings?.revision ?? null,
     };
   }
 }
