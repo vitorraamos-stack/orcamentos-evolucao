@@ -26,7 +26,8 @@ export function normalizeUserDecimal(value: string): DecimalString {
   const normalized = trimmed.includes(",")
     ? trimmed.replace(/\./g, "").replace(",", ".")
     : trimmed;
-  return decimalString(decimalFrom(normalized).toFixed());
+  const parsed = decimalString(normalized);
+  return decimalString(decimalFrom(parsed).toFixed());
 }
 
 export function positiveUserDecimal(value: string, label: string): DecimalString {
