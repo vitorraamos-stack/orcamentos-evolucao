@@ -114,8 +114,11 @@ describe("OfficialQuoteCalculationService", () => {
   });
 
   it("does not require dimensions when installation is not requested", async () => {
-    const withoutDimensions = pricingResult();
-    withoutDimensions.costing.resolvedInputs = [] as any;
+    const original = pricingResult();
+    const withoutDimensions = {
+      ...original,
+      costing: { ...original.costing, resolvedInputs: [] },
+    } as OfficialPricingCalculationResult;
     const result = await new OfficialQuoteCalculationService(
       { calculate: async () => withoutDimensions },
       { loadInstallationSettings: async () => settings }
@@ -130,10 +133,16 @@ describe("OfficialQuoteCalculationService", () => {
   });
 
   it("fails closed when installation area cannot be derived", async () => {
-    const missingHeight = pricingResult();
-    missingHeight.costing.resolvedInputs = missingHeight.costing.resolvedInputs.filter(
-      input => input.key !== "height"
-    ) as any;
+    const original = pricingResult();
+    const missingHeight = {
+      ...original,
+      costing: {
+        ...original.costing,
+        resolvedInputs: original.costing.resolvedInputs.filter(
+          input => input.key !== "height"
+        ),
+      },
+    } as OfficialPricingCalculationResult;
 
     await expect(
       new OfficialQuoteCalculationService(
