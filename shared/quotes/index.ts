@@ -16,3 +16,28 @@ export type {
   QuoteCommercialResult,
   OfficialQuotePublicResult,
 } from "./calculation.js";
+
+export {
+  QUOTE_STATUSES,
+  quoteStatusSchema,
+  quoteIdSchema,
+  quoteSnapshotIdSchema,
+  quoteSaveRequestSchema,
+  quoteSaveApiRequestSchema,
+  quoteGetApiRequestSchema,
+  quoteTransitionApiRequestSchema,
+  quotePersistedSummarySchema,
+  quoteSavePublicResultSchema,
+  quoteCurrentPublicResultSchema,
+  quoteTransitionResultSchema,
+} from "./persistence.js";
+export type {
+  QuoteStatus,
+  QuoteId,
+  QuoteSnapshotId,
+  QuoteSaveRequest,
+  QuotePersistedSummary,
+  QuoteSavePublicResult,
+  QuoteCurrentPublicResult,
+  QuoteTransitionResult,
+} from "./persistence.js";
