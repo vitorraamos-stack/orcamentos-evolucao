@@ -89,6 +89,21 @@ describe("calculateQuoteCommercial", () => {
     expect(result.totalSellingPrice.amount).toBe("2473.68");
   });
 
+  it("supports a product-only quote without additional settings", () => {
+    const result = calculateQuoteCommercial(
+      input({
+        installationRequested: false,
+        installationAreaM2: null,
+        munckRequestedHours: null,
+        settings: null,
+      })
+    );
+    expect(result.subtotalBeforeFinancialRate.amount).toBe("700");
+    expect(result.installation.price.amount).toBe("0");
+    expect(result.munck.price.amount).toBe("0");
+    expect(result.totalSellingPrice.amount).toBe("700.00");
+  });
+
   it("requires an authoritative installation area when installation is requested", () => {
     expect(() =>
       calculateQuoteCommercial(
