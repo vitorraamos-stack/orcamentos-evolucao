@@ -338,12 +338,16 @@ export default async function handler(req: any, res: any) {
     return send(res, 200, { ok: true, data });
   } catch (error) {
     if (isCalculation) {
-      log("official_pricing", "calculation_failed", {
-        code:
-          error instanceof Error && "code" in error
-            ? String(error.code)
-            : "INTERNAL_ERROR",
-      });
+      log(
+        isQuoteCalculation ? "official_quote" : "official_pricing",
+        "calculation_failed",
+        {
+          code:
+            error instanceof Error && "code" in error
+              ? String(error.code)
+              : "INTERNAL_ERROR",
+        }
+      );
 
       if (error instanceof PricingPersistenceServiceError) {
         const safe = pricingConfigurationErrors[error.code];
