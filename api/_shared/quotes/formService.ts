@@ -13,8 +13,18 @@ type ProductEngineeringReader = Pick<ProductEngineeringService, "loadDefinition"
 type CostingReader = Pick<CostingService, "loadProductParameters">;
 type PricingReader = Pick<
   PricingPersistenceService,
-  "loadPaymentTerm" | "loadInstallationSettings"
+  | "loadPaymentTerm"
+  | "loadInstallationSettings"
+  | "loadOfficialCalculationContext"
 >;
+
+const physicalLengthUnits = new Set(["mm", "cm", "m"]);
+const unavailableProductPricingCodes = new Set([
+  "PRODUCT_PRICING_SETTINGS_NOT_FOUND",
+  "PRICING_POLICY_NOT_FOUND",
+  "PRICING_POLICY_NOT_ACTIVE",
+  "PRICING_PUBLISHED_VERSION_NOT_FOUND",
+]);
 
 export class QuoteFormServiceError extends Error {
   constructor(
@@ -29,9 +39,15 @@ export class QuoteFormServiceError extends Error {
 
 const isMissingPricing = (
   error: unknown,
-  code: "PRICING_PAYMENT_TERM_NOT_FOUND" | "PRICING_INSTALLATION_SETTINGS_NOT_FOUND"
+  code:
+    | "PRICING_PAYMENT_TERM_NOT_FOUND"
+    | "PRICING_INSTALLATION_SETTINGS_NOT_FOUND"
 ) =>
   error instanceof PricingPersistenceServiceError && error.code === code;
+
+const isUnavailableProductPricing = (error: unknown) =>
+  error instanceof PricingPersistenceServiceError &&
+  unavailableProductPricingCodes.has(error.code);
 
 export class OfficialQuoteFormService {
   private readonly productEngineering: ProductEngineeringReader;
@@ -64,7 +80,7 @@ export class OfficialQuoteFormService {
     return result;
   }
 
-  private async installationConfigured() {
+  private async additionsConfigured() {
     try {
       await this.pricing.loadInstallationSettings();
       return true;
@@ -75,33 +91,39 @@ export class OfficialQuoteFormService {
     }
   }
 
+  private async productHasUsablePricing(productId: string) {
+    try {
+      await this.pricing.loadOfficialCalculationContext(productId, 1);
+      return true;
+    } catch (error) {
+      if (isUnavailableProductPricing(error)) return false;
+      throw error;
+    }
+  }
+
   async load(): Promise<QuoteFormDefinition> {
-    const [productsResult, settingsResult, installments, additionsConfigured] =
+    const [productsResult, installments, additionsConfigured] =
       await Promise.all([
         this.db
           .from("products")
           .select("id,code,name")
           .eq("status", "ACTIVE")
           .order("name"),
-        this.db.from("product_pricing_settings").select("product_id"),
         this.availableInstallments(),
-        this.installationConfigured(),
+        this.additionsConfigured(),
       ]);
 
-    if (productsResult.error || settingsResult.error)
+    if (productsResult.error)
       throw new QuoteFormServiceError(
         500,
         "QUOTE_FORM_UNAVAILABLE",
         "Quote form configuration is unavailable."
       );
 
-    const configuredProductIds = new Set(
-      (settingsResult.data ?? []).map((row: any) => String(row.product_id))
-    );
     const products: QuoteFormDefinition["products"] = [];
 
     for (const product of productsResult.data ?? []) {
-      if (!configuredProductIds.has(String(product.id))) continue;
+      if (!(await this.productHasUsablePricing(product.id))) continue;
 
       const versionResult = await this.db
         .from("product_versions")
@@ -131,15 +153,14 @@ export class OfficialQuoteFormService {
           (left, right) =>
             left.sortOrder - right.sortOrder || left.key.localeCompare(right.key)
         );
-      const physicalLengthUnits = new Set(["mm", "cm", "m"]);
-      const width = inputs.find(
+      const width = definition.inputs.find(
         input =>
           input.key === "width" &&
           input.type === "DECIMAL" &&
           input.unit !== null &&
           physicalLengthUnits.has(input.unit)
       );
-      const height = inputs.find(
+      const height = definition.inputs.find(
         input =>
           input.key === "height" &&
           input.type === "DECIMAL" &&
@@ -156,6 +177,7 @@ export class OfficialQuoteFormService {
         inputs,
         installationAvailable:
           additionsConfigured && Boolean(width) && Boolean(height),
+        munckAvailable: additionsConfigured,
       });
     }
 

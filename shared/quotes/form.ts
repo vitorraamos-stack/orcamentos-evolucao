@@ -16,6 +16,7 @@ export const quoteFormProductSchema = z
     productVersionNumber: z.number().int().positive(),
     inputs: z.array(productInputSchema),
     installationAvailable: z.boolean(),
+    munckAvailable: z.boolean(),
   })
   .strict();
 

@@ -92,7 +92,7 @@ export default function QuoteCalculatorPage() {
   const [munckHours, setMunckHours] = useState("4");
   const [result, setResult] = useState<OfficialQuotePublicResult | null>(null);
   const [calculatedFingerprint, setCalculatedFingerprint] = useState<string | null>(null);
-  const [saved, setSaved] = useState<QuoteSavePublicResult | null>(null);
+  const [saved, setSaved] = useState<QuoteSavePublicResult | null>(null);\n  const [savedFingerprint, setSavedFingerprint] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
 
@@ -161,13 +161,12 @@ export default function QuoteCalculatorPage() {
       installation: installationRequested
         ? { requested: true }
         : { requested: false },
-      munck:
-        installationRequested && munckRequested
-          ? {
-              requested: true,
-              hours: positiveUserDecimal(munckHours, "Horas de munck"),
-            }
-          : { requested: false },
+      munck: munckRequested
+        ? {
+            requested: true,
+            hours: positiveUserDecimal(munckHours, "Horas de munck"),
+          }
+        : { requested: false },
     };
   };
 
@@ -193,6 +192,10 @@ export default function QuoteCalculatorPage() {
     result !== null &&
     currentFingerprint !== null &&
     currentFingerprint === calculatedFingerprint;
+  const persistedStateIsCurrent =
+    saved !== null &&
+    savedFingerprint !== null &&
+    currentFingerprint === savedFingerprint;
 
   const calculate = async () => {
     setWorking(true);
@@ -220,9 +223,11 @@ export default function QuoteCalculatorPage() {
         expectedRevision: saved?.revision ?? null,
         ...request,
       });
+      const fingerprint = JSON.stringify(request);
       setSaved(persisted);
+      setSavedFingerprint(fingerprint);
       setResult(persisted.publicResult);
-      setCalculatedFingerprint(JSON.stringify(request));
+      setCalculatedFingerprint(fingerprint);
       toast.success(
         saved
           ? `Nova versão salva no orçamento #${persisted.quoteNumber}.`
@@ -270,7 +275,11 @@ export default function QuoteCalculatorPage() {
   const copySummary = async () => {
     if (!result || !product) return;
     const lines = [
-      saved ? `Orçamento #${saved.quoteNumber}` : "Simulação de orçamento",
+      saved && persistedStateIsCurrent
+        ? `Orçamento #${saved.quoteNumber}`
+        : saved
+          ? `Simulação sobre orçamento #${saved.quoteNumber} (não salva)`
+          : "Simulação de orçamento",
       `Produto: ${product.name}`,
       `Quantidade: ${result.commercialQuantity}`,
       `Produto: ${formatBrl(result.productSellingPrice.amount)}`,
@@ -351,7 +360,7 @@ export default function QuoteCalculatorPage() {
                 <Label>Produto</Label>
                 <Select
                   value={productId}
-                  disabled={!editable || working}
+                  disabled={!!saved || !editable || working}
                   onValueChange={value => selectProduct(value)}
                 >
                   <SelectTrigger className="w-full">
@@ -530,62 +539,65 @@ export default function QuoteCalculatorPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {product?.installationAvailable ? (
-                <>
-                  <label className="flex items-center gap-3 rounded-lg border p-4">
+              {product?.installationAvailable && (
+                <label className="flex items-center gap-3 rounded-lg border p-4">
+                  <Checkbox
+                    checked={installationRequested}
+                    disabled={!editable || working}
+                    onCheckedChange={checked =>
+                      setInstallationRequested(checked === true)
+                    }
+                  />
+                  <span>
+                    <span className="block text-sm font-medium">
+                      Incluir instalação
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      A faixa é calculada automaticamente pela área do letreiro.
+                    </span>
+                  </span>
+                </label>
+              )}
+
+              {product?.munckAvailable && (
+                <div className="rounded-lg border p-4">
+                  <label className="flex items-center gap-3">
                     <Checkbox
-                      checked={installationRequested}
+                      checked={munckRequested}
                       disabled={!editable || working}
-                      onCheckedChange={checked => {
-                        const enabled = checked === true;
-                        setInstallationRequested(enabled);
-                        if (!enabled) setMunckRequested(false);
-                      }}
+                      onCheckedChange={checked =>
+                        setMunckRequested(checked === true)
+                      }
                     />
                     <span>
                       <span className="block text-sm font-medium">
-                        Incluir instalação
+                        Incluir caminhão munck
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        A faixa é calculada automaticamente pela área do letreiro.
+                        Pode ser usado com ou sem instalação calculada pelo sistema.
                       </span>
                     </span>
                   </label>
-
-                  {installationRequested && (
-                    <div className="rounded-lg border p-4">
-                      <label className="flex items-center gap-3">
-                        <Checkbox
-                          checked={munckRequested}
-                          disabled={!editable || working}
-                          onCheckedChange={checked =>
-                            setMunckRequested(checked === true)
-                          }
-                        />
-                        <span className="text-sm font-medium">
-                          Instalação precisa de caminhão munck
-                        </span>
-                      </label>
-                      {munckRequested && (
-                        <div className="mt-4 max-w-xs space-y-2">
-                          <Label>Horas previstas</Label>
-                          <Input
-                            value={munckHours}
-                            inputMode="decimal"
-                            disabled={!editable || working}
-                            onChange={event => setMunckHours(event.target.value)}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            O mínimo faturável configurado é aplicado automaticamente.
-                          </p>
-                        </div>
-                      )}
+                  {munckRequested && (
+                    <div className="mt-4 max-w-xs space-y-2">
+                      <Label>Horas previstas</Label>
+                      <Input
+                        value={munckHours}
+                        inputMode="decimal"
+                        disabled={!editable || working}
+                        onChange={event => setMunckHours(event.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        O mínimo faturável configurado é aplicado automaticamente.
+                      </p>
                     </div>
                   )}
-                </>
-              ) : (
+                </div>
+              )}
+
+              {!product?.installationAvailable && !product?.munckAvailable && (
                 <p className="text-sm text-muted-foreground">
-                  Este produto não possui cálculo automático de instalação disponível.
+                  Este produto não possui adicionais automáticos disponíveis.
                 </p>
               )}
             </CardContent>
@@ -719,11 +731,17 @@ export default function QuoteCalculatorPage() {
                     </Badge>
                   </div>
 
+                  {saved.status === "DRAFT" && !persistedStateIsCurrent && (
+                    <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                      Há alterações não salvas. Salve a versão atual antes de marcar o orçamento como enviado.
+                    </div>
+                  )}
+
                   {saved.status === "DRAFT" && (
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <Button
                         className="gap-2"
-                        disabled={working}
+                        disabled={working || !persistedStateIsCurrent}
                         onClick={() => void transition("SENT")}
                       >
                         <Send className="h-4 w-4" />

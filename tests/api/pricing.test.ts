@@ -384,6 +384,7 @@ describe("Pricing API manager authority", () => {
             productVersionNumber: 2,
             inputs: [],
             installationAvailable: true,
+            munckAvailable: true,
           },
         ],
         availableInstallments: [1, 2, 3],
