@@ -274,7 +274,11 @@ export default async function handler(req: any, res: any) {
             parsed.error.issues
           );
         const { action: _action, ...request } = parsed.data;
-        const data = await quotePersistence.save(request, auth.user.id);
+        const data = await quotePersistence.save(
+          request,
+          auth.user.id,
+          isManager
+        );
         log("quote_persistence", "snapshot_saved", {
           quoteId: data.quoteId,
           quoteNumber: data.quoteNumber,
@@ -294,7 +298,11 @@ export default async function handler(req: any, res: any) {
             "Invalid Quote load request.",
             parsed.error.issues
           );
-        const data = await quotePersistence.load(parsed.data);
+        const data = await quotePersistence.load(
+          parsed.data,
+          auth.user.id,
+          isManager
+        );
         log("quote_persistence", "quote_loaded", {
           quoteId: data.quoteId,
           quoteNumber: data.quoteNumber,
@@ -313,7 +321,11 @@ export default async function handler(req: any, res: any) {
           "Invalid Quote transition request.",
           parsed.error.issues
         );
-      const data = await quotePersistence.transition(parsed.data, auth.user.id);
+      const data = await quotePersistence.transition(
+        parsed.data,
+        auth.user.id,
+        isManager
+      );
       log("quote_persistence", "status_changed", {
         quoteId: data.quoteId,
         quoteNumber: data.quoteNumber,
