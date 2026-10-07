@@ -30,38 +30,49 @@ const quoteRevisionSchema = z.number().int().positive();
 const quoteSnapshotVersionSchema = z.number().int().positive();
 const timestampSchema = z.string().min(1);
 
+const quoteSaveFields = {
+  quoteId: quoteIdSchema.nullable(),
+  expectedRevision: quoteRevisionSchema.nullable(),
+  productVersionId: productVersionIdSchema,
+  request: calculationRequestSchema,
+  installments: z.number().int().min(1).max(12),
+  installation: quoteInstallationRequestSchema,
+  munck: quoteMunckRequestSchema,
+} as const;
+
+const validateSaveRevision = (
+  value: { quoteId: string | null; expectedRevision: number | null },
+  ctx: z.RefinementCtx
+) => {
+  const creating = value.quoteId === null;
+  if (creating && value.expectedRevision !== null)
+    ctx.addIssue({
+      code: "custom",
+      path: ["expectedRevision"],
+      message: "New Quotes cannot declare an expected revision",
+    });
+  if (!creating && value.expectedRevision === null)
+    ctx.addIssue({
+      code: "custom",
+      path: ["expectedRevision"],
+      message: "Existing Quotes require an expected revision",
+    });
+};
+
 export const quoteSaveRequestSchema = z
-  .object({
-    quoteId: quoteIdSchema.nullable(),
-    expectedRevision: quoteRevisionSchema.nullable(),
-    productVersionId: productVersionIdSchema,
-    request: calculationRequestSchema,
-    installments: z.number().int().min(1).max(12),
-    installation: quoteInstallationRequestSchema,
-    munck: quoteMunckRequestSchema,
-  })
+  .object(quoteSaveFields)
   .strict()
-  .superRefine((value, ctx) => {
-    const creating = value.quoteId === null;
-    if (creating && value.expectedRevision !== null)
-      ctx.addIssue({
-        code: "custom",
-        path: ["expectedRevision"],
-        message: "New Quotes cannot declare an expected revision",
-      });
-    if (!creating && value.expectedRevision === null)
-      ctx.addIssue({
-        code: "custom",
-        path: ["expectedRevision"],
-        message: "Existing Quotes require an expected revision",
-      });
-  });
+  .superRefine(validateSaveRevision);
 
 export type QuoteSaveRequest = z.infer<typeof quoteSaveRequestSchema>;
 
-export const quoteSaveApiRequestSchema = quoteSaveRequestSchema
-  .extend({ action: z.literal("SAVE_QUOTE") })
-  .strict();
+export const quoteSaveApiRequestSchema = z
+  .object({
+    action: z.literal("SAVE_QUOTE"),
+    ...quoteSaveFields,
+  })
+  .strict()
+  .superRefine(validateSaveRevision);
 
 export const quoteGetApiRequestSchema = z
   .object({
