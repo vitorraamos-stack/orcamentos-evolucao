@@ -2,8 +2,20 @@ import { supabase } from "@/lib/supabase";
 import {
   officialQuoteApiRequestSchema,
   officialQuotePublicResultSchema,
+  quoteCurrentPublicResultSchema,
+  quoteGetApiRequestSchema,
+  quoteSaveApiRequestSchema,
+  quoteSavePublicResultSchema,
+  quoteTransitionApiRequestSchema,
+  quoteTransitionResultSchema,
   type OfficialQuotePublicResult,
   type OfficialQuoteRequest,
+  type QuoteCurrentPublicResult,
+  type QuoteId,
+  type QuoteSavePublicResult,
+  type QuoteSaveRequest,
+  type QuoteStatus,
+  type QuoteTransitionResult,
 } from "@shared/quotes";
 
 type ApiError = Error & {
@@ -19,6 +31,28 @@ async function accessToken() {
   return data.session.access_token;
 }
 
+async function post(body: unknown) {
+  const response = await fetch("/api/pricing", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${await accessToken()}`,
+    },
+    body: JSON.stringify(body),
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok) {
+    const error = new Error(
+      result?.error?.message ?? "Quote request failed"
+    ) as ApiError;
+    error.code = result?.error?.code;
+    error.issues = result?.error?.issues;
+    error.status = response.status;
+    throw error;
+  }
+  return result.data;
+}
+
 export const quoteRepository = {
   calculate: async (
     request: OfficialQuoteRequest
@@ -27,24 +61,36 @@ export const quoteRepository = {
       action: "CALCULATE_QUOTE",
       ...request,
     });
-    const response = await fetch("/api/pricing", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${await accessToken()}`,
-      },
-      body: JSON.stringify(body),
+    return officialQuotePublicResultSchema.parse(await post(body));
+  },
+
+  save: async (request: QuoteSaveRequest): Promise<QuoteSavePublicResult> => {
+    const body = quoteSaveApiRequestSchema.parse({
+      action: "SAVE_QUOTE",
+      ...request,
     });
-    const result = await response.json();
-    if (!response.ok || !result.ok) {
-      const error = new Error(
-        result?.error?.message ?? "Quote calculation failed"
-      ) as ApiError;
-      error.code = result?.error?.code;
-      error.issues = result?.error?.issues;
-      error.status = response.status;
-      throw error;
-    }
-    return officialQuotePublicResultSchema.parse(result.data);
+    return quoteSavePublicResultSchema.parse(await post(body));
+  },
+
+  load: async (quoteId: QuoteId): Promise<QuoteCurrentPublicResult> => {
+    const body = quoteGetApiRequestSchema.parse({
+      action: "GET_QUOTE",
+      quoteId,
+    });
+    return quoteCurrentPublicResultSchema.parse(await post(body));
+  },
+
+  transition: async (
+    quoteId: QuoteId,
+    expectedRevision: number,
+    targetStatus: QuoteStatus
+  ): Promise<QuoteTransitionResult> => {
+    const body = quoteTransitionApiRequestSchema.parse({
+      action: "TRANSITION_QUOTE",
+      quoteId,
+      expectedRevision,
+      targetStatus,
+    });
+    return quoteTransitionResultSchema.parse(await post(body));
   },
 };
