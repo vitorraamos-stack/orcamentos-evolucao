@@ -10,6 +10,7 @@ import {
   pricingPolicyVersionSchema,
   pricingRevisionResultSchema,
   pricingMarkupSchema,
+  pricingInstallationSettingsSchema,
   productPricingSettingsSchema,
 } from "../../../shared/pricing/index.js";
 
@@ -175,3 +176,20 @@ export const mapCreatePricingVersionResult = (row: any) =>
 
 export const mapPricingRevisionResult = (value: any) =>
   pricingRevisionResultSchema.parse({ revision: value?.revision ?? value });
+
+export const mapPricingInstallationSettings = (row: any) => {
+  const parsed = pricingInstallationSettingsSchema.safeParse({
+    tier1MaxAreaM2: row?.tier_1_max_area_m2,
+    tier1Price: row?.tier_1_price,
+    tier2MaxAreaM2: row?.tier_2_max_area_m2,
+    tier2Price: row?.tier_2_price,
+    tier3Price: row?.tier_3_price,
+    munckHourlyPrice: row?.munck_hourly_price,
+    munckMinimumHours: row?.munck_minimum_hours,
+    revision: row?.revision,
+    updatedAt: row?.updated_at,
+    updatedBy: row?.updated_by,
+  });
+  if (!parsed.success) return incompatible();
+  return parsed.data;
+};

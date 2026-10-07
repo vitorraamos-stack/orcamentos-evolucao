@@ -29,7 +29,11 @@ const component = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const definition = (status = "PUBLISHED", components = [component()]) =>
+const definition = (
+  status = "PUBLISHED",
+  components = [component()],
+  inputs: readonly unknown[] = []
+) =>
   productVersionDefinitionSchema.parse({
     schemaVersion: "1.0",
     version: {
@@ -45,7 +49,7 @@ const definition = (status = "PUBLISHED", components = [component()]) =>
         : null,
       publishedBy: ["PUBLISHED", "RETIRED"].includes(status) ? ids.user : null,
     },
-    inputs: [],
+    inputs,
     variables: [],
     components,
   });
@@ -103,6 +107,7 @@ const setup = (
       resource: bundle.definition,
       rates: bundle.rates,
     })),
+    loadProductParameters: vi.fn(async () => []),
   };
   return {
     service: new OfficialCostingCalculationService(engineering, costing, clock),
@@ -188,6 +193,80 @@ describe("OfficialCostingCalculationService", () => {
       ).rejects.toMatchObject({ code: "PRODUCT_VERSION_NOT_PUBLISHED" });
   });
 
+  it("injects server-managed product parameters and rejects client overrides", async () => {
+    const managedComponent = component({
+      quantityExpression: { type: "reference", key: "paint_coats" },
+    });
+    const product = definition(
+      "PUBLISHED",
+      [managedComponent],
+      [
+        {
+          id: "10000000-0000-4000-8000-000000000040",
+          key: "paint_coats",
+          label: "Demãos padrão",
+          type: "DECIMAL",
+          required: true,
+          sortOrder: 0,
+          unit: "un",
+        },
+      ]
+    );
+    const costing = {
+      loadResource: vi.fn(async () => ({
+        resource: resource(rates).definition,
+        rates,
+      })),
+      loadProductParameters: vi.fn(async () => [
+        {
+          productId: ids.product,
+          key: "paint_coats",
+          label: "Demãos padrão",
+          description: null,
+          value: "2",
+          unit: "un",
+          minValue: "1",
+          maxValue: "5",
+          revision: 1,
+          updatedAt: "2026-10-05T10:00:00Z",
+          updatedBy: ids.user,
+        },
+      ]),
+    };
+    const service = new OfficialCostingCalculationService(
+      { loadDefinition: vi.fn(async () => product) },
+      costing,
+      () => "2026-10-05T12:00:00Z"
+    );
+
+    const result = await service.calculate(
+      officialCostingRequestSchema.parse({
+        productVersionId: ids.version,
+        request: { commercialQuantity: "1", technicalInputs: {} },
+      })
+    );
+    expect(result.totalCost.amount).toBe("10");
+    expect(result.resolvedInputs).toContainEqual({
+      key: "paint_coats",
+      value: { kind: "decimal", value: "2", unit: "un" },
+      source: "SERVER_PARAMETER",
+    });
+
+    await expect(
+      service.calculate(
+        officialCostingRequestSchema.parse({
+          productVersionId: ids.version,
+          request: {
+            commercialQuantity: "1",
+            technicalInputs: {
+              paint_coats: { kind: "decimal", value: "4", unit: "un" },
+            },
+          },
+        })
+      )
+    ).rejects.toMatchObject({ code: "SERVER_MANAGED_TECHNICAL_INPUT" });
+  });
+
   it("loads unique resources in deterministic type/id order", async () => {
     const specifications = [
       [
@@ -232,6 +311,7 @@ describe("OfficialCostingCalculationService", () => {
         },
         rates: [],
       })),
+      loadProductParameters: vi.fn(async () => []),
     };
     const service = new OfficialCostingCalculationService(
       { loadDefinition: vi.fn(async () => product) },

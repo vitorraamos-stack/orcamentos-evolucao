@@ -11,6 +11,7 @@ import {
   type CostTimestamp,
 } from "../../../shared/costing/rates.js";
 import type { CostResourceType } from "../../../shared/costing/resources.js";
+import type { ProductCostingParameter } from "../../../shared/costing/productParameters.js";
 import type { ProductVersionDefinition } from "../../../shared/product-engineering/index.js";
 
 export type ServerClock = () => CostTimestamp;
@@ -24,6 +25,7 @@ export interface CostResourceLoader {
     type: CostResourceType,
     id: string
   ): Promise<{ resource: unknown; rates: unknown }>;
+  loadProductParameters(productId: string): Promise<ProductCostingParameter[]>;
 }
 
 export class OfficialCostingCompatibilityError extends Error {
@@ -55,6 +57,23 @@ export class OfficialCostingCalculationService {
     const productDefinition = await this.productEngineering.loadDefinition(
       input.productVersionId
     );
+    const parameterRows = await this.costing.loadProductParameters(
+      productDefinition.version.productId
+    );
+    const inputKeys = new Set(productDefinition.inputs.map(item => item.key));
+    const authoritativeTechnicalInputs = Object.fromEntries(
+      parameterRows
+        .filter(parameter => inputKeys.has(parameter.key))
+        .map(parameter => [
+          parameter.key,
+          {
+            kind: "decimal" as const,
+            value: parameter.value,
+            unit: parameter.unit,
+          },
+        ])
+    );
+
     const unique = new Map<string, { type: CostResourceType; id: string }>();
     for (const component of productDefinition.components) {
       const reference = getComponentCostResourceReference(component);
@@ -81,6 +100,7 @@ export class OfficialCostingCalculationService {
     return aggregateCosting({
       productDefinition,
       request: input.request,
+      authoritativeTechnicalInputs,
       resources,
       effectiveCostAt: effectiveCostAt.data,
     });

@@ -10,6 +10,7 @@ import {
   mapCreatePricingPolicyResult,
   mapCreatePricingVersionResult,
   mapPricingAggregate,
+  mapPricingInstallationSettings,
   mapPricingPaymentTerm,
   mapPricingPolicyRow,
   mapPricingPolicyVersionRow,
@@ -40,6 +41,7 @@ export function mapPricingPersistenceError(error: any): never {
     [/PRICING_VERSION_NOT_FOUND/, 404, "PRICING_VERSION_NOT_FOUND", "Pricing policy version not found."],
     [/PRODUCT_PRICING_SETTINGS_NOT_FOUND/, 404, "PRODUCT_PRICING_SETTINGS_NOT_FOUND", "Product Pricing settings not found."],
     [/PRICING_PAYMENT_TERM_NOT_FOUND/, 404, "PRICING_PAYMENT_TERM_NOT_FOUND", "Pricing payment term not found."],
+    [/PRICING_INSTALLATION_SETTINGS_NOT_FOUND/, 404, "PRICING_INSTALLATION_SETTINGS_NOT_FOUND", "Installation settings not found."],
     [/PRICING_POLICY_CODE_CONFLICT/, 409, "PRICING_POLICY_CODE_CONFLICT", "Pricing policy code is already in use."],
     [/PRICING_REVISION_CONFLICT/, 409, "PRICING_REVISION_CONFLICT", "Pricing configuration changed since it was loaded."],
     [/PRICING_PUBLICATION_CONFLICT/, 409, "PRICING_PUBLICATION_CONFLICT", "Published Pricing version changed."],
@@ -128,6 +130,17 @@ export class PricingPersistenceService {
     return mapPricingPaymentTerm(data);
   }
 
+  async loadInstallationSettings() {
+    const data = await this.rpc("pricing_get_installation_settings_secure", {});
+    if (!data)
+      throw new PricingPersistenceServiceError(
+        404,
+        "PRICING_INSTALLATION_SETTINGS_NOT_FOUND",
+        "Installation settings not found."
+      );
+    return mapPricingInstallationSettings(data);
+  }
+
   async loadOfficialCalculationContext(productId: string, installments: number) {
     const data = await this.rpc("pricing_get_official_calculation_context_secure", {
       p_product_id: productId,
@@ -200,6 +213,21 @@ export class PricingPersistenceService {
         p_actor_id: actorId,
       });
       return mapProductPricingSettings(data);
+    }
+
+    if (command.action === "SET_INSTALLATION_SETTINGS") {
+      const data = await this.rpc("pricing_set_installation_settings_secure", {
+        p_tier_1_max_area_m2: command.tier1MaxAreaM2,
+        p_tier_1_price: command.tier1Price,
+        p_tier_2_max_area_m2: command.tier2MaxAreaM2,
+        p_tier_2_price: command.tier2Price,
+        p_tier_3_price: command.tier3Price,
+        p_munck_hourly_price: command.munckHourlyPrice,
+        p_munck_minimum_hours: command.munckMinimumHours,
+        p_expected_revision: command.expectedRevision,
+        p_actor_id: actorId,
+      });
+      return mapPricingInstallationSettings(data);
     }
 
     if (command.action === "SET_PAYMENT_TERM") {

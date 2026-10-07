@@ -5,7 +5,10 @@ import {
   costResourceTypeSchema,
   resourceDefinitionSchema,
 } from "./resources.js";
+import { productIdSchema } from "../product-engineering/product.js";
+import { configurableKeySchema } from "../calculation-engine/contracts/index.js";
 import { costableUnitIdSchema } from "./units.js";
+import { productCostingParameterSchema } from "./productParameters.js";
 
 const uuidSchema = z.string().uuid();
 const createResourceSchema = z
@@ -41,11 +44,33 @@ export const costingMutationSchema = z.discriminatedUnion("action", [
       effectiveFrom: costTimestampSchema,
     })
     .strict(),
+  z
+    .object({
+      action: z.literal("UPSERT_PRODUCT_PARAMETER"),
+      productId: productIdSchema,
+      key: configurableKeySchema,
+      label: productCostingParameterSchema.shape.label,
+      description: productCostingParameterSchema.shape.description,
+      value: decimalStringSchema,
+      unit: productCostingParameterSchema.shape.unit,
+      minValue: productCostingParameterSchema.shape.minValue,
+      maxValue: productCostingParameterSchema.shape.maxValue,
+      expectedRevision: z.number().int().positive().nullable(),
+    })
+    .strict(),
 ]);
 
-export const costingQuerySchema = z
-  .object({ type: costResourceTypeSchema, resourceId: uuidSchema.optional() })
-  .strict();
+export const costingQuerySchema = z.union([
+  z
+    .object({ type: costResourceTypeSchema, resourceId: uuidSchema.optional() })
+    .strict(),
+  z
+    .object({
+      productId: productIdSchema,
+      scope: z.literal("PRODUCT_PARAMETERS"),
+    })
+    .strict(),
+]);
 
 export type CostingMutation = z.infer<typeof costingMutationSchema>;
 export type CostingQuery = z.infer<typeof costingQuerySchema>;

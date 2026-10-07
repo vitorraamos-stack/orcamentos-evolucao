@@ -4,6 +4,7 @@ import {
   decimalStringSchema,
 } from "../calculation-engine/decimal/index.js";
 import { productIdSchema } from "../product-engineering/product.js";
+import { pricingInstallationSettingsSchema } from "./installationSettings.js";
 import {
   pricingMarkupSchema,
   pricingPolicyCodeSchema,
@@ -178,6 +179,20 @@ const setPaymentTermCommandSchema = z
   })
   .strict();
 
+const setInstallationSettingsCommandSchema = z
+  .object({
+    action: z.literal("SET_INSTALLATION_SETTINGS"),
+    tier1MaxAreaM2: pricingInstallationSettingsSchema.shape.tier1MaxAreaM2,
+    tier1Price: pricingInstallationSettingsSchema.shape.tier1Price,
+    tier2MaxAreaM2: pricingInstallationSettingsSchema.shape.tier2MaxAreaM2,
+    tier2Price: pricingInstallationSettingsSchema.shape.tier2Price,
+    tier3Price: pricingInstallationSettingsSchema.shape.tier3Price,
+    munckHourlyPrice: pricingInstallationSettingsSchema.shape.munckHourlyPrice,
+    munckMinimumHours: pricingInstallationSettingsSchema.shape.munckMinimumHours,
+    expectedRevision: nullableExpectedRevisionSchema,
+  })
+  .strict();
+
 export const pricingPersistenceMutationSchema = z
   .discriminatedUnion("action", [
   createPolicyCommandSchema,
@@ -190,6 +205,7 @@ export const pricingPersistenceMutationSchema = z
   publishVersionCommandSchema,
     setProductPricingCommandSchema,
     setPaymentTermCommandSchema,
+    setInstallationSettingsCommandSchema,
   ])
   .superRefine((command, ctx) => {
     if (

@@ -33,6 +33,7 @@ import { costTimestampSchema } from "@shared/costing/rates";
 import type { CostResourceType } from "@shared/costing/resources";
 import type { PricingPaymentTerm } from "@shared/pricing";
 import type { Product } from "@shared/product-engineering";
+import TechnicalAndInstallationSettings from "../components/TechnicalAndInstallationSettings";
 import { RefreshCcw, Save, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 
@@ -307,10 +308,11 @@ export default function PricingAdminPage() {
       </div>
 
       <Tabs defaultValue="products">
-        <TabsList className="grid w-full grid-cols-3 md:w-[560px]">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 md:h-9 md:w-[780px] md:grid-cols-4">
           <TabsTrigger value="products">Produtos e margem</TabsTrigger>
           <TabsTrigger value="costs">Custos</TabsTrigger>
           <TabsTrigger value="payments">Parcelamento</TabsTrigger>
+          <TabsTrigger value="parameters">Parâmetros e adicionais</TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="mt-4 space-y-4">
@@ -386,14 +388,6 @@ export default function PricingAdminPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Parâmetros técnicos e serviços adicionais</CardTitle>
-              <CardDescription>
-                Rendimento de tinta, número padrão de demãos e regras de instalação/munck serão gerenciados na fase 17B. Eles não serão fixados no frontend.
-              </CardDescription>
-            </CardHeader>
-          </Card>
         </TabsContent>
 
         <TabsContent value="costs" className="mt-4">
@@ -444,6 +438,10 @@ export default function PricingAdminPage() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="parameters" className="mt-4">
+          <TechnicalAndInstallationSettings />
         </TabsContent>
 
         <TabsContent value="payments" className="mt-4">

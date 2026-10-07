@@ -26,3 +26,5 @@ export {
   resolveEffectiveCostRate,
   validateCostRateSeries,
 } from "./resolution.js";
+
+export * from "./productParameters.js";

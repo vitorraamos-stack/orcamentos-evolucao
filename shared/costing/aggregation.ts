@@ -146,7 +146,8 @@ export function aggregateCosting(
   }
   const resolved = resolveTechnicalInputs(
     definition.inputs,
-    parsed.request.technicalInputs
+    parsed.request.technicalInputs,
+    parsed.authoritativeTechnicalInputs
   );
   for (const variable of definition.variables)
     ensureAvailableReferences(variable.expression, resolved.missingOptional);
