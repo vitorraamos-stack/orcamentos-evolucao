@@ -12,6 +12,9 @@ describe("Quote commercial flow", () => {
     expect(calculator).toContain("Cliente e referência");
     expect(calculator).toContain("quoteRepository.load(");
     expect(calculator).toContain("quoteRepository.loadForm(");
+    expect(calculator).toContain("const search = useSearch()");
+    expect(calculator).toContain("new URLSearchParams(search)");
+    expect(calculator).toContain("}, [search]);")
     expect(calculator).toContain("calculationAvailable");
     expect(calculator).toContain(
       "item => item.productVersionId === productVersionId"
@@ -19,6 +22,13 @@ describe("Quote commercial flow", () => {
     expect(calculator).toContain("setProductVersionId(next.productVersionId)");
     expect(calculator).toContain(
       "definition?.products.find(item => item.calculationAvailable)"
+    );
+    expect(calculator).toContain("quoteEditableStateFingerprint({");
+    expect(calculator).toContain(
+      "saved !== null && persistedStateIsCurrent"
+    );
+    expect(calculator).toContain(
+      "saved !== null && persistedStateIsCurrent ? saved.publicResult : result"
     );
     expect(calculator).toContain('url.searchParams.set("quote"');
   });

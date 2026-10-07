@@ -80,6 +80,46 @@ const canonicalize = (value: unknown): unknown => {
 export const quoteFingerprint = (value: unknown) =>
   JSON.stringify(canonicalize(value));
 
+export type QuoteEditableStateFingerprintInput = {
+  productVersionId: string;
+  fieldValues: QuoteFieldValues;
+  fieldUnits: QuoteFieldUnits;
+  quantity: string;
+  installments: string;
+  installationRequested: boolean;
+  munckRequested: boolean;
+  munckHours: string;
+  commercial: {
+    customerName: string;
+    customerPhone: string | null;
+    title: string;
+  };
+};
+
+export const quoteEditableStateFingerprint = (
+  input: QuoteEditableStateFingerprintInput
+) =>
+  quoteFingerprint({
+    productVersionId: input.productVersionId,
+    fieldValues: Object.fromEntries(
+      Object.entries(input.fieldValues).map(([key, value]) => [
+        key,
+        typeof value === "string" ? value.trim() : value,
+      ])
+    ),
+    fieldUnits: input.fieldUnits,
+    quantity: input.quantity.trim(),
+    installments: input.installments,
+    installationRequested: input.installationRequested,
+    munckRequested: input.munckRequested,
+    munckHours: input.munckRequested ? input.munckHours.trim() : null,
+    commercial: {
+      customerName: input.commercial.customerName.trim(),
+      customerPhone: input.commercial.customerPhone?.trim() || null,
+      title: input.commercial.title.trim(),
+    },
+  });
+
 export function hydrateQuoteFields(
   inputs: readonly ProductInput[],
   technicalInputs: Record<string, TechnicalInputValue>

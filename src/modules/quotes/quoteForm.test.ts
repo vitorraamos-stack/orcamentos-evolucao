@@ -4,6 +4,7 @@ import {
   hydrateQuoteFields,
   initialQuoteFields,
   normalizeUserDecimal,
+  quoteEditableStateFingerprint,
   quoteFingerprint,
   positiveUserDecimal,
 } from "./quoteForm";
@@ -69,6 +70,42 @@ describe("quote form helpers", () => {
         },
       })
     );
+  });
+
+  it("tracks only the editable Quote state for persisted dirty checks", () => {
+    const base = {
+      productVersionId: id(9),
+      fieldValues: { width: "150.5", number_of_colors: "2" },
+      fieldUnits: { width: "cm" as const, number_of_colors: null },
+      quantity: "1",
+      installments: "3",
+      installationRequested: false,
+      munckRequested: false,
+      munckHours: "4",
+      commercial: {
+        customerName: " Cliente Teste ",
+        customerPhone: " 48999999999 ",
+        title: " Letreiro ",
+      },
+    };
+
+    expect(quoteEditableStateFingerprint(base)).toBe(
+      quoteEditableStateFingerprint({
+        ...base,
+        munckHours: "99",
+        commercial: {
+          customerName: "Cliente Teste",
+          customerPhone: "48999999999",
+          title: "Letreiro",
+        },
+      })
+    );
+    expect(
+      quoteEditableStateFingerprint({
+        ...base,
+        fieldValues: { ...base.fieldValues, width: "151" },
+      })
+    ).not.toBe(quoteEditableStateFingerprint(base));
   });
 
   it("hydrates a persisted Quote back into editable fields", () => {
