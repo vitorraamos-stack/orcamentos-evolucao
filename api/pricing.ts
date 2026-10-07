@@ -185,6 +185,8 @@ export default async function handler(req: any, res: any) {
     action === "SAVE_QUOTE" ||
     action === "GET_QUOTE" ||
     action === "TRANSITION_QUOTE";
+  const requiresCalculatorModule =
+    isCalculation || isQuoteFormAction || isQuotePersistenceAction;
 
   const log = (
     scope:
@@ -207,6 +209,31 @@ export default async function handler(req: any, res: any) {
 
   try {
     const pricing = new PricingPersistenceService(db);
+
+    if (requiresCalculatorModule && canCalculate) {
+      const { data: moduleAccess, error: moduleAccessError } = await db
+        .from("user_module_access")
+        .select("module_key")
+        .eq("user_id", auth.user.id)
+        .eq("module_key", "calculadora")
+        .maybeSingle();
+
+      if (moduleAccessError)
+        return fail(
+          res,
+          500,
+          "AUTHORIZATION_UNAVAILABLE",
+          "Unable to verify Calculadora module access."
+        );
+
+      if (!moduleAccess)
+        return fail(
+          res,
+          403,
+          "FORBIDDEN",
+          "Calculadora module access is required."
+        );
+    }
 
     if (req.method === "GET") {
       if (!isManager)

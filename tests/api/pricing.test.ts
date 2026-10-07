@@ -101,22 +101,44 @@ const response = () => {
   return res;
 };
 
-const client = (user: any, role: string | null, authError: unknown = null) => ({
+const client = (
+  user: any,
+  role: string | null,
+  authError: unknown = null,
+  hasCalculatorAccess = true
+) => ({
   auth: { getUser: vi.fn(async () => ({ data: { user }, error: authError })) },
-  from: vi.fn((table: string) =>
-    table === "profiles"
-      ? {
-          select: () => ({
+  from: vi.fn((table: string) => {
+    if (table === "profiles")
+      return {
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({
+              data: role ? { role } : null,
+              error: null,
+            }),
+          }),
+        }),
+      };
+
+    if (table === "user_module_access")
+      return {
+        select: () => ({
+          eq: () => ({
             eq: () => ({
               maybeSingle: async () => ({
-                data: role ? { role } : null,
+                data: hasCalculatorAccess
+                  ? { module_key: "calculadora" }
+                  : null,
                 error: null,
               }),
             }),
           }),
-        }
-      : {}
-  ),
+        }),
+      };
+
+    return {};
+  }),
   rpc: vi.fn(async (name: string) => {
     if (name === "pricing_get_policy_secure")
       return {
@@ -425,6 +447,50 @@ describe("Pricing API manager authority", () => {
 
       expect(res.statusCode).toBe(403);
       expect(state.officialQuoteFormLoad).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    "GET_QUOTE_FORM",
+    "CALCULATE",
+    "CALCULATE_QUOTE",
+    "SAVE_QUOTE",
+    "GET_QUOTE",
+    "TRANSITION_QUOTE",
+  ])(
+    "requires the calculadora module server-side for %s",
+    async action => {
+      state.client = client(
+        { id: id(9) },
+        "consultor_vendas",
+        null,
+        false
+      );
+      const res = response();
+
+      await handler(
+        {
+          method: "POST",
+          headers: { authorization: "Bearer valid" },
+          body: { action },
+        },
+        res
+      );
+
+      expect(res.statusCode).toBe(403);
+      expect(res.payload).toEqual({
+        ok: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Calculadora module access is required.",
+        },
+      });
+      expect(state.officialCalculate).not.toHaveBeenCalled();
+      expect(state.officialQuoteCalculate).not.toHaveBeenCalled();
+      expect(state.officialQuoteFormLoad).not.toHaveBeenCalled();
+      expect(state.officialQuoteSave).not.toHaveBeenCalled();
+      expect(state.officialQuoteLoad).not.toHaveBeenCalled();
+      expect(state.officialQuoteTransition).not.toHaveBeenCalled();
     }
   );
 
