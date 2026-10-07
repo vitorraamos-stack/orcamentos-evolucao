@@ -14,6 +14,11 @@ describe("Quote commercial flow", () => {
     expect(calculator).toContain("quoteRepository.loadForm(");
     expect(calculator).toContain("const search = useSearch()");
     expect(calculator).toContain("new URLSearchParams(search)");
+    expect(calculator).toContain("setLoadError(null)");
+    expect(calculator).toContain("setSaved(null)");
+    expect(calculator).toContain("setResult(null)");
+    expect(calculator).toContain("setLoadError(message)");
+    expect(calculator).toContain("Não foi possível abrir o orçamento")
     expect(calculator).toContain("}, [search]);")
     expect(calculator).toContain("calculationAvailable");
     expect(calculator).toContain(

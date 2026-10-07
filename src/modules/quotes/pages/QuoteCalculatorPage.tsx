@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearch } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,6 +91,7 @@ const statusVariant = (status: QuoteStatus) => {
 
 export default function QuoteCalculatorPage() {
   const search = useSearch();
+  const [, setLocation] = useLocation();
   const [definition, setDefinition] = useState<QuoteFormDefinition | null>(null);
   const [productVersionId, setProductVersionId] = useState("");
   const [fieldValues, setFieldValues] = useState<QuoteFieldValues>({});
@@ -108,6 +109,7 @@ export default function QuoteCalculatorPage() {
   const [saved, setSaved] = useState<QuoteSavePublicResult | null>(null);
   const [savedFingerprint, setSavedFingerprint] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
   const product = useMemo(
@@ -146,11 +148,28 @@ export default function QuoteCalculatorPage() {
 
   useEffect(() => {
     let cancelled = false;
+    const quoteParam = new URLSearchParams(search).get("quote");
+
     setLoading(true);
+    setLoadError(null);
+    setSaved(null);
+    setSavedFingerprint(null);
+    setResult(null);
+    setCalculatedFingerprint(null);
+    setProductVersionId("");
+    setFieldValues({});
+    setFieldUnits({});
+    setQuantity("1");
+    setInstallments("1");
+    setInstallationRequested(false);
+    setMunckRequested(false);
+    setMunckHours("4");
+    setCustomerName("");
+    setCustomerPhone("");
+    setTitle("");
 
     void (async () => {
       try {
-        const quoteParam = new URLSearchParams(search).get("quote");
         const existing = quoteParam
           ? await quoteRepository.load(quoteIdSchema.parse(quoteParam))
           : null;
@@ -231,7 +250,11 @@ export default function QuoteCalculatorPage() {
         setTitle("");
         resetForProduct(first);
       } catch (error) {
-        if (!cancelled) toast.error(friendlyError(error));
+        if (!cancelled) {
+          const message = friendlyError(error);
+          setLoadError(message);
+          toast.error(message);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -468,6 +491,21 @@ export default function QuoteCalculatorPage() {
       <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground">
         Carregando Orçamentista...
       </div>
+    );
+
+  if (loadError)
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Não foi possível abrir o orçamento</CardTitle>
+          <CardDescription>{loadError}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" onClick={() => setLocation("/orcamentos")}>
+            Voltar para orçamentos
+          </Button>
+        </CardContent>
+      </Card>
     );
 
   if (!definition || definition.products.length === 0)
