@@ -89,7 +89,7 @@ const statusVariant = (status: QuoteStatus) => {
 
 export default function QuoteCalculatorPage() {
   const [definition, setDefinition] = useState<QuoteFormDefinition | null>(null);
-  const [productId, setProductId] = useState("");
+  const [productVersionId, setProductVersionId] = useState("");
   const [fieldValues, setFieldValues] = useState<QuoteFieldValues>({});
   const [fieldUnits, setFieldUnits] = useState<QuoteFieldUnits>({});
   const [quantity, setQuantity] = useState("1");
@@ -108,8 +108,11 @@ export default function QuoteCalculatorPage() {
   const [working, setWorking] = useState(false);
 
   const product = useMemo(
-    () => definition?.products.find(item => item.productId === productId) ?? null,
-    [definition, productId]
+    () =>
+      definition?.products.find(
+        item => item.productVersionId === productVersionId
+      ) ?? null,
+    [definition, productVersionId]
   );
 
   const editable =
@@ -129,9 +132,12 @@ export default function QuoteCalculatorPage() {
     setMunckHours("4");
   };
 
-  const selectProduct = (nextId: string, source = definition) => {
-    setProductId(nextId);
-    const next = source?.products.find(item => item.productId === nextId) ?? null;
+  const selectProduct = (nextVersionId: string, source = definition) => {
+    setProductVersionId(nextVersionId);
+    const next =
+      source?.products.find(
+        item => item.productVersionId === nextVersionId
+      ) ?? null;
     resetForProduct(next);
   };
 
@@ -157,7 +163,7 @@ export default function QuoteCalculatorPage() {
               "A versão do produto deste orçamento não está disponível."
             );
 
-          setProductId(existingProduct.productId);
+          setProductVersionId(existingProduct.productVersionId);
           const hydrated = hydrateQuoteFields(
             existingProduct.inputs,
             existing.request.request.technicalInputs
@@ -199,7 +205,7 @@ export default function QuoteCalculatorPage() {
 
         const first = loaded.products[0] ?? null;
         if (first) {
-          setProductId(first.productId);
+          setProductVersionId(first.productVersionId);
           const initial = initialQuoteFields(first.inputs);
           setFieldValues(initial.values);
           setFieldUnits(initial.units);
@@ -373,12 +379,20 @@ export default function QuoteCalculatorPage() {
   };
 
   const newQuote = () => {
+    const next =
+      definition?.products.find(item => item.calculationAvailable) ?? null;
+    if (!next) {
+      toast.error("Nenhum produto está disponível para um novo orçamento.");
+      return;
+    }
+
+    setProductVersionId(next.productVersionId);
     setQuantity("1");
     setInstallments(String(definition?.availableInstallments[0] ?? 1));
     setCustomerName("");
     setCustomerPhone("");
     setTitle("");
-    resetForProduct(product);
+    resetForProduct(next);
     const url = new URL(window.location.href);
     url.searchParams.delete("quote");
     window.history.replaceState(window.history.state, "", url);
@@ -521,7 +535,7 @@ export default function QuoteCalculatorPage() {
               <div className="space-y-2">
                 <Label>Produto</Label>
                 <Select
-                  value={productId}
+                  value={productVersionId}
                   disabled={!!saved || !editable || working}
                   onValueChange={value => selectProduct(value)}
                 >
@@ -530,7 +544,10 @@ export default function QuoteCalculatorPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {definition.products.map(item => (
-                      <SelectItem key={item.productId} value={item.productId}>
+                      <SelectItem
+                        key={item.productVersionId}
+                        value={item.productVersionId}
+                      >
                         {item.name} · v{item.productVersionNumber}
                       </SelectItem>
                     ))}

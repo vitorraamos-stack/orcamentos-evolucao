@@ -13,6 +13,13 @@ describe("Quote commercial flow", () => {
     expect(calculator).toContain("quoteRepository.load(");
     expect(calculator).toContain("quoteRepository.loadForm(");
     expect(calculator).toContain("calculationAvailable");
+    expect(calculator).toContain(
+      "item => item.productVersionId === productVersionId"
+    );
+    expect(calculator).toContain("setProductVersionId(next.productVersionId)");
+    expect(calculator).toContain(
+      "definition?.products.find(item => item.calculationAvailable)"
+    );
     expect(calculator).toContain('url.searchParams.set("quote"');
   });
 
@@ -22,6 +29,10 @@ describe("Quote commercial flow", () => {
     );
     expect(central).toContain("quoteRepository");
     expect(central).toContain(".list({");
+    expect(central).toContain("requestGeneration");
+    expect(central).toContain(
+      "generation !== requestGeneration.current"
+    );
     expect(central).toContain("Número, cliente, telefone ou título");
     expect(central).toContain("/orcamentista?quote=");
     for (const forbidden of [

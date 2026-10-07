@@ -154,6 +154,7 @@ describe("OfficialQuoteFormService", () => {
             },
             order: () => chain,
             limit: () => chain,
+            in: () => chain,
             maybeSingle: async () =>
               directLookup
                 ? {
@@ -186,6 +187,40 @@ describe("OfficialQuoteFormService", () => {
       productVersionNumber: 1,
       calculationAvailable: false,
     });
+  });
+
+  it("restricts direct historical lookup to versions that were published", async () => {
+    let requestedStatuses: string[] | null = null;
+    const restrictedDb = {
+      from: (table: string) => {
+        if (table === "products") return query({ data: [], error: null });
+        if (table === "product_versions") {
+          const chain: any = {
+            select: () => chain,
+            eq: () => chain,
+            in: (column: string, values: string[]) => {
+              if (column === "status") requestedStatuses = values;
+              return chain;
+            },
+            order: () => chain,
+            limit: () => chain,
+            maybeSingle: async () => ({ data: null, error: null }),
+          };
+          return chain;
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    };
+
+    const result = await new OfficialQuoteFormService(
+      restrictedDb,
+      { loadDefinition: async () => definition } as any,
+      { loadProductParameters: async () => [] } as any,
+      pricing as any
+    ).load(id(8));
+
+    expect(requestedStatuses).toEqual(["PUBLISHED", "RETIRED"]);
+    expect(result.products).toEqual([]);
   });
 
   it("does not advertise a product whose Pricing cannot calculate", async () => {

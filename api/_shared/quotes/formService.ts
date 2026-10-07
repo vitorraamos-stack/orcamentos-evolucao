@@ -212,6 +212,7 @@ export class OfficialQuoteFormService {
         .from("product_versions")
         .select("id,product_id,version_number,status")
         .eq("id", includeProductVersionId)
+        .in("status", ["PUBLISHED", "RETIRED"])
         .maybeSingle();
 
       if (versionResult.error)

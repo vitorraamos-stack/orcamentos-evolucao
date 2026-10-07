@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import {
   ChevronLeft,
@@ -67,6 +67,7 @@ export default function QuotesCentralPage() {
   const [status, setStatus] = useState<QuoteStatus | "all">("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const requestGeneration = useRef(0);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -76,6 +77,7 @@ export default function QuotesCentralPage() {
   );
 
   const load = () => {
+    const generation = ++requestGeneration.current;
     setLoading(true);
     setError("");
     quoteRepository
@@ -86,17 +88,21 @@ export default function QuotesCentralPage() {
         status: statusFilter,
       })
       .then(result => {
+        if (generation !== requestGeneration.current) return;
         setItems(result.items);
         setTotal(result.total);
       })
-      .catch(reason =>
+      .catch(reason => {
+        if (generation !== requestGeneration.current) return;
         setError(
           reason instanceof Error
             ? reason.message
             : "Falha ao carregar os orçamentos."
-        )
-      )
-      .finally(() => setLoading(false));
+        );
+      })
+      .finally(() => {
+        if (generation === requestGeneration.current) setLoading(false);
+      });
   };
 
   useEffect(load, [page, search, statusFilter]);
