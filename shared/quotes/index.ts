@@ -41,3 +41,13 @@ export type {
   QuoteCurrentPublicResult,
   QuoteTransitionResult,
 } from "./persistence.js";
+
+export {
+  quoteFormApiRequestSchema,
+  quoteFormProductSchema,
+  quoteFormDefinitionSchema,
+} from "./form.js";
+export type {
+  QuoteFormProduct,
+  QuoteFormDefinition,
+} from "./form.js";

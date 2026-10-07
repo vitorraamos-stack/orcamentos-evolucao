@@ -9,6 +9,7 @@ import Galeria from "@/pages/Galeria";
 import Materiais from "@/pages/Materiais";
 import Configuracoes from "@/pages/Configuracoes";
 import PricingAdminPage from "@/modules/pricing-admin/pages/PricingAdminPage";
+import QuoteCalculatorPage from "@/modules/quotes/pages/QuoteCalculatorPage";
 import ArtworkBoardPage from "@/modules/artwork/pages/ArtworkBoardPage";
 import ProductionBoardPage from "@/modules/production/pages/ProductionBoardPage";
 import OsDetailPage from "@/modules/hub-os/pages/OsDetailPage";
@@ -46,6 +47,18 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+
+      <Route path="/orcamentista">
+        <Layout>
+          <RequireModule moduleKey="calculadora">
+            {hubPermissions.canCreateOs ? (
+              <QuoteCalculatorPage />
+            ) : (
+              <Redirect to="/" />
+            )}
+          </RequireModule>
+        </Layout>
+      </Route>
 
       {/* Rota Principal */}
       <Route path="/">
