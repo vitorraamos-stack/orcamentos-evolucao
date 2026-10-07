@@ -7,6 +7,7 @@ const state = vi.hoisted(() => ({
   officialQuoteSave: vi.fn(),
   officialQuoteLoad: vi.fn(),
   officialQuoteTransition: vi.fn(),
+  officialQuoteFormLoad: vi.fn(),
 }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => state.client }));
 vi.mock("../../api/_shared/pricing/calculationService.js", () => ({
@@ -38,6 +39,22 @@ vi.mock("../../api/_shared/quotes/calculationService.js", () => ({
   OfficialQuoteCalculationService: class OfficialQuoteCalculationService {
     async calculate(input: unknown) {
       return state.officialQuoteCalculate(input);
+    }
+  },
+}));
+vi.mock("../../api/_shared/quotes/formService.js", () => ({
+  QuoteFormServiceError: class QuoteFormServiceError extends Error {
+    status: number;
+    code: string;
+    constructor(status: number, code: string, message: string) {
+      super(message);
+      this.status = status;
+      this.code = code;
+    }
+  },
+  OfficialQuoteFormService: class OfficialQuoteFormService {
+    async load() {
+      return state.officialQuoteFormLoad();
     }
   },
 }));
@@ -84,22 +101,44 @@ const response = () => {
   return res;
 };
 
-const client = (user: any, role: string | null, authError: unknown = null) => ({
+const client = (
+  user: any,
+  role: string | null,
+  authError: unknown = null,
+  hasCalculatorAccess = true
+) => ({
   auth: { getUser: vi.fn(async () => ({ data: { user }, error: authError })) },
-  from: vi.fn((table: string) =>
-    table === "profiles"
-      ? {
-          select: () => ({
+  from: vi.fn((table: string) => {
+    if (table === "profiles")
+      return {
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({
+              data: role ? { role } : null,
+              error: null,
+            }),
+          }),
+        }),
+      };
+
+    if (table === "user_module_access")
+      return {
+        select: () => ({
+          eq: () => ({
             eq: () => ({
               maybeSingle: async () => ({
-                data: role ? { role } : null,
+                data: hasCalculatorAccess
+                  ? { module_key: "calculadora" }
+                  : null,
                 error: null,
               }),
             }),
           }),
-        }
-      : {}
-  ),
+        }),
+      };
+
+    return {};
+  }),
   rpc: vi.fn(async (name: string) => {
     if (name === "pricing_get_policy_secure")
       return {
@@ -185,6 +224,7 @@ describe("Pricing API manager authority", () => {
     state.officialQuoteSave.mockReset();
     state.officialQuoteLoad.mockReset();
     state.officialQuoteTransition.mockReset();
+    state.officialQuoteFormLoad.mockReset();
   });
 
   it("returns 401 without bearer or with an invalid token", async () => {
@@ -350,6 +390,107 @@ describe("Pricing API manager authority", () => {
       expect(res.payload.data).not.toHaveProperty("totalCost");
       expect(res.payload.data).not.toHaveProperty("markup");
       expect(res.payload.data).not.toHaveProperty("financialRate");
+    }
+  );
+
+  it.each(["consultor_vendas", "consultor", "gerente", "admin"])(
+    "allows %s to load the official Quote form",
+    async role => {
+      const form = {
+        products: [
+          {
+            productId: id(4),
+            code: "LETREIRO_PVC",
+            name: "Letreiro em PVC",
+            productVersionId: id(5),
+            productVersionNumber: 2,
+            inputs: [],
+            installationAvailable: true,
+            munckAvailable: true,
+          },
+        ],
+        availableInstallments: [1, 2, 3],
+      };
+      state.officialQuoteFormLoad.mockResolvedValueOnce(form);
+      state.client = client({ id: id(9) }, role);
+      const res = response();
+
+      await handler(
+        {
+          method: "POST",
+          headers: { authorization: "Bearer valid" },
+          body: { action: "GET_QUOTE_FORM" },
+        },
+        res
+      );
+
+      expect(res.statusCode).toBe(200);
+      expect(res.payload).toEqual({ ok: true, data: form });
+      expect(state.officialQuoteFormLoad).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each(["arte_finalista", "producao", "instalador"])(
+    "rejects role %s from the official Quote form",
+    async role => {
+      state.client = client({ id: id(9) }, role);
+      const res = response();
+
+      await handler(
+        {
+          method: "POST",
+          headers: { authorization: "Bearer valid" },
+          body: { action: "GET_QUOTE_FORM" },
+        },
+        res
+      );
+
+      expect(res.statusCode).toBe(403);
+      expect(state.officialQuoteFormLoad).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    "GET_QUOTE_FORM",
+    "CALCULATE",
+    "CALCULATE_QUOTE",
+    "SAVE_QUOTE",
+    "GET_QUOTE",
+    "TRANSITION_QUOTE",
+  ])(
+    "requires the calculadora module server-side for %s",
+    async action => {
+      state.client = client(
+        { id: id(9) },
+        "consultor_vendas",
+        null,
+        false
+      );
+      const res = response();
+
+      await handler(
+        {
+          method: "POST",
+          headers: { authorization: "Bearer valid" },
+          body: { action },
+        },
+        res
+      );
+
+      expect(res.statusCode).toBe(403);
+      expect(res.payload).toEqual({
+        ok: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Calculadora module access is required.",
+        },
+      });
+      expect(state.officialCalculate).not.toHaveBeenCalled();
+      expect(state.officialQuoteCalculate).not.toHaveBeenCalled();
+      expect(state.officialQuoteFormLoad).not.toHaveBeenCalled();
+      expect(state.officialQuoteSave).not.toHaveBeenCalled();
+      expect(state.officialQuoteLoad).not.toHaveBeenCalled();
+      expect(state.officialQuoteTransition).not.toHaveBeenCalled();
     }
   );
 

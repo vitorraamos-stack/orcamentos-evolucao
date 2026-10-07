@@ -10,6 +10,7 @@ import {
 } from "../shared/pricing/index.js";
 import {
   officialQuoteApiRequestSchema,
+  quoteFormApiRequestSchema,
   quoteGetApiRequestSchema,
   quoteSaveApiRequestSchema,
   quoteTransitionApiRequestSchema,
@@ -31,6 +32,10 @@ import {
   OfficialQuoteCalculationError,
   OfficialQuoteCalculationService,
 } from "./_shared/quotes/calculationService.js";
+import {
+  OfficialQuoteFormService,
+  QuoteFormServiceError,
+} from "./_shared/quotes/formService.js";
 import {
   OfficialQuotePersistenceService,
   QuotePersistenceServiceError,
@@ -174,17 +179,21 @@ export default async function handler(req: any, res: any) {
       : undefined;
   const isPricingCalculation = action === "CALCULATE";
   const isQuoteCalculation = action === "CALCULATE_QUOTE";
+  const isQuoteFormAction = action === "GET_QUOTE_FORM";
   const isCalculation = isPricingCalculation || isQuoteCalculation;
   const isQuotePersistenceAction =
     action === "SAVE_QUOTE" ||
     action === "GET_QUOTE" ||
     action === "TRANSITION_QUOTE";
+  const requiresCalculatorModule =
+    isCalculation || isQuoteFormAction || isQuotePersistenceAction;
 
   const log = (
     scope:
       | "pricing"
       | "official_pricing"
       | "official_quote"
+      | "quote_form"
       | "quote_persistence",
     event: string,
     details: Record<string, unknown>
@@ -200,6 +209,31 @@ export default async function handler(req: any, res: any) {
 
   try {
     const pricing = new PricingPersistenceService(db);
+
+    if (requiresCalculatorModule && canCalculate) {
+      const { data: moduleAccess, error: moduleAccessError } = await db
+        .from("user_module_access")
+        .select("module_key")
+        .eq("user_id", auth.user.id)
+        .eq("module_key", "calculadora")
+        .maybeSingle();
+
+      if (moduleAccessError)
+        return fail(
+          res,
+          500,
+          "AUTHORIZATION_UNAVAILABLE",
+          "Unable to verify Calculadora module access."
+        );
+
+      if (!moduleAccess)
+        return fail(
+          res,
+          403,
+          "FORBIDDEN",
+          "Calculadora module access is required."
+        );
+    }
 
     if (req.method === "GET") {
       if (!isManager)
@@ -239,6 +273,33 @@ export default async function handler(req: any, res: any) {
                 : "installationSettings" in query
                   ? await pricing.loadInstallationSettings()
                   : await pricing.loadPaymentTerm(Number(query.installments));
+      return send(res, 200, { ok: true, data });
+    }
+
+    if (isQuoteFormAction) {
+      if (!canCalculate)
+        return fail(
+          res,
+          403,
+          "FORBIDDEN",
+          "Quote form is restricted to Sales and managers."
+        );
+
+      const parsed = quoteFormApiRequestSchema.safeParse(body);
+      if (!parsed.success)
+        return fail(
+          res,
+          400,
+          "INVALID_PAYLOAD",
+          "Invalid Quote form request.",
+          parsed.error.issues
+        );
+
+      const data = await new OfficialQuoteFormService(db).load();
+      log("quote_form", "form_loaded", {
+        products: data.products.length,
+        availableInstallments: data.availableInstallments,
+      });
       return send(res, 200, { ok: true, data });
     }
 
@@ -447,11 +508,13 @@ export default async function handler(req: any, res: any) {
     });
     return send(res, 200, { ok: true, data });
   } catch (error) {
-    if (isCalculation || isQuotePersistenceAction) {
+    if (isCalculation || isQuoteFormAction || isQuotePersistenceAction) {
       log(
         isQuotePersistenceAction
           ? "quote_persistence"
-          : isQuoteCalculation
+          : isQuoteFormAction
+            ? "quote_form"
+            : isQuoteCalculation
             ? "official_quote"
             : "official_pricing",
         "calculation_failed",
@@ -462,6 +525,9 @@ export default async function handler(req: any, res: any) {
               : "INTERNAL_ERROR",
         }
       );
+
+      if (error instanceof QuoteFormServiceError)
+        return fail(res, error.status, error.code, error.message);
 
       if (error instanceof QuotePersistenceServiceError)
         return fail(res, error.status, error.code, error.message);

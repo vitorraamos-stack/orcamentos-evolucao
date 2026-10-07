@@ -17,6 +17,7 @@ import {
   Settings,
   SlidersHorizontal,
   BadgeDollarSign,
+  FileText,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -66,6 +67,8 @@ export default function Layout({ children }: LayoutProps) {
   const canViewHubOs = hubPermissions.canViewHubOS && hasModuleAccess("hub_os");
   const canViewGaleria = hasModuleAccess("galeria");
   const canViewCalculadora = hasModuleAccess("calculadora");
+  const canViewOrcamentista =
+    hubPermissions.canCreateOs && canViewCalculadora;
   const canViewMateriais = isAdmin && hasModuleAccess("materiais");
   const canViewConfiguracoes =
     hubPermissions.canManageUsers && hasModuleAccess("configuracoes");
@@ -190,6 +193,22 @@ export default function Layout({ children }: LayoutProps) {
           >
             <Image className="mr-2 h-4 w-4" />
             Galeria
+          </Button>
+        </Link>
+      )}
+
+      {canViewOrcamentista && (
+        <Link href="/orcamentista">
+          <Button
+            variant={location === "/orcamentista" ? "secondary" : "ghost"}
+            className={cn(
+              "w-full justify-start",
+              location === "/orcamentista" &&
+                "bg-sidebar-accent text-sidebar-accent-foreground"
+            )}
+          >
+            <FileText className="mr-2 h-4 w-4" />
+            Orçamentista
           </Button>
         </Link>
       )}

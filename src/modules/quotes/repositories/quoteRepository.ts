@@ -8,6 +8,8 @@ import {
   quoteSavePublicResultSchema,
   quoteTransitionApiRequestSchema,
   quoteTransitionResultSchema,
+  quoteFormApiRequestSchema,
+  quoteFormDefinitionSchema,
   type OfficialQuotePublicResult,
   type OfficialQuoteRequest,
   type QuoteCurrentPublicResult,
@@ -16,6 +18,7 @@ import {
   type QuoteSaveRequest,
   type QuoteStatus,
   type QuoteTransitionResult,
+  type QuoteFormDefinition,
 } from "@shared/quotes";
 
 type ApiError = Error & {
@@ -54,6 +57,13 @@ async function post(body: unknown) {
 }
 
 export const quoteRepository = {
+  loadForm: async (): Promise<QuoteFormDefinition> => {
+    const body = quoteFormApiRequestSchema.parse({
+      action: "GET_QUOTE_FORM",
+    });
+    return quoteFormDefinitionSchema.parse(await post(body));
+  },
+
   calculate: async (
     request: OfficialQuoteRequest
   ): Promise<OfficialQuotePublicResult> => {
