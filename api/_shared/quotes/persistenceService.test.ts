@@ -146,7 +146,7 @@ describe("OfficialQuotePersistenceService", () => {
     const result = await new OfficialQuotePersistenceService(
       db,
       calculator
-    ).save(request, id(9));
+    ).save(request, id(9), false);
 
     expect(calculator.calculate).toHaveBeenCalledWith({
       productVersionId: id(2),
@@ -199,11 +199,34 @@ describe("OfficialQuotePersistenceService", () => {
     const service = new OfficialQuotePersistenceService(db, {
       calculate: async () => calculation(),
     });
+    db.rpc
+      .mockResolvedValueOnce({
+        data: {
+          quote: { id: id(10), created_by: id(9) },
+          snapshot: {},
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          quote_id: id(10),
+          quote_number: 1001,
+          status: "DRAFT",
+          revision: 2,
+          snapshot_id: id(12),
+          snapshot_version: 2,
+          saved_at: now,
+        },
+        error: null,
+      });
+
     await service.save(
       { ...request, quoteId: id(10), expectedRevision: 1 },
-      id(9)
+      id(9),
+      false
     );
-    expect(db.rpc).toHaveBeenCalledWith(
+    expect(db.rpc).toHaveBeenNthCalledWith(
+      2,
       "quote_append_snapshot_secure",
       expect.objectContaining({
         p_quote_id: id(10),
@@ -221,6 +244,7 @@ describe("OfficialQuotePersistenceService", () => {
           quote: {
             id: id(10),
             quote_number: 1001,
+            created_by: id(9),
             status: "DRAFT",
             revision: 2,
           },
@@ -244,7 +268,11 @@ describe("OfficialQuotePersistenceService", () => {
     };
     const result = await new OfficialQuotePersistenceService(db, {
       calculate: async () => calc,
-    }).load({ action: "GET_QUOTE", quoteId: id(10) });
+    }).load(
+      { action: "GET_QUOTE", quoteId: id(10) },
+      id(9),
+      false
+    );
 
     expect(result.publicResult.totalSellingPrice.amount).toBe("870.00");
     expect(result).not.toHaveProperty("private_snapshot");
@@ -253,17 +281,26 @@ describe("OfficialQuotePersistenceService", () => {
 
   it("transitions status using the authenticated actor and expected revision", async () => {
     const db = {
-      rpc: vi.fn(async () => ({
-        data: {
-          quote_id: id(10),
-          quote_number: 1001,
-          status: "SENT",
-          revision: 3,
-          snapshot_id: id(12),
-          updated_at: now,
-        },
-        error: null,
-      })),
+      rpc: vi
+        .fn()
+        .mockResolvedValueOnce({
+          data: {
+            quote: { id: id(10), created_by: id(9) },
+            snapshot: {},
+          },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: {
+            quote_id: id(10),
+            quote_number: 1001,
+            status: "SENT",
+            revision: 3,
+            snapshot_id: id(12),
+            updated_at: now,
+          },
+          error: null,
+        }),
     };
     const result = await new OfficialQuotePersistenceService(db, {
       calculate: async () => calculation(),
@@ -274,9 +311,11 @@ describe("OfficialQuotePersistenceService", () => {
         expectedRevision: 2,
         targetStatus: "SENT",
       },
-      id(9)
+      id(9),
+      false
     );
-    expect(db.rpc).toHaveBeenCalledWith(
+    expect(db.rpc).toHaveBeenNthCalledWith(
+      2,
       "quote_transition_status_secure",
       expect.objectContaining({
         p_actor_id: id(9),
@@ -285,6 +324,69 @@ describe("OfficialQuotePersistenceService", () => {
       })
     );
     expect(result.status).toBe("SENT");
+  });
+
+  it("blocks consultants from reading another consultant's Quote", async () => {
+    const db = {
+      rpc: vi.fn(async () => ({
+        data: {
+          quote: { id: id(10), created_by: id(8) },
+          snapshot: {},
+        },
+        error: null,
+      })),
+    };
+    await expect(
+      new OfficialQuotePersistenceService(db, {
+        calculate: async () => calculation(),
+      }).load(
+        { action: "GET_QUOTE", quoteId: id(10) },
+        id(9),
+        false
+      )
+    ).rejects.toMatchObject({
+      status: 403,
+      code: "QUOTE_FORBIDDEN",
+    });
+  });
+
+  it("allows managers to read another consultant's Quote", async () => {
+    const calc = calculation();
+    const db = {
+      rpc: vi.fn(async () => ({
+        data: {
+          quote: {
+            id: id(10),
+            quote_number: 1001,
+            status: "DRAFT",
+            revision: 1,
+            created_by: id(8),
+          },
+          snapshot: {
+            id: id(11),
+            version_number: 1,
+            created_at: now,
+            request_snapshot: {
+              productVersionId: id(2),
+              request: request.request,
+              installments: 3,
+              installation: { requested: true },
+              munck: { requested: false },
+            },
+            public_result_snapshot: calc.publicResult,
+          },
+        },
+        error: null,
+      })),
+    };
+    const loaded = await new OfficialQuotePersistenceService(db, {
+      calculate: async () => calc,
+    }).load(
+      { action: "GET_QUOTE", quoteId: id(10) },
+      id(9),
+      true
+    );
+    expect(loaded.quoteId).toBe(id(10));
   });
 
   it("sanitizes SQL persistence errors", () => {
