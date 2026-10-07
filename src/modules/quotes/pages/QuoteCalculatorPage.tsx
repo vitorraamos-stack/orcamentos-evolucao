@@ -92,7 +92,8 @@ export default function QuoteCalculatorPage() {
   const [munckHours, setMunckHours] = useState("4");
   const [result, setResult] = useState<OfficialQuotePublicResult | null>(null);
   const [calculatedFingerprint, setCalculatedFingerprint] = useState<string | null>(null);
-  const [saved, setSaved] = useState<QuoteSavePublicResult | null>(null);\n  const [savedFingerprint, setSavedFingerprint] = useState<string | null>(null);
+  const [saved, setSaved] = useState<QuoteSavePublicResult | null>(null);
+  const [savedFingerprint, setSavedFingerprint] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
 
@@ -110,6 +111,7 @@ export default function QuoteCalculatorPage() {
     setResult(null);
     setCalculatedFingerprint(null);
     setSaved(null);
+    setSavedFingerprint(null);
     setInstallationRequested(false);
     setMunckRequested(false);
     setMunckHours("4");
