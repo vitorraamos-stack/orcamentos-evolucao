@@ -275,7 +275,7 @@ export default function QuoteCalculatorPage() {
   };
 
   const copySummary = async () => {
-    if (!result || !product) return;
+    if (!result || !product || !freshResult) return;
     const lines = [
       saved && persistedStateIsCurrent
         ? `Orçamento #${saved.quoteNumber}`
@@ -709,6 +709,7 @@ export default function QuoteCalculatorPage() {
                   <Button
                     variant="outline"
                     className="w-full gap-2"
+                    disabled={!freshResult}
                     onClick={() => void copySummary()}
                   >
                     <ClipboardCopy className="h-4 w-4" />
