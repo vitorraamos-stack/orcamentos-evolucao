@@ -23,6 +23,7 @@ import {
   Truck,
 } from "lucide-react";
 import { toast } from "sonner";
+import { createOrderFromQuotePath } from "@/features/hubos/createOrderNavigation";
 import {
   quoteRepository,
 } from "../repositories/quoteRepository";
@@ -1045,9 +1046,26 @@ export default function QuoteCalculatorPage() {
                   )}
 
                   {saved.status === "ACCEPTED" && (
-                    <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm">
-                      <Truck className="h-4 w-4 text-emerald-600" />
-                      Orçamento aceito. A conversão para OS entra na próxima etapa.
+                    <div className="space-y-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Truck className="h-4 w-4 text-emerald-600" />
+                        Orçamento aceito. Os dados comerciais estão bloqueados e prontos para o handoff operacional.
+                      </div>
+                      <Button
+                        className="w-full gap-2"
+                        disabled={working}
+                        onClick={() =>
+                          setLocation(
+                            createOrderFromQuotePath(
+                              saved.quoteId,
+                              `/orcamentista?quote=${saved.quoteId}`
+                            )
+                          )
+                        }
+                      >
+                        <Truck className="h-4 w-4" />
+                        Criar OS a partir deste orçamento
+                      </Button>
                     </div>
                   )}
                 </div>

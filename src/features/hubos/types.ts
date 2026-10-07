@@ -33,6 +33,10 @@ export type ProdStatus =
 export type OsOrder = {
   id: string;
   os_number?: number | null;
+  quote_id?: string | null;
+  quote_snapshot_id?: string | null;
+  quote_total?: number | null;
+  customer_phone?: string | null;
   sale_number: string;
   client_name: string;
   title: string | null;

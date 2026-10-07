@@ -351,6 +351,47 @@ export const createOrder = async (payload: CreateOrderPayload) => {
   return data as OsOrder;
 };
 
+export const createOrderFromQuote = async (
+  quoteId: string,
+  payload: CreateOrderPayload
+) => {
+  const { data, error } = await supabase.rpc(
+    "hub_os_create_from_quote_secure",
+    {
+      p_quote_id: quoteId,
+      p_payload: payload,
+    }
+  );
+
+  if (error) throw new Error(error.message);
+  return data as OsOrder;
+};
+
+export const findOrderByQuoteId = async (quoteId: string) => {
+  const { data, error } = await supabase
+    .from("os_orders")
+    .select(
+      "id,os_number,sale_number,client_name,title,quote_id,quote_snapshot_id,quote_total,customer_phone"
+    )
+    .eq("quote_id", quoteId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data as Pick<
+    OsOrder,
+    | "id"
+    | "os_number"
+    | "sale_number"
+    | "client_name"
+    | "title"
+    | "quote_id"
+    | "quote_snapshot_id"
+    | "quote_total"
+    | "customer_phone"
+  > | null;
+};
+
 export const findOrderBySaleNumber = async (saleNumber: string) => {
   const { data, error } = await supabase
     .from("os_orders")

@@ -39,6 +39,19 @@ export const createOrderItemInputSchema = orderItemInputSchema.extend({
 });
 
 export type CreateOrderItemDraft = z.input<typeof createOrderItemInputSchema>;
+export type CreateOrderPrefill = {
+  saleNumber: string;
+  clientName: string;
+  description: string;
+  deliveryDate: string;
+  deliveryDeadlinePreset: DeliveryDeadlinePreset | null;
+  logisticType: LogisticType;
+  address: string;
+  selectedArtDirectionTag: ArtDirectionTag | null;
+  isUrgent: boolean;
+  items: CreateOrderItemDraft[];
+};
+
 export const emptyOrderItem = (): CreateOrderItemDraft => ({
   name: "",
   description: "",

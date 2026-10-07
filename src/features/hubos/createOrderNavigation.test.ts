@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  createOrderFromQuotePath,
   createOrderPath,
   resolveOrderCreationReturnPath,
 } from "./createOrderNavigation";
@@ -13,6 +14,21 @@ describe("order creation navigation", () => {
         new URLSearchParams(path.split("?")[1]).get("returnTo")
       )
     ).toBe("/os/arte?status=entrada");
+  });
+
+  it("builds a Quote → OS creation path with a safe return destination", () => {
+    const path = createOrderFromQuotePath(
+      "00000000-0000-4000-8000-000000000001",
+      "/orcamentista?quote=00000000-0000-4000-8000-000000000001"
+    );
+    const params = new URLSearchParams(path.split("?")[1]);
+    expect(path.startsWith("/os/novo?")).toBe(true);
+    expect(params.get("quote")).toBe(
+      "00000000-0000-4000-8000-000000000001"
+    );
+    expect(params.get("returnTo")).toBe(
+      "/orcamentista?quote=00000000-0000-4000-8000-000000000001"
+    );
   });
 
   it.each([
