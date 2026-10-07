@@ -181,6 +181,37 @@ describe("OfficialQuoteCalculationService", () => {
     expect(result.publicResult.installation.tier).toBe("TIER_1");
   });
 
+  it.each(["0", "-1"])(
+    "fails closed for nonpositive installation dimensions (%s m)",
+    async width => {
+      const original = pricingResult();
+      const invalidDimensions = {
+        ...original,
+        costing: {
+          ...original.costing,
+          resolvedInputs: original.costing.resolvedInputs.map(input =>
+            input.key === "width"
+              ? {
+                  ...input,
+                  value: { kind: "decimal", value: width, unit: "m" },
+                }
+              : input
+          ),
+        },
+      } as OfficialPricingCalculationResult;
+
+      await expect(
+        new OfficialQuoteCalculationService(
+          { calculate: async () => invalidDimensions },
+          { loadInstallationSettings: async () => settings }
+        ).calculate(request)
+      ).rejects.toMatchObject({
+        status: 422,
+        code: "INSTALLATION_AREA_UNAVAILABLE",
+      });
+    }
+  );
+
   it("fails closed when installation area cannot be derived", async () => {
     const original = pricingResult();
     const missingHeight = {
