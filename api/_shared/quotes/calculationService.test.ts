@@ -1,0 +1,148 @@
+import { describe, expect, it, vi } from "vitest";
+import type { OfficialPricingCalculationResult } from "../pricing/calculationService.js";
+import { OfficialQuoteCalculationService } from "./calculationService";
+
+const id = (n: number) =>
+  `10000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+const now = "2026-10-07T12:00:00Z";
+
+const pricingResult = (): OfficialPricingCalculationResult =>
+  ({
+    publicResult: {
+      calculationVersion: "1.0",
+      productId: id(4),
+      productVersionId: id(5),
+      productVersionNumber: 2,
+      productVersionRevision: 2,
+      commercialQuantity: "2",
+      installments: 3,
+      roundingRule: "BRL_2DP_HALF_UP_V1",
+      totalSellingPrice: { currency: "BRL", amount: "700.00" },
+    },
+    costing: {
+      aggregationVersion: "1.0",
+      productId: id(4),
+      productVersionId: id(5),
+      productVersionNumber: 2,
+      productVersionRevision: 2,
+      effectiveCostAt: now,
+      commercialQuantity: "2",
+      resolvedInputs: [
+        {
+          key: "width",
+          value: { kind: "decimal", value: "1", unit: "m" },
+          source: "PROVIDED",
+        },
+        {
+          key: "height",
+          value: { kind: "decimal", value: "0.75", unit: "m" },
+          source: "PROVIDED",
+        },
+      ],
+      components: [],
+      unitVariableCost: { currency: "BRL", amount: "0" },
+      quoteItemFixedCost: { currency: "BRL", amount: "0" },
+      totalCost: { currency: "BRL", amount: "0" },
+    },
+    pricingEngine: {} as any,
+    commercial: {
+      roundingRule: "BRL_2DP_HALF_UP_V1",
+      minimumApplied: true,
+      baseSellingPrice: { currency: "BRL", amount: "0" },
+      minimumSellingPrice: { currency: "BRL", amount: "700" },
+      priceAfterMinimum: { currency: "BRL", amount: "700" },
+      financialRate: "0",
+      unroundedTotalSellingPrice: { currency: "BRL", amount: "700" },
+      totalSellingPrice: { currency: "BRL", amount: "700.00" },
+    },
+    privateProvenance: {
+      productPricingSettingsRevision: 1,
+      paymentRateSource: "SYSTEM_ZERO",
+      paymentTermRevision: null,
+    },
+  }) as OfficialPricingCalculationResult;
+
+const settings = {
+  tier1MaxAreaM2: "1",
+  tier1Price: "150",
+  tier2MaxAreaM2: "2",
+  tier2Price: "180",
+  tier3Price: "200",
+  munckHourlyPrice: "375",
+  munckMinimumHours: "4",
+  revision: 3,
+  updatedAt: now,
+  updatedBy: id(9),
+} as any;
+
+const request = {
+  productVersionId: id(5),
+  request: {
+    commercialQuantity: "2",
+    technicalInputs: {},
+  },
+  installments: 3,
+  installation: { requested: true },
+  munck: { requested: false },
+};
+
+describe("OfficialQuoteCalculationService", () => {
+  it("derives installation area from authoritative resolved dimensions and quantity", async () => {
+    const pricing = { calculate: vi.fn(async () => pricingResult()) };
+    const installation = {
+      loadInstallationSettings: vi.fn(async () => settings),
+    };
+    const result = await new OfficialQuoteCalculationService(
+      pricing,
+      installation
+    ).calculate(request);
+
+    expect(pricing.calculate).toHaveBeenCalledWith({
+      productVersionId: id(5),
+      request: request.request,
+      installments: 3,
+    });
+    expect(result.publicResult.installation).toMatchObject({
+      requested: true,
+      areaM2: "1.5",
+      tier: "TIER_2",
+      price: { amount: "180" },
+    });
+    expect(result.publicResult.productSellingPrice.amount).toBe("700");
+    expect(result.publicResult.totalSellingPrice.amount).toBe("880.00");
+    expect(result.installationSettingsRevision).toBe(3);
+  });
+
+  it("does not require dimensions when installation is not requested", async () => {
+    const withoutDimensions = pricingResult();
+    withoutDimensions.costing.resolvedInputs = [] as any;
+    const result = await new OfficialQuoteCalculationService(
+      { calculate: async () => withoutDimensions },
+      { loadInstallationSettings: async () => settings }
+    ).calculate({
+      ...request,
+      installation: { requested: false },
+      munck: { requested: true, hours: "2" },
+    });
+    expect(result.publicResult.installation.price.amount).toBe("0");
+    expect(result.publicResult.munck.billedHours).toBe("4");
+    expect(result.publicResult.totalSellingPrice.amount).toBe("2200.00");
+  });
+
+  it("fails closed when installation area cannot be derived", async () => {
+    const missingHeight = pricingResult();
+    missingHeight.costing.resolvedInputs = missingHeight.costing.resolvedInputs.filter(
+      input => input.key !== "height"
+    ) as any;
+
+    await expect(
+      new OfficialQuoteCalculationService(
+        { calculate: async () => missingHeight },
+        { loadInstallationSettings: async () => settings }
+      ).calculate(request)
+    ).rejects.toMatchObject({
+      status: 422,
+      code: "INSTALLATION_AREA_UNAVAILABLE",
+    });
+  });
+});
