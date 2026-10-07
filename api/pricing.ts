@@ -8,6 +8,7 @@ import {
   pricingPersistenceMutationSchema,
   PricingDomainError,
 } from "../shared/pricing/index.js";
+import { officialQuoteApiRequestSchema } from "../shared/quotes/index.js";
 import { CostingCompatibilityError } from "./_shared/costing/mappers.js";
 import {
   OfficialCostingCalculationService,
@@ -21,6 +22,10 @@ import {
   OfficialPricingCalculationError,
   OfficialPricingCalculationService,
 } from "./_shared/pricing/calculationService.js";
+import {
+  OfficialQuoteCalculationError,
+  OfficialQuoteCalculationService,
+} from "./_shared/quotes/calculationService.js";
 import {
   PricingPersistenceCompatibilityError,
 } from "./_shared/pricing/mappers.js";
@@ -102,6 +107,10 @@ const pricingConfigurationErrors: Record<
     code: "PAYMENT_TERM_NOT_CONFIGURED",
     message: "The selected installment option is not configured.",
   },
+  PRICING_INSTALLATION_SETTINGS_NOT_FOUND: {
+    code: "QUOTE_ADDITIONALS_NOT_CONFIGURED",
+    message: "Installation and munck settings are not configured.",
+  },
 };
 
 export default async function handler(req: any, res: any) {
@@ -154,10 +163,12 @@ export default async function handler(req: any, res: any) {
     typeof body === "object" && body !== null && "action" in body
       ? (body as Record<string, unknown>).action
       : undefined;
-  const isCalculation = action === "CALCULATE";
+  const isPricingCalculation = action === "CALCULATE";
+  const isQuoteCalculation = action === "CALCULATE_QUOTE";
+  const isCalculation = isPricingCalculation || isQuoteCalculation;
 
   const log = (
-    scope: "pricing" | "official_pricing",
+    scope: "pricing" | "official_pricing" | "official_quote",
     event: string,
     details: Record<string, unknown>
   ) =>
@@ -223,6 +234,52 @@ export default async function handler(req: any, res: any) {
           "Official Pricing is restricted to Sales and managers."
         );
 
+      const pricingCalculation = new OfficialPricingCalculationService(
+        new OfficialCostingCalculationService(
+          new ProductEngineeringService(db),
+          new CostingService(db)
+        ),
+        pricing
+      );
+
+      if (isQuoteCalculation) {
+        const parsed = officialQuoteApiRequestSchema.safeParse(body);
+        if (!parsed.success)
+          return fail(
+            res,
+            400,
+            "INVALID_PAYLOAD",
+            "Invalid official Quote request.",
+            parsed.error.issues
+          );
+
+        log("official_quote", "calculation_started", {
+          productVersionId: parsed.data.productVersionId,
+          installments: parsed.data.installments,
+          installationRequested: parsed.data.installation.requested,
+          munckRequested: parsed.data.munck.requested,
+        });
+
+        const calculation = new OfficialQuoteCalculationService(
+          pricingCalculation,
+          pricing
+        );
+        const result = await calculation.calculate({
+          productVersionId: parsed.data.productVersionId,
+          request: parsed.data.request,
+          installments: parsed.data.installments,
+          installation: parsed.data.installation,
+          munck: parsed.data.munck,
+        });
+
+        log("official_quote", "calculation_completed", {
+          productVersionId: result.publicResult.productVersionId,
+          installments: result.publicResult.installments,
+          installationSettingsRevision: result.installationSettingsRevision,
+        });
+        return send(res, 200, { ok: true, data: result.publicResult });
+      }
+
       const parsed = officialPricingApiRequestSchema.safeParse(body);
       if (!parsed.success)
         return fail(
@@ -238,14 +295,7 @@ export default async function handler(req: any, res: any) {
         installments: parsed.data.installments,
       });
 
-      const calculation = new OfficialPricingCalculationService(
-        new OfficialCostingCalculationService(
-          new ProductEngineeringService(db),
-          new CostingService(db)
-        ),
-        pricing
-      );
-      const result = await calculation.calculate({
+      const result = await pricingCalculation.calculate({
         productVersionId: parsed.data.productVersionId,
         request: parsed.data.request,
         installments: parsed.data.installments,
@@ -365,12 +415,19 @@ export default async function handler(req: any, res: any) {
         return fail(res, 400, error.code, error.message);
 
       if (
+        error instanceof OfficialQuoteCalculationError &&
+        (error.status === 400 || error.status === 422)
+      )
+        return fail(res, error.status, error.code, error.message);
+
+      if (
         error instanceof OfficialCostingCompatibilityError ||
         error instanceof CostingCompatibilityError ||
         error instanceof CompatibilityError ||
         error instanceof PricingPersistenceCompatibilityError ||
         error instanceof PricingDomainError ||
         error instanceof OfficialPricingCalculationError ||
+        error instanceof OfficialQuoteCalculationError ||
         error instanceof z.ZodError
       )
         return fail(
