@@ -1,12 +1,15 @@
 import {
   quoteCurrentPublicResultSchema,
   quoteGetApiRequestSchema,
+  quoteListApiRequestSchema,
+  quoteListResultSchema,
   quotePersistedSummarySchema,
   quoteSavePublicResultSchema,
   quoteSaveRequestSchema,
   quoteTransitionApiRequestSchema,
   quoteTransitionResultSchema,
   type QuoteCurrentPublicResult,
+  type QuoteListResult,
   type QuoteSavePublicResult,
   type QuoteTransitionResult,
 } from "../../../shared/quotes/index.js";
@@ -83,6 +86,12 @@ export function mapQuotePersistenceError(error: any): never {
   );
 }
 
+const commercialFromDto = (dto: any) => ({
+  customerName: dto?.customer_name,
+  customerPhone: dto?.customer_phone ?? null,
+  title: dto?.title,
+});
+
 const mapSummary = (dto: any) =>
   quotePersistedSummarySchema.safeParse({
     quoteId: dto?.quote_id,
@@ -92,6 +101,7 @@ const mapSummary = (dto: any) =>
     snapshotId: dto?.snapshot_id,
     snapshotVersion: dto?.snapshot_version,
     savedAt: dto?.saved_at,
+    commercial: commercialFromDto(dto),
   });
 
 export class OfficialQuotePersistenceService {
@@ -145,6 +155,10 @@ export class OfficialQuotePersistenceService {
     const pricing = calculation.pricing;
     return {
       p_actor_id: actorId,
+      p_customer_name: request.commercial.customerName,
+      p_customer_phone: request.commercial.customerPhone,
+      p_title: request.commercial.title,
+      p_commercial_snapshot: request.commercial,
       p_calculation_version: calculation.publicResult.calculationVersion,
       p_product_id: calculation.publicResult.productId,
       p_product_version_id: calculation.publicResult.productVersionId,
@@ -216,8 +230,8 @@ export class OfficialQuotePersistenceService {
 
     const data =
       request.quoteId === null
-        ? await this.rpc("quote_create_with_snapshot_secure", args)
-        : await this.rpc("quote_append_snapshot_secure", {
+        ? await this.rpc("quote_create_with_snapshot_v2_secure", args)
+        : await this.rpc("quote_append_snapshot_v2_secure", {
             p_quote_id: request.quoteId,
             p_expected_revision: request.expectedRevision,
             ...args,
@@ -265,6 +279,7 @@ export class OfficialQuotePersistenceService {
       snapshotId: snapshot?.id,
       snapshotVersion: snapshot?.version_number,
       savedAt: snapshot?.created_at,
+      commercial: commercialFromDto(data?.quote),
       request: snapshot?.request_snapshot,
       publicResult: snapshot?.public_result_snapshot,
     });
@@ -273,6 +288,62 @@ export class OfficialQuotePersistenceService {
         500,
         "QUOTE_PERSISTENCE_COMPATIBILITY_ERROR",
         "Persisted Quote is incompatible with this server."
+      );
+    return result.data;
+  }
+
+  async list(
+    input: unknown,
+    actorId: string,
+    isManager = false
+  ): Promise<QuoteListResult> {
+    const parsed = quoteListApiRequestSchema.safeParse(input);
+    if (!parsed.success)
+      throw new QuotePersistenceServiceError(
+        400,
+        "INVALID_QUOTE_CONFIGURATION",
+        "Quote list request is invalid."
+      );
+
+    const { page, pageSize, search, status } = parsed.data;
+    const data = await this.rpc("quote_list_secure", {
+      p_actor_id: actorId,
+      p_is_manager: isManager,
+      p_search: search,
+      p_status: status,
+      p_limit: pageSize,
+      p_offset: (page - 1) * pageSize,
+    });
+
+    const result = quoteListResultSchema.safeParse({
+      items: (data?.items ?? []).map((item: any) => ({
+        quoteId: item?.quote_id,
+        quoteNumber: item?.quote_number,
+        status: item?.status,
+        revision: item?.revision,
+        commercial: commercialFromDto(item),
+        snapshotVersion: item?.snapshot_version,
+        totalSellingPrice: {
+          currency: "BRL",
+          amount: item?.total_selling_price,
+        },
+        installments: item?.installments,
+        productId: item?.product_id,
+        productName: item?.product_name,
+        createdAt: item?.created_at,
+        updatedAt: item?.updated_at,
+        createdBy: item?.created_by,
+        createdByEmail: item?.created_by_email ?? null,
+      })),
+      total: data?.total ?? 0,
+      page,
+      pageSize,
+    });
+    if (!result.success)
+      throw new QuotePersistenceServiceError(
+        500,
+        "QUOTE_PERSISTENCE_COMPATIBILITY_ERROR",
+        "Persisted Quote list is incompatible with this server."
       );
     return result.data;
   }

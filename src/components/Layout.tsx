@@ -18,6 +18,7 @@ import {
   SlidersHorizontal,
   BadgeDollarSign,
   FileText,
+  FilePlus2,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -198,19 +199,34 @@ export default function Layout({ children }: LayoutProps) {
       )}
 
       {canViewOrcamentista && (
-        <Link href="/orcamentista">
-          <Button
-            variant={location === "/orcamentista" ? "secondary" : "ghost"}
-            className={cn(
-              "w-full justify-start",
-              location === "/orcamentista" &&
-                "bg-sidebar-accent text-sidebar-accent-foreground"
-            )}
-          >
-            <FileText className="mr-2 h-4 w-4" />
-            Orçamentista
-          </Button>
-        </Link>
+        <>
+          <Link href="/orcamentos">
+            <Button
+              variant={location.startsWith("/orcamentos") ? "secondary" : "ghost"}
+              className={cn(
+                "w-full justify-start",
+                location.startsWith("/orcamentos") &&
+                  "bg-sidebar-accent text-sidebar-accent-foreground"
+              )}
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Orçamentos
+            </Button>
+          </Link>
+          <Link href="/orcamentista">
+            <Button
+              variant={location.startsWith("/orcamentista") ? "secondary" : "ghost"}
+              className={cn(
+                "w-full justify-start",
+                location.startsWith("/orcamentista") &&
+                  "bg-sidebar-accent text-sidebar-accent-foreground"
+              )}
+            >
+              <FilePlus2 className="mr-2 h-4 w-4" />
+              Novo orçamento
+            </Button>
+          </Link>
+        </>
       )}
 
       {canViewCalculadora && (

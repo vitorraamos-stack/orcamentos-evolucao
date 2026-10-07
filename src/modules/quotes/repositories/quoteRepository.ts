@@ -4,6 +4,8 @@ import {
   officialQuotePublicResultSchema,
   quoteCurrentPublicResultSchema,
   quoteGetApiRequestSchema,
+  quoteListApiRequestSchema,
+  quoteListResultSchema,
   quoteSaveApiRequestSchema,
   quoteSavePublicResultSchema,
   quoteTransitionApiRequestSchema,
@@ -14,6 +16,7 @@ import {
   type OfficialQuoteRequest,
   type QuoteCurrentPublicResult,
   type QuoteId,
+  type QuoteListResult,
   type QuoteSavePublicResult,
   type QuoteSaveRequest,
   type QuoteStatus,
@@ -57,9 +60,12 @@ async function post(body: unknown) {
 }
 
 export const quoteRepository = {
-  loadForm: async (): Promise<QuoteFormDefinition> => {
+  loadForm: async (
+    productVersionId: string | null = null
+  ): Promise<QuoteFormDefinition> => {
     const body = quoteFormApiRequestSchema.parse({
       action: "GET_QUOTE_FORM",
+      productVersionId,
     });
     return quoteFormDefinitionSchema.parse(await post(body));
   },
@@ -72,6 +78,22 @@ export const quoteRepository = {
       ...request,
     });
     return officialQuotePublicResultSchema.parse(await post(body));
+  },
+
+  list: async (input: {
+    page: number;
+    pageSize: number;
+    search?: string | null;
+    status?: QuoteStatus | null;
+  }): Promise<QuoteListResult> => {
+    const body = quoteListApiRequestSchema.parse({
+      action: "LIST_QUOTES",
+      page: input.page,
+      pageSize: input.pageSize,
+      search: input.search?.trim() || null,
+      status: input.status ?? null,
+    });
+    return quoteListResultSchema.parse(await post(body));
   },
 
   save: async (request: QuoteSaveRequest): Promise<QuoteSavePublicResult> => {

@@ -27,17 +27,24 @@ import {
 } from "../repositories/quoteRepository";
 import {
   buildTechnicalInputs,
+  hydrateQuoteFields,
   initialQuoteFields,
   isDimensionField,
   positiveUserDecimal,
+  quoteFingerprint,
   type QuoteFieldUnits,
   type QuoteFieldValues,
 } from "../quoteForm";
 import type { UnitId } from "@shared/calculation-engine/units";
+import {
+  quoteCommercialDetailsSchema,
+  quoteIdSchema,
+} from "@shared/quotes";
 import type {
   OfficialQuotePublicResult,
   OfficialQuoteRequest,
   QuoteFormDefinition,
+  QuoteCommercialDetails,
   QuoteFormProduct,
   QuoteSavePublicResult,
   QuoteStatus,
@@ -90,6 +97,9 @@ export default function QuoteCalculatorPage() {
   const [installationRequested, setInstallationRequested] = useState(false);
   const [munckRequested, setMunckRequested] = useState(false);
   const [munckHours, setMunckHours] = useState("4");
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [title, setTitle] = useState("");
   const [result, setResult] = useState<OfficialQuotePublicResult | null>(null);
   const [calculatedFingerprint, setCalculatedFingerprint] = useState<string | null>(null);
   const [saved, setSaved] = useState<QuoteSavePublicResult | null>(null);
@@ -102,7 +112,9 @@ export default function QuoteCalculatorPage() {
     [definition, productId]
   );
 
-  const editable = !saved || saved.status === "DRAFT";
+  const editable =
+    (!saved || saved.status === "DRAFT") &&
+    (product?.calculationAvailable ?? true);
 
   const resetForProduct = (next: QuoteFormProduct | null) => {
     const initial = initialQuoteFields(next?.inputs ?? []);
@@ -126,8 +138,65 @@ export default function QuoteCalculatorPage() {
   useEffect(() => {
     void (async () => {
       try {
-        const loaded = await quoteRepository.loadForm();
+        const quoteParam = new URLSearchParams(window.location.search).get("quote");
+        const existing = quoteParam
+          ? await quoteRepository.load(quoteIdSchema.parse(quoteParam))
+          : null;
+        const loaded = await quoteRepository.loadForm(
+          existing?.request.productVersionId ?? null
+        );
         setDefinition(loaded);
+
+        if (existing) {
+          const existingProduct =
+            loaded.products.find(
+              item => item.productVersionId === existing.request.productVersionId
+            ) ?? null;
+          if (!existingProduct)
+            throw new Error(
+              "A versão do produto deste orçamento não está disponível."
+            );
+
+          setProductId(existingProduct.productId);
+          const hydrated = hydrateQuoteFields(
+            existingProduct.inputs,
+            existing.request.request.technicalInputs
+          );
+          setFieldValues(hydrated.values);
+          setFieldUnits(hydrated.units);
+          setQuantity(existing.request.request.commercialQuantity);
+          setInstallments(String(existing.request.installments));
+          setInstallationRequested(existing.request.installation.requested);
+          setMunckRequested(existing.request.munck.requested);
+          if (existing.request.munck.requested)
+            setMunckHours(existing.request.munck.hours);
+          setCustomerName(existing.commercial.customerName);
+          setCustomerPhone(existing.commercial.customerPhone ?? "");
+          setTitle(existing.commercial.title);
+          setResult(existing.publicResult);
+
+          const requestFingerprint = quoteFingerprint(existing.request);
+          setCalculatedFingerprint(requestFingerprint);
+          setSavedFingerprint(
+            quoteFingerprint({
+              requestFingerprint,
+              commercial: existing.commercial,
+            })
+          );
+          setSaved({
+            quoteId: existing.quoteId,
+            quoteNumber: existing.quoteNumber,
+            status: existing.status,
+            revision: existing.revision,
+            snapshotId: existing.snapshotId,
+            snapshotVersion: existing.snapshotVersion,
+            savedAt: existing.savedAt,
+            commercial: existing.commercial,
+            publicResult: existing.publicResult,
+          });
+          return;
+        }
+
         const first = loaded.products[0] ?? null;
         if (first) {
           setProductId(first.productId);
@@ -143,6 +212,19 @@ export default function QuoteCalculatorPage() {
       }
     })();
   }, []);
+
+  const buildCommercial = (): QuoteCommercialDetails => {
+    const normalized = {
+      customerName: customerName.trim(),
+      customerPhone: customerPhone.trim() || null,
+      title: title.trim(),
+    };
+    if (!normalized.customerName) throw new Error("Preencha o cliente.");
+    if (!normalized.title) throw new Error("Preencha o título do orçamento.");
+    if (normalized.customerPhone && normalized.customerPhone.length < 3)
+      throw new Error("Informe um telefone válido.");
+    return quoteCommercialDetailsSchema.parse(normalized);
+  };
 
   const buildRequest = (): OfficialQuoteRequest => {
     if (!product) throw new Error("Selecione um produto.");
@@ -174,7 +256,7 @@ export default function QuoteCalculatorPage() {
 
   const currentFingerprint = useMemo(() => {
     try {
-      return JSON.stringify(buildRequest());
+      return quoteFingerprint(buildRequest());
     } catch {
       return null;
     }
@@ -194,10 +276,22 @@ export default function QuoteCalculatorPage() {
     result !== null &&
     currentFingerprint !== null &&
     currentFingerprint === calculatedFingerprint;
+  const currentCommercial = {
+    customerName: customerName.trim(),
+    customerPhone: customerPhone.trim() || null,
+    title: title.trim(),
+  };
+  const currentPersistedFingerprint =
+    currentFingerprint === null
+      ? null
+      : quoteFingerprint({
+          requestFingerprint: currentFingerprint,
+          commercial: currentCommercial,
+        });
   const persistedStateIsCurrent =
     saved !== null &&
     savedFingerprint !== null &&
-    currentFingerprint === savedFingerprint;
+    currentPersistedFingerprint === savedFingerprint;
 
   const calculate = async () => {
     setWorking(true);
@@ -205,7 +299,7 @@ export default function QuoteCalculatorPage() {
       const request = buildRequest();
       const calculated = await quoteRepository.calculate(request);
       setResult(calculated);
-      setCalculatedFingerprint(JSON.stringify(request));
+      setCalculatedFingerprint(quoteFingerprint(request));
       toast.success("Orçamento calculado com os valores oficiais.");
     } catch (error) {
       toast.error(friendlyError(error));
@@ -218,18 +312,28 @@ export default function QuoteCalculatorPage() {
     setWorking(true);
     try {
       const request = buildRequest();
-      if (JSON.stringify(request) !== calculatedFingerprint)
+      if (quoteFingerprint(request) !== calculatedFingerprint)
         throw new Error("Recalcule o orçamento antes de salvar.");
+      const commercial = buildCommercial();
       const persisted = await quoteRepository.save({
         quoteId: saved?.quoteId ?? null,
         expectedRevision: saved?.revision ?? null,
+        commercial,
         ...request,
       });
-      const fingerprint = JSON.stringify(request);
+      const fingerprint = quoteFingerprint(request);
       setSaved(persisted);
-      setSavedFingerprint(fingerprint);
+      setSavedFingerprint(
+        quoteFingerprint({
+          requestFingerprint: fingerprint,
+          commercial,
+        })
+      );
       setResult(persisted.publicResult);
       setCalculatedFingerprint(fingerprint);
+      const url = new URL(window.location.href);
+      url.searchParams.set("quote", persisted.quoteId);
+      window.history.replaceState(window.history.state, "", url);
       toast.success(
         saved
           ? `Nova versão salva no orçamento #${persisted.quoteNumber}.`
@@ -271,7 +375,13 @@ export default function QuoteCalculatorPage() {
   const newQuote = () => {
     setQuantity("1");
     setInstallments(String(definition?.availableInstallments[0] ?? 1));
+    setCustomerName("");
+    setCustomerPhone("");
+    setTitle("");
     resetForProduct(product);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("quote");
+    window.history.replaceState(window.history.state, "", url);
   };
 
   const copySummary = async () => {
@@ -282,6 +392,8 @@ export default function QuoteCalculatorPage() {
         : saved
           ? `Simulação sobre orçamento #${saved.quoteNumber} (não salva)`
           : "Simulação de orçamento",
+      `Cliente: ${customerName.trim() || "Não informado"}`,
+      `Referência: ${title.trim() || "Sem título"}`,
       `Produto: ${product.name}`,
       `Quantidade: ${result.commercialQuantity}`,
       `Produto: ${formatBrl(result.productSellingPrice.amount)}`,
@@ -350,6 +462,54 @@ export default function QuoteCalculatorPage() {
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
         <div className="space-y-5 lg:col-span-7">
+          {saved && !product?.calculationAvailable && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+              Esta versão do produto não está mais disponível para novo cálculo.
+              O orçamento permanece acessível em modo leitura com o snapshot oficial salvo.
+            </div>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Cliente e referência</CardTitle>
+              <CardDescription>
+                Estes dados identificam o orçamento e serão reutilizados na futura OS.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Cliente</Label>
+                <Input
+                  value={customerName}
+                  disabled={!editable || working}
+                  maxLength={160}
+                  placeholder="Nome ou razão social"
+                  onChange={event => setCustomerName(event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Telefone</Label>
+                <Input
+                  value={customerPhone}
+                  disabled={!editable || working}
+                  maxLength={40}
+                  placeholder="Opcional"
+                  onChange={event => setCustomerPhone(event.target.value)}
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Título / referência</Label>
+                <Input
+                  value={title}
+                  disabled={!editable || working}
+                  maxLength={200}
+                  placeholder="Ex.: Letreiro recepção · Unidade Kobrasol"
+                  onChange={event => setTitle(event.target.value)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Produto e medidas</CardTitle>

@@ -4,7 +4,10 @@ import { productInputSchema } from "../product-engineering/inputs.js";
 import { productVersionIdSchema } from "../product-engineering/productVersion.js";
 
 export const quoteFormApiRequestSchema = z
-  .object({ action: z.literal("GET_QUOTE_FORM") })
+  .object({
+    action: z.literal("GET_QUOTE_FORM"),
+    productVersionId: productVersionIdSchema.nullable().default(null),
+  })
   .strict();
 
 export const quoteFormProductSchema = z
@@ -17,6 +20,7 @@ export const quoteFormProductSchema = z
     inputs: z.array(productInputSchema),
     installationAvailable: z.boolean(),
     munckAvailable: z.boolean(),
+    calculationAvailable: z.boolean(),
   })
   .strict();
 
