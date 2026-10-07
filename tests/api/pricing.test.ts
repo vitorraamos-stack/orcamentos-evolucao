@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
   client: null as any,
   officialCalculate: vi.fn(),
+  officialQuoteCalculate: vi.fn(),
 }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => state.client }));
 vi.mock("../../api/_shared/pricing/calculationService.js", () => ({
@@ -18,6 +19,22 @@ vi.mock("../../api/_shared/pricing/calculationService.js", () => ({
   OfficialPricingCalculationService: class OfficialPricingCalculationService {
     async calculate(input: unknown) {
       return state.officialCalculate(input);
+    }
+  },
+}));
+vi.mock("../../api/_shared/quotes/calculationService.js", () => ({
+  OfficialQuoteCalculationError: class OfficialQuoteCalculationError extends Error {
+    status: number;
+    code: string;
+    constructor(status: number, code: string, message: string) {
+      super(message);
+      this.status = status;
+      this.code = code;
+    }
+  },
+  OfficialQuoteCalculationService: class OfficialQuoteCalculationService {
+    async calculate(input: unknown) {
+      return state.officialQuoteCalculate(input);
     }
   },
 }));
@@ -139,6 +156,7 @@ describe("Pricing API manager authority", () => {
     process.env.SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "server-secret";
     state.officialCalculate.mockReset();
+    state.officialQuoteCalculate.mockReset();
   });
 
   it("returns 401 without bearer or with an invalid token", async () => {
@@ -306,6 +324,104 @@ describe("Pricing API manager authority", () => {
       expect(res.payload.data).not.toHaveProperty("financialRate");
     }
   );
+
+  it.each(["consultor_vendas", "consultor", "gerente", "admin"])(
+    "allows %s to request a sanitized official Quote",
+    async role => {
+      const publicResult = {
+        calculationVersion: "1.0",
+        productId: id(4),
+        productVersionId: id(5),
+        productVersionNumber: 2,
+        productVersionRevision: 2,
+        commercialQuantity: "1",
+        installments: 3,
+        productSellingPrice: { currency: "BRL", amount: "720" },
+        installation: {
+          requested: true,
+          areaM2: "1",
+          tier: "TIER_1",
+          price: { currency: "BRL", amount: "150" },
+        },
+        munck: {
+          requested: false,
+          requestedHours: null,
+          billedHours: null,
+          price: { currency: "BRL", amount: "0" },
+        },
+        subtotalBeforeFinancialRate: { currency: "BRL", amount: "870" },
+        roundingRule: "BRL_2DP_HALF_UP_V1",
+        totalSellingPrice: { currency: "BRL", amount: "870.00" },
+      };
+      state.officialQuoteCalculate.mockResolvedValueOnce({ publicResult });
+      state.client = client({ id: id(9) }, role);
+      const res = response();
+
+      await handler(
+        {
+          method: "POST",
+          headers: { authorization: "Bearer valid" },
+          body: {
+            action: "CALCULATE_QUOTE",
+            productVersionId: id(5),
+            request: {
+              commercialQuantity: "1",
+              technicalInputs: {
+                width: { kind: "decimal", value: "1", unit: "m" },
+                height: { kind: "decimal", value: "1", unit: "m" },
+              },
+            },
+            installments: 3,
+            installation: { requested: true },
+            munck: { requested: false },
+          },
+        },
+        res
+      );
+
+      expect(res.statusCode).toBe(200);
+      expect(res.payload).toEqual({ ok: true, data: publicResult });
+      expect(state.officialQuoteCalculate).toHaveBeenCalledWith({
+        productVersionId: id(5),
+        request: {
+          commercialQuantity: "1",
+          technicalInputs: {
+            width: { kind: "decimal", value: "1", unit: "m" },
+            height: { kind: "decimal", value: "1", unit: "m" },
+          },
+        },
+        installments: 3,
+        installation: { requested: true },
+        munck: { requested: false },
+      });
+      expect(res.payload.data).not.toHaveProperty("totalCost");
+      expect(res.payload.data).not.toHaveProperty("markup");
+      expect(res.payload.data).not.toHaveProperty("financialRate");
+    }
+  );
+
+  it("rejects browser-supplied Quote prices", async () => {
+    state.client = client({ id: id(9) }, "consultor_vendas");
+    const res = response();
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer valid" },
+        body: {
+          action: "CALCULATE_QUOTE",
+          productVersionId: id(5),
+          request: { commercialQuantity: "1", technicalInputs: {} },
+          installments: 3,
+          installation: { requested: false },
+          munck: { requested: false },
+          installationPrice: "1",
+        },
+      },
+      res
+    );
+    expect(res.statusCode).toBe(400);
+    expect(state.officialQuoteCalculate).not.toHaveBeenCalled();
+  });
 
   it.each(["arte_finalista", "producao", "instalador"])(
     "rejects non-commercial role %s from official Pricing",
