@@ -17,17 +17,23 @@ describe("EvoluSystem — OS detail premium visual contract", () => {
     }
   });
 
-  it("places the summary tabs before operational progress and management cards", () => {
-    const header = detail.indexOf("<OrderHeader order={detail.order}");
-    const tabs = detail.indexOf('<Tabs className="evolu-detail__tabs"');
-    const summary = detail.indexOf("<OrderSummaryTab order={detail.order}");
-    const flow = detail.indexOf("<OrderFlowProgress order={detail.order}");
-    const management = detail.indexOf('<section aria-label="Responsáveis e prazos"');
-    expect(header).toBeGreaterThan(0);
-    expect(tabs).toBeGreaterThan(header);
-    expect(summary).toBeGreaterThan(tabs);
-    expect(flow).toBeGreaterThan(summary);
-    expect(management).toBeGreaterThan(flow);
+  it("places operational progress between tabs and summary details and keeps it visible across tabs", () => {
+    const headerIndex = detail.indexOf("<OrderHeader order={detail.order}");
+    const tabsIndex = detail.indexOf('<Tabs className="evolu-detail__tabs"');
+    const tabsListEnd = detail.indexOf("</TabsList>", tabsIndex);
+    const flowIndex = detail.indexOf("<OrderFlowProgress order={detail.order}");
+    const summaryIndex = detail.indexOf("<OrderSummaryTab order={detail.order}");
+    const tabsClose = detail.indexOf("</Tabs>", tabsIndex);
+    const managementIndex = detail.indexOf('<section aria-label="Responsáveis e prazos"');
+
+    expect(headerIndex).toBeGreaterThan(0);
+    expect(tabsIndex).toBeGreaterThan(headerIndex);
+    expect(tabsListEnd).toBeGreaterThan(tabsIndex);
+    expect(flowIndex).toBeGreaterThan(tabsListEnd);
+    expect(summaryIndex).toBeGreaterThan(flowIndex);
+    expect(tabsClose).toBeGreaterThan(summaryIndex);
+    expect(managementIndex).toBeGreaterThan(tabsClose);
+    expect((detail.match(/<OrderFlowProgress order={detail.order} \/>/g) ?? []).length).toBe(1);
   });
 
   it("keeps domain mutations, permissions and destructive confirmations unchanged", () => {
