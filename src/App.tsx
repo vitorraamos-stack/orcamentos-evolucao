@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import Login from "@/pages/Login";
+import ResetPassword from "@/pages/ResetPassword";
 import Home from "@/pages/Home";
 import HubOS from "@/pages/HubOS";
 import Galeria from "@/pages/Galeria";
@@ -49,6 +50,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/redefinir-senha" component={ResetPassword} />
 
       <Route path="/orcamentos/:quoteId/proposta">
         <Layout>
