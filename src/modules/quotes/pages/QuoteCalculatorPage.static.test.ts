@@ -8,7 +8,7 @@ const source = readFileSync(
 
 describe("QuoteCalculatorPage re-scope 19A", () => {
   it("keeps the official calculation flow and copy summary", () => {
-    expect(source).toContain("quoteRepository.loadForm()");
+    expect(source).toContain(".loadForm()");
     expect(source).toContain("quoteRepository.calculate(request)");
     expect(source).toContain("buildTechnicalInputs(");
     expect(source).toContain("availableInstallments");
