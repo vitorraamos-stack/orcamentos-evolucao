@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import {
   AlertTriangle,
+  CalendarDays,
   Eye,
   MapPin,
   MoreHorizontal,
@@ -81,7 +82,54 @@ export function OrderTable({
       </div>
     );
   return (
-    <div className="overflow-x-auto rounded-xl border bg-card shadow-xs">
+    <div className="evolu-orders__results">
+      <div className="evolu-orders__mobile-list lg:hidden" aria-label="Lista de ordens de serviço">
+        {orders.map(order => {
+          const risk = calculateOrderRisk(order);
+          const path = `/os/${order.id}`;
+          const number = order.sale_number || order.os_number || "—";
+          return (
+            <article key={order.id} className="evolu-orders__mobile-card">
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <Link href={path} className="text-base font-extrabold text-primary hover:underline">
+                    #{number}
+                  </Link>
+                  <p className="mt-1 truncate text-sm font-semibold" title={order.client_name}>
+                    {order.client_name}
+                  </p>
+                </div>
+                <OrderRiskBadge risk={risk} />
+              </div>
+              <p className="mt-3 line-clamp-2 text-sm text-foreground" title={order.title || order.description || "Sem título"}>
+                {order.title || order.description || "Sem título"}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <OrderStatusBadge status={order.prod_status || order.art_status} />
+                <OrderPriorityBadge urgent={isOrderUrgent(order)} />
+                <OrderLogisticsCell type={order.logistic_type} />
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3">
+                <span className={cn(
+                  "inline-flex items-center gap-1.5 text-xs",
+                  risk === "CRITICO" ? "font-bold text-destructive" : "text-muted-foreground"
+                )}>
+                  <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                  {date(order.delivery_date)}
+                </span>
+                <Link
+                  href={path}
+                  className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-primary hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  aria-label={`Visualizar OS ${number}`}
+                >
+                  <Eye className="h-4 w-4" aria-hidden="true" /> Visualizar OS
+                </Link>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      <div className="evolu-orders__desktop-table hidden overflow-x-auto rounded-xl border bg-card shadow-xs lg:block">
       <table className="w-full min-w-[1040px] table-fixed text-sm 2xl:min-w-0">
         <colgroup>
           <col className="w-[17%]" />
@@ -244,6 +292,7 @@ export function OrderTable({
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
