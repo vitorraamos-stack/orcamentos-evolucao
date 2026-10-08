@@ -1,7 +1,3 @@
--- Canonical production migration:
--- supabase/migrations/20261008161302_quote_history_18k.sql
--- Kept here as the reviewed 18K SQL source.
-
 create function public.quote_history_secure(
   p_quote_id uuid,
   p_actor_id uuid,

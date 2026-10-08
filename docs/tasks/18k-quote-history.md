@@ -1,6 +1,6 @@
 # 18K — Histórico sanitizado do Quote
 
-Status: **implementação preparada em commit isolado; Supabase ainda não alterado**.
+Status: **Supabase production aplicado e reconciliado; aguardando CI/Preview e merge**.
 
 ## Objetivo
 
@@ -32,11 +32,11 @@ O histórico não retorna:
 
 ## Autorização
 
-A nova RPC `quote_history_secure` recebe o ator autenticado resolvido pelo backend e aplica owner-or-manager novamente no banco.
+A RPC `quote_history_secure` recebe o ator autenticado resolvido pelo backend e aplica owner-or-manager novamente no banco.
 
 - consultor: apenas seus próprios Quotes;
 - gerente: qualquer Quote permitido pelo módulo;
-- anon/authenticated: sem EXECUTE direto;
+- anon/authenticated/PUBLIC: sem EXECUTE direto;
 - service_role: único executor.
 
 A API continua validando sessão, papel e acesso ao módulo Calculadora antes da chamada.
@@ -49,17 +49,36 @@ A timeline deriva o modo de preço de cada snapshot:
 - MANAGER_FINAL_PRICE -> MANAGER_ADJUSTED;
 - valor inesperado -> INVALID, rejeitado pelo contrato do servidor.
 
-## Banco
+## SQL production
 
-Nenhuma alteração foi aplicada ainda.
+Migration aplicada:
+- `20261008161302_quote_history_18k`.
 
-O SQL candidato está em:
-`docs/tasks/18k-quote-history-migration.sql`
+Arquivo canônico:
+- `supabase/migrations/20261008161302_quote_history_18k.sql`.
 
-Após autorização explícita do Supabase:
-1. pré-check production;
-2. aplicar a função;
-3. validar ACL, SECURITY INVOKER e smoke;
-4. executar Security Advisor;
-5. reconciliar o timestamp remoto em `supabase/migrations/`;
-6. só então criar branch/PR e rodar CI/Preview.
+A função permanece:
+- STABLE;
+- SECURITY INVOKER;
+- `search_path=pg_catalog, public`;
+- EXECUTE apenas para `service_role`;
+- sem acesso de `anon`, `authenticated` ou `PUBLIC`;
+- limite de 200 eventos mais recentes.
+
+## Pós-check production
+
+- Quotes: 0;
+- Quote snapshots: 0;
+- Quote events: 0;
+- smoke como `service_role`: `QUOTE_NOT_FOUND` esperado para Quote inexistente;
+- `security_invoker = true`;
+- `stable = true`;
+- `search_path = pg_catalog, public`;
+- `service_role EXECUTE = true`;
+- `anon/authenticated/PUBLIC EXECUTE = false`;
+- RLS de `quote_events` continua habilitado;
+- Security Advisor sem finding nova atribuída à 18K.
+
+## Próximo gate
+
+Criar branch a partir deste head reconciliado, abrir PR draft e validar CI/Preview antes de solicitar merge.

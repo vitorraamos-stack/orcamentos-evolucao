@@ -2,11 +2,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const sql = readFileSync(
-  "docs/tasks/18k-quote-history-migration.sql",
+  "supabase/migrations/20261008161302_quote_history_18k.sql",
   "utf8"
 ).replaceAll("\r\n", "\n");
 
-describe("Quote history migration draft 18K", () => {
+describe("Quote history migration 18K", () => {
   it("uses STABLE SECURITY INVOKER and a fixed search_path", () => {
     expect(sql).toMatch(/stable\s+security\s+invoker/i);
     expect(sql).toMatch(
