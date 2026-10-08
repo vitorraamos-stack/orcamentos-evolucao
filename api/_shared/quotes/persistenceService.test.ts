@@ -5,6 +5,7 @@ import {
   mapQuotePersistenceError,
 } from "./persistenceService";
 import type { OfficialQuoteCalculationResult } from "./calculationService";
+import { QuoteNegotiationServiceError } from "./negotiationService";
 
 const id = (n: number) =>
   `10000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -385,6 +386,38 @@ describe("OfficialQuotePersistenceService", () => {
     });
     expect(JSON.stringify(result)).not.toContain("850.00");
     expect(JSON.stringify(result)).not.toContain("Condição comercial aprovada");
+  });
+
+  it("rejects manager pricing input from consultants before the RPC", async () => {
+    const db = { rpc: vi.fn() };
+    const service = new OfficialQuotePersistenceService(db, {
+      calculate: async () => calculation(),
+    });
+
+    let captured: unknown;
+    try {
+      await service.save(
+        {
+          ...request,
+          negotiation: {
+            mode: "MANAGER_FINAL_PRICE",
+            finalAmount: "860.00",
+            reason: "Tentativa sem autoridade",
+            allowBelowMinimum: false,
+          },
+        },
+        id(9),
+        false
+      );
+    } catch (error) {
+      captured = error;
+    }
+
+    expect(captured).toBeInstanceOf(QuoteNegotiationServiceError);
+    expect((captured as QuoteNegotiationServiceError).code).toBe(
+      "QUOTE_NEGOTIATION_FORBIDDEN"
+    );
+    expect(db.rpc).not.toHaveBeenCalled();
   });
 
   it("keeps legacy v2 snapshots readable as OFFICIAL pricing", async () => {
