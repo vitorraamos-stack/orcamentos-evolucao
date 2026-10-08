@@ -318,7 +318,7 @@ export default function OrdersCentralPage() {
         </div>
         {hubPermissions.canCreateOs && (
           <Button className="evolu-orders__new-button" onClick={() => setLocation(createOrderPath("/os"))}>
-            <Plus className="h-4 w-4" aria-hidden="true" /> + Nova OS
+            <Plus className="h-4 w-4" aria-hidden="true" /> Nova OS
           </Button>
         )}
       </div>
