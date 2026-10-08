@@ -13,6 +13,20 @@ describe("EvoluSystem premium shell", () => {
     expect(layout).toContain("setMobileOpen(false)");
   });
 
+  it("keeps account identification in the sidebar and a compact mobile-only header", () => {
+    const header = layout.slice(
+      layout.indexOf('<header className="evolu-shell__topbar'),
+      layout.indexOf("</header>") + "</header>".length
+    );
+    expect(header).toContain("md:hidden");
+    expect(header).toContain("h-14");
+    expect(header).not.toContain("evolu-shell__topbar-avatar");
+    expect(header).not.toContain("activePageLabel");
+    expect(header).not.toContain("lg:block");
+    expect(layout).toContain('className="evolu-shell__account px-3 py-4"');
+    expect(layout).toContain("md:p-5 xl:p-6");
+  });
+
   it("preserves permission gates and operational section routing", () => {
     expect(layout).toContain('hubPermissions.canViewHubOS');
     expect(layout).toContain('hasModuleAccess("hub_os")');

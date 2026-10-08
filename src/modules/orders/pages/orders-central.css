@@ -1,0 +1,124 @@
+.evolu-orders {
+  --orders-line: #e2eaf3;
+  --orders-blue: #087fcb;
+  color: #182e48;
+}
+
+.evolu-orders__heading { padding: 2px 0 0; }
+.evolu-orders__heading header { margin-bottom: 0; }
+.evolu-orders__heading h1 {
+  font-size: clamp(1.7rem, 2.1vw, 2.2rem);
+  line-height: 1.15;
+  letter-spacing: -.047em;
+  color: #172c46;
+}
+.evolu-orders__heading header p { margin-top: 9px; color: #718399; }
+.evolu-orders__eyebrow {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 9px;
+  color: #358ebf; font-size: 11px; font-weight: 760;
+  letter-spacing: .18em; text-transform: uppercase;
+}
+.evolu-orders__eyebrow span {
+  width: 28px; height: 2px;
+  background: linear-gradient(90deg,#00a0e3 0 42%,#ec008c 42% 74%,#fce000 74%);
+}
+.evolu-orders__new-button {
+  min-height: 43px; padding-inline: 17px; border-radius: 11px;
+  background: #0784d1; color: white; font-weight: 700;
+  box-shadow: 0 9px 20px -12px rgba(9,113,183,.75);
+}
+.evolu-orders__new-button:hover { background: #006fad; }
+.evolu-orders [aria-label="Resumo das ordens"] { gap: 12px; }
+.evolu-orders [aria-label="Resumo das ordens"] > [data-slot="card"] {
+  min-width: 0; border: 1px solid var(--orders-line); border-radius: 16px;
+  background: #fff; box-shadow: 0 12px 30px -26px rgba(24,54,91,.55);
+}
+.evolu-orders [aria-label="Resumo das ordens"] [data-slot="card-content"] {
+  min-height: 95px; padding: 17px;
+}
+.evolu-orders [aria-label="Resumo das ordens"] [data-slot="card-content"] span.rounded-lg {
+  border-radius: 12px; padding: 10px;
+}
+.evolu-orders [aria-label="Resumo das ordens"] [data-slot="card-content"] p.text-2xl {
+  font-size: 27px; letter-spacing: -.045em; color: #172d46;
+}
+.evolu-orders__quick-filters {
+  padding: 17px 18px 14px; border: 1px solid var(--orders-line);
+  border-radius: 16px; background: #fff;
+}
+.evolu-orders__quick-label {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 12px; margin-bottom: 12px; font-size: 13px;
+  font-weight: 750; color: #233b58;
+}
+.evolu-orders__quick-hint { color: #8a9aac; font-size: 12px; font-weight: 450; }
+.evolu-orders__quick-scroll {
+  display: flex; gap: 8px; overflow-x: auto; padding-bottom: 3px;
+  scrollbar-width: thin;
+}
+.evolu-orders__quick-button {
+  flex: 0 0 auto; min-height: 37px; padding-inline: 14px; border-radius: 99px;
+  font-size: 12px; font-weight: 650;
+}
+.evolu-orders__quick-button[aria-pressed="true"] {
+  border-color: var(--orders-blue); background: var(--orders-blue); color: #fff;
+}
+.evolu-orders__filter-card {
+  border: 1px solid var(--orders-line); border-radius: 16px; background: #fff;
+  box-shadow: 0 12px 32px -30px rgba(24,54,91,.55);
+}
+.evolu-orders__toolbar input { min-height: 42px; border-radius: 10px; background: #f9fbfe; }
+.evolu-orders__advanced-button { min-height: 42px; border-radius: 10px; }
+.evolu-orders__table {
+  overflow: hidden; border: 1px solid var(--orders-line); border-radius: 17px;
+  background: #fff;
+}
+.evolu-orders__table-heading {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 19px 20px; border-bottom: 1px solid var(--orders-line);
+}
+.evolu-orders__table-heading h2 {
+  color: #172c46; font-size: 15px; font-weight: 750;
+}
+.evolu-orders__table-heading p { margin-top: 4px; color: #7d8fa4; font-size: 12px; }
+.evolu-orders__live-hint { color: #8598aa; font-size: 11px; }
+.evolu-orders__table .evolu-orders__desktop-table { border: 0; border-radius: 0; box-shadow: none; }
+.evolu-orders__table .evolu-orders__desktop-table thead {
+  background: #f4f7fb; color: #5e7187;
+}
+.evolu-orders__table .evolu-orders__desktop-table th {
+  padding-block: 14px; font-size: 11px;
+}
+.evolu-orders__table .evolu-orders__desktop-table td { padding-block: 14px; }
+.evolu-orders__table .evolu-orders__desktop-table tbody tr:hover { background: #f5fafe; }
+.evolu-orders__mobile-list { display: grid; gap: 10px; padding: 12px; }
+.evolu-orders__mobile-card {
+  min-width: 0; border: 1px solid #e4ebf4; border-radius: 14px; background: #fbfcfe;
+  padding: 15px; overflow: hidden;
+}
+.evolu-orders__mobile-card a { text-underline-offset: 3px; }
+.evolu-orders__mobile-card:hover { border-color: #c2dcec; }
+.evolu-orders__footer { padding: 5px 2px 0; }
+.dark .evolu-orders { color: var(--foreground); }
+.dark .evolu-orders__heading h1,
+.dark .evolu-orders__table-heading h2,
+.dark .evolu-orders__quick-label { color: var(--foreground); }
+.dark .evolu-orders__quick-filters,
+.dark .evolu-orders__filter-card,
+.dark .evolu-orders__table,
+.dark .evolu-orders [aria-label="Resumo das ordens"] > [data-slot="card"],
+.dark .evolu-orders__mobile-card { border-color: var(--border); background: var(--card); }
+.dark .evolu-orders [aria-label="Resumo das ordens"] p.text-2xl { color: var(--foreground); }
+.dark .evolu-orders__table .evolu-orders__desktop-table thead { background: var(--muted); }
+.dark .evolu-orders__table .evolu-orders__desktop-table tbody tr:hover { background: var(--accent); }
+@media (max-width: 639px) {
+  .evolu-orders__heading { align-items: stretch; }
+  .evolu-orders__new-button { width: 100%; }
+  .evolu-orders__quick-filters { padding: 14px 12px 11px; }
+  .evolu-orders__quick-hint { display: none; }
+  .evolu-orders__table-heading { padding: 15px; }
+  .evolu-orders [aria-label="Resumo das ordens"] [data-slot="card-content"] { min-height: 86px; padding: 13px; gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .evolu-orders__new-button, .evolu-orders__quick-button { transition: none; }
+}
