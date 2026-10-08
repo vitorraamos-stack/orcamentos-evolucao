@@ -28,6 +28,61 @@ export const QUOTE_STATUSES = [
 export const quoteStatusSchema = z.enum(QUOTE_STATUSES);
 export type QuoteStatus = z.infer<typeof quoteStatusSchema>;
 
+export const QUOTE_OUTCOME_REASON_CODES = [
+  "PRICE",
+  "DEADLINE",
+  "COMPETITOR",
+  "NO_RESPONSE",
+  "CLIENT_CANCELLED",
+  "DUPLICATE",
+  "CREATED_BY_MISTAKE",
+  "SCOPE_CHANGED",
+  "OTHER",
+] as const;
+
+export const quoteOutcomeReasonCodeSchema = z.enum(
+  QUOTE_OUTCOME_REASON_CODES
+);
+export type QuoteOutcomeReasonCode = z.infer<
+  typeof quoteOutcomeReasonCodeSchema
+>;
+
+export const quoteOutcomeReasonSchema = z
+  .object({
+    code: quoteOutcomeReasonCodeSchema,
+    note: z.string().trim().min(1).max(300).nullable(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (
+      value.code === "OTHER" &&
+      (value.note === null || value.note.trim().length < 5)
+    )
+      ctx.addIssue({
+        code: "custom",
+        path: ["note"],
+        message: "OTHER outcome reasons require a note with at least 5 characters",
+      });
+  });
+
+export type QuoteOutcomeReason = z.infer<typeof quoteOutcomeReasonSchema>;
+
+const REJECTED_REASON_CODES = new Set<QuoteOutcomeReasonCode>([
+  "PRICE",
+  "DEADLINE",
+  "COMPETITOR",
+  "NO_RESPONSE",
+  "CLIENT_CANCELLED",
+  "OTHER",
+]);
+
+const CANCELLED_REASON_CODES = new Set<QuoteOutcomeReasonCode>([
+  "DUPLICATE",
+  "CREATED_BY_MISTAKE",
+  "SCOPE_CHANGED",
+  "OTHER",
+]);
+
 export const quoteIdSchema = z.string().uuid().brand<"QuoteId">();
 export type QuoteId = z.infer<typeof quoteIdSchema>;
 
@@ -119,8 +174,54 @@ export const quoteTransitionApiRequestSchema = z
     quoteId: quoteIdSchema,
     expectedRevision: quoteRevisionSchema,
     targetStatus: quoteStatusSchema,
+    outcomeReason: quoteOutcomeReasonSchema.nullable().optional().default(null),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    const requiresOutcome =
+      value.targetStatus === "REJECTED" ||
+      value.targetStatus === "CANCELLED";
+
+    if (requiresOutcome && value.outcomeReason === null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["outcomeReason"],
+        message: "Rejected and cancelled Quotes require an outcome reason",
+      });
+      return;
+    }
+
+    if (!requiresOutcome && value.outcomeReason !== null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["outcomeReason"],
+        message: "This Quote transition cannot declare an outcome reason",
+      });
+      return;
+    }
+
+    if (
+      value.targetStatus === "REJECTED" &&
+      value.outcomeReason &&
+      !REJECTED_REASON_CODES.has(value.outcomeReason.code)
+    )
+      ctx.addIssue({
+        code: "custom",
+        path: ["outcomeReason", "code"],
+        message: "Invalid rejection reason",
+      });
+
+    if (
+      value.targetStatus === "CANCELLED" &&
+      value.outcomeReason &&
+      !CANCELLED_REASON_CODES.has(value.outcomeReason.code)
+    )
+      ctx.addIssue({
+        code: "custom",
+        path: ["outcomeReason", "code"],
+        message: "Invalid cancellation reason",
+      });
+  });
 
 export const quoteHistoryApiRequestSchema = z
   .object({
@@ -238,6 +339,7 @@ export const quoteHistoryItemSchema = z
     totalSellingPrice: moneySchema,
     fromStatus: quoteStatusSchema.nullable(),
     toStatus: quoteStatusSchema.nullable(),
+    outcomeReason: quoteOutcomeReasonSchema.nullable(),
   })
   .strict()
   .superRefine((value, ctx) => {
@@ -253,6 +355,16 @@ export const quoteHistoryItemSchema = z
         code: "custom",
         path: ["fromStatus"],
         message: "Non-status history events cannot declare status transition",
+      });
+
+    const outcomeStatus =
+      statusEvent &&
+      (value.toStatus === "REJECTED" || value.toStatus === "CANCELLED");
+    if (!outcomeStatus && value.outcomeReason !== null)
+      ctx.addIssue({
+        code: "custom",
+        path: ["outcomeReason"],
+        message: "Only rejected or cancelled history events may declare an outcome reason",
       });
   });
 

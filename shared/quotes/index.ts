@@ -20,6 +20,9 @@ export type {
 export {
   QUOTE_STATUSES,
   quoteStatusSchema,
+  QUOTE_OUTCOME_REASON_CODES,
+  quoteOutcomeReasonCodeSchema,
+  quoteOutcomeReasonSchema,
   quoteIdSchema,
   quoteSnapshotIdSchema,
   quoteCommercialDetailsSchema,
@@ -42,6 +45,8 @@ export {
 } from "./persistence.js";
 export type {
   QuoteStatus,
+  QuoteOutcomeReasonCode,
+  QuoteOutcomeReason,
   QuoteId,
   QuoteSnapshotId,
   QuoteCommercialDetails,

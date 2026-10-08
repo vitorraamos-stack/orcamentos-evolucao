@@ -441,6 +441,67 @@ describe("Pricing API manager authority", () => {
     }
   );
 
+  it("rejects a rejected Quote transition without commercial outcome", async () => {
+    state.client = client({ id: id(9) }, "consultor_vendas");
+    const res = response();
+
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer valid" },
+        body: {
+          action: "TRANSITION_QUOTE",
+          quoteId: id(10),
+          expectedRevision: 2,
+          targetStatus: "REJECTED",
+        },
+      },
+      res
+    );
+
+    expect(res.statusCode).toBe(400);
+    expect(state.officialQuoteTransition).not.toHaveBeenCalled();
+  });
+
+  it("passes structured rejection outcome to Quote persistence", async () => {
+    state.officialQuoteTransition.mockResolvedValueOnce({
+      quoteId: id(10),
+      quoteNumber: 1001,
+      status: "REJECTED",
+      revision: 3,
+      snapshotId: id(12),
+      updatedAt: now,
+    });
+    state.client = client({ id: id(9) }, "consultor_vendas");
+    const res = response();
+    const request = {
+      action: "TRANSITION_QUOTE",
+      quoteId: id(10),
+      expectedRevision: 2,
+      targetStatus: "REJECTED",
+      outcomeReason: {
+        code: "PRICE",
+        note: "Cliente recebeu proposta mais barata.",
+      },
+    };
+
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer valid" },
+        body: request,
+      },
+      res
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(state.officialQuoteTransition).toHaveBeenCalledWith(
+      request,
+      id(9),
+      false
+    );
+  });
+
   it.each(["arte_finalista", "producao", "instalador"])(
     "rejects role %s from the official Quote form",
     async role => {
@@ -1060,6 +1121,7 @@ describe("Pricing API manager authority", () => {
         quoteId: id(10),
         expectedRevision: 2,
         targetStatus: "SENT",
+        outcomeReason: null,
       },
       id(9),
       false

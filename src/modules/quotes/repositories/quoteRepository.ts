@@ -19,6 +19,7 @@ import {
   type QuoteCurrentPublicResult,
   type QuoteId,
   type QuoteHistoryResult,
+  type QuoteOutcomeReason,
   type QuoteListResult,
   type QuoteSavePublicResult,
   type QuoteSaveRequest,
@@ -126,13 +127,15 @@ export const quoteRepository = {
   transition: async (
     quoteId: QuoteId,
     expectedRevision: number,
-    targetStatus: QuoteStatus
+    targetStatus: QuoteStatus,
+    outcomeReason: QuoteOutcomeReason | null = null
   ): Promise<QuoteTransitionResult> => {
     const body = quoteTransitionApiRequestSchema.parse({
       action: "TRANSITION_QUOTE",
       quoteId,
       expectedRevision,
       targetStatus,
+      outcomeReason,
     });
     return quoteTransitionResultSchema.parse(await post(body));
   },
