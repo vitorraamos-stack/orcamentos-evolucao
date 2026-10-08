@@ -17,8 +17,6 @@ import {
   Settings,
   SlidersHorizontal,
   BadgeDollarSign,
-  FileText,
-  FilePlus2,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import "./evolusystem-shell.css";
@@ -200,34 +198,19 @@ export default function Layout({ children }: LayoutProps) {
       )}
 
       {canViewOrcamentista && (
-        <>
-          <Link href="/orcamentos">
-            <Button
-              variant={location.startsWith("/orcamentos") ? "secondary" : "ghost"}
-              className={cn(
-                "evolu-nav__item w-full justify-start",
-                location.startsWith("/orcamentos") &&
-                  "bg-sidebar-accent text-sidebar-accent-foreground"
-              )}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Orçamentos
-            </Button>
-          </Link>
-          <Link href="/orcamentista">
-            <Button
-              variant={location.startsWith("/orcamentista") ? "secondary" : "ghost"}
-              className={cn(
-                "evolu-nav__item w-full justify-start",
-                location.startsWith("/orcamentista") &&
-                  "bg-sidebar-accent text-sidebar-accent-foreground"
-              )}
-            >
-              <FilePlus2 className="mr-2 h-4 w-4" />
-              Novo orçamento
-            </Button>
-          </Link>
-        </>
+        <Link href="/orcamentista">
+          <Button
+            variant={location.startsWith("/orcamentista") ? "secondary" : "ghost"}
+            className={cn(
+              "evolu-nav__item w-full justify-start",
+              location.startsWith("/orcamentista") &&
+                "bg-sidebar-accent text-sidebar-accent-foreground"
+            )}
+          >
+            <Calculator className="mr-2 h-4 w-4" />
+            Orçamentista
+          </Button>
+        </Link>
       )}
 
       {canViewCalculadora && (
