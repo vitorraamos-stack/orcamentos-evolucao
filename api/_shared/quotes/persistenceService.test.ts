@@ -302,6 +302,13 @@ describe("OfficialQuotePersistenceService", () => {
             minimum_allowed_total: "850.00",
             negotiation_private_snapshot: {
               mode: "OFFICIAL",
+              officialTotal: { currency: "BRL", amount: "870.00" },
+              minimumAllowedTotal: { currency: "BRL", amount: "850.00" },
+              finalTotal: { currency: "BRL", amount: "870.00" },
+              adjustmentKind: "NONE",
+              adjustmentAmount: { currency: "BRL", amount: "0.00" },
+              belowMinimum: false,
+              belowMinimumOverride: false,
               reason: null,
             },
             public_result_snapshot: calc.publicResult,
