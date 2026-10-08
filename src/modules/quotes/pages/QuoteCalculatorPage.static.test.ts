@@ -12,7 +12,7 @@ describe("QuoteCalculatorPage stale result guard", () => {
       "if (!displayedResult || !product || !freshResult) return;"
     );
     expect(source).toContain(
-      'disabled={!freshResult}\n                    onClick={() => void copySummary()}'
+      'disabled={!freshResult || hasPendingManagerAdjustment}\n                    onClick={() => void copySummary()}'
     );
   });
 

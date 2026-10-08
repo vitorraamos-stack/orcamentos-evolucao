@@ -110,11 +110,18 @@ const mapSummary = (dto: any) =>
   });
 
 const publicNegotiationFromSnapshot = (snapshot: any) => {
-  const privateEvaluation = quoteNegotiationEvaluationSchema.safeParse(
-    snapshot?.negotiation_private_snapshot
-  );
-  if (privateEvaluation.success)
+  const privateSnapshot = snapshot?.negotiation_private_snapshot;
+  if (privateSnapshot !== null && privateSnapshot !== undefined) {
+    const privateEvaluation =
+      quoteNegotiationEvaluationSchema.safeParse(privateSnapshot);
+    if (!privateEvaluation.success)
+      throw new QuotePersistenceServiceError(
+        500,
+        "QUOTE_PERSISTENCE_COMPATIBILITY_ERROR",
+        "Persisted Quote negotiation is incompatible with this server."
+      );
     return toPublicQuoteNegotiation(privateEvaluation.data);
+  }
 
   return quoteNegotiationPublicResultSchema.parse({
     pricingMode: "OFFICIAL",

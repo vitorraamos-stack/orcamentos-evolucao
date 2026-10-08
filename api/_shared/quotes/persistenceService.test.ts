@@ -469,6 +469,60 @@ describe("OfficialQuotePersistenceService", () => {
     });
   });
 
+  it("rejects malformed v3 negotiation evidence instead of downgrading it to legacy", async () => {
+    const calc = calculation();
+    const db = {
+      rpc: vi.fn(async () => ({
+        data: {
+          quote: {
+            id: id(10),
+            quote_number: 1001,
+            created_by: id(9),
+            status: "DRAFT",
+            revision: 1,
+            customer_name: "Cliente Teste",
+            customer_phone: null,
+            title: "Snapshot inválido",
+          },
+          snapshot: {
+            id: id(11),
+            version_number: 1,
+            created_at: now,
+            request_snapshot: {
+              productVersionId: id(2),
+              request: request.request,
+              installments: 3,
+              installation: { requested: true },
+              munck: { requested: false },
+            },
+            total_selling_price: "860.00",
+            negotiation_private_snapshot: { mode: "BROKEN" },
+            public_result_snapshot: calc.publicResult,
+          },
+        },
+        error: null,
+      })),
+    };
+
+    let captured: unknown;
+    try {
+      await new OfficialQuotePersistenceService(db, {
+        calculate: async () => calc,
+      }).load(
+        { action: "GET_QUOTE", quoteId: id(10) },
+        id(9),
+        false
+      );
+    } catch (error) {
+      captured = error;
+    }
+
+    expect(captured).toBeInstanceOf(QuotePersistenceServiceError);
+    expect((captured as QuotePersistenceServiceError).code).toBe(
+      "QUOTE_PERSISTENCE_COMPATIBILITY_ERROR"
+    );
+  });
+
   it("transitions status using the authenticated actor and expected revision", async () => {
     const db = {
       rpc: vi
