@@ -1,18 +1,17 @@
 # 18M — Funil comercial e motivos de perda
 
-Status: **implementação preparada em commit isolado; Supabase ainda não alterado**.
+Status: **Supabase production aplicado e reconciliado; aguardando CI/Preview e merge**.
 
 ## Objetivo
 
 Transformar o estado atual dos Quotes em um resumo comercial seguro dentro da Central de Orçamentos.
 
-## Escopo
+## Escopo de visibilidade
 
-A métrica respeita a mesma visibilidade do Quote:
-- gerente: todos os Quotes acessíveis ao módulo;
+- gerente: consolidação de todos os Quotes acessíveis ao módulo;
 - consultor: somente Quotes criados por ele.
 
-Nenhum cliente ou detalhe individual entra na resposta.
+Nenhum cliente, telefone ou detalhe individual entra na resposta agregada.
 
 ## Métricas
 
@@ -29,11 +28,11 @@ Nenhum cliente ou detalhe individual entra na resposta.
 - motivos de perda agregados;
 - quantidade de recusas legadas/sem motivo.
 
-Cancelamentos ficam fora da taxa de fechamento porque representam encerramento operacional, não decisão comercial de ganho/perda.
+Cancelamentos ficam fora da taxa de fechamento porque representam encerramento operacional, não uma decisão comercial de ganho/perda.
 
 ## Motivos de perda
 
-Apenas REJECTED:
+Somente REJECTED:
 - PRICE;
 - DEADLINE;
 - COMPETITOR;
@@ -41,24 +40,62 @@ Apenas REJECTED:
 - CLIENT_CANCELLED;
 - OTHER.
 
-A RPC lê somente `reason_code` do evento terminal de recusa. Nunca retorna `reason_note`, payload bruto, cliente, telefone, mínimo, costing ou negociação privada.
+A RPC lê apenas `reason_code` do evento terminal de recusa. Nunca retorna:
+- `reason_note`;
+- payload bruto;
+- cliente;
+- telefone;
+- mínimo protegido;
+- costing;
+- markup;
+- negociação privada.
 
 ## Banco
 
-Nova RPC candidata:
-`quote_commercial_metrics_secure(actor,is_manager)`.
+Migration aplicada:
+- `20261008172217_quote_commercial_metrics_18m`.
 
-Características:
+Arquivo canônico:
+- `supabase/migrations/20261008172217_quote_commercial_metrics_18m.sql`.
+
+A função `quote_commercial_metrics_secure(uuid,boolean)` é:
 - read-only;
 - STABLE;
 - SECURITY INVOKER;
 - `search_path=pg_catalog, public`;
-- EXECUTE apenas por service_role;
-- nenhuma tabela nova;
-- nenhum backfill.
+- executável apenas por `service_role`;
+- sem tabela nova;
+- sem backfill.
 
-SQL candidato:
-`docs/tasks/18m-quote-commercial-metrics-migration.sql`.
+## Pós-check production
+
+- Quotes: 0;
+- Quote snapshots: 0;
+- Quote events: 0;
+- `security_invoker = true`;
+- `stable = true`;
+- `search_path=pg_catalog, public`;
+- `service_role EXECUTE=true`;
+- `anon/authenticated/PUBLIC EXECUTE=false`;
+- RLS de `quotes` e `quote_events` continua habilitado;
+- Security Advisor sem finding nova atribuída à 18M;
+- nenhuma projeção de `reason_note`, `customer_name` ou `customer_phone`;
+- conversão confirmada como ACCEPTED / (ACCEPTED + REJECTED), excluindo CANCELLED.
+
+## Smoke transacional
+
+Validado com dados temporários e lifecycle real:
+- consultor: 5 Quotes próprios;
+- gerente: 7 Quotes da equipe;
+- DRAFT/SENT/ACCEPTED/REJECTED/CANCELLED;
+- conversão de 50%;
+- valor aceito de R$ 1.000,00 para o consultor;
+- valor aceito de R$ 1.500,00 no consolidado;
+- motivos PRICE e DEADLINE agregados;
+- notas dos motivos não vazaram;
+- primeiro teste tentou inserir estados terminais diretamente e foi corretamente bloqueado por `quote_guard_quote()`;
+- smoke final respeitou o lifecycle oficial e terminou em ROLLBACK;
+- contagens production retornaram a zero.
 
 ## UI
 
@@ -73,11 +110,4 @@ O resumo é independente da paginação/filtro da tabela e representa todo o uni
 
 ## Próximo gate
 
-Após autorização explícita do Supabase:
-1. pré-check production;
-2. aplicar RPC read-only;
-3. validar ACL e SECURITY INVOKER;
-4. smoke transacional/agregado;
-5. Security Advisor;
-6. reconciliar timestamp remoto;
-7. abrir uma única branch/PR e gerar Preview.
+Criar branch a partir deste head reconciliado, abrir PR draft e validar CI/Preview antes de solicitar merge.

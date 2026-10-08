@@ -1,7 +1,3 @@
--- Canonical production migration:
--- supabase/migrations/20261008172217_quote_commercial_metrics_18m.sql
--- Kept here as the reviewed 18M SQL source.
-
 create function public.quote_commercial_metrics_secure(
   p_actor_id uuid,
   p_is_manager boolean
