@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   FilePlus2,
+  FileText,
   RefreshCw,
   Search,
 } from "lucide-react";
@@ -201,18 +202,19 @@ export default function QuotesCentralPage() {
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead>Responsável</TableHead>
                 <TableHead>Atualizado</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading && items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-28 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-28 text-center text-muted-foreground">
                     Carregando orçamentos...
                   </TableCell>
                 </TableRow>
               ) : items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center">
+                  <TableCell colSpan={8} className="h-32 text-center">
                     <p className="font-medium">Nenhum orçamento encontrado.</p>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Crie um novo orçamento ou ajuste os filtros.
@@ -259,6 +261,22 @@ export default function QuotesCentralPage() {
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                       {formatDate(item.updatedAt)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-2"
+                        onClick={event => {
+                          event.stopPropagation();
+                          setLocation(
+                            `/orcamentos/${item.quoteId}/proposta`
+                          );
+                        }}
+                      >
+                        <FileText className="h-4 w-4" />
+                        Proposta
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))

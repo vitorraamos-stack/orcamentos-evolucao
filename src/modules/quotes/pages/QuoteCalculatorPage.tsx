@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   ClipboardCopy,
   FilePlus2,
+  FileText,
   Save,
   Send,
   Truck,
@@ -986,6 +987,18 @@ export default function QuoteCalculatorPage() {
                       {STATUS_LABEL[saved.status]}
                     </Badge>
                   </div>
+
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2"
+                    disabled={working || !persistedStateIsCurrent}
+                    onClick={() =>
+                      setLocation(`/orcamentos/${saved.quoteId}/proposta`)
+                    }
+                  >
+                    <FileText className="h-4 w-4" />
+                    Proposta comercial
+                  </Button>
 
                   {saved.status === "DRAFT" && !persistedStateIsCurrent && (
                     <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
