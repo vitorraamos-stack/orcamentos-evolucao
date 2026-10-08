@@ -17,20 +17,20 @@ describe("EvoluSystem — OS detail premium visual contract", () => {
     }
   });
 
-  it("places operational progress between tabs and summary details and keeps it visible across tabs", () => {
+  it("places flow above the tab navigation, which stays directly above the details", () => {
     const headerIndex = detail.indexOf("<OrderHeader order={detail.order}");
+    const flowIndex = detail.indexOf("<OrderFlowProgress order={detail.order}");
     const tabsIndex = detail.indexOf('<Tabs className="evolu-detail__tabs"');
     const tabsListEnd = detail.indexOf("</TabsList>", tabsIndex);
-    const flowIndex = detail.indexOf("<OrderFlowProgress order={detail.order}");
     const summaryIndex = detail.indexOf("<OrderSummaryTab order={detail.order}");
     const tabsClose = detail.indexOf("</Tabs>", tabsIndex);
     const managementIndex = detail.indexOf('<section aria-label="Responsáveis e prazos"');
 
     expect(headerIndex).toBeGreaterThan(0);
-    expect(tabsIndex).toBeGreaterThan(headerIndex);
+    expect(flowIndex).toBeGreaterThan(headerIndex);
+    expect(tabsIndex).toBeGreaterThan(flowIndex);
     expect(tabsListEnd).toBeGreaterThan(tabsIndex);
-    expect(flowIndex).toBeGreaterThan(tabsListEnd);
-    expect(summaryIndex).toBeGreaterThan(flowIndex);
+    expect(summaryIndex).toBeGreaterThan(tabsListEnd);
     expect(tabsClose).toBeGreaterThan(summaryIndex);
     expect(managementIndex).toBeGreaterThan(tabsClose);
     expect((detail.match(/<OrderFlowProgress order={detail.order} \/>/g) ?? []).length).toBe(1);
