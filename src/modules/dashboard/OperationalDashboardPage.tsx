@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
+import "./operational-dashboard.css";
 import {
   AlertTriangle,
   ArrowRight,
@@ -70,7 +71,7 @@ export function OperationalDashboardSections({
 }) {
   return (
     <>
-      <section className="rounded-lg border bg-card p-3 sm:p-4">
+      <section className="evolu-dashboard__panel rounded-lg border bg-card p-3 sm:p-4">
         <div className="mb-2.5 flex items-start gap-2">
           <ChartNoAxesColumnIncreasing
             aria-hidden="true"
@@ -124,7 +125,7 @@ export function OperationalDashboardSections({
           />
         </div>
       </section>
-      <section className="mt-3 rounded-lg border border-destructive/20 bg-destructive/[0.02] p-3 sm:p-4">
+      <section className="evolu-dashboard__panel evolu-dashboard__panel--attention mt-4 rounded-lg border p-3 sm:p-4">
         <div className="mb-2.5 flex items-start gap-2">
           <TriangleAlert
             aria-hidden="true"
@@ -243,7 +244,8 @@ export default function OperationalDashboardPage() {
   const maxLoad = Math.max(1, ...workload.map(([, value]) => value));
 
   return (
-    <div className="pb-10">
+    <div className="evolu-dashboard pb-10">
+      <div className="evolu-dashboard__eyebrow">Visão consolidada <span aria-hidden="true" /></div>
       <PageHeader
         title="Dashboard operacional"
         description="Estado atual da operação e prazos do período selecionado."
@@ -255,7 +257,7 @@ export default function OperationalDashboardPage() {
           </Button>
         }
       />
-      <div className="mb-5 flex flex-wrap gap-2">
+      <div className="evolu-dashboard__filters mb-5 flex flex-wrap gap-2" aria-label="Período de análise">
         {(
           [
             ["today", "Hoje"],
@@ -268,6 +270,8 @@ export default function OperationalDashboardPage() {
           <Button
             key={value}
             size="sm"
+            aria-pressed={period === value}
+            className="evolu-dashboard__filter"
             variant={period === value ? "default" : "outline"}
             onClick={() => setPeriod(value)}
           >
@@ -315,7 +319,7 @@ export default function OperationalDashboardPage() {
               attentionMetrics={attentionMetrics}
             />
             <div className="mt-6 grid gap-5 lg:grid-cols-5">
-              <Card className="lg:col-span-3">
+              <Card className="evolu-dashboard__detail-card lg:col-span-3">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
                     <AlertTriangle className="h-5 w-5 text-amber-600" /> Atenção
@@ -349,7 +353,7 @@ export default function OperationalDashboardPage() {
                   )}
                 </CardContent>
               </Card>
-              <Card className="lg:col-span-2">
+              <Card className="evolu-dashboard__detail-card lg:col-span-2">
                 <CardHeader>
                   <CardTitle className="text-base">Carga operacional</CardTitle>
                 </CardHeader>
