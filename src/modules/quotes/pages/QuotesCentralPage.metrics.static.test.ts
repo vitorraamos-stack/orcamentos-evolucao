@@ -8,7 +8,7 @@ const source = readFileSync(
 
 describe("QuotesCentralPage commercial funnel 18M", () => {
   it("renders aggregate funnel metrics from the dedicated endpoint", () => {
-    expect(source).toContain("quoteRepository.metrics()");
+    expect(source).toMatch(/quoteRepository\s*\.\s*metrics\(\)/);
     expect(source).toContain("Taxa de fechamento");
     expect(source).toContain("Aceitos ÷ decisões comerciais");
     expect(source).toContain("Motivos de perda");
