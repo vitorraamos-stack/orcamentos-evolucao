@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useLocation } from 'wouter';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import './login-layout.css';
 import {
   ArrowLeft,
   ArrowRight,
@@ -28,13 +29,13 @@ const highlights: { title: string; detail: string; Icon: LucideIcon }[] = [
 ];
 
 const fieldClass =
-  'h-12 w-full rounded-xl border border-[#D6DFEB] bg-[#F8FAFD] pl-12 pr-4 text-[15px] text-[#14253B] placeholder:text-[#93A1B5] transition-colors focus:border-[#058BD6] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#058BD6]/10 disabled:opacity-60';
+  'h-12 w-full rounded-xl border border-[#D6DFEB] bg-[#F8FAFD] pl-12 pr-4 text-base text-[#14253B] placeholder:text-[#93A1B5] transition-colors focus:border-[#058BD6] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#058BD6]/10 disabled:opacity-60';
 
 function BrandPanel() {
   return (
     <section
       aria-label="Sobre o EvoluSystem"
-      className="relative isolate hidden min-h-screen flex-col justify-between overflow-hidden bg-[#071A34] px-10 py-10 text-white lg:flex xl:px-16 xl:py-14"
+      className="evolu-login__brand relative isolate hidden flex-col justify-between overflow-hidden bg-[#071A34] px-10 text-white lg:flex xl:px-16"
     >
       <div
         className="pointer-events-none absolute inset-0 -z-10"
@@ -89,48 +90,48 @@ function BrandPanel() {
         <img
           src="/logo-branca.png"
           alt="Evolução Comunicação Visual"
-          className="h-auto w-48 object-contain xl:w-56"
+          className="evolu-login__brand-logo h-auto w-48 object-contain xl:w-56"
         />
       </div>
 
-      <div className="relative my-14 max-w-[660px]">
-        <div className="mb-6 flex items-center gap-3 text-xs font-semibold uppercase tracking-[.24em] text-[#AFD2EE]">
+      <div className="evolu-login__brand-content relative max-w-[660px]">
+        <div className="evolu-login__brand-eyebrow flex items-center gap-3 text-xs font-semibold uppercase tracking-[.24em] text-[#AFD2EE]">
           <span className="h-px w-10 bg-[#0BA5EE]" aria-hidden="true" />
           Uma operação conectada
         </div>
-        <h1 className="text-[clamp(3.3rem,5vw,5.7rem)] font-extrabold leading-[.99] tracking-[-.065em]">
+        <h1 className="evolu-login__brand-title font-extrabold leading-[.99] tracking-[-.065em]">
           Evolu<span className="text-[#0C9DED]">System</span>
         </h1>
-        <p className="mt-3 text-sm font-semibold uppercase tracking-[.39em] text-[#D5E6F6] sm:text-base">
+        <p className="evolu-login__brand-subtitle text-sm font-semibold uppercase tracking-[.39em] text-[#D5E6F6] sm:text-base">
           Controle Operacional
         </p>
-        <div className="mt-7 flex h-1 w-28 overflow-hidden rounded-full" aria-hidden="true">
+        <div className="evolu-login__brand-rule flex h-1 w-28 overflow-hidden rounded-full" aria-hidden="true">
           <span className="w-1/3 bg-[#009FE3]" />
           <span className="w-1/3 bg-[#EC008C]" />
           <span className="w-1/3 bg-[#FFE600]" />
         </div>
-        <p className="mt-8 max-w-md text-2xl font-semibold leading-snug tracking-[-.035em] xl:text-[27px]">
+        <p className="evolu-login__brand-heading max-w-md font-semibold leading-snug tracking-[-.035em]">
           Do atendimento à entrega, tudo em um só lugar.
         </p>
-        <p className="mt-3 max-w-md text-base leading-relaxed text-[#BDD0E3]">
+        <p className="evolu-login__brand-description max-w-md leading-relaxed text-[#BDD0E3]">
           Mais organização, agilidade e clareza em cada etapa da sua operação.
         </p>
 
-        <div className="mt-10 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="evolu-login__highlights grid grid-cols-2 xl:grid-cols-4">
           {highlights.map(({ title, detail, Icon }) => (
             <div
               key={title}
-              className="rounded-2xl border border-white/15 bg-white/[.045] p-4 backdrop-blur-sm"
+              className="evolu-login__highlight rounded-2xl border border-white/15 bg-white/[.045] backdrop-blur-sm"
             >
-              <Icon className="mb-4 h-7 w-7 text-[#24AEF4]" strokeWidth={1.8} aria-hidden="true" />
+              <Icon className="evolu-login__highlight-icon h-7 w-7 text-[#24AEF4]" strokeWidth={1.8} aria-hidden="true" />
               <h2 className="text-sm font-bold">{title}</h2>
-              <p className="mt-1 text-xs leading-relaxed text-[#C1D1E2]">{detail}</p>
+              <p className="evolu-login__highlight-detail text-xs leading-relaxed text-[#C1D1E2]">{detail}</p>
             </div>
           ))}
         </div>
       </div>
 
-      <p className="relative text-xs text-[#9CB5CC]">
+      <p className="evolu-login__brand-footer relative text-xs text-[#9CB5CC]">
         © {new Date().getFullYear()} Evolução Comunicação Visual. Todos os direitos reservados.
       </p>
     </section>
@@ -189,11 +190,11 @@ export default function Login() {
   };
 
   return (
-    <main className="min-h-screen bg-[#F4F7FB] text-[#102038] lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)]">
+    <main className="evolu-login bg-[#F4F7FB] text-[#102038] lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)]">
       <BrandPanel />
 
-      <section className="flex min-h-screen flex-col items-center justify-center px-4 py-10 sm:px-8 lg:px-10">
-        <div className="mb-8 flex items-center gap-3 lg:hidden">
+      <section className="evolu-login__form-side flex flex-col items-center justify-center px-4 sm:px-8 lg:px-10">
+        <div className="evolu-login__mobile-brand flex items-center gap-3 lg:hidden">
           <img src="/logo.png" alt="Evolução Comunicação Visual" className="h-14 w-auto" />
           <div className="border-l border-[#D8E0EA] pl-3">
             <p className="text-xl font-extrabold tracking-[-.04em]">Evolu<span className="text-[#008DDD]">System</span></p>
@@ -201,18 +202,18 @@ export default function Login() {
           </div>
         </div>
 
-        <div className="w-full max-w-[540px] rounded-[28px] border border-[#E8EDF4] bg-white px-5 py-9 shadow-[0_24px_70px_-32px_rgba(23,49,82,.25)] sm:px-10 sm:py-12 xl:px-12">
-          <header className="mb-10">
+        <div className="evolu-login__card w-full max-w-[540px] rounded-[28px] border border-[#E8EDF4] bg-white shadow-[0_24px_70px_-32px_rgba(23,49,82,.25)]">
+          <header className="evolu-login__card-header">
             <p className="text-[11px] font-bold uppercase tracking-[.36em] text-[#72849B]">
               {mode === 'login' ? 'Bem-vindo(a) ao' : 'Recuperação de acesso'}
             </p>
-            <div className="mt-2 text-[clamp(2.5rem,4vw,3.6rem)] font-extrabold leading-tight tracking-[-.065em]">
+            <div className="evolu-login__card-title mt-2 font-extrabold leading-tight tracking-[-.065em]">
               Evolu<span className="text-[#008DE1]">System</span>
             </div>
             <p className="mt-1 text-xs font-bold uppercase tracking-[.32em] text-[#687C93]">
               Controle Operacional
             </p>
-            <p className="mt-6 text-sm leading-relaxed text-[#6B7B91]">
+            <p className="evolu-login__card-description text-sm leading-relaxed text-[#6B7B91]">
               {mode === 'login'
                 ? 'Entre com suas credenciais para acessar o sistema.'
                 : 'Informe seu e-mail para receber instruções de redefinição de senha.'}
@@ -233,9 +234,9 @@ export default function Login() {
               </button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="evolu-login__form">
               <div>
-                <label htmlFor="login-email" className="mb-2 block text-sm font-semibold text-[#26374D]">
+                <label htmlFor="login-email" className="evolu-login__label block text-sm font-semibold text-[#26374D]">
                   E-mail
                 </label>
                 <div className="relative">
@@ -259,7 +260,7 @@ export default function Login() {
 
               {mode === 'login' && (
                 <div>
-                  <label htmlFor="login-password" className="mb-2 block text-sm font-semibold text-[#26374D]">
+                  <label htmlFor="login-password" className="evolu-login__label block text-sm font-semibold text-[#26374D]">
                     Senha
                   </label>
                   <div className="relative">
@@ -286,7 +287,7 @@ export default function Login() {
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
                   </div>
-                  <div className="mt-3 text-right">
+                  <div className="evolu-login__forgot text-right">
                     <button
                       type="button"
                       onClick={() => switchMode('recover')}
@@ -326,7 +327,7 @@ export default function Login() {
             </form>
           )}
 
-          <div className="mt-10 flex items-center justify-between gap-3 border-t border-[#E9EDF4] pt-5 text-xs text-[#7C8DA3]">
+          <div className="evolu-login__card-footer flex items-center justify-between gap-3 border-t border-[#E9EDF4] text-xs text-[#7C8DA3]">
             <span className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-[#6E8499]" aria-hidden="true" />
               Acesso protegido
@@ -335,7 +336,7 @@ export default function Login() {
           </div>
         </div>
 
-        <p className="mt-8 text-center text-xs text-[#8A9AAE] lg:hidden">
+        <p className="evolu-login__mobile-copyright text-center text-xs text-[#8A9AAE] lg:hidden">
           © {new Date().getFullYear()} Evolução Comunicação Visual
         </p>
       </section>
