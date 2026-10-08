@@ -72,9 +72,10 @@ describe("Quote negotiation migration 18G", () => {
   it("validates manager authority and explicit below-minimum override in SQL", () => {
     expect(migration).toContain("QUOTE_NEGOTIATION_FORBIDDEN");
     expect(migration).toContain("BELOW_MINIMUM_OVERRIDE_REQUIRED");
+    expect(migration).toContain("BELOW_MINIMUM_OVERRIDE_NOT_APPLICABLE");
     expect(migration).toContain("v_role is distinct from 'gerente'");
     expect(migration).toContain(
-      "v_expected_below_minimum is distinct from v_below_minimum_override"
+      "v_expected_below_minimum and not v_below_minimum_override"
     );
   });
 });
