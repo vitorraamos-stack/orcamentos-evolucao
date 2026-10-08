@@ -58,3 +58,19 @@ export type {
   QuoteFormProduct,
   QuoteFormDefinition,
 } from "./form.js";
+
+
+export {
+  quoteNegotiationRequestSchema,
+  quoteNegotiationEvaluationInputSchema,
+  quoteNegotiationEvaluationSchema,
+  quoteNegotiationPublicResultSchema,
+  QuoteNegotiationDomainError,
+  evaluateQuoteNegotiation,
+  toPublicQuoteNegotiation,
+} from "./negotiation.js";
+export type {
+  QuoteNegotiationRequest,
+  QuoteNegotiationEvaluation,
+  QuoteNegotiationPublicResult,
+} from "./negotiation.js";
