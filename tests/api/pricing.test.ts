@@ -1121,6 +1121,7 @@ describe("Pricing API manager authority", () => {
         quoteId: id(10),
         expectedRevision: 2,
         targetStatus: "SENT",
+        outcomeReason: null,
       },
       id(9),
       false
