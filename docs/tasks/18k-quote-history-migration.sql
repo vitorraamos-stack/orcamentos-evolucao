@@ -34,48 +34,62 @@ begin
       (
         select jsonb_agg(
           jsonb_build_object(
-            'event_id', e.id,
-            'event_type', e.event_type,
-            'occurred_at', e.occurred_at,
-            'actor_id', e.actor_id,
-            'actor_email', pr.email,
-            'snapshot_version', s.version_number,
+            'event_id', h.id,
+            'event_type', h.event_type,
+            'occurred_at', h.occurred_at,
+            'actor_id', h.actor_id,
+            'actor_email', h.actor_email,
+            'snapshot_version', h.version_number,
             'pricing_mode',
               case
-                when s.negotiation_private_snapshot is null then 'OFFICIAL'
-                when s.negotiation_private_snapshot->>'mode' = 'OFFICIAL'
+                when h.negotiation_private_snapshot is null then 'OFFICIAL'
+                when h.negotiation_private_snapshot->>'mode' = 'OFFICIAL'
                   then 'OFFICIAL'
-                when s.negotiation_private_snapshot->>'mode' = 'MANAGER_FINAL_PRICE'
+                when h.negotiation_private_snapshot->>'mode' = 'MANAGER_FINAL_PRICE'
                   then 'MANAGER_ADJUSTED'
                 else 'INVALID'
               end,
-            'total_selling_price', s.total_selling_price::text,
+            'total_selling_price', h.total_selling_price::text,
             'from_status',
               case
-                when e.event_type <> 'STATUS_CHANGED' then null
-                when e.payload->>'from' in (
+                when h.event_type <> 'STATUS_CHANGED' then null
+                when h.payload->>'from' in (
                   'DRAFT','SENT','ACCEPTED','REJECTED','CANCELLED'
-                ) then e.payload->>'from'
+                ) then h.payload->>'from'
                 else 'INVALID'
               end,
             'to_status',
               case
-                when e.event_type <> 'STATUS_CHANGED' then null
-                when e.payload->>'to' in (
+                when h.event_type <> 'STATUS_CHANGED' then null
+                when h.payload->>'to' in (
                   'DRAFT','SENT','ACCEPTED','REJECTED','CANCELLED'
-                ) then e.payload->>'to'
+                ) then h.payload->>'to'
                 else 'INVALID'
               end
           )
-          order by e.occurred_at desc, e.id desc
+          order by h.occurred_at desc, h.id desc
         )
-        from public.quote_events e
-        join public.quote_snapshots s
-          on s.id = e.snapshot_id
-         and s.quote_id = e.quote_id
-        join public.profiles pr
-          on pr.id = e.actor_id
-        where e.quote_id = p_quote_id
+        from (
+          select
+            e.id,
+            e.event_type,
+            e.occurred_at,
+            e.actor_id,
+            e.payload,
+            pr.email as actor_email,
+            s.version_number,
+            s.negotiation_private_snapshot,
+            s.total_selling_price
+          from public.quote_events e
+          join public.quote_snapshots s
+            on s.id = e.snapshot_id
+           and s.quote_id = e.quote_id
+          join public.profiles pr
+            on pr.id = e.actor_id
+          where e.quote_id = p_quote_id
+          order by e.occurred_at desc, e.id desc
+          limit 200
+        ) h
       ),
       '[]'::jsonb
     )

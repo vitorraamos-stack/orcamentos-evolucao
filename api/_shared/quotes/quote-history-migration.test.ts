@@ -32,6 +32,10 @@ describe("Quote history migration draft 18K", () => {
     expect(sql).not.toContain("'negotiation_private_snapshot',");
   });
 
+  it("caps the public timeline to the latest 200 events", () => {
+    expect(sql).toMatch(/order by e\.occurred_at desc, e\.id desc\s+limit 200/i);
+  });
+
   it("locks EXECUTE to service_role and performs no data mutation", () => {
     expect(sql).toMatch(
       /revoke all on function public\.quote_history_secure\([\s\S]*?\) from public,anon,authenticated,service_role;/i

@@ -8,7 +8,7 @@ Transformar a trilha append-only já existente em `quote_events` em uma timeline
 
 ## Eventos públicos
 
-A timeline pode mostrar:
+A timeline retorna no máximo os **200 eventos mais recentes** e pode mostrar:
 - orçamento criado;
 - nova versão salva;
 - mudança de status;
