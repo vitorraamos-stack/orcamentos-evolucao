@@ -17,6 +17,19 @@ describe("EvoluSystem — OS detail premium visual contract", () => {
     }
   });
 
+  it("places the summary tabs before operational progress and management cards", () => {
+    const header = detail.indexOf("<OrderHeader order={detail.order}");
+    const tabs = detail.indexOf('<Tabs className="evolu-detail__tabs"');
+    const summary = detail.indexOf("<OrderSummaryTab order={detail.order}");
+    const flow = detail.indexOf("<OrderFlowProgress order={detail.order}");
+    const management = detail.indexOf('<section aria-label="Responsáveis e prazos"');
+    expect(header).toBeGreaterThan(0);
+    expect(tabs).toBeGreaterThan(header);
+    expect(summary).toBeGreaterThan(tabs);
+    expect(flow).toBeGreaterThan(summary);
+    expect(management).toBeGreaterThan(flow);
+  });
+
   it("keeps domain mutations, permissions and destructive confirmations unchanged", () => {
     for (const key of [
       "getOrderDetail(orderId)",
