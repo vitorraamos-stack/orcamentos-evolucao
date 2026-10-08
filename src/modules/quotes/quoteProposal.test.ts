@@ -36,6 +36,10 @@ const quote = {
     installation: { requested: true },
     munck: { requested: false },
   },
+  negotiation: {
+    pricingMode: "MANAGER_ADJUSTED",
+    totalSellingPrice: { currency: "BRL", amount: "1125.00" },
+  },
   publicResult: {
     calculationVersion: "1.0",
     productId: "44444444-4444-4444-8444-444444444444",
@@ -119,7 +123,7 @@ describe("Quote proposal 18F", () => {
 
     expect(data.quoteNumber).toBe(42);
     expect(data.quantity).toBe("2");
-    expect(data.total).toBe("1180.00");
+    expect(data.total).toBe("1125.00");
     expect(data.installation.areaM2).toBe("1,5");
     expect(data.specs).toEqual([
       { label: "Largura", value: "1,5 m" },

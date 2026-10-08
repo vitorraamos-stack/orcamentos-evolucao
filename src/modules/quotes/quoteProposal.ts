@@ -124,7 +124,7 @@ export function buildQuoteProposalData(
       price: quote.publicResult.munck.price.amount,
     },
     subtotal: quote.publicResult.subtotalBeforeFinancialRate.amount,
-    total: quote.publicResult.totalSellingPrice.amount,
+    total: quote.negotiation.totalSellingPrice.amount,
   };
 }
 

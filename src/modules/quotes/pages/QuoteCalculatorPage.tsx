@@ -1,11 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -14,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  AlertTriangle,
   Calculator,
   CheckCircle2,
   ClipboardCopy,
@@ -24,6 +36,7 @@ import {
   Truck,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import { createOrderFromQuotePath } from "@/features/hubos/createOrderNavigation";
 import {
   quoteRepository,
@@ -33,16 +46,19 @@ import {
   hydrateQuoteFields,
   initialQuoteFields,
   isDimensionField,
+  normalizeUserDecimal,
   positiveUserDecimal,
   quoteEditableStateFingerprint,
   quoteFingerprint,
   type QuoteFieldUnits,
   type QuoteFieldValues,
 } from "../quoteForm";
+import { decimalFrom } from "@shared/calculation-engine/decimal";
 import type { UnitId } from "@shared/calculation-engine/units";
 import {
   quoteCommercialDetailsSchema,
   quoteIdSchema,
+  quoteNegotiationRequestSchema,
 } from "@shared/quotes";
 import type {
   OfficialQuotePublicResult,
@@ -50,6 +66,7 @@ import type {
   QuoteFormDefinition,
   QuoteCommercialDetails,
   QuoteFormProduct,
+  QuoteNegotiationRequest,
   QuoteSavePublicResult,
   QuoteStatus,
 } from "@shared/quotes";
@@ -75,6 +92,9 @@ const friendlyError = (error: unknown) => {
     QUOTE_ADDITIONALS_NOT_CONFIGURED: "Instalação e munck ainda não estão configurados.",
     QUOTE_REVISION_CONFLICT: "Este orçamento mudou em outra sessão. Atualize antes de salvar novamente.",
     QUOTE_STATE_CONFLICT: "O orçamento não pode ser alterado no status atual.",
+    QUOTE_NEGOTIATION_FORBIDDEN: "Apenas gerentes podem ajustar o preço final.",
+    INVALID_QUOTE_NEGOTIATION: "Revise o preço final e a justificativa do ajuste.",
+    BELOW_MINIMUM_OVERRIDE_NOT_APPLICABLE: "A confirmação de exceção não é necessária para este valor.",
     TECHNICAL_INPUT_OUT_OF_RANGE: "Um dos valores informados está fora da faixa permitida.",
   };
   return api.code && messages[api.code]
@@ -94,6 +114,8 @@ const statusVariant = (status: QuoteStatus) => {
 export default function QuoteCalculatorPage() {
   const search = useSearch();
   const [, setLocation] = useLocation();
+  const { hubPermissions } = useAuth();
+  const isManager = hubPermissions.isManager;
   const [definition, setDefinition] = useState<QuoteFormDefinition | null>(null);
   const [productVersionId, setProductVersionId] = useState("");
   const [fieldValues, setFieldValues] = useState<QuoteFieldValues>({});
@@ -113,6 +135,11 @@ export default function QuoteCalculatorPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
+  const [managerAdjustment, setManagerAdjustment] = useState(false);
+  const [managerFinalPrice, setManagerFinalPrice] = useState("");
+  const [managerReason, setManagerReason] = useState("");
+  const [belowMinimumConfirmOpen, setBelowMinimumConfirmOpen] =
+    useState(false);
 
   const product = useMemo(
     () =>
@@ -122,9 +149,12 @@ export default function QuoteCalculatorPage() {
     [definition, productVersionId]
   );
 
+  const managerAdjustedLock =
+    saved?.negotiation.pricingMode === "MANAGER_ADJUSTED" && !isManager;
   const editable =
     (!saved || saved.status === "DRAFT") &&
-    (product?.calculationAvailable ?? true);
+    (product?.calculationAvailable ?? true) &&
+    !managerAdjustedLock;
 
   const resetForProduct = (next: QuoteFormProduct | null) => {
     const initial = initialQuoteFields(next?.inputs ?? []);
@@ -137,6 +167,10 @@ export default function QuoteCalculatorPage() {
     setInstallationRequested(false);
     setMunckRequested(false);
     setMunckHours("4");
+    setManagerAdjustment(false);
+    setManagerFinalPrice("");
+    setManagerReason("");
+    setBelowMinimumConfirmOpen(false);
   };
 
   const selectProduct = (nextVersionId: string, source = definition) => {
@@ -169,6 +203,10 @@ export default function QuoteCalculatorPage() {
     setCustomerName("");
     setCustomerPhone("");
     setTitle("");
+    setManagerAdjustment(false);
+    setManagerFinalPrice("");
+    setManagerReason("");
+    setBelowMinimumConfirmOpen(false);
 
     void (async () => {
       try {
@@ -212,6 +250,13 @@ export default function QuoteCalculatorPage() {
           setCustomerPhone(existing.commercial.customerPhone ?? "");
           setTitle(existing.commercial.title);
           setResult(existing.publicResult);
+          const adjusted =
+            existing.negotiation.pricingMode === "MANAGER_ADJUSTED";
+          setManagerAdjustment(adjusted);
+          setManagerFinalPrice(
+            adjusted ? existing.negotiation.totalSellingPrice.amount : ""
+          );
+          setManagerReason("");
 
           const requestFingerprint = quoteFingerprint(existing.request);
           setCalculatedFingerprint(requestFingerprint);
@@ -238,6 +283,7 @@ export default function QuoteCalculatorPage() {
             savedAt: existing.savedAt,
             commercial: existing.commercial,
             publicResult: existing.publicResult,
+            negotiation: existing.negotiation,
           });
           return;
         }
@@ -326,6 +372,34 @@ export default function QuoteCalculatorPage() {
     definition,
   ]);
 
+  const normalizedManagerFinalPrice = useMemo(() => {
+    if (!managerFinalPrice.trim()) return null;
+    try {
+      return decimalFrom(normalizeUserDecimal(managerFinalPrice)).toFixed(2);
+    } catch {
+      return null;
+    }
+  }, [managerFinalPrice]);
+
+  const buildNegotiation = (
+    allowBelowMinimum = false
+  ): QuoteNegotiationRequest => {
+    if (!isManager || !managerAdjustment)
+      return { mode: "OFFICIAL" };
+
+    if (normalizedManagerFinalPrice === null)
+      throw new Error("Informe um preço final válido.");
+    if (managerReason.trim().length < 5)
+      throw new Error("Informe uma justificativa com pelo menos 5 caracteres.");
+
+    return quoteNegotiationRequestSchema.parse({
+      mode: "MANAGER_FINAL_PRICE",
+      finalAmount: normalizedManagerFinalPrice,
+      reason: managerReason.trim(),
+      allowBelowMinimum,
+    });
+  };
+
   const currentCommercial = {
     customerName: customerName.trim(),
     customerPhone: customerPhone.trim() || null,
@@ -342,10 +416,20 @@ export default function QuoteCalculatorPage() {
     munckHours,
     commercial: currentCommercial,
   });
+  const negotiationStateIsCurrent =
+    saved === null
+      ? !managerAdjustment
+      : saved.negotiation.pricingMode === "MANAGER_ADJUSTED"
+        ? managerAdjustment &&
+          normalizedManagerFinalPrice ===
+            saved.negotiation.totalSellingPrice.amount &&
+          managerReason.trim() === ""
+        : !managerAdjustment;
   const persistedStateIsCurrent =
     saved !== null &&
     savedFingerprint !== null &&
-    currentEditableFingerprint === savedFingerprint;
+    currentEditableFingerprint === savedFingerprint &&
+    negotiationStateIsCurrent;
   const freshResult =
     result !== null &&
     ((saved !== null && persistedStateIsCurrent) ||
@@ -353,6 +437,19 @@ export default function QuoteCalculatorPage() {
         currentFingerprint === calculatedFingerprint));
   const displayedResult =
     saved !== null && persistedStateIsCurrent ? saved.publicResult : result;
+  const displayedTotal =
+    saved !== null && persistedStateIsCurrent
+      ? saved.negotiation.totalSellingPrice.amount
+      : displayedResult?.totalSellingPrice.amount ?? null;
+  const hasPendingManagerAdjustment =
+    isManager &&
+    managerAdjustment &&
+    (saved === null || !negotiationStateIsCurrent);
+  const managerNegotiationReady =
+    !isManager ||
+    !managerAdjustment ||
+    (normalizedManagerFinalPrice !== null &&
+      managerReason.trim().length >= 5);
 
   const calculate = async () => {
     setWorking(true);
@@ -369,7 +466,7 @@ export default function QuoteCalculatorPage() {
     }
   };
 
-  const save = async () => {
+  const save = async (allowBelowMinimum = false) => {
     setWorking(true);
     try {
       const request = buildRequest();
@@ -380,6 +477,7 @@ export default function QuoteCalculatorPage() {
         quoteId: saved?.quoteId ?? null,
         expectedRevision: saved?.revision ?? null,
         commercial,
+        negotiation: buildNegotiation(allowBelowMinimum),
         ...request,
       });
       const fingerprint = quoteFingerprint(request);
@@ -399,6 +497,14 @@ export default function QuoteCalculatorPage() {
       );
       setResult(persisted.publicResult);
       setCalculatedFingerprint(fingerprint);
+      const adjusted =
+        persisted.negotiation.pricingMode === "MANAGER_ADJUSTED";
+      setManagerAdjustment(adjusted);
+      setManagerFinalPrice(
+        adjusted ? persisted.negotiation.totalSellingPrice.amount : ""
+      );
+      setManagerReason("");
+      setBelowMinimumConfirmOpen(false);
       const url = new URL(window.location.href);
       url.searchParams.set("quote", persisted.quoteId);
       window.history.replaceState(window.history.state, "", url);
@@ -408,7 +514,17 @@ export default function QuoteCalculatorPage() {
           : `Orçamento #${persisted.quoteNumber} criado.`
       );
     } catch (error) {
-      toast.error(friendlyError(error));
+      const api = error as Error & { code?: string };
+      if (
+        api.code === "BELOW_MINIMUM_OVERRIDE_REQUIRED" &&
+        isManager &&
+        managerAdjustment &&
+        !allowBelowMinimum
+      ) {
+        setBelowMinimumConfirmOpen(true);
+      } else {
+        toast.error(friendlyError(error));
+      }
     } finally {
       setWorking(false);
     }
@@ -482,7 +598,7 @@ export default function QuoteCalculatorPage() {
       );
     lines.push(
       `Pagamento: ${displayedResult.installments}x`,
-      `TOTAL: ${formatBrl(displayedResult.totalSellingPrice.amount)}`
+      `TOTAL: ${formatBrl(displayedTotal ?? displayedResult.totalSellingPrice.amount)}`
     );
     await navigator.clipboard.writeText(lines.join("\n"));
     toast.success("Resumo copiado.");
@@ -557,6 +673,13 @@ export default function QuoteCalculatorPage() {
             <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
               Esta versão do produto não está mais disponível para novo cálculo.
               O orçamento permanece acessível em modo leitura com o snapshot oficial salvo.
+            </div>
+          )}
+
+          {managerAdjustedLock && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+              Este orçamento possui um preço final autorizado por gerente.
+              Para preservar essa aprovação, alterações no orçamento precisam ser feitas por um gerente.
             </div>
           )}
 
@@ -859,6 +982,85 @@ export default function QuoteCalculatorPage() {
             </CardContent>
           </Card>
 
+          {isManager && displayedResult && freshResult && editable && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Negociação gerencial</CardTitle>
+                <CardDescription>
+                  Ajuste o preço final sem alterar o cálculo oficial. O limite interno não é exibido na interface.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <label className="flex items-center gap-3 rounded-lg border p-4">
+                  <Checkbox
+                    checked={managerAdjustment}
+                    disabled={working}
+                    onCheckedChange={checked => {
+                      const enabled = checked === true;
+                      setManagerAdjustment(enabled);
+                      setManagerFinalPrice(
+                        enabled
+                          ? displayedTotal ??
+                              displayedResult.totalSellingPrice.amount
+                          : ""
+                      );
+                      setManagerReason("");
+                      setBelowMinimumConfirmOpen(false);
+                    }}
+                  />
+                  <span>
+                    <span className="block text-sm font-medium">
+                      Definir preço final manualmente
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      O valor oficial continua preservado para auditoria.
+                    </span>
+                  </span>
+                </label>
+
+                {managerAdjustment && (
+                  <div className="space-y-4 rounded-lg border p-4">
+                    <div className="space-y-2">
+                      <Label>Preço final autorizado</Label>
+                      <Input
+                        value={managerFinalPrice}
+                        inputMode="decimal"
+                        disabled={working}
+                        placeholder="Ex.: 1500,00"
+                        onChange={event =>
+                          setManagerFinalPrice(event.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Justificativa do ajuste</Label>
+                      <Textarea
+                        value={managerReason}
+                        disabled={working}
+                        maxLength={500}
+                        placeholder="Ex.: condição comercial aprovada para fechamento"
+                        onChange={event => setManagerReason(event.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        A justificativa fica registrada internamente e não aparece na proposta do cliente.
+                      </p>
+                    </div>
+                    {normalizedManagerFinalPrice && (
+                      <div className="rounded-lg bg-muted p-3 text-sm">
+                        <span className="text-muted-foreground">
+                          Preço final solicitado:
+                        </span>{" "}
+                        <strong>
+                          {formatBrl(normalizedManagerFinalPrice)}
+                        </strong>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           <div className="flex flex-wrap gap-2">
             <Button
               size="lg"
@@ -873,7 +1075,12 @@ export default function QuoteCalculatorPage() {
               size="lg"
               variant="outline"
               className="gap-2"
-              disabled={!editable || working || !freshResult}
+              disabled={
+                !editable ||
+                working ||
+                !freshResult ||
+                !managerNegotiationReady
+              }
               onClick={() => void save()}
             >
               <Save className="h-4 w-4" />
@@ -953,17 +1160,35 @@ export default function QuoteCalculatorPage() {
 
                   <div className="rounded-xl bg-primary/10 p-5 text-center">
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Total a cobrar
+                      {saved?.negotiation.pricingMode === "MANAGER_ADJUSTED" &&
+                      persistedStateIsCurrent
+                        ? "Total autorizado"
+                        : "Total a cobrar"}
                     </p>
                     <p className="mt-1 text-4xl font-bold tracking-tight text-primary">
-                      {formatBrl(displayedResult.totalSellingPrice.amount)}
+                      {formatBrl(
+                        displayedTotal ?? displayedResult.totalSellingPrice.amount
+                      )}
                     </p>
+                    {saved?.negotiation.pricingMode === "MANAGER_ADJUSTED" &&
+                      persistedStateIsCurrent && (
+                        <Badge variant="secondary" className="mt-3">
+                          Ajuste gerencial
+                        </Badge>
+                      )}
                   </div>
+
+                  {hasPendingManagerAdjustment && normalizedManagerFinalPrice && (
+                    <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                      O ajuste de {formatBrl(normalizedManagerFinalPrice)} ainda não foi autorizado no snapshot.
+                      Salve a nova versão antes de enviar ou gerar a proposta.
+                    </div>
+                  )}
 
                   <Button
                     variant="outline"
                     className="w-full gap-2"
-                    disabled={!freshResult}
+                    disabled={!freshResult || hasPendingManagerAdjustment}
                     onClick={() => void copySummary()}
                   >
                     <ClipboardCopy className="h-4 w-4" />
@@ -1087,6 +1312,38 @@ export default function QuoteCalculatorPage() {
           </Card>
         </div>
       </div>
+      <AlertDialog
+        open={belowMinimumConfirmOpen}
+        onOpenChange={setBelowMinimumConfirmOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              Confirmar exceção comercial
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Este preço ficou abaixo do limite comercial protegido. O valor do limite não é exibido.
+              Confirme somente se deseja autorizar esta exceção de forma consciente e auditável.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={working}>
+              Voltar e revisar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={working}
+              onClick={event => {
+                event.preventDefault();
+                setBelowMinimumConfirmOpen(false);
+                void save(true);
+              }}
+            >
+              Autorizar exceção
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

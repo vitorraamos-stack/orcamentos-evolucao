@@ -18,6 +18,7 @@ export class QuoteNegotiationServiceError extends Error {
       | "INVALID_QUOTE_NEGOTIATION"
       | "QUOTE_NEGOTIATION_FORBIDDEN"
       | "BELOW_MINIMUM_OVERRIDE_REQUIRED"
+      | "BELOW_MINIMUM_OVERRIDE_NOT_APPLICABLE"
       | "INVALID_QUOTE_NEGOTIATION_CONTEXT",
     message: string
   ) {
@@ -32,6 +33,13 @@ const mapDomainError = (error: QuoteNegotiationDomainError): never => {
       422,
       "BELOW_MINIMUM_OVERRIDE_REQUIRED",
       "Selling below the configured minimum requires explicit manager override."
+    );
+
+  if (error.code === "BELOW_MINIMUM_OVERRIDE_NOT_APPLICABLE")
+    throw new QuoteNegotiationServiceError(
+      400,
+      "BELOW_MINIMUM_OVERRIDE_NOT_APPLICABLE",
+      "Below-minimum override is not applicable to this price."
     );
 
   throw new QuoteNegotiationServiceError(

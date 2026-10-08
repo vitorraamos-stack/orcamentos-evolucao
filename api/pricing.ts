@@ -42,6 +42,9 @@ import {
   QuotePersistenceServiceError,
 } from "./_shared/quotes/persistenceService.js";
 import {
+  QuoteNegotiationServiceError,
+} from "./_shared/quotes/negotiationService.js";
+import {
   PricingPersistenceCompatibilityError,
 } from "./_shared/pricing/mappers.js";
 import {
@@ -559,6 +562,9 @@ export default async function handler(req: any, res: any) {
         return fail(res, error.status, error.code, error.message);
 
       if (error instanceof QuotePersistenceServiceError)
+        return fail(res, error.status, error.code, error.message);
+
+      if (error instanceof QuoteNegotiationServiceError)
         return fail(res, error.status, error.code, error.message);
 
       if (error instanceof PricingPersistenceServiceError) {

@@ -11,6 +11,10 @@ import {
 } from "../calculation-engine/contracts/index.js";
 import { productIdSchema } from "../product-engineering/product.js";
 import { productVersionIdSchema } from "../product-engineering/productVersion.js";
+import {
+  quoteNegotiationPublicResultSchema,
+  quoteNegotiationRequestSchema,
+} from "./negotiation.js";
 
 export const QUOTE_STATUSES = [
   "DRAFT",
@@ -49,6 +53,7 @@ const quoteSaveFields = {
   quoteId: quoteIdSchema.nullable(),
   expectedRevision: quoteRevisionSchema.nullable(),
   commercial: quoteCommercialDetailsSchema,
+  negotiation: quoteNegotiationRequestSchema.optional(),
   productVersionId: productVersionIdSchema,
   request: calculationRequestSchema,
   installments: z.number().int().min(1).max(12),
@@ -136,6 +141,7 @@ export type QuotePersistedSummary = z.infer<
 export const quoteSavePublicResultSchema = quotePersistedSummarySchema
   .extend({
     publicResult: officialQuotePublicResultSchema,
+    negotiation: quoteNegotiationPublicResultSchema,
   })
   .strict();
 
@@ -147,6 +153,7 @@ export const quoteCurrentPublicResultSchema = quotePersistedSummarySchema
   .extend({
     request: officialQuoteRequestSchema,
     publicResult: officialQuotePublicResultSchema,
+    negotiation: quoteNegotiationPublicResultSchema,
   })
   .strict();
 
