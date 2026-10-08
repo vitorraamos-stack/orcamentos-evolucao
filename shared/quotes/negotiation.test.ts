@@ -86,7 +86,8 @@ describe("Quote negotiation domain 18G", () => {
   });
 
   it("rejects an unnecessary below-minimum override", () => {
-    expect(() =>
+    let captured: unknown;
+    try {
       evaluateQuoteNegotiation({
         officialTotal: "1200.00",
         minimumAllowedTotal: "950.00",
@@ -96,11 +97,14 @@ describe("Quote negotiation domain 18G", () => {
           reason: "Ajuste comercial autorizado",
           allowBelowMinimum: true,
         },
-      })
-    ).toThrowError(
-      expect.objectContaining({
-        code: "BELOW_MINIMUM_OVERRIDE_NOT_APPLICABLE",
-      })
+      });
+    } catch (error) {
+      captured = error;
+    }
+
+    expect(captured).toBeInstanceOf(QuoteNegotiationDomainError);
+    expect((captured as QuoteNegotiationDomainError).code).toBe(
+      "BELOW_MINIMUM_OVERRIDE_NOT_APPLICABLE"
     );
   });
 

@@ -72,7 +72,8 @@ describe("QuoteNegotiationService 18G", () => {
   });
 
   it("rejects manual final price from consultants", () => {
-    expect(() =>
+    let captured: unknown;
+    try {
       new QuoteNegotiationService().evaluate(
         calculation,
         {
@@ -82,13 +83,16 @@ describe("QuoteNegotiationService 18G", () => {
           allowBelowMinimum: false,
         },
         false
-      )
-    ).toThrowError(
-      expect.objectContaining({
-        code: "QUOTE_NEGOTIATION_FORBIDDEN",
-        status: 403,
-      })
+      );
+    } catch (error) {
+      captured = error;
+    }
+
+    expect(captured).toBeInstanceOf(QuoteNegotiationServiceError);
+    expect((captured as QuoteNegotiationServiceError).code).toBe(
+      "QUOTE_NEGOTIATION_FORBIDDEN"
     );
+    expect((captured as QuoteNegotiationServiceError).status).toBe(403);
   });
 
   it("allows managers to negotiate above the protected floor", () => {
@@ -112,7 +116,8 @@ describe("QuoteNegotiationService 18G", () => {
   });
 
   it("requires the explicit below-minimum override even for managers", () => {
-    expect(() =>
+    let captured: unknown;
+    try {
       new QuoteNegotiationService().evaluate(
         calculation,
         {
@@ -122,13 +127,16 @@ describe("QuoteNegotiationService 18G", () => {
           allowBelowMinimum: false,
         },
         true
-      )
-    ).toThrowError(
-      expect.objectContaining({
-        code: "BELOW_MINIMUM_OVERRIDE_REQUIRED",
-        status: 422,
-      })
+      );
+    } catch (error) {
+      captured = error;
+    }
+
+    expect(captured).toBeInstanceOf(QuoteNegotiationServiceError);
+    expect((captured as QuoteNegotiationServiceError).code).toBe(
+      "BELOW_MINIMUM_OVERRIDE_REQUIRED"
     );
+    expect((captured as QuoteNegotiationServiceError).status).toBe(422);
   });
 
   it("keeps minimum and reason private after an authorized exception", () => {
