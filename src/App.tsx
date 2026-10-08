@@ -11,8 +11,6 @@ import Materiais from "@/pages/Materiais";
 import Configuracoes from "@/pages/Configuracoes";
 import PricingAdminPage from "@/modules/pricing-admin/pages/PricingAdminPage";
 import QuoteCalculatorPage from "@/modules/quotes/pages/QuoteCalculatorPage";
-import QuotesCentralPage from "@/modules/quotes/pages/QuotesCentralPage";
-import QuoteProposalPage from "@/modules/quotes/pages/QuoteProposalPage";
 import ArtworkBoardPage from "@/modules/artwork/pages/ArtworkBoardPage";
 import ProductionBoardPage from "@/modules/production/pages/ProductionBoardPage";
 import OsDetailPage from "@/modules/hub-os/pages/OsDetailPage";
@@ -52,28 +50,13 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/redefinir-senha" component={ResetPassword} />
 
+      {/* Legacy Quote-management URLs now return to the stateless estimator. */}
       <Route path="/orcamentos/:quoteId/proposta">
-        <Layout>
-          <RequireModule moduleKey="calculadora">
-            {hubPermissions.canCreateOs ? (
-              <QuoteProposalPage />
-            ) : (
-              <Redirect to="/" />
-            )}
-          </RequireModule>
-        </Layout>
+        <Redirect to="/orcamentista" />
       </Route>
 
       <Route path="/orcamentos">
-        <Layout>
-          <RequireModule moduleKey="calculadora">
-            {hubPermissions.canCreateOs ? (
-              <QuotesCentralPage />
-            ) : (
-              <Redirect to="/" />
-            )}
-          </RequireModule>
-        </Layout>
+        <Redirect to="/orcamentista" />
       </Route>
 
       <Route path="/orcamentista">
