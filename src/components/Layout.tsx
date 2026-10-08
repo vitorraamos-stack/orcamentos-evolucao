@@ -49,21 +49,6 @@ export default function Layout({ children }: LayoutProps) {
   const isInstallationsCentralPage = location === "/instalacoes";
   const isDeliveriesCentralPage = location === "/entregas";
   const operationalNav = getOperationalNavState(location);
-  const activePageLabel = operationalNav.art ? "Arte"
-    : operationalNav.production ? "Produção"
-    : location === "/hub-os" ? "Dashboard"
-    : location.startsWith("/os") ? "Ordens de serviço"
-    : location.startsWith("/instalacoes") ? "Instalações"
-    : location.startsWith("/entregas") ? "Entregas"
-    : location.startsWith("/orcamentos") ? "Orçamentos"
-    : location.startsWith("/orcamentista") ? "Novo orçamento"
-    : location.startsWith("/galeria") ? "Galeria"
-    : location.startsWith("/materiais") ? "Materiais"
-    : location.startsWith("/configuracoes") ? "Configurações"
-    : location.includes("financeiro") ? "Financeiro"
-    : location === "/" ? "Calculadora"
-    : "Controle operacional";
-
   useEffect(() => {
     if (!loading && !user) {
       setLocation("/login");
@@ -347,8 +332,8 @@ export default function Layout({ children }: LayoutProps) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="evolu-shell__topbar z-30 flex h-[70px] shrink-0 items-center justify-between gap-4 border-b border-[#E5EAF2] bg-white px-4 sm:px-6 lg:px-8 dark:border-border dark:bg-card">
-          <div className="flex min-w-0 items-center gap-3">
+        <header className="evolu-shell__topbar z-30 flex h-14 shrink-0 items-center gap-3 border-b border-[#E5EAF2] bg-white px-4 md:hidden dark:border-border dark:bg-card">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0 rounded-xl border border-[#DDE6F0] md:hidden" aria-label="Abrir menu de navegação">
@@ -381,19 +366,19 @@ export default function Layout({ children }: LayoutProps) {
               </SheetContent>
             </Sheet>
             <div className="min-w-0">
-              <p className="hidden text-[11px] font-bold uppercase tracking-[.2em] text-[#8795A8] sm:block">EvoluSystem / Área de trabalho</p>
-              <p className="truncate text-base font-semibold tracking-[-.02em] text-[#172D49] sm:text-lg dark:text-foreground">{activePageLabel}</p>
+              <p className="truncate text-base font-extrabold tracking-[-.035em] text-[#172D49] dark:text-foreground">
+                Evolu<span className="text-[#068BCF]">System</span>
+              </p>
+              <p className="truncate text-[10px] font-semibold uppercase tracking-[.14em] text-[#71839A]">
+                Controle Operacional
+              </p>
             </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-3">
-            <span className="hidden max-w-56 truncate text-right text-xs text-[#6A7E94] lg:block">{user.email}</span>
-            <div className="evolu-shell__topbar-avatar" title={getRoleLabel(role)} aria-label={"Usuário: " + (user.email || "autenticado")}>{initial}</div>
           </div>
         </header>
 
         <main
           className={cn(
-            "evolu-shell__main min-h-0 flex-1 p-4 md:p-6 xl:p-8",
+            "evolu-shell__main min-h-0 flex-1 p-4 md:p-5 xl:p-6",
             isCreateOrderPage ? "overflow-visible" : "overflow-auto"
           )}
         >

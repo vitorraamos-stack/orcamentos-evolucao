@@ -25,7 +25,8 @@ describe("OrdersCentralPage dedicated creation entry", () => {
   });
   it("shows a permission-protected button that preserves the central as origin", () => {
     expect(source).toContain("hubPermissions.canCreateOs &&");
-    expect(source).toContain("+ Nova OS");
+    expect(source).toContain("Nova OS");
+    expect(source).not.toContain(" /> + Nova OS");
     expect(source).toContain('setLocation(createOrderPath("/os"))');
   });
 

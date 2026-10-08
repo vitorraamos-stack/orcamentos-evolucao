@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { Filter, RotateCcw, X } from "lucide-react";
+import { Filter, Plus, RotateCcw, X } from "lucide-react";
+import "./orders-central.css";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -306,15 +307,18 @@ export default function OrdersCentralPage() {
   }>;
 
   return (
-    <main className="space-y-4 pb-10">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <main className="evolu-orders space-y-4 pb-10">
+      <div className="evolu-orders__heading flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="evolu-orders__eyebrow">Gestão operacional <span aria-hidden="true" /></p>
         <PageHeader
           title="Ordens de Serviço"
           description={`${total} ordens encontradas · Acompanhamento operacional centralizado`}
         />
+        </div>
         {hubPermissions.canCreateOs && (
-          <Button onClick={() => setLocation(createOrderPath("/os"))}>
-            + Nova OS
+          <Button className="evolu-orders__new-button" onClick={() => setLocation(createOrderPath("/os"))}>
+            <Plus className="h-4 w-4" aria-hidden="true" /> Nova OS
           </Button>
         )}
       </div>
@@ -323,16 +327,40 @@ export default function OrdersCentralPage() {
       ) : (
         <>
           <OrdersSummaryCards summary={summary} />
-          <Card className="gap-4 py-4 shadow-xs">
+          <section aria-label="Filtros rápidos" className="evolu-orders__quick-filters">
+            <div className="evolu-orders__quick-label">
+              <span>Visualização rápida</span>
+              <span className="evolu-orders__quick-hint">Filtre as ordens com um toque</span>
+            </div>
+            <div className="evolu-orders__quick-scroll">
+              {quickFilters.map(([value, label]) => (
+                <Button
+                  key={value}
+                  type="button"
+                  size="sm"
+                  className="evolu-orders__quick-button"
+                  variant={quick === value ? "default" : "outline"}
+                  aria-pressed={quick === value}
+                  onClick={() => {
+                    setQuick(value);
+                    setPage(1);
+                  }}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
+          </section>
+          <Card className="evolu-orders__filter-card gap-4 py-4 shadow-xs">
             <CardContent className="space-y-3 px-4">
-              <div className="flex gap-2">
+              <div className="evolu-orders__toolbar flex gap-2">
                 <OrderSearch value={search} onChange={setSearch} />
                 <Popover
                   open={filtersOpen}
                   onOpenChange={handleFiltersOpenChange}
                 >
                   <PopoverTrigger asChild>
-                    <Button variant="outline">
+                    <Button variant="outline" className="evolu-orders__advanced-button">
                       <Filter className="h-4 w-4" />
                       Filtros
                       {advancedCount > 0 && (
@@ -408,7 +436,7 @@ export default function OrdersCentralPage() {
             </CardContent>
           </Card>
           {error ? (
-            <Card>
+            <Card className="evolu-orders__filter-card">
               <CardContent>
                 <ErrorState
                   message="Não foi possível carregar as Ordens de Serviço."
@@ -417,12 +445,21 @@ export default function OrdersCentralPage() {
               </CardContent>
             </Card>
           ) : (
-            <OrderTable
-              orders={orders}
-              onClearFilters={hasFilters ? clearFilters : undefined}
-            />
+            <div className="evolu-orders__table">
+              <div className="evolu-orders__table-heading">
+                <div>
+                  <h2>Relação de ordens</h2>
+                  <p>{total} registros encontrados nesta consulta</p>
+                </div>
+                <span className="evolu-orders__live-hint">{loading ? "Atualizando…" : "Lista atualizada"}</span>
+              </div>
+              <OrderTable
+                orders={orders}
+                onClearFilters={hasFilters ? clearFilters : undefined}
+              />
+            </div>
           )}
-          <footer className="flex items-center justify-between text-sm text-muted-foreground">
+          <footer className="evolu-orders__footer flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
             <span>
               Mostrando {orders.length} de {total} ordens
             </span>
