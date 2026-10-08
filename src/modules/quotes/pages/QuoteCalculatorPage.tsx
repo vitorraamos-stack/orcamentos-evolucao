@@ -31,6 +31,7 @@ import {
   ClipboardCopy,
   FilePlus2,
   FileText,
+  History,
   Save,
   Send,
   Truck,
@@ -66,6 +67,7 @@ import type {
   QuoteFormDefinition,
   QuoteCommercialDetails,
   QuoteFormProduct,
+  QuoteHistoryItem,
   QuoteNegotiationRequest,
   QuoteSavePublicResult,
   QuoteStatus,
@@ -104,6 +106,19 @@ const friendlyError = (error: unknown) => {
       : "Não foi possível concluir a operação.";
 };
 
+const formatHistoryDate = (value: string) =>
+  new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
+
+const historyTitle = (item: QuoteHistoryItem) => {
+  if (item.eventType === "QUOTE_CREATED") return "Orçamento criado";
+  if (item.eventType === "SNAPSHOT_APPENDED")
+    return `Versão ${item.snapshotVersion} salva`;
+  return `${STATUS_LABEL[item.fromStatus!]} → ${STATUS_LABEL[item.toStatus!]}`;
+};
+
 const statusVariant = (status: QuoteStatus) => {
   if (status === "ACCEPTED") return "default" as const;
   if (status === "REJECTED" || status === "CANCELLED")
@@ -140,6 +155,9 @@ export default function QuoteCalculatorPage() {
   const [managerReason, setManagerReason] = useState("");
   const [belowMinimumConfirmOpen, setBelowMinimumConfirmOpen] =
     useState(false);
+  const [historyItems, setHistoryItems] = useState<QuoteHistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   const product = useMemo(
     () =>
@@ -312,6 +330,37 @@ export default function QuoteCalculatorPage() {
       cancelled = true;
     };
   }, [search]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!saved) {
+      setHistoryItems([]);
+      setHistoryLoading(false);
+      setHistoryError(null);
+      return;
+    }
+
+    setHistoryLoading(true);
+    setHistoryError(null);
+    void quoteRepository
+      .history(saved.quoteId)
+      .then(result => {
+        if (!cancelled) setHistoryItems(result.items);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHistoryItems([]);
+          setHistoryError("Não foi possível carregar o histórico.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setHistoryLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [saved?.quoteId, saved?.revision]);
 
   const buildCommercial = (): QuoteCommercialDetails => {
     const normalized = {
@@ -1306,6 +1355,68 @@ export default function QuoteCalculatorPage() {
                       </Button>
                     </div>
                   )}
+
+                  <div className="space-y-3 border-t pt-4">
+                    <div className="flex items-center gap-2">
+                      <History className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-semibold">Histórico</p>
+                        <p className="text-xs text-muted-foreground">
+                          Alterações e mudanças de status deste orçamento.
+                        </p>
+                      </div>
+                    </div>
+
+                    {historyLoading && (
+                      <p className="text-xs text-muted-foreground">
+                        Carregando histórico...
+                      </p>
+                    )}
+                    {historyError && (
+                      <p className="text-xs text-destructive">{historyError}</p>
+                    )}
+                    {!historyLoading &&
+                      !historyError &&
+                      historyItems.length === 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Nenhum evento registrado.
+                        </p>
+                      )}
+
+                    {!historyLoading &&
+                      !historyError &&
+                      historyItems.map(item => (
+                        <div
+                          key={item.eventId}
+                          className="rounded-lg border p-3 text-sm"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-medium">{historyTitle(item)}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {formatHistoryDate(item.occurredAt)}
+                                {item.actorEmail
+                                  ? ` · ${item.actorEmail}`
+                                  : ""}
+                              </p>
+                            </div>
+                            {item.pricingMode === "MANAGER_ADJUSTED" && (
+                              <Badge variant="outline" className="text-[10px]">
+                                Ajuste gerencial
+                              </Badge>
+                            )}
+                          </div>
+                          {item.eventType !== "STATUS_CHANGED" && (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Total autorizado:{" "}
+                              <span className="font-medium text-foreground">
+                                {formatBrl(item.totalSellingPrice.amount)}
+                              </span>
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                  </div>
                 </div>
               )}
             </CardContent>

@@ -530,6 +530,93 @@ describe("OfficialQuotePersistenceService", () => {
     );
   });
 
+  it("loads sanitized Quote history without private event payloads", async () => {
+    const db = {
+      rpc: vi.fn(async () => ({
+        data: {
+          items: [
+            {
+              event_id: id(30),
+              event_type: "SNAPSHOT_APPENDED",
+              occurred_at: now,
+              actor_id: id(9),
+              actor_email: "gestor@evolucao.test",
+              snapshot_version: 2,
+              pricing_mode: "MANAGER_ADJUSTED",
+              total_selling_price: "860.00",
+              from_status: null,
+              to_status: null,
+            },
+            {
+              event_id: id(31),
+              event_type: "STATUS_CHANGED",
+              occurred_at: now,
+              actor_id: id(9),
+              actor_email: "gestor@evolucao.test",
+              snapshot_version: 2,
+              pricing_mode: "MANAGER_ADJUSTED",
+              total_selling_price: "860.00",
+              from_status: "DRAFT",
+              to_status: "SENT",
+            },
+          ],
+        },
+        error: null,
+      })),
+    };
+    const service = new OfficialQuotePersistenceService(db, {
+      calculate: async () => calculation(),
+    });
+
+    const history = await service.history(
+      { action: "GET_QUOTE_HISTORY", quoteId: id(10) },
+      id(9),
+      true
+    );
+
+    expect(db.rpc).toHaveBeenCalledWith("quote_history_secure", {
+      p_quote_id: id(10),
+      p_actor_id: id(9),
+      p_is_manager: true,
+    });
+    expect(history.items).toHaveLength(2);
+    expect(history.items[0]).toMatchObject({
+      eventType: "SNAPSHOT_APPENDED",
+      snapshotVersion: 2,
+      pricingMode: "MANAGER_ADJUSTED",
+      totalSellingPrice: { currency: "BRL", amount: "860.00" },
+    });
+    expect(history.items[1]).toMatchObject({
+      eventType: "STATUS_CHANGED",
+      fromStatus: "DRAFT",
+      toStatus: "SENT",
+    });
+    expect(JSON.stringify(history)).not.toContain("minimumAllowedTotal");
+    expect(JSON.stringify(history)).not.toContain("negotiation_private_snapshot");
+    expect(JSON.stringify(history)).not.toContain("payload");
+  });
+
+  it("maps Quote history ownership denial to a safe 403", async () => {
+    const db = {
+      rpc: vi.fn(async () => ({
+        data: null,
+        error: { message: "QUOTE_FORBIDDEN" },
+      })),
+    };
+    await expect(
+      new OfficialQuotePersistenceService(db, {
+        calculate: async () => calculation(),
+      }).history(
+        { action: "GET_QUOTE_HISTORY", quoteId: id(10) },
+        id(9),
+        false
+      )
+    ).rejects.toMatchObject({
+      status: 403,
+      code: "QUOTE_FORBIDDEN",
+    });
+  });
+
   it("transitions status using the authenticated actor and expected revision", async () => {
     const db = {
       rpc: vi

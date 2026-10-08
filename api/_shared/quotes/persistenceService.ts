@@ -1,6 +1,8 @@
 import {
   quoteCurrentPublicResultSchema,
   quoteGetApiRequestSchema,
+  quoteHistoryApiRequestSchema,
+  quoteHistoryResultSchema,
   quoteListApiRequestSchema,
   quoteListResultSchema,
   quoteNegotiationEvaluationSchema,
@@ -13,6 +15,7 @@ import {
   quoteTransitionResultSchema,
   toPublicQuoteNegotiation,
   type QuoteCurrentPublicResult,
+  type QuoteHistoryResult,
   type QuoteListResult,
   type QuoteNegotiationEvaluation,
   type QuoteSavePublicResult,
@@ -57,6 +60,7 @@ export function mapQuotePersistenceError(error: any): never {
     ]
   > = [
     [/QUOTE_NOT_FOUND/, 404, "QUOTE_NOT_FOUND", "Quote not found."],
+    [/QUOTE_FORBIDDEN/, 403, "QUOTE_FORBIDDEN", "Quote access is not authorized."],
     [
       /QUOTE_REVISION_CONFLICT/,
       409,
@@ -406,6 +410,51 @@ export class OfficialQuotePersistenceService {
         500,
         "QUOTE_PERSISTENCE_COMPATIBILITY_ERROR",
         "Persisted Quote list is incompatible with this server."
+      );
+    return result.data;
+  }
+
+  async history(
+    input: unknown,
+    actorId: string,
+    isManager = false
+  ): Promise<QuoteHistoryResult> {
+    const parsed = quoteHistoryApiRequestSchema.safeParse(input);
+    if (!parsed.success)
+      throw new QuotePersistenceServiceError(
+        400,
+        "INVALID_QUOTE_CONFIGURATION",
+        "Quote history request is invalid."
+      );
+
+    const data = await this.rpc("quote_history_secure", {
+      p_quote_id: parsed.data.quoteId,
+      p_actor_id: actorId,
+      p_is_manager: isManager,
+    });
+
+    const result = quoteHistoryResultSchema.safeParse({
+      items: (data?.items ?? []).map((item: any) => ({
+        eventId: item?.event_id,
+        eventType: item?.event_type,
+        occurredAt: item?.occurred_at,
+        actorId: item?.actor_id,
+        actorEmail: item?.actor_email ?? null,
+        snapshotVersion: item?.snapshot_version,
+        pricingMode: pricingModeFromListDto(item?.pricing_mode),
+        totalSellingPrice: {
+          currency: "BRL",
+          amount: item?.total_selling_price,
+        },
+        fromStatus: item?.from_status ?? null,
+        toStatus: item?.to_status ?? null,
+      })),
+    });
+    if (!result.success)
+      throw new QuotePersistenceServiceError(
+        500,
+        "QUOTE_PERSISTENCE_COMPATIBILITY_ERROR",
+        "Persisted Quote history is incompatible with this server."
       );
     return result.data;
   }

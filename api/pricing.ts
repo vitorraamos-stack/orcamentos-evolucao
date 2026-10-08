@@ -12,6 +12,7 @@ import {
   officialQuoteApiRequestSchema,
   quoteFormApiRequestSchema,
   quoteGetApiRequestSchema,
+  quoteHistoryApiRequestSchema,
   quoteListApiRequestSchema,
   quoteSaveApiRequestSchema,
   quoteTransitionApiRequestSchema,
@@ -188,6 +189,7 @@ export default async function handler(req: any, res: any) {
   const isQuotePersistenceAction =
     action === "SAVE_QUOTE" ||
     action === "GET_QUOTE" ||
+    action === "GET_QUOTE_HISTORY" ||
     action === "LIST_QUOTES" ||
     action === "TRANSITION_QUOTE";
   const requiresCalculatorModule =
@@ -401,6 +403,28 @@ export default async function handler(req: any, res: any) {
           quoteNumber: data.quoteNumber,
           revision: data.revision,
           snapshotVersion: data.snapshotVersion,
+        });
+        return send(res, 200, { ok: true, data });
+      }
+
+      if (action === "GET_QUOTE_HISTORY") {
+        const parsed = quoteHistoryApiRequestSchema.safeParse(body);
+        if (!parsed.success)
+          return fail(
+            res,
+            400,
+            "INVALID_PAYLOAD",
+            "Invalid Quote history request.",
+            parsed.error.issues
+          );
+        const data = await quotePersistence.history(
+          parsed.data,
+          auth.user.id,
+          isManager
+        );
+        log("quote_persistence", "quote_history_loaded", {
+          quoteId: parsed.data.quoteId,
+          events: data.items.length,
         });
         return send(res, 200, { ok: true, data });
       }

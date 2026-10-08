@@ -28,12 +28,17 @@ export {
   quoteGetApiRequestSchema,
   quoteListApiRequestSchema,
   quoteTransitionApiRequestSchema,
+  quoteHistoryApiRequestSchema,
+  QUOTE_EVENT_TYPES,
+  quoteEventTypeSchema,
   quotePersistedSummarySchema,
   quoteSavePublicResultSchema,
   quoteCurrentPublicResultSchema,
   quoteListItemSchema,
   quoteListResultSchema,
   quoteTransitionResultSchema,
+  quoteHistoryItemSchema,
+  quoteHistoryResultSchema,
 } from "./persistence.js";
 export type {
   QuoteStatus,
@@ -47,6 +52,9 @@ export type {
   QuoteListItem,
   QuoteListResult,
   QuoteTransitionResult,
+  QuoteEventType,
+  QuoteHistoryItem,
+  QuoteHistoryResult,
 } from "./persistence.js";
 
 export {

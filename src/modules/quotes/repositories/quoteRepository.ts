@@ -4,6 +4,8 @@ import {
   officialQuotePublicResultSchema,
   quoteCurrentPublicResultSchema,
   quoteGetApiRequestSchema,
+  quoteHistoryApiRequestSchema,
+  quoteHistoryResultSchema,
   quoteListApiRequestSchema,
   quoteListResultSchema,
   quoteSaveApiRequestSchema,
@@ -16,6 +18,7 @@ import {
   type OfficialQuoteRequest,
   type QuoteCurrentPublicResult,
   type QuoteId,
+  type QuoteHistoryResult,
   type QuoteListResult,
   type QuoteSavePublicResult,
   type QuoteSaveRequest,
@@ -110,6 +113,14 @@ export const quoteRepository = {
       quoteId,
     });
     return quoteCurrentPublicResultSchema.parse(await post(body));
+  },
+
+  history: async (quoteId: QuoteId): Promise<QuoteHistoryResult> => {
+    const body = quoteHistoryApiRequestSchema.parse({
+      action: "GET_QUOTE_HISTORY",
+      quoteId,
+    });
+    return quoteHistoryResultSchema.parse(await post(body));
   },
 
   transition: async (

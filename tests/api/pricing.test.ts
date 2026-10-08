@@ -6,6 +6,7 @@ const state = vi.hoisted(() => ({
   officialQuoteCalculate: vi.fn(),
   officialQuoteSave: vi.fn(),
   officialQuoteLoad: vi.fn(),
+  officialQuoteHistory: vi.fn(),
   officialQuoteList: vi.fn(),
   officialQuoteTransition: vi.fn(),
   officialQuoteFormLoad: vi.fn(),
@@ -78,6 +79,9 @@ vi.mock("../../api/_shared/quotes/persistenceService.js", () => ({
     }
     async list(input: unknown, actorId: string, isManager: boolean) {
       return state.officialQuoteList(input, actorId, isManager);
+    }
+    async history(input: unknown, actorId: string, isManager: boolean) {
+      return state.officialQuoteHistory(input, actorId, isManager);
     }
     async transition(input: unknown, actorId: string, isManager: boolean) {
       return state.officialQuoteTransition(input, actorId, isManager);
@@ -463,6 +467,7 @@ describe("Pricing API manager authority", () => {
     "CALCULATE_QUOTE",
     "SAVE_QUOTE",
     "GET_QUOTE",
+    "GET_QUOTE_HISTORY",
     "LIST_QUOTES",
     "TRANSITION_QUOTE",
   ])(
@@ -498,6 +503,7 @@ describe("Pricing API manager authority", () => {
       expect(state.officialQuoteFormLoad).not.toHaveBeenCalled();
       expect(state.officialQuoteSave).not.toHaveBeenCalled();
       expect(state.officialQuoteLoad).not.toHaveBeenCalled();
+      expect(state.officialQuoteHistory).not.toHaveBeenCalled();
       expect(state.officialQuoteList).not.toHaveBeenCalled();
       expect(state.officialQuoteTransition).not.toHaveBeenCalled();
     }
@@ -916,6 +922,47 @@ describe("Pricing API manager authority", () => {
       id(9),
       false
     );
+  });
+
+  it("loads sanitized Quote history through the authenticated server contract", async () => {
+    const history = {
+      items: [
+        {
+          eventId: id(30),
+          eventType: "STATUS_CHANGED",
+          occurredAt: now,
+          actorId: id(9),
+          actorEmail: "consultor@evolucao.test",
+          snapshotVersion: 2,
+          pricingMode: "MANAGER_ADJUSTED",
+          totalSellingPrice: { currency: "BRL", amount: "860.00" },
+          fromStatus: "DRAFT",
+          toStatus: "SENT",
+        },
+      ],
+    };
+    state.officialQuoteHistory.mockResolvedValueOnce(history);
+    state.client = client({ id: id(9) }, "consultor_vendas");
+    const res = response();
+
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer valid" },
+        body: { action: "GET_QUOTE_HISTORY", quoteId: id(10) },
+      },
+      res
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(res.payload).toEqual({ ok: true, data: history });
+    expect(state.officialQuoteHistory).toHaveBeenCalledWith(
+      { action: "GET_QUOTE_HISTORY", quoteId: id(10) },
+      id(9),
+      false
+    );
+    expect(JSON.stringify(res.payload)).not.toContain("minimumAllowedTotal");
+    expect(JSON.stringify(res.payload)).not.toContain("payload");
   });
 
   it("lists Quotes through the sanitized server-side contract", async () => {

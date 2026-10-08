@@ -122,6 +122,22 @@ export const quoteTransitionApiRequestSchema = z
   })
   .strict();
 
+export const quoteHistoryApiRequestSchema = z
+  .object({
+    action: z.literal("GET_QUOTE_HISTORY"),
+    quoteId: quoteIdSchema,
+  })
+  .strict();
+
+export const QUOTE_EVENT_TYPES = [
+  "QUOTE_CREATED",
+  "SNAPSHOT_APPENDED",
+  "STATUS_CHANGED",
+] as const;
+
+export const quoteEventTypeSchema = z.enum(QUOTE_EVENT_TYPES);
+export type QuoteEventType = z.infer<typeof quoteEventTypeSchema>;
+
 export const quotePersistedSummarySchema = z
   .object({
     quoteId: quoteIdSchema,
@@ -209,3 +225,43 @@ export const quoteTransitionResultSchema = z
 export type QuoteTransitionResult = z.infer<
   typeof quoteTransitionResultSchema
 >;
+
+export const quoteHistoryItemSchema = z
+  .object({
+    eventId: z.string().uuid(),
+    eventType: quoteEventTypeSchema,
+    occurredAt: timestampSchema,
+    actorId: z.string().uuid(),
+    actorEmail: z.string().email().nullable(),
+    snapshotVersion: quoteSnapshotVersionSchema,
+    pricingMode: quotePricingModeSchema,
+    totalSellingPrice: moneySchema,
+    fromStatus: quoteStatusSchema.nullable(),
+    toStatus: quoteStatusSchema.nullable(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    const statusEvent = value.eventType === "STATUS_CHANGED";
+    if (statusEvent && (!value.fromStatus || !value.toStatus))
+      ctx.addIssue({
+        code: "custom",
+        path: ["fromStatus"],
+        message: "Status history events require from/to status",
+      });
+    if (!statusEvent && (value.fromStatus !== null || value.toStatus !== null))
+      ctx.addIssue({
+        code: "custom",
+        path: ["fromStatus"],
+        message: "Non-status history events cannot declare status transition",
+      });
+  });
+
+export type QuoteHistoryItem = z.infer<typeof quoteHistoryItemSchema>;
+
+export const quoteHistoryResultSchema = z
+  .object({
+    items: z.array(quoteHistoryItemSchema).max(200),
+  })
+  .strict();
+
+export type QuoteHistoryResult = z.infer<typeof quoteHistoryResultSchema>;
