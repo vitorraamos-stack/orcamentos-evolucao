@@ -1,6 +1,6 @@
 # 18G — Negociação gerencial de Quote
 
-Status: **domínio e desenho de persistência prontos para implementação controlada**.
+Status: **domínio integrado ao main; migration de persistência preparada para validação isolada antes de qualquer aplicação remota**.
 
 Esta etapa fecha a regra comercial que permaneceu explicitamente adiada desde 16C:
 - consultor não altera o preço calculado;
@@ -85,18 +85,17 @@ Não criar tabela paralela de negociação.
 A próxima migration deve ser aditiva em `quote_snapshots` e manter snapshots append-only.
 
 Campos propostos:
-- `official_total_selling_price numeric`;
-- `minimum_allowed_total numeric`;
-- `negotiation_private_snapshot jsonb not null`.
+- `official_total_selling_price numeric null`;
+- `minimum_allowed_total numeric null`;
+- `negotiation_private_snapshot jsonb null`.
 
 `total_selling_price` continua sendo o total final voltado ao cliente/listagem.
 
-Para snapshots legados:
-- `official_total_selling_price = total_selling_price`;
-- `minimum_allowed_total = total_selling_price` como backfill conservador;
-- modo `OFFICIAL`.
+Os três novos campos são **all-null ou all-non-null**. O estado nulo é reservado somente para snapshots legados/v2.
 
-Novos snapshots devem persistir os três valores calculados exclusivamente no servidor.
+Não fazer backfill por `UPDATE`: `quote_snapshots` é append-only e a migration não deve abrir uma exceção à imutabilidade apenas para preencher histórico. O service boundary futuro interpretará snapshots legados nulos como modo `OFFICIAL`, usando o `total_selling_price` legado como total oficial/final.
+
+Novos snapshots gravados pelas RPCs v3 devem persistir os três valores completos, calculados e validados exclusivamente no servidor.
 
 `public_result_snapshot` continua preservando o cálculo oficial original. O service boundary de Quotes passa a projetar o total final a partir de `total_selling_price`, acompanhado do DTO público de negociação.
 
@@ -141,8 +140,8 @@ Se um Quote já foi `SENT` e houver renegociação:
 Esta etapa **não aplica migration remotamente**.
 
 Antes da aplicação:
-1. criar a migration com Supabase CLI em ambiente com CLI disponível;
-2. validar DDL em transação;
+1. validar a migration em PostgreSQL/Supabase isolado;
+2. executar os testes pgTAP de estrutura/ACL;
 3. testar create/append OFFICIAL;
 4. testar ajuste gerencial acima do piso;
 5. testar rejeição de consultor;
