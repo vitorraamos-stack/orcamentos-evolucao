@@ -1,6 +1,6 @@
 # 18L — Desfecho comercial do Quote
 
-Status: **implementação preparada em commit isolado; Supabase ainda não alterado**.
+Status: **Supabase production aplicado e reconciliado; aguardando CI/Preview e merge**.
 
 ## Objetivo
 
@@ -34,22 +34,22 @@ Transições para DRAFT, SENT e ACCEPTED não aceitam motivo comercial.
 
 ## Persistência
 
-Nenhuma tabela nova.
+Nenhuma tabela nova e nenhum backfill.
 
-A nova RPC `quote_transition_status_v2_secure`:
+A RPC `quote_transition_status_v2_secure`:
 - mantém optimistic concurrency por `expectedRevision`;
 - preserva o trigger existente de lifecycle;
-- revalida owner-or-manager dentro do banco;
+- revalida owner-or-manager dentro do banco usando o ator e o contexto de gerente fornecidos pelo backend autenticado;
 - grava `reason_code` e `reason_note` somente no payload append-only de `STATUS_CHANGED`;
 - é SECURITY INVOKER;
 - usa `search_path=pg_catalog, public`;
-- será executável apenas por `service_role`.
+- é executável apenas por `service_role`.
 
-O runtime novo usa somente v2. A v1 permanece durante a transição de compatibilidade.
+O runtime 18L usa somente v2. A v1 permanece disponível durante o rollout de compatibilidade.
 
 ## Histórico
 
-`quote_history_secure` continua sem retornar payload bruto e passa a projetar somente:
+`quote_history_secure` continua sem retornar payload bruto e projeta somente:
 - `outcome_reason_code`;
 - `outcome_reason_note`.
 
@@ -61,18 +61,30 @@ Ao clicar em **Recusado** ou **Cancelar**, o usuário registra o motivo em um di
 
 A timeline mostra o motivo em linguagem comercial.
 
-## Banco
+## SQL production
 
-Nenhuma alteração aplicada ainda.
+Migration aplicada:
+- `20261008165833_quote_commercial_outcome_18l`.
 
-SQL candidato:
-`docs/tasks/18l-quote-commercial-outcome-migration.sql`.
+Arquivo canônico:
+- `supabase/migrations/20261008165833_quote_commercial_outcome_18l.sql`.
 
-Após autorização explícita do Supabase:
-1. pré-check production;
-2. aplicar transition v2 + projeção do histórico;
-3. validar ACL, SECURITY INVOKER e owner/manager;
-4. smoke transacional;
-5. Security Advisor;
-6. reconciliar timestamp remoto;
-7. abrir uma única branch/PR e gerar Preview.
+## Pós-check production
+
+- Quotes: 0;
+- Quote snapshots: 0;
+- Quote events: 0;
+- `quote_transition_status_v2_secure`: SECURITY INVOKER;
+- `quote_history_secure`: STABLE + SECURITY INVOKER;
+- `search_path=pg_catalog, public` nas duas funções;
+- `service_role EXECUTE=true`;
+- `anon/authenticated/PUBLIC EXECUTE=false`;
+- RLS de `quote_events` continua habilitado;
+- RPC v1 permanece disponível durante o rollout;
+- smoke transacional validou owner, bloqueio de não-dono, motivo obrigatório, rejeição PRICE, cancelamento DUPLICATE por gerente e projeção sanitizada no histórico;
+- smoke terminou em ROLLBACK, mantendo 0 Quotes/snapshots/events;
+- Security Advisor sem finding nova atribuída à 18L.
+
+## Próximo gate
+
+Criar branch a partir deste head reconciliado, abrir PR draft e validar CI/Preview antes de solicitar merge.

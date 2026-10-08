@@ -2,11 +2,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const sql = readFileSync(
-  "docs/tasks/18l-quote-commercial-outcome-migration.sql",
+  "supabase/migrations/20261008165833_quote_commercial_outcome_18l.sql",
   "utf8"
 ).replaceAll("\r\n", "\n");
 
-describe("Quote commercial outcome migration draft 18L", () => {
+describe("Quote commercial outcome migration 18L", () => {
   it("creates transition v2 with owner-or-manager authorization", () => {
     expect(sql).toContain("quote_transition_status_v2_secure");
     expect(sql).toContain("v_before.created_by is distinct from p_actor_id");

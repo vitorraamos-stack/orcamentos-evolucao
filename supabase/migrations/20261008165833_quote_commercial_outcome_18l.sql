@@ -1,7 +1,3 @@
--- Canonical production migration:
--- supabase/migrations/20261008165833_quote_commercial_outcome_18l.sql
--- Kept here as the reviewed 18L SQL source.
-
 create function public.quote_transition_status_v2_secure(
   p_quote_id uuid,
   p_expected_revision integer,
