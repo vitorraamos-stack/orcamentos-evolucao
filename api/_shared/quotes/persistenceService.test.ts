@@ -654,14 +654,113 @@ describe("OfficialQuotePersistenceService", () => {
     );
     expect(db.rpc).toHaveBeenNthCalledWith(
       2,
-      "quote_transition_status_secure",
-      expect.objectContaining({
-        p_actor_id: id(9),
+      "quote_transition_status_v2_secure",
+      {
+        p_quote_id: id(10),
         p_expected_revision: 2,
         p_target_status: "SENT",
-      })
+        p_actor_id: id(9),
+        p_is_manager: false,
+        p_reason_code: null,
+        p_reason_note: null,
+      }
     );
     expect(result.status).toBe("SENT");
+  });
+
+  it("passes a structured rejected outcome only to transition v2", async () => {
+    const db = {
+      rpc: vi
+        .fn()
+        .mockResolvedValueOnce({
+          data: {
+            quote: { id: id(10), created_by: id(9) },
+            snapshot: {},
+          },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: {
+            quote_id: id(10),
+            quote_number: 1001,
+            status: "REJECTED",
+            revision: 3,
+            snapshot_id: id(12),
+            updated_at: now,
+          },
+          error: null,
+        }),
+    };
+
+    await new OfficialQuotePersistenceService(db, {
+      calculate: async () => calculation(),
+    }).transition(
+      {
+        action: "TRANSITION_QUOTE",
+        quoteId: id(10),
+        expectedRevision: 2,
+        targetStatus: "REJECTED",
+        outcomeReason: {
+          code: "PRICE",
+          note: "Cliente recebeu proposta mais barata.",
+        },
+      },
+      id(9),
+      false
+    );
+
+    expect(db.rpc).toHaveBeenNthCalledWith(
+      2,
+      "quote_transition_status_v2_secure",
+      expect.objectContaining({
+        p_is_manager: false,
+        p_reason_code: "PRICE",
+        p_reason_note: "Cliente recebeu proposta mais barata.",
+      })
+    );
+  });
+
+  it("loads sanitized outcome reasons without exposing raw event payloads", async () => {
+    const db = {
+      rpc: vi.fn(async () => ({
+        data: {
+          items: [
+            {
+              event_id: id(31),
+              event_type: "STATUS_CHANGED",
+              occurred_at: now,
+              actor_id: id(9),
+              actor_email: "consultor@evolucao.test",
+              snapshot_version: 2,
+              pricing_mode: "OFFICIAL",
+              total_selling_price: "870.00",
+              from_status: "SENT",
+              to_status: "REJECTED",
+              outcome_reason_code: "PRICE",
+              outcome_reason_note: "Cliente recebeu proposta mais barata.",
+            },
+          ],
+        },
+        error: null,
+      })),
+    };
+
+    const history = await new OfficialQuotePersistenceService(db, {
+      calculate: async () => calculation(),
+    }).history(
+      { action: "GET_QUOTE_HISTORY", quoteId: id(10) },
+      id(9),
+      false
+    );
+
+    expect(history.items[0]).toMatchObject({
+      toStatus: "REJECTED",
+      outcomeReason: {
+        code: "PRICE",
+        note: "Cliente recebeu proposta mais barata.",
+      },
+    });
+    expect(JSON.stringify(history)).not.toContain("payload");
   });
 
   it("blocks consultants from reading another consultant's Quote", async () => {

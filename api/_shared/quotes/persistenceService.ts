@@ -448,6 +448,14 @@ export class OfficialQuotePersistenceService {
         },
         fromStatus: item?.from_status ?? null,
         toStatus: item?.to_status ?? null,
+        outcomeReason:
+          item?.outcome_reason_code === null ||
+          item?.outcome_reason_code === undefined
+            ? null
+            : {
+                code: item.outcome_reason_code,
+                note: item?.outcome_reason_note ?? null,
+              },
       })),
     });
     if (!result.success)
@@ -474,11 +482,14 @@ export class OfficialQuotePersistenceService {
 
     await this.loadAuthorizedRaw(parsed.data.quoteId, actorId, isManager);
 
-    const data = await this.rpc("quote_transition_status_secure", {
+    const data = await this.rpc("quote_transition_status_v2_secure", {
       p_quote_id: parsed.data.quoteId,
       p_expected_revision: parsed.data.expectedRevision,
       p_target_status: parsed.data.targetStatus,
       p_actor_id: actorId,
+      p_is_manager: isManager,
+      p_reason_code: parsed.data.outcomeReason?.code ?? null,
+      p_reason_note: parsed.data.outcomeReason?.note ?? null,
     });
 
     const result = quoteTransitionResultSchema.safeParse({

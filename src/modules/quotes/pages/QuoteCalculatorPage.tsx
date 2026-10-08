@@ -13,6 +13,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,6 +76,8 @@ import type {
   QuoteCommercialDetails,
   QuoteFormProduct,
   QuoteHistoryItem,
+  QuoteOutcomeReason,
+  QuoteOutcomeReasonCode,
   QuoteNegotiationRequest,
   QuoteSavePublicResult,
   QuoteStatus,
@@ -78,6 +88,34 @@ const formatBrl = (amount: string) =>
     style: "currency",
     currency: "BRL",
   }).format(Number(amount));
+
+const OUTCOME_REASON_LABEL: Record<QuoteOutcomeReasonCode, string> = {
+  PRICE: "Preço",
+  DEADLINE: "Prazo",
+  COMPETITOR: "Fechou com concorrente",
+  NO_RESPONSE: "Sem retorno do cliente",
+  CLIENT_CANCELLED: "Cliente desistiu",
+  DUPLICATE: "Orçamento duplicado",
+  CREATED_BY_MISTAKE: "Criado por engano",
+  SCOPE_CHANGED: "Escopo alterado",
+  OTHER: "Outro motivo",
+};
+
+const REJECTED_REASON_OPTIONS: QuoteOutcomeReasonCode[] = [
+  "PRICE",
+  "DEADLINE",
+  "COMPETITOR",
+  "NO_RESPONSE",
+  "CLIENT_CANCELLED",
+  "OTHER",
+];
+
+const CANCELLED_REASON_OPTIONS: QuoteOutcomeReasonCode[] = [
+  "DUPLICATE",
+  "CREATED_BY_MISTAKE",
+  "SCOPE_CHANGED",
+  "OTHER",
+];
 
 const STATUS_LABEL: Record<QuoteStatus, string> = {
   DRAFT: "Rascunho",
@@ -158,6 +196,12 @@ export default function QuoteCalculatorPage() {
   const [historyItems, setHistoryItems] = useState<QuoteHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [outcomeTarget, setOutcomeTarget] = useState<
+    "REJECTED" | "CANCELLED" | null
+  >(null);
+  const [outcomeReasonCode, setOutcomeReasonCode] =
+    useState<QuoteOutcomeReasonCode | null>(null);
+  const [outcomeReasonNote, setOutcomeReasonNote] = useState("");
 
   const product = useMemo(
     () =>
@@ -579,14 +623,18 @@ export default function QuoteCalculatorPage() {
     }
   };
 
-  const transition = async (targetStatus: QuoteStatus) => {
+  const transition = async (
+    targetStatus: QuoteStatus,
+    outcomeReason: QuoteOutcomeReason | null = null
+  ) => {
     if (!saved) return;
     setWorking(true);
     try {
       const changed = await quoteRepository.transition(
         saved.quoteId,
         saved.revision,
-        targetStatus
+        targetStatus,
+        outcomeReason
       );
       setSaved(current =>
         current
@@ -597,12 +645,41 @@ export default function QuoteCalculatorPage() {
             }
           : current
       );
+      setOutcomeTarget(null);
+      setOutcomeReasonCode(null);
+      setOutcomeReasonNote("");
       toast.success(`Orçamento marcado como ${STATUS_LABEL[targetStatus].toLowerCase()}.`);
     } catch (error) {
       toast.error(friendlyError(error));
     } finally {
       setWorking(false);
     }
+  };
+
+  const openOutcomeDialog = (
+    targetStatus: "REJECTED" | "CANCELLED"
+  ) => {
+    setOutcomeTarget(targetStatus);
+    setOutcomeReasonCode(null);
+    setOutcomeReasonNote("");
+  };
+
+  const outcomeReasonOptions =
+    outcomeTarget === "REJECTED"
+      ? REJECTED_REASON_OPTIONS
+      : CANCELLED_REASON_OPTIONS;
+
+  const outcomeReasonIsValid =
+    outcomeReasonCode !== null &&
+    (outcomeReasonCode !== "OTHER" ||
+      outcomeReasonNote.trim().length >= 5);
+
+  const confirmOutcome = () => {
+    if (!outcomeTarget || !outcomeReasonCode || !outcomeReasonIsValid) return;
+    void transition(outcomeTarget, {
+      code: outcomeReasonCode,
+      note: outcomeReasonNote.trim() || null,
+    });
   };
 
   const newQuote = () => {
@@ -1293,7 +1370,7 @@ export default function QuoteCalculatorPage() {
                       <Button
                         variant="outline"
                         disabled={working}
-                        onClick={() => void transition("CANCELLED")}
+                        onClick={() => openOutcomeDialog("CANCELLED")}
                       >
                         Cancelar
                       </Button>
@@ -1318,14 +1395,14 @@ export default function QuoteCalculatorPage() {
                       <Button
                         variant="outline"
                         disabled={working}
-                        onClick={() => void transition("REJECTED")}
+                        onClick={() => openOutcomeDialog("REJECTED")}
                       >
                         Recusado
                       </Button>
                       <Button
                         variant="outline"
                         disabled={working}
-                        onClick={() => void transition("CANCELLED")}
+                        onClick={() => openOutcomeDialog("CANCELLED")}
                       >
                         Cancelar
                       </Button>
@@ -1414,6 +1491,17 @@ export default function QuoteCalculatorPage() {
                               </span>
                             </p>
                           )}
+                          {item.outcomeReason && (
+                            <div className="mt-2 rounded-md bg-muted/50 px-2.5 py-2 text-xs">
+                              <span className="font-medium">Motivo: </span>
+                              {OUTCOME_REASON_LABEL[item.outcomeReason.code]}
+                              {item.outcomeReason.note && (
+                                <p className="mt-1 text-muted-foreground">
+                                  {item.outcomeReason.note}
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
                   </div>
@@ -1423,6 +1511,91 @@ export default function QuoteCalculatorPage() {
           </Card>
         </div>
       </div>
+      <Dialog
+        open={outcomeTarget !== null}
+        onOpenChange={open => {
+          if (!open && !working) {
+            setOutcomeTarget(null);
+            setOutcomeReasonCode(null);
+            setOutcomeReasonNote("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {outcomeTarget === "REJECTED"
+                ? "Registrar orçamento recusado"
+                : "Cancelar orçamento"}
+            </DialogTitle>
+            <DialogDescription>
+              Registre o motivo para manter o histórico comercial completo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Motivo</Label>
+              <Select
+                value={outcomeReasonCode ?? ""}
+                disabled={working}
+                onValueChange={value =>
+                  setOutcomeReasonCode(value as QuoteOutcomeReasonCode)
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione o motivo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {outcomeReasonOptions.map(code => (
+                    <SelectItem key={code} value={code}>
+                      {OUTCOME_REASON_LABEL[code]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Observação</Label>
+              <Textarea
+                value={outcomeReasonNote}
+                disabled={working}
+                maxLength={300}
+                placeholder={
+                  outcomeReasonCode === "OTHER"
+                    ? "Descreva o motivo (obrigatório)"
+                    : "Opcional"
+                }
+                onChange={event => setOutcomeReasonNote(event.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                {outcomeReasonNote.length}/300
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={working}
+              onClick={() => {
+                setOutcomeTarget(null);
+                setOutcomeReasonCode(null);
+                setOutcomeReasonNote("");
+              }}
+            >
+              Voltar
+            </Button>
+            <Button
+              type="button"
+              disabled={working || !outcomeReasonIsValid}
+              onClick={confirmOutcome}
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog
         open={belowMinimumConfirmOpen}
         onOpenChange={setBelowMinimumConfirmOpen}
