@@ -1,6 +1,6 @@
 # 18J — Visibilidade da negociação na Central de Orçamentos
 
-Status: **camada de aplicação preparada; mudança SQL pendente de autorização separada**.
+Status: **aplicação + SQL production implementados; aguardando CI/Preview final e merge**.
 
 ## Objetivo
 
@@ -22,7 +22,7 @@ Nunca entram na listagem:
 
 ## Compatibilidade
 
-Enquanto o banco ainda não devolver `pricing_mode`, o servidor interpreta ausência/null como `OFFICIAL`. Isso permite implantar a camada de aplicação sem quebrar o runtime atual.
+Enquanto o banco não devolver `pricing_mode`, o servidor interpreta ausência/null como `OFFICIAL`.
 
 Se o banco devolver um valor inesperado, o servidor falha com `QUOTE_PERSISTENCE_COMPATIBILITY_ERROR` em vez de fazer downgrade silencioso.
 
@@ -30,16 +30,33 @@ Se o banco devolver um valor inesperado, o servidor falha com `QUOTE_PERSISTENCE
 
 A Central continua mostrando o total final e adiciona um badge discreto **Ajuste gerencial** apenas quando `pricingMode = MANAGER_ADJUSTED`.
 
-## SQL pendente
+## SQL production
 
-A evolução de `quote_list_secure` deve derivar somente o modo sanitizado:
-- `MANAGER_FINAL_PRICE` privado -> `MANAGER_ADJUSTED`;
-- qualquer snapshot legado/official -> `OFFICIAL`.
+Migration aplicada:
+- `20261008153453_quote_list_pricing_mode_18j`.
 
-A função deve continuar:
+`quote_list_secure` deriva somente o modo sanitizado:
+- snapshot legado/null -> `OFFICIAL`;
+- `OFFICIAL` -> `OFFICIAL`;
+- `MANAGER_FINAL_PRICE` -> `MANAGER_ADJUSTED`;
+- modo inesperado -> `INVALID`, que o servidor rejeita como incompatibilidade.
+
+A função permanece:
 - SECURITY INVOKER;
+- STABLE;
 - search_path fixo `pg_catalog, public`;
 - EXECUTE apenas para `service_role`;
 - sem acesso de `anon` ou `authenticated`.
 
-Nenhum JSON privado deve ser retornado.
+Nenhum JSON privado é retornado.
+
+## Pós-check production
+
+- Quotes: 0;
+- Quote snapshots: 0;
+- retorno smoke: `{ items: [], total: 0 }`;
+- `security_definer = false`;
+- `search_path = pg_catalog, public`;
+- `service_role EXECUTE = true`;
+- `anon/authenticated EXECUTE = false`;
+- Security Advisor sem finding nova atribuída à 18J.
