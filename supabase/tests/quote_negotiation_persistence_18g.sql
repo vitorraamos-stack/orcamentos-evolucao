@@ -1,6 +1,6 @@
 -- 18G Quote negotiation persistence structural/security tests.
 begin;
-select plan(22);
+select plan(23);
 
 select has_column(
   'public','quote_snapshots','official_total_selling_price',

@@ -30,6 +30,12 @@ describe("Quote negotiation migration 18G", () => {
     expect(service).toContain('"quote_create_with_snapshot_v2_secure"');
     expect(service).toContain('"quote_append_snapshot_v2_secure"');
     expect(service).not.toContain('"quote_create_with_snapshot_v3_secure"');
+    expect(migration).toContain(
+      "payment_rate_source,payment_term_revision,installation_settings_revision"
+    );
+    expect(migration).not.toContain(
+      "payment_rate_source,p_payment_term_revision,installation_settings_revision"
+    );
   });
 
   it("uses SECURITY INVOKER and fixed search_path for every new function", () => {
