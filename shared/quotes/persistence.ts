@@ -67,21 +67,36 @@ export const quoteOutcomeReasonSchema = z
 
 export type QuoteOutcomeReason = z.infer<typeof quoteOutcomeReasonSchema>;
 
-const REJECTED_REASON_CODES = new Set<QuoteOutcomeReasonCode>([
+export const QUOTE_REJECTION_REASON_CODES = [
   "PRICE",
   "DEADLINE",
   "COMPETITOR",
   "NO_RESPONSE",
   "CLIENT_CANCELLED",
   "OTHER",
-]);
+] as const;
 
-const CANCELLED_REASON_CODES = new Set<QuoteOutcomeReasonCode>([
+export const quoteRejectionReasonCodeSchema = z.enum(
+  QUOTE_REJECTION_REASON_CODES
+);
+export type QuoteRejectionReasonCode = z.infer<
+  typeof quoteRejectionReasonCodeSchema
+>;
+
+export const QUOTE_CANCELLATION_REASON_CODES = [
   "DUPLICATE",
   "CREATED_BY_MISTAKE",
   "SCOPE_CHANGED",
   "OTHER",
-]);
+] as const;
+
+const REJECTED_REASON_CODES = new Set<QuoteOutcomeReasonCode>(
+  QUOTE_REJECTION_REASON_CODES
+);
+
+const CANCELLED_REASON_CODES = new Set<QuoteOutcomeReasonCode>(
+  QUOTE_CANCELLATION_REASON_CODES
+);
 
 export const quoteIdSchema = z.string().uuid().brand<"QuoteId">();
 export type QuoteId = z.infer<typeof quoteIdSchema>;
@@ -165,6 +180,12 @@ export const quoteListApiRequestSchema = z
     pageSize: z.number().int().min(10).max(100),
     search: z.string().trim().max(120).nullable(),
     status: quoteStatusSchema.nullable(),
+  })
+  .strict();
+
+export const quoteMetricsApiRequestSchema = z
+  .object({
+    action: z.literal("GET_QUOTE_METRICS"),
   })
   .strict();
 
@@ -311,6 +332,64 @@ export const quoteListResultSchema = z
   .strict();
 
 export type QuoteListResult = z.infer<typeof quoteListResultSchema>;
+
+export const quoteLossReasonMetricSchema = z
+  .object({
+    code: quoteRejectionReasonCodeSchema,
+    count: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export type QuoteLossReasonMetric = z.infer<
+  typeof quoteLossReasonMetricSchema
+>;
+
+export const quoteCommercialMetricsSchema = z
+  .object({
+    totalQuotes: z.number().int().nonnegative(),
+    draftQuotes: z.number().int().nonnegative(),
+    sentQuotes: z.number().int().nonnegative(),
+    openQuotes: z.number().int().nonnegative(),
+    acceptedQuotes: z.number().int().nonnegative(),
+    rejectedQuotes: z.number().int().nonnegative(),
+    cancelledQuotes: z.number().int().nonnegative(),
+    decidedQuotes: z.number().int().nonnegative(),
+    conversionBps: z.number().int().min(0).max(10000),
+    acceptedValue: moneySchema,
+    rejectedWithoutReason: z.number().int().nonnegative(),
+    lossReasons: z.array(quoteLossReasonMetricSchema).max(6),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.openQuotes !== value.draftQuotes + value.sentQuotes)
+      ctx.addIssue({
+        code: "custom",
+        path: ["openQuotes"],
+        message: "Open Quote count must equal DRAFT + SENT",
+      });
+    if (
+      value.decidedQuotes !==
+      value.acceptedQuotes + value.rejectedQuotes
+    )
+      ctx.addIssue({
+        code: "custom",
+        path: ["decidedQuotes"],
+        message: "Decided Quote count must equal ACCEPTED + REJECTED",
+      });
+    if (
+      value.totalQuotes !==
+      value.openQuotes + value.decidedQuotes + value.cancelledQuotes
+    )
+      ctx.addIssue({
+        code: "custom",
+        path: ["totalQuotes"],
+        message: "Quote metric counts are inconsistent",
+      });
+  });
+
+export type QuoteCommercialMetrics = z.infer<
+  typeof quoteCommercialMetricsSchema
+>;
 
 export const quoteTransitionResultSchema = z
   .object({

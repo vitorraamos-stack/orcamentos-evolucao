@@ -530,6 +530,96 @@ describe("OfficialQuotePersistenceService", () => {
     );
   });
 
+  it("loads sanitized commercial metrics scoped by actor context", async () => {
+    const db = {
+      rpc: vi.fn(async () => ({
+        data: {
+          total_quotes: 10,
+          draft_quotes: 2,
+          sent_quotes: 2,
+          open_quotes: 4,
+          accepted_quotes: 3,
+          rejected_quotes: 2,
+          cancelled_quotes: 1,
+          decided_quotes: 5,
+          conversion_bps: 6000,
+          accepted_value: "4350.00",
+          rejected_without_reason: 1,
+          loss_reasons: [
+            { code: "PRICE", count: 1 },
+          ],
+        },
+        error: null,
+      })),
+    };
+
+    const metrics = await new OfficialQuotePersistenceService(db, {
+      calculate: async () => calculation(),
+    }).metrics(
+      { action: "GET_QUOTE_METRICS" },
+      id(9),
+      false
+    );
+
+    expect(db.rpc).toHaveBeenCalledWith(
+      "quote_commercial_metrics_secure",
+      {
+        p_actor_id: id(9),
+        p_is_manager: false,
+      }
+    );
+    expect(metrics).toMatchObject({
+      totalQuotes: 10,
+      openQuotes: 4,
+      acceptedQuotes: 3,
+      rejectedQuotes: 2,
+      cancelledQuotes: 1,
+      decidedQuotes: 5,
+      conversionBps: 6000,
+      acceptedValue: { currency: "BRL", amount: "4350.00" },
+      rejectedWithoutReason: 1,
+      lossReasons: [{ code: "PRICE", count: 1 }],
+    });
+    expect(JSON.stringify(metrics)).not.toContain("customer");
+    expect(JSON.stringify(metrics)).not.toContain("reason_note");
+    expect(JSON.stringify(metrics)).not.toContain("payload");
+  });
+
+  it("rejects inconsistent persisted commercial metrics", async () => {
+    const db = {
+      rpc: vi.fn(async () => ({
+        data: {
+          total_quotes: 10,
+          draft_quotes: 2,
+          sent_quotes: 2,
+          open_quotes: 99,
+          accepted_quotes: 3,
+          rejected_quotes: 2,
+          cancelled_quotes: 1,
+          decided_quotes: 5,
+          conversion_bps: 6000,
+          accepted_value: "4350.00",
+          rejected_without_reason: 0,
+          loss_reasons: [],
+        },
+        error: null,
+      })),
+    };
+
+    await expect(
+      new OfficialQuotePersistenceService(db, {
+        calculate: async () => calculation(),
+      }).metrics(
+        { action: "GET_QUOTE_METRICS" },
+        id(9),
+        true
+      )
+    ).rejects.toMatchObject({
+      code: "QUOTE_PERSISTENCE_COMPATIBILITY_ERROR",
+      status: 500,
+    });
+  });
+
   it("loads sanitized Quote history without private event payloads", async () => {
     const db = {
       rpc: vi.fn(async () => ({

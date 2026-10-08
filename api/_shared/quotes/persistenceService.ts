@@ -5,6 +5,8 @@ import {
   quoteHistoryResultSchema,
   quoteListApiRequestSchema,
   quoteListResultSchema,
+  quoteMetricsApiRequestSchema,
+  quoteCommercialMetricsSchema,
   quoteNegotiationEvaluationSchema,
   quoteNegotiationPublicResultSchema,
   quotePricingModeSchema,
@@ -17,6 +19,7 @@ import {
   type QuoteCurrentPublicResult,
   type QuoteHistoryResult,
   type QuoteListResult,
+  type QuoteCommercialMetrics,
   type QuoteNegotiationEvaluation,
   type QuoteSavePublicResult,
   type QuoteTransitionResult,
@@ -410,6 +413,53 @@ export class OfficialQuotePersistenceService {
         500,
         "QUOTE_PERSISTENCE_COMPATIBILITY_ERROR",
         "Persisted Quote list is incompatible with this server."
+      );
+    return result.data;
+  }
+
+  async metrics(
+    input: unknown,
+    actorId: string,
+    isManager = false
+  ): Promise<QuoteCommercialMetrics> {
+    const parsed = quoteMetricsApiRequestSchema.safeParse(input);
+    if (!parsed.success)
+      throw new QuotePersistenceServiceError(
+        400,
+        "INVALID_QUOTE_CONFIGURATION",
+        "Quote metrics request is invalid."
+      );
+
+    const data = await this.rpc("quote_commercial_metrics_secure", {
+      p_actor_id: actorId,
+      p_is_manager: isManager,
+    });
+
+    const result = quoteCommercialMetricsSchema.safeParse({
+      totalQuotes: data?.total_quotes ?? 0,
+      draftQuotes: data?.draft_quotes ?? 0,
+      sentQuotes: data?.sent_quotes ?? 0,
+      openQuotes: data?.open_quotes ?? 0,
+      acceptedQuotes: data?.accepted_quotes ?? 0,
+      rejectedQuotes: data?.rejected_quotes ?? 0,
+      cancelledQuotes: data?.cancelled_quotes ?? 0,
+      decidedQuotes: data?.decided_quotes ?? 0,
+      conversionBps: data?.conversion_bps ?? 0,
+      acceptedValue: {
+        currency: "BRL",
+        amount: data?.accepted_value ?? "0.00",
+      },
+      rejectedWithoutReason: data?.rejected_without_reason ?? 0,
+      lossReasons: (data?.loss_reasons ?? []).map((item: any) => ({
+        code: item?.code,
+        count: item?.count,
+      })),
+    });
+    if (!result.success)
+      throw new QuotePersistenceServiceError(
+        500,
+        "QUOTE_PERSISTENCE_COMPATIBILITY_ERROR",
+        "Persisted Quote metrics are incompatible with this server."
       );
     return result.data;
   }

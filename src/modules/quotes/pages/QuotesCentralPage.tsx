@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -27,9 +28,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { quoteRepository } from "../repositories/quoteRepository";
-import type { QuoteListItem, QuoteStatus } from "@shared/quotes";
+import type {
+  QuoteCommercialMetrics,
+  QuoteListItem,
+  QuoteRejectionReasonCode,
+  QuoteStatus,
+} from "@shared/quotes";
 
 const PAGE_SIZE = 25;
+
+const LOSS_REASON_LABEL: Record<QuoteRejectionReasonCode, string> = {
+  PRICE: "Preço",
+  DEADLINE: "Prazo",
+  COMPETITOR: "Concorrente",
+  NO_RESPONSE: "Sem retorno",
+  CLIENT_CANCELLED: "Desistência",
+  OTHER: "Outro",
+};
 
 const STATUS_LABEL: Record<QuoteStatus, string> = {
   DRAFT: "Rascunho",
@@ -52,6 +67,13 @@ const formatBrl = (amount: string) =>
     currency: "BRL",
   }).format(Number(amount));
 
+const formatConversion = (basisPoints: number) =>
+  new Intl.NumberFormat("pt-BR", {
+    style: "percent",
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(basisPoints / 10000);
+
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
@@ -61,6 +83,9 @@ const formatDate = (value: string) =>
 export default function QuotesCentralPage() {
   const [, setLocation] = useLocation();
   const [items, setItems] = useState<QuoteListItem[]>([]);
+  const [metrics, setMetrics] = useState<QuoteCommercialMetrics | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(true);
+  const [metricsError, setMetricsError] = useState("");
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
@@ -106,7 +131,26 @@ export default function QuotesCentralPage() {
       });
   };
 
+  const loadMetrics = () => {
+    setMetricsLoading(true);
+    setMetricsError("");
+    quoteRepository
+      .metrics()
+      .then(setMetrics)
+      .catch(reason =>
+        setMetricsError(
+          reason instanceof Error
+            ? reason.message
+            : "Falha ao carregar o resumo comercial."
+        )
+      )
+      .finally(() => setMetricsLoading(false));
+  };
+
   useEffect(load, [page, search, statusFilter]);
+  useEffect(() => {
+    loadMetrics();
+  }, []);
 
   const submitSearch = () => {
     setPage(1);
@@ -136,6 +180,120 @@ export default function QuotesCentralPage() {
           Novo orçamento
         </Button>
       </div>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-base font-semibold">Visão comercial</h2>
+          <p className="text-xs text-muted-foreground">
+            Funil consolidado dos orçamentos que você pode acessar.
+          </p>
+        </div>
+
+        {metricsError ? (
+          <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4">
+            <p className="text-sm font-medium">
+              Não foi possível carregar o resumo comercial.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={loadMetrics}
+            >
+              Tentar novamente
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Em aberto
+                  </p>
+                  <p className="mt-1 text-2xl font-bold">
+                    {metricsLoading ? "—" : (metrics?.openQuotes ?? 0)}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {metricsLoading
+                      ? "Carregando..."
+                      : `${metrics?.draftQuotes ?? 0} rascunhos · ${metrics?.sentQuotes ?? 0} enviados`}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Taxa de fechamento
+                  </p>
+                  <p className="mt-1 text-2xl font-bold">
+                    {metricsLoading
+                      ? "—"
+                      : formatConversion(metrics?.conversionBps ?? 0)}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Aceitos ÷ decisões comerciais
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Aceitos
+                  </p>
+                  <p className="mt-1 text-2xl font-bold">
+                    {metricsLoading ? "—" : (metrics?.acceptedQuotes ?? 0)}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {metricsLoading
+                      ? "Carregando..."
+                      : formatBrl(metrics?.acceptedValue.amount ?? "0.00")}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Recusados
+                  </p>
+                  <p className="mt-1 text-2xl font-bold">
+                    {metricsLoading ? "—" : (metrics?.rejectedQuotes ?? 0)}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {metricsLoading
+                      ? "Carregando..."
+                      : `${metrics?.cancelledQuotes ?? 0} cancelados fora da conversão`}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {!metricsLoading &&
+              metrics &&
+              (metrics.lossReasons.length > 0 ||
+                metrics.rejectedWithoutReason > 0) && (
+                <div className="rounded-xl border bg-card p-4">
+                  <p className="text-sm font-semibold">Motivos de perda</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {metrics.lossReasons.map(reason => (
+                      <Badge key={reason.code} variant="secondary">
+                        {LOSS_REASON_LABEL[reason.code]} · {reason.count}
+                      </Badge>
+                    ))}
+                    {metrics.rejectedWithoutReason > 0 && (
+                      <Badge variant="outline">
+                        Sem motivo (legado) · {metrics.rejectedWithoutReason}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )}
+          </>
+        )}
+      </section>
 
       <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 lg:flex-row lg:items-center">
         <div className="flex flex-1 gap-2">
@@ -176,7 +334,10 @@ export default function QuotesCentralPage() {
           size="icon"
           aria-label="Atualizar orçamentos"
           disabled={loading}
-          onClick={load}
+          onClick={() => {
+            load();
+            loadMetrics();
+          }}
         >
           <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
         </Button>
