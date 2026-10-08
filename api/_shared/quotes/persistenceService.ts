@@ -5,6 +5,7 @@ import {
   quoteListResultSchema,
   quoteNegotiationEvaluationSchema,
   quoteNegotiationPublicResultSchema,
+  quotePricingModeSchema,
   quotePersistedSummarySchema,
   quoteSavePublicResultSchema,
   quoteSaveRequestSchema,
@@ -108,6 +109,18 @@ const mapSummary = (dto: any) =>
     savedAt: dto?.saved_at,
     commercial: commercialFromDto(dto),
   });
+
+const pricingModeFromListDto = (value: unknown) => {
+  if (value === null || value === undefined) return "OFFICIAL" as const;
+  const parsed = quotePricingModeSchema.safeParse(value);
+  if (!parsed.success)
+    throw new QuotePersistenceServiceError(
+      500,
+      "QUOTE_PERSISTENCE_COMPATIBILITY_ERROR",
+      "Persisted Quote list is incompatible with this server."
+    );
+  return parsed.data;
+};
 
 const publicNegotiationFromSnapshot = (snapshot: any) => {
   const privateSnapshot = snapshot?.negotiation_private_snapshot;
@@ -371,6 +384,7 @@ export class OfficialQuotePersistenceService {
         revision: item?.revision,
         commercial: commercialFromDto(item),
         snapshotVersion: item?.snapshot_version,
+        pricingMode: pricingModeFromListDto(item?.pricing_mode),
         totalSellingPrice: {
           currency: "BRL",
           amount: item?.total_selling_price,

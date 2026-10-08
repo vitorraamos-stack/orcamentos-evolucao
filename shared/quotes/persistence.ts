@@ -14,6 +14,7 @@ import { productVersionIdSchema } from "../product-engineering/productVersion.js
 import {
   quoteNegotiationPublicResultSchema,
   quoteNegotiationRequestSchema,
+  quotePricingModeSchema,
 } from "./negotiation.js";
 
 export const QUOTE_STATUSES = [
@@ -169,6 +170,7 @@ export const quoteListItemSchema = z
     revision: quoteRevisionSchema,
     commercial: quoteCommercialDetailsSchema,
     snapshotVersion: quoteSnapshotVersionSchema,
+    pricingMode: quotePricingModeSchema,
     totalSellingPrice: moneySchema,
     installments: z.number().int().min(1).max(12),
     productId: productIdSchema,

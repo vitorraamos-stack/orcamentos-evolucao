@@ -253,8 +253,17 @@ export default function QuotesCentralPage() {
                         {STATUS_LABEL[item.status]}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {formatBrl(item.totalSellingPrice.amount)}
+                    <TableCell className="text-right">
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="font-semibold">
+                          {formatBrl(item.totalSellingPrice.amount)}
+                        </span>
+                        {item.pricingMode === "MANAGER_ADJUSTED" && (
+                          <Badge variant="outline" className="text-[10px]">
+                            Ajuste gerencial
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm">
                       {item.createdByEmail ?? "—"}
