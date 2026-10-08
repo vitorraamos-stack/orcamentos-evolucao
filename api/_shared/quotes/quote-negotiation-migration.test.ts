@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migrationPath =
-  "supabase/migrations/20261008104500_quote_negotiation_persistence_18g.sql";
+  "supabase/migrations/20261008140144_quote_negotiation_persistence_18g.sql";
 const migration = readFileSync(migrationPath, "utf8").replaceAll("\r\n", "\n");
 const service = readFileSync(
   "api/_shared/quotes/persistenceService.ts",
