@@ -658,7 +658,8 @@ describe("OfficialQuotePersistenceService", () => {
               customer_phone: "48999999999",
               title: "Letreiro recepção",
               snapshot_version: 2,
-              total_selling_price: "870.00",
+              pricing_mode: "MANAGER_ADJUSTED",
+              total_selling_price: "860.00",
               installments: 3,
               product_id: id(1),
               product_name: "Letreiro em PVC",
@@ -701,10 +702,111 @@ describe("OfficialQuotePersistenceService", () => {
       quoteNumber: 1001,
       commercial: request.commercial,
       productName: "Letreiro em PVC",
-      totalSellingPrice: { currency: "BRL", amount: "870.00" },
+      pricingMode: "MANAGER_ADJUSTED",
+      totalSellingPrice: { currency: "BRL", amount: "860.00" },
     });
     expect(listed.items[0]).not.toHaveProperty("costing");
     expect(listed.items[0]).not.toHaveProperty("privateSnapshot");
+    expect(listed.items[0]).not.toHaveProperty("minimumAllowedTotal");
+    expect(listed.items[0]).not.toHaveProperty("negotiationPrivateSnapshot");
+  });
+
+  it("treats legacy list rows without pricing_mode as OFFICIAL", async () => {
+    const db = {
+      rpc: vi.fn(async () => ({
+        data: {
+          total: 1,
+          items: [
+            {
+              quote_id: id(10),
+              quote_number: 1001,
+              status: "DRAFT",
+              revision: 1,
+              customer_name: "Cliente legado",
+              customer_phone: null,
+              title: "Orçamento legado",
+              snapshot_version: 1,
+              total_selling_price: "870.00",
+              installments: 3,
+              product_id: id(1),
+              product_name: "Letreiro em PVC",
+              created_at: now,
+              updated_at: now,
+              created_by: id(9),
+              created_by_email: null,
+            },
+          ],
+        },
+        error: null,
+      })),
+    };
+
+    const listed = await new OfficialQuotePersistenceService(db, {
+      calculate: async () => calculation(),
+    }).list(
+      {
+        action: "LIST_QUOTES",
+        page: 1,
+        pageSize: 25,
+        search: null,
+        status: null,
+      },
+      id(9),
+      false
+    );
+
+    expect(listed.items[0].pricingMode).toBe("OFFICIAL");
+  });
+
+  it("rejects invalid sanitized pricing_mode values from the list RPC", async () => {
+    const db = {
+      rpc: vi.fn(async () => ({
+        data: {
+          total: 1,
+          items: [
+            {
+              quote_id: id(10),
+              quote_number: 1001,
+              status: "DRAFT",
+              revision: 1,
+              customer_name: "Cliente",
+              customer_phone: null,
+              title: "Inválido",
+              snapshot_version: 1,
+              pricing_mode: "PRIVATE_BROKEN_MODE",
+              total_selling_price: "870.00",
+              installments: 3,
+              product_id: id(1),
+              product_name: "Letreiro em PVC",
+              created_at: now,
+              updated_at: now,
+              created_by: id(9),
+              created_by_email: null,
+            },
+          ],
+        },
+        error: null,
+      })),
+    };
+
+    await expect(
+      new OfficialQuotePersistenceService(db, {
+        calculate: async () => calculation(),
+      }).list(
+        {
+          action: "LIST_QUOTES",
+          page: 1,
+          pageSize: 25,
+          search: null,
+          status: null,
+        },
+        id(9),
+        false
+      )
+    ).rejects.toMatchObject({
+      code: "QUOTE_PERSISTENCE_COMPATIBILITY_ERROR",
+      status: 500,
+    });
   });
 
   it("sanitizes SQL persistence errors", () => {

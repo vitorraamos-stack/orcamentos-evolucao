@@ -64,6 +64,7 @@ export {
   quoteNegotiationRequestSchema,
   quoteNegotiationEvaluationInputSchema,
   quoteNegotiationEvaluationSchema,
+  quotePricingModeSchema,
   quoteNegotiationPublicResultSchema,
   QuoteNegotiationDomainError,
   evaluateQuoteNegotiation,
@@ -72,5 +73,6 @@ export {
 export type {
   QuoteNegotiationRequest,
   QuoteNegotiationEvaluation,
+  QuotePricingMode,
   QuoteNegotiationPublicResult,
 } from "./negotiation.js";

@@ -64,9 +64,15 @@ export type QuoteNegotiationEvaluation = z.infer<
   typeof quoteNegotiationEvaluationSchema
 >;
 
+export const quotePricingModeSchema = z.enum([
+  "OFFICIAL",
+  "MANAGER_ADJUSTED",
+]);
+export type QuotePricingMode = z.infer<typeof quotePricingModeSchema>;
+
 export const quoteNegotiationPublicResultSchema = z
   .object({
-    pricingMode: z.enum(["OFFICIAL", "MANAGER_ADJUSTED"]),
+    pricingMode: quotePricingModeSchema,
     totalSellingPrice: negotiationMoneySchema,
   })
   .strict();
