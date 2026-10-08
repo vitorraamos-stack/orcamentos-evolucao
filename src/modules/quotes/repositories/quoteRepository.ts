@@ -8,6 +8,8 @@ import {
   quoteHistoryResultSchema,
   quoteListApiRequestSchema,
   quoteListResultSchema,
+  quoteMetricsApiRequestSchema,
+  quoteCommercialMetricsSchema,
   quoteSaveApiRequestSchema,
   quoteSavePublicResultSchema,
   quoteTransitionApiRequestSchema,
@@ -19,6 +21,7 @@ import {
   type QuoteCurrentPublicResult,
   type QuoteId,
   type QuoteHistoryResult,
+  type QuoteCommercialMetrics,
   type QuoteOutcomeReason,
   type QuoteListResult,
   type QuoteSavePublicResult,
@@ -98,6 +101,13 @@ export const quoteRepository = {
       status: input.status ?? null,
     });
     return quoteListResultSchema.parse(await post(body));
+  },
+
+  metrics: async (): Promise<QuoteCommercialMetrics> => {
+    const body = quoteMetricsApiRequestSchema.parse({
+      action: "GET_QUOTE_METRICS",
+    });
+    return quoteCommercialMetricsSchema.parse(await post(body));
   },
 
   save: async (request: QuoteSaveRequest): Promise<QuoteSavePublicResult> => {

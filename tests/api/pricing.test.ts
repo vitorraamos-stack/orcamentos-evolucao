@@ -7,6 +7,7 @@ const state = vi.hoisted(() => ({
   officialQuoteSave: vi.fn(),
   officialQuoteLoad: vi.fn(),
   officialQuoteHistory: vi.fn(),
+  officialQuoteMetrics: vi.fn(),
   officialQuoteList: vi.fn(),
   officialQuoteTransition: vi.fn(),
   officialQuoteFormLoad: vi.fn(),
@@ -79,6 +80,9 @@ vi.mock("../../api/_shared/quotes/persistenceService.js", () => ({
     }
     async list(input: unknown, actorId: string, isManager: boolean) {
       return state.officialQuoteList(input, actorId, isManager);
+    }
+    async metrics(input: unknown, actorId: string, isManager: boolean) {
+      return state.officialQuoteMetrics(input, actorId, isManager);
     }
     async history(input: unknown, actorId: string, isManager: boolean) {
       return state.officialQuoteHistory(input, actorId, isManager);
@@ -529,6 +533,7 @@ describe("Pricing API manager authority", () => {
     "SAVE_QUOTE",
     "GET_QUOTE",
     "GET_QUOTE_HISTORY",
+    "GET_QUOTE_METRICS",
     "LIST_QUOTES",
     "TRANSITION_QUOTE",
   ])(
@@ -565,6 +570,7 @@ describe("Pricing API manager authority", () => {
       expect(state.officialQuoteSave).not.toHaveBeenCalled();
       expect(state.officialQuoteLoad).not.toHaveBeenCalled();
       expect(state.officialQuoteHistory).not.toHaveBeenCalled();
+      expect(state.officialQuoteMetrics).not.toHaveBeenCalled();
       expect(state.officialQuoteList).not.toHaveBeenCalled();
       expect(state.officialQuoteTransition).not.toHaveBeenCalled();
     }
@@ -1024,6 +1030,43 @@ describe("Pricing API manager authority", () => {
     );
     expect(JSON.stringify(res.payload)).not.toContain("minimumAllowedTotal");
     expect(JSON.stringify(res.payload)).not.toContain("payload");
+  });
+
+  it("loads Quote commercial metrics through the authenticated server contract", async () => {
+    const metrics = {
+      totalQuotes: 10,
+      draftQuotes: 2,
+      sentQuotes: 2,
+      openQuotes: 4,
+      acceptedQuotes: 3,
+      rejectedQuotes: 2,
+      cancelledQuotes: 1,
+      decidedQuotes: 5,
+      conversionBps: 6000,
+      acceptedValue: { currency: "BRL", amount: "4350.00" },
+      rejectedWithoutReason: 1,
+      lossReasons: [{ code: "PRICE", count: 1 }],
+    };
+    state.officialQuoteMetrics.mockResolvedValueOnce(metrics);
+    state.client = client({ id: id(9) }, "consultor_vendas");
+    const res = response();
+
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer valid" },
+        body: { action: "GET_QUOTE_METRICS" },
+      },
+      res
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(res.payload).toEqual({ ok: true, data: metrics });
+    expect(state.officialQuoteMetrics).toHaveBeenCalledWith(
+      { action: "GET_QUOTE_METRICS" },
+      id(9),
+      false
+    );
   });
 
   it("lists Quotes through the sanitized server-side contract", async () => {

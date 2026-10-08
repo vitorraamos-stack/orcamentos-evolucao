@@ -14,6 +14,7 @@ import {
   quoteGetApiRequestSchema,
   quoteHistoryApiRequestSchema,
   quoteListApiRequestSchema,
+  quoteMetricsApiRequestSchema,
   quoteSaveApiRequestSchema,
   quoteTransitionApiRequestSchema,
 } from "../shared/quotes/index.js";
@@ -190,6 +191,7 @@ export default async function handler(req: any, res: any) {
     action === "SAVE_QUOTE" ||
     action === "GET_QUOTE" ||
     action === "GET_QUOTE_HISTORY" ||
+    action === "GET_QUOTE_METRICS" ||
     action === "LIST_QUOTES" ||
     action === "TRANSITION_QUOTE";
   const requiresCalculatorModule =
@@ -332,6 +334,30 @@ export default async function handler(req: any, res: any) {
         db,
         new OfficialQuoteCalculationService(pricingCalculation, pricing)
       );
+
+      if (action === "GET_QUOTE_METRICS") {
+        const parsed = quoteMetricsApiRequestSchema.safeParse(body);
+        if (!parsed.success)
+          return fail(
+            res,
+            400,
+            "INVALID_PAYLOAD",
+            "Invalid Quote metrics request.",
+            parsed.error.issues
+          );
+        const data = await quotePersistence.metrics(
+          parsed.data,
+          auth.user.id,
+          isManager
+        );
+        log("quote_persistence", "quote_metrics_loaded", {
+          total: data.totalQuotes,
+          open: data.openQuotes,
+          accepted: data.acceptedQuotes,
+          rejected: data.rejectedQuotes,
+        });
+        return send(res, 200, { ok: true, data });
+      }
 
       if (action === "LIST_QUOTES") {
         const parsed = quoteListApiRequestSchema.safeParse(body);
