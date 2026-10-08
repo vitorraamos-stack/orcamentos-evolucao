@@ -10,12 +10,14 @@ import {
   quoteTransitionResultSchema,
   type QuoteCurrentPublicResult,
   type QuoteListResult,
+  type QuoteNegotiationEvaluation,
   type QuoteSavePublicResult,
   type QuoteTransitionResult,
 } from "../../../shared/quotes/index.js";
 import type {
   OfficialQuoteCalculationResult,
 } from "./calculationService.js";
+import { QuoteNegotiationService } from "./negotiationService.js";
 
 export interface OfficialQuotePersistenceCalculator {
   calculate(input: unknown): Promise<OfficialQuoteCalculationResult>;
@@ -149,6 +151,7 @@ export class OfficialQuotePersistenceService {
 
   private snapshotArgs(
     calculation: OfficialQuoteCalculationResult,
+    negotiation: QuoteNegotiationEvaluation,
     request: ReturnType<typeof quoteSaveRequestSchema.parse>,
     actorId: string
   ) {
@@ -182,8 +185,13 @@ export class OfficialQuotePersistenceService {
       p_effective_cost_at: pricing.costing.effectiveCostAt,
       p_commercial_quantity: pricing.costing.commercialQuantity,
       p_installments: calculation.publicResult.installments,
+      p_official_total_selling_price:
+        negotiation.officialTotal.amount,
+      p_minimum_allowed_total:
+        negotiation.minimumAllowedTotal.amount,
       p_total_selling_price:
-        calculation.publicResult.totalSellingPrice.amount,
+        negotiation.finalTotal.amount,
+      p_negotiation_private_snapshot: negotiation,
       p_request_snapshot: {
         productVersionId: request.productVersionId,
         request: request.request,
@@ -226,12 +234,22 @@ export class OfficialQuotePersistenceService {
       installation: request.installation,
       munck: request.munck,
     });
-    const args = this.snapshotArgs(calculation, request, actorId);
+    const negotiation = new QuoteNegotiationService().evaluate(
+      calculation,
+      { mode: "OFFICIAL" },
+      isManager
+    ).privateEvaluation;
+    const args = this.snapshotArgs(
+      calculation,
+      negotiation,
+      request,
+      actorId
+    );
 
     const data =
       request.quoteId === null
-        ? await this.rpc("quote_create_with_snapshot_v2_secure", args)
-        : await this.rpc("quote_append_snapshot_v2_secure", {
+        ? await this.rpc("quote_create_with_snapshot_v3_secure", args)
+        : await this.rpc("quote_append_snapshot_v3_secure", {
             p_quote_id: request.quoteId,
             p_expected_revision: request.expectedRevision,
             ...args,

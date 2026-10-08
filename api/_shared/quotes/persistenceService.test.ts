@@ -164,14 +164,26 @@ describe("OfficialQuotePersistenceService", () => {
       munck: { requested: false },
     });
     expect(db.rpc).toHaveBeenCalledWith(
-      "quote_create_with_snapshot_v2_secure",
+      "quote_create_with_snapshot_v3_secure",
       expect.objectContaining({
         p_actor_id: id(9),
         p_customer_name: "Cliente Teste",
         p_customer_phone: "48999999999",
         p_title: "Letreiro recepção",
         p_commercial_snapshot: request.commercial,
+        p_official_total_selling_price: "870.00",
+        p_minimum_allowed_total: "850.00",
         p_total_selling_price: "870.00",
+        p_negotiation_private_snapshot: expect.objectContaining({
+          mode: "OFFICIAL",
+          officialTotal: { currency: "BRL", amount: "870.00" },
+          minimumAllowedTotal: { currency: "BRL", amount: "850.00" },
+          finalTotal: { currency: "BRL", amount: "870.00" },
+          adjustmentKind: "NONE",
+          belowMinimum: false,
+          belowMinimumOverride: false,
+          reason: null,
+        }),
         p_pricing_policy_id: id(3),
         p_pricing_policy_version_id: id(4),
         p_request_snapshot: expect.objectContaining({
@@ -246,7 +258,7 @@ describe("OfficialQuotePersistenceService", () => {
     );
     expect(db.rpc).toHaveBeenNthCalledWith(
       2,
-      "quote_append_snapshot_v2_secure",
+      "quote_append_snapshot_v3_secure",
       expect.objectContaining({
         p_quote_id: id(10),
         p_expected_revision: 1,
@@ -281,6 +293,12 @@ describe("OfficialQuotePersistenceService", () => {
               installation: { requested: true },
               munck: { requested: false },
             },
+            official_total_selling_price: "870.00",
+            minimum_allowed_total: "850.00",
+            negotiation_private_snapshot: {
+              mode: "OFFICIAL",
+              reason: null,
+            },
             public_result_snapshot: calc.publicResult,
             private_snapshot: { secret: "must-not-leak" },
           },
@@ -300,6 +318,10 @@ describe("OfficialQuotePersistenceService", () => {
     expect(result.commercial).toEqual(request.commercial);
     expect(result).not.toHaveProperty("private_snapshot");
     expect(result).not.toHaveProperty("privateSnapshot");
+    expect(result).not.toHaveProperty("minimum_allowed_total");
+    expect(result).not.toHaveProperty("minimumAllowedTotal");
+    expect(result).not.toHaveProperty("negotiation_private_snapshot");
+    expect(result).not.toHaveProperty("negotiationPrivateSnapshot");
   });
 
   it("transitions status using the authenticated actor and expected revision", async () => {

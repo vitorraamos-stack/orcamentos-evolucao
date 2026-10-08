@@ -8,6 +8,10 @@ const service = readFileSync(
   "api/_shared/quotes/persistenceService.ts",
   "utf8"
 ).replaceAll("\r\n", "\n");
+const publicContract = readFileSync(
+  "shared/quotes/persistence.ts",
+  "utf8"
+).replaceAll("\r\n", "\n");
 
 describe("Quote negotiation migration 18G", () => {
   it("is additive and does not backfill immutable Quote snapshots", () => {
@@ -24,12 +28,13 @@ describe("Quote negotiation migration 18G", () => {
     );
   });
 
-  it("creates v3 RPCs without changing the live v2 runtime dependency", () => {
+  it("creates v3 RPCs and the runtime persists new snapshots through them", () => {
     expect(migration).toContain("quote_create_with_snapshot_v3_secure");
     expect(migration).toContain("quote_append_snapshot_v3_secure");
-    expect(service).toContain('"quote_create_with_snapshot_v2_secure"');
-    expect(service).toContain('"quote_append_snapshot_v2_secure"');
-    expect(service).not.toContain('"quote_create_with_snapshot_v3_secure"');
+    expect(service).toContain('"quote_create_with_snapshot_v3_secure"');
+    expect(service).toContain('"quote_append_snapshot_v3_secure"');
+    expect(service).not.toContain('"quote_create_with_snapshot_v2_secure"');
+    expect(service).not.toContain('"quote_append_snapshot_v2_secure"');
     expect(migration).toContain(
       "payment_rate_source,payment_term_revision,installation_settings_revision"
     );
@@ -63,10 +68,12 @@ describe("Quote negotiation migration 18G", () => {
     }
   });
 
-  it("does not expose protected minimum or manager reason in quote_list_secure", () => {
+  it("keeps protected negotiation details out of browser Quote contracts", () => {
     expect(migration).not.toContain("create or replace function public.quote_list_secure");
-    expect(service).not.toContain("minimum_allowed_total");
-    expect(service).not.toContain("negotiation_private_snapshot");
+    expect(publicContract).not.toContain("minimumAllowedTotal");
+    expect(publicContract).not.toContain("minimum_allowed_total");
+    expect(publicContract).not.toContain("negotiationPrivateSnapshot");
+    expect(publicContract).not.toContain("negotiation_private_snapshot");
   });
 
   it("validates manager authority and explicit below-minimum override in SQL", () => {
