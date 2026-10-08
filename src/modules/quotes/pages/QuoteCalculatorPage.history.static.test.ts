@@ -8,9 +8,13 @@ const source = readFileSync(
 
 describe("QuoteCalculatorPage history 18K", () => {
   it("renders a sanitized timeline and reloads it by Quote revision", () => {
-    expect(source).toContain("quoteRepository.history(saved.quoteId)");
-    expect(source).toContain("[saved?.quoteId, saved?.revision]");
-    expect(source).toContain(">Histórico<");
+    expect(source).toMatch(
+      /quoteRepository\s*\.\s*history\(saved\.quoteId\)/
+    );
+    expect(source).toMatch(
+      /\[\s*saved\?\.quoteId,\s*saved\?\.revision\s*\]/
+    );
+    expect(source).toMatch(/>\s*Histórico\s*</);
     expect(source).toContain("Ajuste gerencial");
     expect(source).toContain("item.totalSellingPrice.amount");
     expect(source).not.toContain("item.minimumAllowedTotal");
