@@ -166,8 +166,7 @@ export default function QuoteProposalPage() {
               Proposta Comercial
             </h1>
             <p className="mt-2 text-sm text-slate-500">
-              Orçamento #{proposal.quoteNumber} · Snapshot v
-              {proposal.snapshotVersion}
+              Orçamento #{proposal.quoteNumber}
             </p>
             <p className="mt-1 text-sm text-slate-500">
               {formatDate(proposal.savedAt)}
@@ -212,8 +211,7 @@ export default function QuoteProposalPage() {
           </h2>
           <h3 className="text-2xl font-bold">{proposal.productName}</h3>
           <p className="mt-1 text-sm text-slate-500">
-            Quantidade: {proposal.quantity} · Versão técnica{" "}
-            {proposal.productVersionNumber}
+            Quantidade: {proposal.quantity}
           </p>
 
           {proposal.specs.length > 0 ? (
@@ -290,9 +288,8 @@ export default function QuoteProposalPage() {
         </section>
 
         <footer className="mt-12 border-t pt-5 text-xs leading-relaxed text-slate-500">
-          Documento gerado a partir do snapshot persistido do orçamento no
-          EvoluSystem. A proposta comercial não exibe custos internos, markup
-          ou parâmetros privados de precificação.
+          Proposta comercial referente ao orçamento #{proposal.quoteNumber}.
+          Valores e condições correspondem à versão salva deste orçamento.
         </footer>
       </article>
     </div>

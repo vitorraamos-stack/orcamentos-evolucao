@@ -58,7 +58,7 @@ const quote = {
       price: { currency: "BRL", amount: "0" },
     },
     subtotalBeforeFinancialRate: { currency: "BRL", amount: "1180.00" },
-    roundingRule: "BRL_2_HALF_UP",
+    roundingRule: "BRL_2DP_HALF_UP_V1",
     totalSellingPrice: { currency: "BRL", amount: "1180.00" },
   },
 } as QuoteCurrentPublicResult;
@@ -142,6 +142,10 @@ describe("Quote proposal 18F", () => {
     expect(html).toContain("Teste &lt;script&gt;");
     expect(html).not.toContain("Cliente <Teste>");
     expect(html).not.toContain("Teste <script>");
+    expect(html).not.toContain("Snapshot");
+    expect(html).not.toContain("Versão técnica");
+    expect(html).not.toContain("markup");
+    expect(html).not.toContain("custos internos");
   });
 
   it("never needs private costing or markup fields", () => {

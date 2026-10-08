@@ -217,9 +217,8 @@ export function buildQuoteProposalPrintHtml(
     <img class="logo" src="${escapeHtml(logoUrl)}" alt="Evolução Comunicação Visual" />
     <div class="meta">
       <h1>Proposta Comercial</h1>
-      <p>Orçamento #${data.quoteNumber} · Snapshot v${data.snapshotVersion}</p>
+      <p>Orçamento #${data.quoteNumber}</p>
       <p>${escapeHtml(date(data.savedAt))}</p>
-      <span class="badge">${escapeHtml(data.statusLabel)}</span>
     </div>
   </header>
 
@@ -235,7 +234,7 @@ export function buildQuoteProposalPrintHtml(
   <section class="section">
     <h2>Produto e especificações</h2>
     <h3 class="product-title">${escapeHtml(data.productName)}</h3>
-    <p class="muted">Quantidade: ${escapeHtml(data.quantity)} · Versão técnica ${data.productVersionNumber}</p>
+    <p class="muted">Quantidade: ${escapeHtml(data.quantity)}</p>
     <div class="specs">${specRows}</div>
   </section>
 
@@ -255,8 +254,8 @@ export function buildQuoteProposalPrintHtml(
   </section>
 
   <footer class="footer">
-    Documento gerado a partir do snapshot persistido do orçamento no EvoluSystem.
-    Os valores apresentados são comerciais e não exibem custos internos, markup ou parâmetros privados de precificação.
+    Proposta comercial referente ao orçamento #${data.quoteNumber}.
+    Valores e condições correspondem à versão salva deste orçamento.
   </footer>
 </main>
 </body>
