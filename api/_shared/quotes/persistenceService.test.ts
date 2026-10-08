@@ -203,6 +203,10 @@ describe("OfficialQuotePersistenceService", () => {
       snapshotVersion: 1,
       commercial: request.commercial,
       publicResult: { totalSellingPrice: { amount: "870.00" } },
+      negotiation: {
+        pricingMode: "OFFICIAL",
+        totalSellingPrice: { currency: "BRL", amount: "870.00" },
+      },
     });
   });
 
@@ -315,6 +319,10 @@ describe("OfficialQuotePersistenceService", () => {
     );
 
     expect(result.publicResult.totalSellingPrice.amount).toBe("870.00");
+    expect(result.negotiation).toEqual({
+      pricingMode: "OFFICIAL",
+      totalSellingPrice: { currency: "BRL", amount: "870.00" },
+    });
     expect(result.commercial).toEqual(request.commercial);
     expect(result).not.toHaveProperty("private_snapshot");
     expect(result).not.toHaveProperty("privateSnapshot");
@@ -322,6 +330,110 @@ describe("OfficialQuotePersistenceService", () => {
     expect(result).not.toHaveProperty("minimumAllowedTotal");
     expect(result).not.toHaveProperty("negotiation_private_snapshot");
     expect(result).not.toHaveProperty("negotiationPrivateSnapshot");
+  });
+
+  it("persists a manager-authorized final price without exposing the protected floor", async () => {
+    const db = {
+      rpc: vi.fn(async () => ({
+        data: {
+          quote_id: id(10),
+          quote_number: 1001,
+          status: "DRAFT",
+          revision: 1,
+          snapshot_id: id(11),
+          snapshot_version: 1,
+          saved_at: now,
+          customer_name: "Cliente Teste",
+          customer_phone: "48999999999",
+          title: "Letreiro recepção",
+        },
+        error: null,
+      })),
+    };
+    const result = await new OfficialQuotePersistenceService(db, {
+      calculate: async () => calculation(),
+    }).save(
+      {
+        ...request,
+        negotiation: {
+          mode: "MANAGER_FINAL_PRICE",
+          finalAmount: "860.00",
+          reason: "Condição comercial aprovada",
+          allowBelowMinimum: false,
+        },
+      },
+      id(9),
+      true
+    );
+
+    expect(db.rpc).toHaveBeenCalledWith(
+      "quote_create_with_snapshot_v3_secure",
+      expect.objectContaining({
+        p_official_total_selling_price: "870.00",
+        p_minimum_allowed_total: "850.00",
+        p_total_selling_price: "860.00",
+        p_negotiation_private_snapshot: expect.objectContaining({
+          mode: "MANAGER_FINAL_PRICE",
+          reason: "Condição comercial aprovada",
+          belowMinimum: false,
+        }),
+      })
+    );
+    expect(result.negotiation).toEqual({
+      pricingMode: "MANAGER_ADJUSTED",
+      totalSellingPrice: { currency: "BRL", amount: "860.00" },
+    });
+    expect(JSON.stringify(result)).not.toContain("850.00");
+    expect(JSON.stringify(result)).not.toContain("Condição comercial aprovada");
+  });
+
+  it("keeps legacy v2 snapshots readable as OFFICIAL pricing", async () => {
+    const calc = calculation();
+    const db = {
+      rpc: vi.fn(async () => ({
+        data: {
+          quote: {
+            id: id(10),
+            quote_number: 1001,
+            created_by: id(9),
+            status: "DRAFT",
+            revision: 1,
+            customer_name: "Cliente Teste",
+            customer_phone: null,
+            title: "Legado",
+          },
+          snapshot: {
+            id: id(11),
+            version_number: 1,
+            created_at: now,
+            request_snapshot: {
+              productVersionId: id(2),
+              request: request.request,
+              installments: 3,
+              installation: { requested: true },
+              munck: { requested: false },
+            },
+            total_selling_price: "870.00",
+            negotiation_private_snapshot: null,
+            public_result_snapshot: calc.publicResult,
+          },
+        },
+        error: null,
+      })),
+    };
+
+    const result = await new OfficialQuotePersistenceService(db, {
+      calculate: async () => calc,
+    }).load(
+      { action: "GET_QUOTE", quoteId: id(10) },
+      id(9),
+      false
+    );
+
+    expect(result.negotiation).toEqual({
+      pricingMode: "OFFICIAL",
+      totalSellingPrice: { currency: "BRL", amount: "870.00" },
+    });
   });
 
   it("transitions status using the authenticated actor and expected revision", async () => {

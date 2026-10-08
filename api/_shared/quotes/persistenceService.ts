@@ -3,11 +3,14 @@ import {
   quoteGetApiRequestSchema,
   quoteListApiRequestSchema,
   quoteListResultSchema,
+  quoteNegotiationEvaluationSchema,
+  quoteNegotiationPublicResultSchema,
   quotePersistedSummarySchema,
   quoteSavePublicResultSchema,
   quoteSaveRequestSchema,
   quoteTransitionApiRequestSchema,
   quoteTransitionResultSchema,
+  toPublicQuoteNegotiation,
   type QuoteCurrentPublicResult,
   type QuoteListResult,
   type QuoteNegotiationEvaluation,
@@ -105,6 +108,24 @@ const mapSummary = (dto: any) =>
     savedAt: dto?.saved_at,
     commercial: commercialFromDto(dto),
   });
+
+const publicNegotiationFromSnapshot = (snapshot: any) => {
+  const privateEvaluation = quoteNegotiationEvaluationSchema.safeParse(
+    snapshot?.negotiation_private_snapshot
+  );
+  if (privateEvaluation.success)
+    return toPublicQuoteNegotiation(privateEvaluation.data);
+
+  return quoteNegotiationPublicResultSchema.parse({
+    pricingMode: "OFFICIAL",
+    totalSellingPrice: {
+      currency: "BRL",
+      amount:
+        snapshot?.total_selling_price ??
+        snapshot?.public_result_snapshot?.totalSellingPrice?.amount,
+    },
+  });
+};
 
 export class OfficialQuotePersistenceService {
   constructor(
@@ -236,12 +257,12 @@ export class OfficialQuotePersistenceService {
     });
     const negotiation = new QuoteNegotiationService().evaluate(
       calculation,
-      { mode: "OFFICIAL" },
+      request.negotiation ?? { mode: "OFFICIAL" },
       isManager
-    ).privateEvaluation;
+    );
     const args = this.snapshotArgs(
       calculation,
-      negotiation,
+      negotiation.privateEvaluation,
       request,
       actorId
     );
@@ -266,6 +287,7 @@ export class OfficialQuotePersistenceService {
     return quoteSavePublicResultSchema.parse({
       ...summary.data,
       publicResult: calculation.publicResult,
+      negotiation: negotiation.publicResult,
     });
   }
 
@@ -300,6 +322,7 @@ export class OfficialQuotePersistenceService {
       commercial: commercialFromDto(data?.quote),
       request: snapshot?.request_snapshot,
       publicResult: snapshot?.public_result_snapshot,
+      negotiation: publicNegotiationFromSnapshot(snapshot),
     });
     if (!result.success)
       throw new QuotePersistenceServiceError(
