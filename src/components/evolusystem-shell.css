@@ -1,0 +1,43 @@
+.evolu-shell__sidebar,
+[data-slot="sheet-content"]:has(.evolu-shell__branding) {
+  background: radial-gradient(ellipse at 105% 5%, #11365d, #071a34 68%);
+}
+.evolu-shell__branding { border-bottom: 1px solid rgba(159,195,225,.15); padding: 25px 22px 22px; }
+.evolu-shell__company-logo { display:block; height: 58px; width:auto; max-width:190px; object-fit:contain; object-position:left center; }
+.evolu-shell__brand-name { margin-top:16px; color:white; font-size:26px; font-weight:800; letter-spacing:-.055em; line-height:1.1; }
+.evolu-shell__brand-name span { color:#31b6f5; }
+.evolu-shell__brand-description { margin-top:4px; color:#a9c2db; font-size:10px; font-weight:650; letter-spacing:.19em; text-transform:uppercase; }
+.evolu-shell__cmyk { display:flex; overflow:hidden; width:72px; height:3px; margin-top:16px; border-radius:99px; }
+.evolu-shell__cmyk i { flex:1; }
+.evolu-shell__cmyk i:nth-child(1) { background:#00adee; }
+.evolu-shell__cmyk i:nth-child(2) { background:#ee168f; }
+.evolu-shell__cmyk i:nth-child(3) { background:#f5dc00; }
+.evolu-shell__navigation { scrollbar-color:#395979 transparent; scrollbar-width:thin; }
+.evolu-shell__navigation .evolu-nav__section { color:#8aa9c9; letter-spacing:.14em; }
+.evolu-shell__navigation .evolu-nav__item {
+  min-height:42px; height:auto; padding:9px 12px; border-radius:10px; background:transparent;
+  color:#c7d6e5; font-size:13px; font-weight:520; transition: color .16s ease, background-color .16s ease;
+}
+.evolu-shell__navigation .evolu-nav__item:hover,
+.evolu-shell__navigation .evolu-nav__item:focus-visible { background:rgba(91,150,207,.16); color:white; }
+.evolu-shell__navigation .evolu-nav__item.bg-sidebar-accent {
+  background:rgba(20,156,225,.19); color:white; box-shadow:inset 3px 0 0 #27b5f5;
+}
+.evolu-shell__navigation .evolu-nav__item.bg-sidebar-accent svg { color:#55c8ff; }
+.evolu-shell__account { border-top:1px solid rgba(159,195,225,.15); background:rgba(0,12,28,.18); }
+.evolu-shell__avatar, .evolu-shell__topbar-avatar {
+  display:flex; flex:0 0 auto; align-items:center; justify-content:center; width:38px; height:38px;
+  border-radius:12px; background:#153f67; color:#a9e3ff; font-size:14px; font-weight:800;
+}
+.evolu-shell__topbar-avatar { width:36px; height:36px; background:#e8f4fc; color:#067fbd; }
+.evolu-shell__signout { min-height:40px; color:#c2d4e6; }
+.evolu-shell__signout:hover, .evolu-shell__signout:focus-visible { background:rgba(91,150,207,.16); color:white; }
+.evolu-shell__main { background:linear-gradient(165deg,#f7f9fc 0%,#f3f6fb 100%); }
+.dark .evolu-shell__main { background:var(--background); }
+@media(max-width:767px) {
+  .evolu-shell__topbar { height:64px; }
+  .evolu-shell__main { padding:16px; }
+  .evolu-shell__branding { padding-top:22px; padding-bottom:18px; }
+  .evolu-shell__company-logo { height:48px; }
+}
+@media(prefers-reduced-motion:reduce) { .evolu-shell__navigation .evolu-nav__item { transition:none; } }
