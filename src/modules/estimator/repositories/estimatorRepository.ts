@@ -1,13 +1,13 @@
 import { supabase } from "@/lib/supabase";
 import {
-  officialQuoteApiRequestSchema,
-  officialQuotePublicResultSchema,
-  quoteFormApiRequestSchema,
-  quoteFormDefinitionSchema,
-  type OfficialQuotePublicResult,
-  type OfficialQuoteRequest,
-  type QuoteFormDefinition,
-} from "@shared/quotes";
+  officialEstimateApiRequestSchema,
+  officialEstimatePublicResultSchema,
+  estimatorFormApiRequestSchema,
+  estimatorFormDefinitionSchema,
+  type OfficialEstimatePublicResult,
+  type OfficialEstimateRequest,
+  type EstimatorFormDefinition,
+} from "@shared/estimator";
 
 type ApiError = Error & {
   code?: string;
@@ -44,24 +44,24 @@ async function post(body: unknown) {
   return result.data;
 }
 
-export const quoteRepository = {
+export const estimatorRepository = {
   loadForm: async (
     productVersionId: string | null = null
-  ): Promise<QuoteFormDefinition> => {
-    const body = quoteFormApiRequestSchema.parse({
-      action: "GET_QUOTE_FORM",
+  ): Promise<EstimatorFormDefinition> => {
+    const body = estimatorFormApiRequestSchema.parse({
+      action: "GET_ESTIMATOR_FORM",
       productVersionId,
     });
-    return quoteFormDefinitionSchema.parse(await post(body));
+    return estimatorFormDefinitionSchema.parse(await post(body));
   },
 
   calculate: async (
-    request: OfficialQuoteRequest
-  ): Promise<OfficialQuotePublicResult> => {
-    const body = officialQuoteApiRequestSchema.parse({
-      action: "CALCULATE_QUOTE",
+    request: OfficialEstimateRequest
+  ): Promise<OfficialEstimatePublicResult> => {
+    const body = officialEstimateApiRequestSchema.parse({
+      action: "CALCULATE_ESTIMATE",
       ...request,
     });
-    return officialQuotePublicResultSchema.parse(await post(body));
+    return officialEstimatePublicResultSchema.parse(await post(body));
   },
 };

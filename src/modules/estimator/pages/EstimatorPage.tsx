@@ -24,23 +24,23 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
-import { quoteRepository } from "../repositories/quoteRepository";
+import { estimatorRepository } from "../repositories/estimatorRepository";
 import {
   buildTechnicalInputs,
-  initialQuoteFields,
+  initialEstimatorFields,
   isDimensionField,
   positiveUserDecimal,
-  quoteFingerprint,
-  type QuoteFieldUnits,
-  type QuoteFieldValues,
-} from "../quoteForm";
+  estimatorFingerprint,
+  type EstimatorFieldUnits,
+  type EstimatorFieldValues,
+} from "../estimatorForm";
 import type { UnitId } from "@shared/calculation-engine/units";
 import type {
-  OfficialQuotePublicResult,
-  OfficialQuoteRequest,
-  QuoteFormDefinition,
-  QuoteFormProduct,
-} from "@shared/quotes";
+  OfficialEstimatePublicResult,
+  OfficialEstimateRequest,
+  EstimatorFormDefinition,
+  EstimatorFormProduct,
+} from "@shared/estimator";
 
 const formatBrl = (amount: string) =>
   new Intl.NumberFormat("pt-BR", {
@@ -53,7 +53,7 @@ const friendlyError = (error: unknown) => {
   const messages: Record<string, string> = {
     PAYMENT_TERM_NOT_CONFIGURED:
       "Essa condição de pagamento ainda não está configurada.",
-    QUOTE_ADDITIONALS_NOT_CONFIGURED:
+    ESTIMATOR_ADDITIONALS_NOT_CONFIGURED:
       "Instalação e munck ainda não estão configurados.",
     TECHNICAL_INPUT_OUT_OF_RANGE:
       "Um dos valores informados está fora da faixa permitida.",
@@ -69,17 +69,17 @@ const friendlyError = (error: unknown) => {
       : "Não foi possível calcular o preço.";
 };
 
-export default function QuoteCalculatorPage() {
-  const [definition, setDefinition] = useState<QuoteFormDefinition | null>(null);
+export default function EstimatorPage() {
+  const [definition, setDefinition] = useState<EstimatorFormDefinition | null>(null);
   const [productVersionId, setProductVersionId] = useState("");
-  const [fieldValues, setFieldValues] = useState<QuoteFieldValues>({});
-  const [fieldUnits, setFieldUnits] = useState<QuoteFieldUnits>({});
+  const [fieldValues, setFieldValues] = useState<EstimatorFieldValues>({});
+  const [fieldUnits, setFieldUnits] = useState<EstimatorFieldUnits>({});
   const [quantity, setQuantity] = useState("1");
   const [installments, setInstallments] = useState("1");
   const [installationRequested, setInstallationRequested] = useState(false);
   const [munckRequested, setMunckRequested] = useState(false);
   const [munckHours, setMunckHours] = useState("4");
-  const [result, setResult] = useState<OfficialQuotePublicResult | null>(null);
+  const [result, setResult] = useState<OfficialEstimatePublicResult | null>(null);
   const [calculatedFingerprint, setCalculatedFingerprint] = useState<
     string | null
   >(null);
@@ -95,8 +95,8 @@ export default function QuoteCalculatorPage() {
     [definition, productVersionId]
   );
 
-  const resetForProduct = (next: QuoteFormProduct | null) => {
-    const initial = initialQuoteFields(next?.inputs ?? []);
+  const resetForProduct = (next: EstimatorFormProduct | null) => {
+    const initial = initialEstimatorFields(next?.inputs ?? []);
     setFieldValues(initial.values);
     setFieldUnits(initial.units);
     setQuantity("1");
@@ -109,7 +109,7 @@ export default function QuoteCalculatorPage() {
 
   const selectProduct = (
     nextVersionId: string,
-    source: QuoteFormDefinition | null = definition
+    source: EstimatorFormDefinition | null = definition
   ) => {
     setProductVersionId(nextVersionId);
     const next =
@@ -124,7 +124,7 @@ export default function QuoteCalculatorPage() {
     setLoading(true);
     setLoadError(null);
 
-    void quoteRepository
+    void estimatorRepository
       .loadForm()
       .then(loaded => {
         if (cancelled) return;
@@ -151,7 +151,7 @@ export default function QuoteCalculatorPage() {
     };
   }, []);
 
-  const buildRequest = (): OfficialQuoteRequest => {
+  const buildRequest = (): OfficialEstimateRequest => {
     if (!product) throw new Error("Selecione um produto.");
     if (!product.calculationAvailable)
       throw new Error("Este produto ainda não está liberado para cálculo.");
@@ -185,7 +185,7 @@ export default function QuoteCalculatorPage() {
 
   const currentFingerprint = useMemo(() => {
     try {
-      return quoteFingerprint(buildRequest());
+      return estimatorFingerprint(buildRequest());
     } catch {
       return null;
     }
@@ -210,9 +210,9 @@ export default function QuoteCalculatorPage() {
     setWorking(true);
     try {
       const request = buildRequest();
-      const calculated = await quoteRepository.calculate(request);
+      const calculated = await estimatorRepository.calculate(request);
       setResult(calculated);
-      setCalculatedFingerprint(quoteFingerprint(request));
+      setCalculatedFingerprint(estimatorFingerprint(request));
       toast.success("Preço calculado com os valores oficiais.");
     } catch (error) {
       toast.error(friendlyError(error));
@@ -222,7 +222,7 @@ export default function QuoteCalculatorPage() {
   };
 
   const formatInputValue = (
-    input: QuoteFormProduct["inputs"][number]
+    input: EstimatorFormProduct["inputs"][number]
   ): string | null => {
     const raw = fieldValues[input.key];
 
