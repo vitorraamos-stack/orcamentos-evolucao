@@ -105,3 +105,59 @@
 @media (prefers-reduced-motion: reduce) {
   .evolu-orders__new-button, .evolu-orders__quick-button { transition: none; }
 }
+
+/* Indicadores consistentes nas versões desktop e móvel, sem alterar seus valores. */
+.evolu-orders .evolu-order-indicator {
+  min-height: 24px;
+  max-width: 100%;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.3;
+  vertical-align: middle;
+}
+.evolu-orders [data-order-indicator="status"] {
+  max-width: 11rem;
+  text-overflow: ellipsis;
+}
+.evolu-orders [data-order-indicator="risk"],
+.evolu-orders [data-order-indicator="priority"][data-tone="danger"] {
+  font-weight: 750;
+}
+/* Visibilidade da linha ativa ao navegar usando teclado. */
+.evolu-orders__desktop-table tbody tr:focus-within {
+  background: #edf7ff;
+  box-shadow: inset 3px 0 0 #087fcb;
+}
+.evolu-orders__mobile-card:focus-within {
+  border-color: #087fcb;
+  box-shadow: 0 0 0 2px rgba(8, 127, 203, .18);
+}
+.dark .evolu-orders__desktop-table tbody tr:focus-within {
+  background: var(--accent);
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+.dark .evolu-orders__mobile-card:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+/* No tema escuro, os tons semânticos mantêm contraste e significado. */
+.dark .evolu-orders [data-order-indicator][data-tone="neutral"] {
+  color: #cbd5e1; background: #1e293b; border-color: #475569;
+}
+.dark .evolu-orders [data-order-indicator][data-tone="info"] {
+  color: #bae6fd; background: #082f49; border-color: #0369a1;
+}
+.dark .evolu-orders [data-order-indicator][data-tone="active"] {
+  color: #ddd6fe; background: #2e1065; border-color: #6d28d9;
+}
+.dark .evolu-orders [data-order-indicator][data-tone="warning"] {
+  color: #fde68a; background: #451a03; border-color: #b45309;
+}
+.dark .evolu-orders [data-order-indicator][data-tone="success"] {
+  color: #a7f3d0; background: #064e3b; border-color: #047857;
+}
+.dark .evolu-orders [data-order-indicator][data-tone="danger"] {
+  color: #fecaca; background: #450a0a; border-color: #b91c1c;
+}

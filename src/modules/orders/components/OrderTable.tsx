@@ -131,6 +131,7 @@ export function OrderTable({
       </div>
       <div className="evolu-orders__desktop-table hidden overflow-x-auto rounded-xl border bg-card shadow-xs lg:block">
       <table className="w-full min-w-[1040px] table-fixed text-sm 2xl:min-w-0">
+        <caption className="sr-only">Ordens de Serviço — relação de resultados</caption>
         <colgroup>
           <col className="w-[17%]" />
           <col className="w-[18%]" />
@@ -155,6 +156,7 @@ export function OrderTable({
             ].map(label => (
               <th
                 key={label}
+                scope="col"
                 className="whitespace-nowrap px-3 py-3 font-semibold"
               >
                 {label}
