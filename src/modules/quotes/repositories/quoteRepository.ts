@@ -2,32 +2,10 @@ import { supabase } from "@/lib/supabase";
 import {
   officialQuoteApiRequestSchema,
   officialQuotePublicResultSchema,
-  quoteCurrentPublicResultSchema,
-  quoteGetApiRequestSchema,
-  quoteHistoryApiRequestSchema,
-  quoteHistoryResultSchema,
-  quoteListApiRequestSchema,
-  quoteListResultSchema,
-  quoteMetricsApiRequestSchema,
-  quoteCommercialMetricsSchema,
-  quoteSaveApiRequestSchema,
-  quoteSavePublicResultSchema,
-  quoteTransitionApiRequestSchema,
-  quoteTransitionResultSchema,
   quoteFormApiRequestSchema,
   quoteFormDefinitionSchema,
   type OfficialQuotePublicResult,
   type OfficialQuoteRequest,
-  type QuoteCurrentPublicResult,
-  type QuoteId,
-  type QuoteHistoryResult,
-  type QuoteCommercialMetrics,
-  type QuoteOutcomeReason,
-  type QuoteListResult,
-  type QuoteSavePublicResult,
-  type QuoteSaveRequest,
-  type QuoteStatus,
-  type QuoteTransitionResult,
   type QuoteFormDefinition,
 } from "@shared/quotes";
 
@@ -56,7 +34,7 @@ async function post(body: unknown) {
   const result = await response.json();
   if (!response.ok || !result.ok) {
     const error = new Error(
-      result?.error?.message ?? "Quote request failed"
+      result?.error?.message ?? "Estimator request failed"
     ) as ApiError;
     error.code = result?.error?.code;
     error.issues = result?.error?.issues;
@@ -85,68 +63,5 @@ export const quoteRepository = {
       ...request,
     });
     return officialQuotePublicResultSchema.parse(await post(body));
-  },
-
-  list: async (input: {
-    page: number;
-    pageSize: number;
-    search?: string | null;
-    status?: QuoteStatus | null;
-  }): Promise<QuoteListResult> => {
-    const body = quoteListApiRequestSchema.parse({
-      action: "LIST_QUOTES",
-      page: input.page,
-      pageSize: input.pageSize,
-      search: input.search?.trim() || null,
-      status: input.status ?? null,
-    });
-    return quoteListResultSchema.parse(await post(body));
-  },
-
-  metrics: async (): Promise<QuoteCommercialMetrics> => {
-    const body = quoteMetricsApiRequestSchema.parse({
-      action: "GET_QUOTE_METRICS",
-    });
-    return quoteCommercialMetricsSchema.parse(await post(body));
-  },
-
-  save: async (request: QuoteSaveRequest): Promise<QuoteSavePublicResult> => {
-    const body = quoteSaveApiRequestSchema.parse({
-      action: "SAVE_QUOTE",
-      ...request,
-    });
-    return quoteSavePublicResultSchema.parse(await post(body));
-  },
-
-  load: async (quoteId: QuoteId): Promise<QuoteCurrentPublicResult> => {
-    const body = quoteGetApiRequestSchema.parse({
-      action: "GET_QUOTE",
-      quoteId,
-    });
-    return quoteCurrentPublicResultSchema.parse(await post(body));
-  },
-
-  history: async (quoteId: QuoteId): Promise<QuoteHistoryResult> => {
-    const body = quoteHistoryApiRequestSchema.parse({
-      action: "GET_QUOTE_HISTORY",
-      quoteId,
-    });
-    return quoteHistoryResultSchema.parse(await post(body));
-  },
-
-  transition: async (
-    quoteId: QuoteId,
-    expectedRevision: number,
-    targetStatus: QuoteStatus,
-    outcomeReason: QuoteOutcomeReason | null = null
-  ): Promise<QuoteTransitionResult> => {
-    const body = quoteTransitionApiRequestSchema.parse({
-      action: "TRANSITION_QUOTE",
-      quoteId,
-      expectedRevision,
-      targetStatus,
-      outcomeReason,
-    });
-    return quoteTransitionResultSchema.parse(await post(body));
   },
 };

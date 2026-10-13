@@ -4,12 +4,6 @@ const state = vi.hoisted(() => ({
   client: null as any,
   officialCalculate: vi.fn(),
   officialQuoteCalculate: vi.fn(),
-  officialQuoteSave: vi.fn(),
-  officialQuoteLoad: vi.fn(),
-  officialQuoteHistory: vi.fn(),
-  officialQuoteMetrics: vi.fn(),
-  officialQuoteList: vi.fn(),
-  officialQuoteTransition: vi.fn(),
   officialQuoteFormLoad: vi.fn(),
 }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => state.client }));
@@ -61,40 +55,8 @@ vi.mock("../../api/_shared/quotes/formService.js", () => ({
     }
   },
 }));
-vi.mock("../../api/_shared/quotes/persistenceService.js", () => ({
-  QuotePersistenceServiceError: class QuotePersistenceServiceError extends Error {
-    status: number;
-    code: string;
-    constructor(status: number, code: string, message: string) {
-      super(message);
-      this.status = status;
-      this.code = code;
-    }
-  },
-  OfficialQuotePersistenceService: class OfficialQuotePersistenceService {
-    async save(input: unknown, actorId: string, isManager: boolean) {
-      return state.officialQuoteSave(input, actorId, isManager);
-    }
-    async load(input: unknown, actorId: string, isManager: boolean) {
-      return state.officialQuoteLoad(input, actorId, isManager);
-    }
-    async list(input: unknown, actorId: string, isManager: boolean) {
-      return state.officialQuoteList(input, actorId, isManager);
-    }
-    async metrics(input: unknown, actorId: string, isManager: boolean) {
-      return state.officialQuoteMetrics(input, actorId, isManager);
-    }
-    async history(input: unknown, actorId: string, isManager: boolean) {
-      return state.officialQuoteHistory(input, actorId, isManager);
-    }
-    async transition(input: unknown, actorId: string, isManager: boolean) {
-      return state.officialQuoteTransition(input, actorId, isManager);
-    }
-  },
-}));
 import { CostingDomainError } from "../../shared/costing/index.js";
 import { CostingServiceError } from "../../api/_shared/costing/service.js";
-import { QuoteNegotiationServiceError } from "../../api/_shared/quotes/negotiationService.js";
 import handler from "../../api/pricing";
 
 const id = (n: number) =>
@@ -234,10 +196,6 @@ describe("Pricing API manager authority", () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY = "server-secret";
     state.officialCalculate.mockReset();
     state.officialQuoteCalculate.mockReset();
-    state.officialQuoteSave.mockReset();
-    state.officialQuoteLoad.mockReset();
-    state.officialQuoteList.mockReset();
-    state.officialQuoteTransition.mockReset();
     state.officialQuoteFormLoad.mockReset();
   });
 
@@ -445,67 +403,6 @@ describe("Pricing API manager authority", () => {
     }
   );
 
-  it("rejects a rejected Quote transition without commercial outcome", async () => {
-    state.client = client({ id: id(9) }, "consultor_vendas");
-    const res = response();
-
-    await handler(
-      {
-        method: "POST",
-        headers: { authorization: "Bearer valid" },
-        body: {
-          action: "TRANSITION_QUOTE",
-          quoteId: id(10),
-          expectedRevision: 2,
-          targetStatus: "REJECTED",
-        },
-      },
-      res
-    );
-
-    expect(res.statusCode).toBe(400);
-    expect(state.officialQuoteTransition).not.toHaveBeenCalled();
-  });
-
-  it("passes structured rejection outcome to Quote persistence", async () => {
-    state.officialQuoteTransition.mockResolvedValueOnce({
-      quoteId: id(10),
-      quoteNumber: 1001,
-      status: "REJECTED",
-      revision: 3,
-      snapshotId: id(12),
-      updatedAt: now,
-    });
-    state.client = client({ id: id(9) }, "consultor_vendas");
-    const res = response();
-    const request = {
-      action: "TRANSITION_QUOTE",
-      quoteId: id(10),
-      expectedRevision: 2,
-      targetStatus: "REJECTED",
-      outcomeReason: {
-        code: "PRICE",
-        note: "Cliente recebeu proposta mais barata.",
-      },
-    };
-
-    await handler(
-      {
-        method: "POST",
-        headers: { authorization: "Bearer valid" },
-        body: request,
-      },
-      res
-    );
-
-    expect(res.statusCode).toBe(200);
-    expect(state.officialQuoteTransition).toHaveBeenCalledWith(
-      request,
-      id(9),
-      false
-    );
-  });
-
   it.each(["arte_finalista", "producao", "instalador"])(
     "rejects role %s from the official Quote form",
     async role => {
@@ -530,12 +427,6 @@ describe("Pricing API manager authority", () => {
     "GET_QUOTE_FORM",
     "CALCULATE",
     "CALCULATE_QUOTE",
-    "SAVE_QUOTE",
-    "GET_QUOTE",
-    "GET_QUOTE_HISTORY",
-    "GET_QUOTE_METRICS",
-    "LIST_QUOTES",
-    "TRANSITION_QUOTE",
   ])(
     "requires the calculadora module server-side for %s",
     async action => {
@@ -567,12 +458,6 @@ describe("Pricing API manager authority", () => {
       expect(state.officialCalculate).not.toHaveBeenCalled();
       expect(state.officialQuoteCalculate).not.toHaveBeenCalled();
       expect(state.officialQuoteFormLoad).not.toHaveBeenCalled();
-      expect(state.officialQuoteSave).not.toHaveBeenCalled();
-      expect(state.officialQuoteLoad).not.toHaveBeenCalled();
-      expect(state.officialQuoteHistory).not.toHaveBeenCalled();
-      expect(state.officialQuoteMetrics).not.toHaveBeenCalled();
-      expect(state.officialQuoteList).not.toHaveBeenCalled();
-      expect(state.officialQuoteTransition).not.toHaveBeenCalled();
     }
   );
 
@@ -674,341 +559,14 @@ describe("Pricing API manager authority", () => {
     expect(state.officialQuoteCalculate).not.toHaveBeenCalled();
   });
 
-  it.each(["consultor_vendas", "consultor", "gerente", "admin"])(
-    "allows %s to persist an official Quote snapshot",
-    async role => {
-      const saved = {
-        quoteId: id(10),
-        quoteNumber: 1001,
-        status: "DRAFT",
-        revision: 1,
-        snapshotId: id(11),
-        snapshotVersion: 1,
-        savedAt: now,
-        commercial: {
-          customerName: "Cliente Teste",
-          customerPhone: "48999999999",
-          title: "Letreiro recepção",
-        },
-        publicResult: {
-          calculationVersion: "1.0",
-          productId: id(4),
-          productVersionId: id(5),
-          productVersionNumber: 2,
-          productVersionRevision: 2,
-          commercialQuantity: "1",
-          installments: 3,
-          productSellingPrice: { currency: "BRL", amount: "720" },
-          installation: {
-            requested: false,
-            areaM2: null,
-            tier: null,
-            price: { currency: "BRL", amount: "0" },
-          },
-          munck: {
-            requested: false,
-            requestedHours: null,
-            billedHours: null,
-            price: { currency: "BRL", amount: "0" },
-          },
-          subtotalBeforeFinancialRate: { currency: "BRL", amount: "720" },
-          roundingRule: "BRL_2DP_HALF_UP_V1",
-          totalSellingPrice: { currency: "BRL", amount: "720.00" },
-        },
-      };
-      state.officialQuoteSave.mockResolvedValueOnce(saved);
-      state.client = client({ id: id(9) }, role);
-      const res = response();
-      const request = {
-        quoteId: null,
-        expectedRevision: null,
-        commercial: {
-          customerName: "Cliente Teste",
-          customerPhone: "48999999999",
-          title: "Letreiro recepção",
-        },
-        productVersionId: id(5),
-        request: { commercialQuantity: "1", technicalInputs: {} },
-        installments: 3,
-        installation: { requested: false },
-        munck: { requested: false },
-      };
-
-      await handler(
-        {
-          method: "POST",
-          headers: { authorization: "Bearer valid" },
-          body: { action: "SAVE_QUOTE", ...request },
-        },
-        res
-      );
-
-      expect(res.statusCode).toBe(200);
-      expect(res.payload).toEqual({ ok: true, data: saved });
-      expect(state.officialQuoteSave).toHaveBeenCalledWith(
-        request,
-        id(9),
-        role === "gerente" || role === "admin"
-      );
-      expect(res.payload.data).not.toHaveProperty("privateSnapshot");
-      expect(res.payload.data).not.toHaveProperty("costing");
-      expect(res.payload.data).not.toHaveProperty("pricingEngine");
-    }
-  );
-
-  it("passes sanitized manager negotiation to Quote persistence", async () => {
-    const saved = {
-      quoteId: id(10),
-      quoteNumber: 1001,
-      status: "DRAFT",
-      revision: 1,
-      snapshotId: id(11),
-      snapshotVersion: 1,
-      savedAt: now,
-      commercial: {
-        customerName: "Cliente Teste",
-        customerPhone: null,
-        title: "Letreiro",
-      },
-      publicResult: {
-        calculationVersion: "1.0",
-        productId: id(4),
-        productVersionId: id(5),
-        productVersionNumber: 2,
-        productVersionRevision: 2,
-        commercialQuantity: "1",
-        installments: 3,
-        productSellingPrice: { currency: "BRL", amount: "720" },
-        installation: {
-          requested: false,
-          areaM2: null,
-          tier: null,
-          price: { currency: "BRL", amount: "0" },
-        },
-        munck: {
-          requested: false,
-          requestedHours: null,
-          billedHours: null,
-          price: { currency: "BRL", amount: "0" },
-        },
-        subtotalBeforeFinancialRate: { currency: "BRL", amount: "720" },
-        roundingRule: "BRL_2DP_HALF_UP_V1",
-        totalSellingPrice: { currency: "BRL", amount: "720.00" },
-      },
-      negotiation: {
-        pricingMode: "MANAGER_ADJUSTED",
-        totalSellingPrice: { currency: "BRL", amount: "700.00" },
-      },
-    };
-    state.officialQuoteSave.mockResolvedValueOnce(saved);
-    state.client = client({ id: id(9) }, "gerente");
-    const res = response();
-    const request = {
-      quoteId: null,
-      expectedRevision: null,
-      commercial: {
-        customerName: "Cliente Teste",
-        customerPhone: null,
-        title: "Letreiro",
-      },
-      negotiation: {
-        mode: "MANAGER_FINAL_PRICE",
-        finalAmount: "700.00",
-        reason: "Condição comercial aprovada",
-        allowBelowMinimum: false,
-      },
-      productVersionId: id(5),
-      request: { commercialQuantity: "1", technicalInputs: {} },
-      installments: 3,
-      installation: { requested: false },
-      munck: { requested: false },
-    };
-
-    await handler(
-      {
-        method: "POST",
-        headers: { authorization: "Bearer valid" },
-        body: { action: "SAVE_QUOTE", ...request },
-      },
-      res
-    );
-
-    expect(res.statusCode).toBe(200);
-    expect(state.officialQuoteSave).toHaveBeenCalledWith(
-      request,
-      id(9),
-      true
-    );
-    expect(JSON.stringify(res.payload)).not.toContain("minimumAllowedTotal");
-    expect(JSON.stringify(res.payload)).not.toContain("reason");
-  });
-
-  it("maps protected-floor confirmation to a safe client error", async () => {
-    state.officialQuoteSave.mockRejectedValueOnce(
-      new QuoteNegotiationServiceError(
-        422,
-        "BELOW_MINIMUM_OVERRIDE_REQUIRED",
-        "Selling below the configured minimum requires explicit manager override."
-      )
-    );
-    state.client = client({ id: id(9) }, "gerente");
-    const res = response();
-
-    await handler(
-      {
-        method: "POST",
-        headers: { authorization: "Bearer valid" },
-        body: {
-          action: "SAVE_QUOTE",
-          quoteId: null,
-          expectedRevision: null,
-          commercial: {
-            customerName: "Cliente Teste",
-            customerPhone: null,
-            title: "Letreiro",
-          },
-          negotiation: {
-            mode: "MANAGER_FINAL_PRICE",
-            finalAmount: "600.00",
-            reason: "Exceção comercial aprovada",
-            allowBelowMinimum: false,
-          },
-          productVersionId: id(5),
-          request: { commercialQuantity: "1", technicalInputs: {} },
-          installments: 3,
-          installation: { requested: false },
-          munck: { requested: false },
-        },
-      },
-      res
-    );
-
-    expect(res.statusCode).toBe(422);
-    expect(res.payload.error.code).toBe(
-      "BELOW_MINIMUM_OVERRIDE_REQUIRED"
-    );
-    expect(JSON.stringify(res.payload)).not.toContain("minimumAllowedTotal");
-  });
-
-  it("rejects browser-supplied persisted Quote snapshots and prices", async () => {
-    state.client = client({ id: id(9) }, "consultor_vendas");
-    const res = response();
-    await handler(
-      {
-        method: "POST",
-        headers: { authorization: "Bearer valid" },
-        body: {
-          action: "SAVE_QUOTE",
-          quoteId: null,
-          expectedRevision: null,
-          commercial: {
-            customerName: "Cliente Teste",
-            customerPhone: null,
-            title: "Letreiro",
-          },
-          productVersionId: id(5),
-          request: { commercialQuantity: "1", technicalInputs: {} },
-          installments: 3,
-          installation: { requested: false },
-          munck: { requested: false },
-          totalSellingPrice: "1",
-          privateSnapshot: { hacked: true },
-        },
-      },
-      res
-    );
-    expect(res.statusCode).toBe(400);
-    expect(state.officialQuoteSave).not.toHaveBeenCalled();
-  });
-
-  it("loads a persisted Quote through the sanitized public contract", async () => {
-    const loaded = {
-      quoteId: id(10),
-      quoteNumber: 1001,
-      status: "DRAFT",
-      revision: 2,
-      snapshotId: id(12),
-      snapshotVersion: 2,
-      savedAt: now,
-      commercial: {
-        customerName: "Cliente Teste",
-        customerPhone: "48999999999",
-        title: "Letreiro recepção",
-      },
-      request: {
-        productVersionId: id(5),
-        request: { commercialQuantity: "1", technicalInputs: {} },
-        installments: 3,
-        installation: { requested: false },
-        munck: { requested: false },
-      },
-      publicResult: {
-        calculationVersion: "1.0",
-        productId: id(4),
-        productVersionId: id(5),
-        productVersionNumber: 2,
-        productVersionRevision: 2,
-        commercialQuantity: "1",
-        installments: 3,
-        productSellingPrice: { currency: "BRL", amount: "720" },
-        installation: {
-          requested: false,
-          areaM2: null,
-          tier: null,
-          price: { currency: "BRL", amount: "0" },
-        },
-        munck: {
-          requested: false,
-          requestedHours: null,
-          billedHours: null,
-          price: { currency: "BRL", amount: "0" },
-        },
-        subtotalBeforeFinancialRate: { currency: "BRL", amount: "720" },
-        roundingRule: "BRL_2DP_HALF_UP_V1",
-        totalSellingPrice: { currency: "BRL", amount: "720.00" },
-      },
-    };
-    state.officialQuoteLoad.mockResolvedValueOnce(loaded);
-    state.client = client({ id: id(9) }, "consultor_vendas");
-    const res = response();
-    await handler(
-      {
-        method: "POST",
-        headers: { authorization: "Bearer valid" },
-        body: { action: "GET_QUOTE", quoteId: id(10) },
-      },
-      res
-    );
-    expect(res.statusCode).toBe(200);
-    expect(res.payload.data).toEqual(loaded);
-    expect(state.officialQuoteLoad).toHaveBeenCalledWith(
-      {
-        action: "GET_QUOTE",
-        quoteId: id(10),
-      },
-      id(9),
-      false
-    );
-  });
-
-  it("loads sanitized Quote history through the authenticated server contract", async () => {
-    const history = {
-      items: [
-        {
-          eventId: id(30),
-          eventType: "STATUS_CHANGED",
-          occurredAt: now,
-          actorId: id(9),
-          actorEmail: "consultor@evolucao.test",
-          snapshotVersion: 2,
-          pricingMode: "MANAGER_ADJUSTED",
-          totalSellingPrice: { currency: "BRL", amount: "860.00" },
-          fromStatus: "DRAFT",
-          toStatus: "SENT",
-        },
-      ],
-    };
-    state.officialQuoteHistory.mockResolvedValueOnce(history);
+  it.each([
+    "SAVE_QUOTE",
+    "GET_QUOTE",
+    "GET_QUOTE_HISTORY",
+    "GET_QUOTE_METRICS",
+    "LIST_QUOTES",
+    "TRANSITION_QUOTE",
+  ])("retires Quote management action %s in favor of Conta Azul", async action => {
     state.client = client({ id: id(9) }, "consultor_vendas");
     const res = response();
 
@@ -1016,159 +574,22 @@ describe("Pricing API manager authority", () => {
       {
         method: "POST",
         headers: { authorization: "Bearer valid" },
-        body: { action: "GET_QUOTE_HISTORY", quoteId: id(10) },
+        body: { action },
       },
       res
     );
 
-    expect(res.statusCode).toBe(200);
-    expect(res.payload).toEqual({ ok: true, data: history });
-    expect(state.officialQuoteHistory).toHaveBeenCalledWith(
-      { action: "GET_QUOTE_HISTORY", quoteId: id(10) },
-      id(9),
-      false
-    );
-    expect(JSON.stringify(res.payload)).not.toContain("minimumAllowedTotal");
-    expect(JSON.stringify(res.payload)).not.toContain("payload");
-  });
-
-  it("loads Quote commercial metrics through the authenticated server contract", async () => {
-    const metrics = {
-      totalQuotes: 10,
-      draftQuotes: 2,
-      sentQuotes: 2,
-      openQuotes: 4,
-      acceptedQuotes: 3,
-      rejectedQuotes: 2,
-      cancelledQuotes: 1,
-      decidedQuotes: 5,
-      conversionBps: 6000,
-      acceptedValue: { currency: "BRL", amount: "4350.00" },
-      rejectedWithoutReason: 1,
-      lossReasons: [{ code: "PRICE", count: 1 }],
-    };
-    state.officialQuoteMetrics.mockResolvedValueOnce(metrics);
-    state.client = client({ id: id(9) }, "consultor_vendas");
-    const res = response();
-
-    await handler(
-      {
-        method: "POST",
-        headers: { authorization: "Bearer valid" },
-        body: { action: "GET_QUOTE_METRICS" },
+    expect(res.statusCode).toBe(410);
+    expect(res.payload).toEqual({
+      ok: false,
+      error: {
+        code: "QUOTE_MANAGEMENT_RETIRED",
+        message: "Quote management is handled in Conta Azul.",
       },
-      res
-    );
-
-    expect(res.statusCode).toBe(200);
-    expect(res.payload).toEqual({ ok: true, data: metrics });
-    expect(state.officialQuoteMetrics).toHaveBeenCalledWith(
-      { action: "GET_QUOTE_METRICS" },
-      id(9),
-      false
-    );
-  });
-
-  it("lists Quotes through the sanitized server-side contract", async () => {
-    const listed = {
-      items: [
-        {
-          quoteId: id(10),
-          quoteNumber: 1001,
-          status: "DRAFT",
-          revision: 2,
-          commercial: {
-            customerName: "Cliente Teste",
-            customerPhone: "48999999999",
-            title: "Letreiro recepção",
-          },
-          snapshotVersion: 2,
-          totalSellingPrice: { currency: "BRL", amount: "870.00" },
-          installments: 3,
-          productId: id(4),
-          productName: "Letreiro em PVC",
-          createdAt: now,
-          updatedAt: now,
-          createdBy: id(9),
-          createdByEmail: "consultor@evolucao.test",
-        },
-      ],
-      total: 1,
-      page: 1,
-      pageSize: 25,
-    };
-    state.officialQuoteList.mockResolvedValueOnce(listed);
-    state.client = client({ id: id(9) }, "consultor_vendas");
-    const res = response();
-
-    await handler(
-      {
-        method: "POST",
-        headers: { authorization: "Bearer valid" },
-        body: {
-          action: "LIST_QUOTES",
-          page: 1,
-          pageSize: 25,
-          search: "Cliente",
-          status: "DRAFT",
-        },
-      },
-      res
-    );
-
-    expect(res.statusCode).toBe(200);
-    expect(res.payload).toEqual({ ok: true, data: listed });
-    expect(state.officialQuoteList).toHaveBeenCalledWith(
-      {
-        action: "LIST_QUOTES",
-        page: 1,
-        pageSize: 25,
-        search: "Cliente",
-        status: "DRAFT",
-      },
-      id(9),
-      false
-    );
-    expect(res.payload.data.items[0]).not.toHaveProperty("costing");
-    expect(res.payload.data.items[0]).not.toHaveProperty("privateSnapshot");
-  });
-
-  it("transitions a Quote with the authenticated actor", async () => {
-    state.officialQuoteTransition.mockResolvedValueOnce({
-      quoteId: id(10),
-      quoteNumber: 1001,
-      status: "SENT",
-      revision: 3,
-      snapshotId: id(12),
-      updatedAt: now,
     });
-    state.client = client({ id: id(9) }, "consultor_vendas");
-    const res = response();
-    await handler(
-      {
-        method: "POST",
-        headers: { authorization: "Bearer valid" },
-        body: {
-          action: "TRANSITION_QUOTE",
-          quoteId: id(10),
-          expectedRevision: 2,
-          targetStatus: "SENT",
-        },
-      },
-      res
-    );
-    expect(res.statusCode).toBe(200);
-    expect(state.officialQuoteTransition).toHaveBeenCalledWith(
-      {
-        action: "TRANSITION_QUOTE",
-        quoteId: id(10),
-        expectedRevision: 2,
-        targetStatus: "SENT",
-        outcomeReason: null,
-      },
-      id(9),
-      false
-    );
+    expect(state.officialCalculate).not.toHaveBeenCalled();
+    expect(state.officialQuoteCalculate).not.toHaveBeenCalled();
+    expect(state.officialQuoteFormLoad).not.toHaveBeenCalled();
   });
 
   it.each(["arte_finalista", "producao", "instalador"])(

@@ -11,12 +11,6 @@ import {
 import {
   officialQuoteApiRequestSchema,
   quoteFormApiRequestSchema,
-  quoteGetApiRequestSchema,
-  quoteHistoryApiRequestSchema,
-  quoteListApiRequestSchema,
-  quoteMetricsApiRequestSchema,
-  quoteSaveApiRequestSchema,
-  quoteTransitionApiRequestSchema,
 } from "../shared/quotes/index.js";
 import { CostingCompatibilityError } from "./_shared/costing/mappers.js";
 import {
@@ -39,13 +33,6 @@ import {
   OfficialQuoteFormService,
   QuoteFormServiceError,
 } from "./_shared/quotes/formService.js";
-import {
-  OfficialQuotePersistenceService,
-  QuotePersistenceServiceError,
-} from "./_shared/quotes/persistenceService.js";
-import {
-  QuoteNegotiationServiceError,
-} from "./_shared/quotes/negotiationService.js";
 import {
   PricingPersistenceCompatibilityError,
 } from "./_shared/pricing/mappers.js";
@@ -183,27 +170,28 @@ export default async function handler(req: any, res: any) {
     typeof body === "object" && body !== null && "action" in body
       ? (body as Record<string, unknown>).action
       : undefined;
+  const retiredQuoteManagementActions = new Set([
+    "SAVE_QUOTE",
+    "GET_QUOTE",
+    "GET_QUOTE_HISTORY",
+    "GET_QUOTE_METRICS",
+    "LIST_QUOTES",
+    "TRANSITION_QUOTE",
+  ]);
+  const isRetiredQuoteManagementAction =
+    typeof action === "string" && retiredQuoteManagementActions.has(action);
   const isPricingCalculation = action === "CALCULATE";
   const isQuoteCalculation = action === "CALCULATE_QUOTE";
   const isQuoteFormAction = action === "GET_QUOTE_FORM";
   const isCalculation = isPricingCalculation || isQuoteCalculation;
-  const isQuotePersistenceAction =
-    action === "SAVE_QUOTE" ||
-    action === "GET_QUOTE" ||
-    action === "GET_QUOTE_HISTORY" ||
-    action === "GET_QUOTE_METRICS" ||
-    action === "LIST_QUOTES" ||
-    action === "TRANSITION_QUOTE";
-  const requiresCalculatorModule =
-    isCalculation || isQuoteFormAction || isQuotePersistenceAction;
+  const requiresCalculatorModule = isCalculation || isQuoteFormAction;
 
   const log = (
     scope:
       | "pricing"
       | "official_pricing"
       | "official_quote"
-      | "quote_form"
-      | "quote_persistence",
+      | "quote_form",
     event: string,
     details: Record<string, unknown>
   ) =>
@@ -218,6 +206,14 @@ export default async function handler(req: any, res: any) {
 
   try {
     const pricing = new PricingPersistenceService(db);
+
+    if (isRetiredQuoteManagementAction)
+      return fail(
+        res,
+        410,
+        "QUOTE_MANAGEMENT_RETIRED",
+        "Quote management is handled in Conta Azul."
+      );
 
     if (requiresCalculatorModule && canCalculate) {
       const { data: moduleAccess, error: moduleAccessError } = await db
@@ -310,170 +306,6 @@ export default async function handler(req: any, res: any) {
       log("quote_form", "form_loaded", {
         products: data.products.length,
         availableInstallments: data.availableInstallments,
-      });
-      return send(res, 200, { ok: true, data });
-    }
-
-    if (isQuotePersistenceAction) {
-      if (!canCalculate)
-        return fail(
-          res,
-          403,
-          "FORBIDDEN",
-          "Quote persistence is restricted to Sales and managers."
-        );
-
-      const pricingCalculation = new OfficialPricingCalculationService(
-        new OfficialCostingCalculationService(
-          new ProductEngineeringService(db),
-          new CostingService(db)
-        ),
-        pricing
-      );
-      const quotePersistence = new OfficialQuotePersistenceService(
-        db,
-        new OfficialQuoteCalculationService(pricingCalculation, pricing)
-      );
-
-      if (action === "GET_QUOTE_METRICS") {
-        const parsed = quoteMetricsApiRequestSchema.safeParse(body);
-        if (!parsed.success)
-          return fail(
-            res,
-            400,
-            "INVALID_PAYLOAD",
-            "Invalid Quote metrics request.",
-            parsed.error.issues
-          );
-        const data = await quotePersistence.metrics(
-          parsed.data,
-          auth.user.id,
-          isManager
-        );
-        log("quote_persistence", "quote_metrics_loaded", {
-          total: data.totalQuotes,
-          open: data.openQuotes,
-          accepted: data.acceptedQuotes,
-          rejected: data.rejectedQuotes,
-        });
-        return send(res, 200, { ok: true, data });
-      }
-
-      if (action === "LIST_QUOTES") {
-        const parsed = quoteListApiRequestSchema.safeParse(body);
-        if (!parsed.success)
-          return fail(
-            res,
-            400,
-            "INVALID_PAYLOAD",
-            "Invalid Quote list request.",
-            parsed.error.issues
-          );
-        const data = await quotePersistence.list(
-          parsed.data,
-          auth.user.id,
-          isManager
-        );
-        log("quote_persistence", "quotes_listed", {
-          page: data.page,
-          pageSize: data.pageSize,
-          total: data.total,
-          status: parsed.data.status,
-          hasSearch: Boolean(parsed.data.search),
-        });
-        return send(res, 200, { ok: true, data });
-      }
-
-      if (action === "SAVE_QUOTE") {
-        const parsed = quoteSaveApiRequestSchema.safeParse(body);
-        if (!parsed.success)
-          return fail(
-            res,
-            400,
-            "INVALID_PAYLOAD",
-            "Invalid Quote save request.",
-            parsed.error.issues
-          );
-        const { action: _action, ...request } = parsed.data;
-        const data = await quotePersistence.save(
-          request,
-          auth.user.id,
-          isManager
-        );
-        log("quote_persistence", "snapshot_saved", {
-          quoteId: data.quoteId,
-          quoteNumber: data.quoteNumber,
-          revision: data.revision,
-          snapshotVersion: data.snapshotVersion,
-        });
-        return send(res, 200, { ok: true, data });
-      }
-
-      if (action === "GET_QUOTE") {
-        const parsed = quoteGetApiRequestSchema.safeParse(body);
-        if (!parsed.success)
-          return fail(
-            res,
-            400,
-            "INVALID_PAYLOAD",
-            "Invalid Quote load request.",
-            parsed.error.issues
-          );
-        const data = await quotePersistence.load(
-          parsed.data,
-          auth.user.id,
-          isManager
-        );
-        log("quote_persistence", "quote_loaded", {
-          quoteId: data.quoteId,
-          quoteNumber: data.quoteNumber,
-          revision: data.revision,
-          snapshotVersion: data.snapshotVersion,
-        });
-        return send(res, 200, { ok: true, data });
-      }
-
-      if (action === "GET_QUOTE_HISTORY") {
-        const parsed = quoteHistoryApiRequestSchema.safeParse(body);
-        if (!parsed.success)
-          return fail(
-            res,
-            400,
-            "INVALID_PAYLOAD",
-            "Invalid Quote history request.",
-            parsed.error.issues
-          );
-        const data = await quotePersistence.history(
-          parsed.data,
-          auth.user.id,
-          isManager
-        );
-        log("quote_persistence", "quote_history_loaded", {
-          quoteId: parsed.data.quoteId,
-          events: data.items.length,
-        });
-        return send(res, 200, { ok: true, data });
-      }
-
-      const parsed = quoteTransitionApiRequestSchema.safeParse(body);
-      if (!parsed.success)
-        return fail(
-          res,
-          400,
-          "INVALID_PAYLOAD",
-          "Invalid Quote transition request.",
-          parsed.error.issues
-        );
-      const data = await quotePersistence.transition(
-        parsed.data,
-        auth.user.id,
-        isManager
-      );
-      log("quote_persistence", "status_changed", {
-        quoteId: data.quoteId,
-        quoteNumber: data.quoteNumber,
-        revision: data.revision,
-        status: data.status,
       });
       return send(res, 200, { ok: true, data });
     }
@@ -590,13 +422,11 @@ export default async function handler(req: any, res: any) {
     });
     return send(res, 200, { ok: true, data });
   } catch (error) {
-    if (isCalculation || isQuoteFormAction || isQuotePersistenceAction) {
+    if (isCalculation || isQuoteFormAction) {
       log(
-        isQuotePersistenceAction
-          ? "quote_persistence"
-          : isQuoteFormAction
-            ? "quote_form"
-            : isQuoteCalculation
+        isQuoteFormAction
+          ? "quote_form"
+          : isQuoteCalculation
             ? "official_quote"
             : "official_pricing",
         "calculation_failed",
@@ -609,12 +439,6 @@ export default async function handler(req: any, res: any) {
       );
 
       if (error instanceof QuoteFormServiceError)
-        return fail(res, error.status, error.code, error.message);
-
-      if (error instanceof QuotePersistenceServiceError)
-        return fail(res, error.status, error.code, error.message);
-
-      if (error instanceof QuoteNegotiationServiceError)
         return fail(res, error.status, error.code, error.message);
 
       if (error instanceof PricingPersistenceServiceError) {
