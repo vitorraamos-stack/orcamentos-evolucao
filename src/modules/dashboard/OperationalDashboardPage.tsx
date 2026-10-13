@@ -71,7 +71,7 @@ export function OperationalDashboardSections({
 }) {
   return (
     <>
-      <section className="evolu-dashboard__panel rounded-lg border bg-card p-3 sm:p-4">
+      <section className="evolu-dashboard__panel evolu-ui-panel p-3 sm:p-4">
         <div className="mb-2.5 flex items-start gap-2">
           <ChartNoAxesColumnIncreasing
             aria-hidden="true"
@@ -125,7 +125,7 @@ export function OperationalDashboardSections({
           />
         </div>
       </section>
-      <section className="evolu-dashboard__panel evolu-dashboard__panel--attention mt-4 rounded-lg border p-3 sm:p-4">
+      <section className="evolu-dashboard__panel evolu-dashboard__panel--attention evolu-ui-panel mt-4 p-3 sm:p-4">
         <div className="mb-2.5 flex items-start gap-2">
           <TriangleAlert
             aria-hidden="true"
@@ -250,7 +250,7 @@ export default function OperationalDashboardPage() {
         title="Dashboard operacional"
         description="Estado atual da operação e prazos do período selecionado."
         actions={
-          <Button asChild>
+          <Button asChild className="evolu-ui-primary-action">
             <Link href="/os">
               Ver todas as OS <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
@@ -271,7 +271,7 @@ export default function OperationalDashboardPage() {
             key={value}
             size="sm"
             aria-pressed={period === value}
-            className="evolu-dashboard__filter"
+            className="evolu-dashboard__filter evolu-ui-filter-control"
             variant={period === value ? "default" : "outline"}
             onClick={() => setPeriod(value)}
           >
@@ -284,7 +284,7 @@ export default function OperationalDashboardPage() {
           <label className="text-sm font-medium">
             Data inicial
             <Input
-              className="mt-1"
+              className="mt-1 evolu-ui-field"
               type="date"
               value={customStart}
               onChange={event => setCustomStart(event.target.value)}
@@ -319,7 +319,7 @@ export default function OperationalDashboardPage() {
               attentionMetrics={attentionMetrics}
             />
             <div className="mt-6 grid gap-5 lg:grid-cols-5">
-              <Card className="evolu-dashboard__detail-card lg:col-span-3">
+              <Card className="evolu-dashboard__detail-card evolu-ui-panel lg:col-span-3">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
                     <AlertTriangle className="h-5 w-5 text-amber-600" /> Atenção
@@ -353,7 +353,7 @@ export default function OperationalDashboardPage() {
                   )}
                 </CardContent>
               </Card>
-              <Card className="evolu-dashboard__detail-card lg:col-span-2">
+              <Card className="evolu-dashboard__detail-card evolu-ui-panel lg:col-span-2">
                 <CardHeader>
                   <CardTitle className="text-base">Carga operacional</CardTitle>
                 </CardHeader>

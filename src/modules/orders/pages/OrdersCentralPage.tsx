@@ -317,7 +317,7 @@ export default function OrdersCentralPage() {
         />
         </div>
         {hubPermissions.canCreateOs && (
-          <Button className="evolu-orders__new-button" onClick={() => setLocation(createOrderPath("/os"))}>
+          <Button className="evolu-orders__new-button evolu-ui-primary-action" onClick={() => setLocation(createOrderPath("/os"))}>
             <Plus className="h-4 w-4" aria-hidden="true" /> Nova OS
           </Button>
         )}
@@ -327,7 +327,7 @@ export default function OrdersCentralPage() {
       ) : (
         <>
           <OrdersSummaryCards summary={summary} />
-          <section aria-label="Filtros rápidos" className="evolu-orders__quick-filters">
+          <section aria-label="Filtros rápidos" className="evolu-orders__quick-filters evolu-ui-panel">
             <div className="evolu-orders__quick-label">
               <span>Visualização rápida</span>
               <span className="evolu-orders__quick-hint">Filtre as ordens com um toque</span>
@@ -338,7 +338,7 @@ export default function OrdersCentralPage() {
                   key={value}
                   type="button"
                   size="sm"
-                  className="evolu-orders__quick-button"
+                  className="evolu-orders__quick-button evolu-ui-filter-control"
                   variant={quick === value ? "default" : "outline"}
                   aria-pressed={quick === value}
                   onClick={() => {
@@ -351,7 +351,7 @@ export default function OrdersCentralPage() {
               ))}
             </div>
           </section>
-          <Card className="evolu-orders__filter-card gap-4 py-4 shadow-xs">
+          <Card className="evolu-orders__filter-card evolu-ui-panel gap-4 py-4 shadow-xs">
             <CardContent className="space-y-3 px-4">
               <div className="evolu-orders__toolbar flex gap-2">
                 <OrderSearch value={search} onChange={setSearch} />
@@ -436,7 +436,7 @@ export default function OrdersCentralPage() {
             </CardContent>
           </Card>
           {error ? (
-            <Card className="evolu-orders__filter-card">
+            <Card className="evolu-orders__filter-card evolu-ui-panel">
               <CardContent>
                 <ErrorState
                   message="Não foi possível carregar as Ordens de Serviço."
@@ -445,7 +445,7 @@ export default function OrdersCentralPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="evolu-orders__table">
+            <div className="evolu-orders__table evolu-ui-panel">
               <div className="evolu-orders__table-heading">
                 <div>
                   <h2>Relação de ordens</h2>
