@@ -4,12 +4,6 @@ const state = vi.hoisted(() => ({
   client: null as any,
   officialCalculate: vi.fn(),
   officialQuoteCalculate: vi.fn(),
-  officialQuoteSave: vi.fn(),
-  officialQuoteLoad: vi.fn(),
-  officialQuoteHistory: vi.fn(),
-  officialQuoteMetrics: vi.fn(),
-  officialQuoteList: vi.fn(),
-  officialQuoteTransition: vi.fn(),
   officialQuoteFormLoad: vi.fn(),
 }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => state.client }));
@@ -61,40 +55,8 @@ vi.mock("../../api/_shared/quotes/formService.js", () => ({
     }
   },
 }));
-vi.mock("../../api/_shared/quotes/persistenceService.js", () => ({
-  QuotePersistenceServiceError: class QuotePersistenceServiceError extends Error {
-    status: number;
-    code: string;
-    constructor(status: number, code: string, message: string) {
-      super(message);
-      this.status = status;
-      this.code = code;
-    }
-  },
-  OfficialQuotePersistenceService: class OfficialQuotePersistenceService {
-    async save(input: unknown, actorId: string, isManager: boolean) {
-      return state.officialQuoteSave(input, actorId, isManager);
-    }
-    async load(input: unknown, actorId: string, isManager: boolean) {
-      return state.officialQuoteLoad(input, actorId, isManager);
-    }
-    async list(input: unknown, actorId: string, isManager: boolean) {
-      return state.officialQuoteList(input, actorId, isManager);
-    }
-    async metrics(input: unknown, actorId: string, isManager: boolean) {
-      return state.officialQuoteMetrics(input, actorId, isManager);
-    }
-    async history(input: unknown, actorId: string, isManager: boolean) {
-      return state.officialQuoteHistory(input, actorId, isManager);
-    }
-    async transition(input: unknown, actorId: string, isManager: boolean) {
-      return state.officialQuoteTransition(input, actorId, isManager);
-    }
-  },
-}));
 import { CostingDomainError } from "../../shared/costing/index.js";
 import { CostingServiceError } from "../../api/_shared/costing/service.js";
-import { QuoteNegotiationServiceError } from "../../api/_shared/quotes/negotiationService.js";
 import handler from "../../api/pricing";
 
 const id = (n: number) =>
@@ -234,10 +196,6 @@ describe("Pricing API manager authority", () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY = "server-secret";
     state.officialCalculate.mockReset();
     state.officialQuoteCalculate.mockReset();
-    state.officialQuoteSave.mockReset();
-    state.officialQuoteLoad.mockReset();
-    state.officialQuoteList.mockReset();
-    state.officialQuoteTransition.mockReset();
     state.officialQuoteFormLoad.mockReset();
   });
 
