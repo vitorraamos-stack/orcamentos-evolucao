@@ -29,6 +29,6 @@ describe("19G kiosk RLS and privileged RPC hardening", () => {
  });
  it("uses the signed-in identity, never the caller supplied actor id", () => {
   expect(sql).not.toContain("v_actor_id := coalesce(p_actor_id, auth.uid());");
-  expect((sql.match(/v_actor_id := auth.uid\(\);/g)??[]).toHaveLength(4);
+  expect(sql.match(/v_actor_id := auth.uid\(\);/g) ?? []).toHaveLength(4);
  });
 });
