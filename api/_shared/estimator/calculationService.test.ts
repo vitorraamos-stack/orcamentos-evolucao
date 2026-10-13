@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { OfficialPricingCalculationResult } from "../pricing/calculationService.js";
-import { OfficialQuoteCalculationService } from "./calculationService";
+import { OfficialEstimateCalculationService } from "./calculationService";
 
 const id = (n: number) =>
   `10000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -86,13 +86,13 @@ const request = {
   munck: { requested: false },
 };
 
-describe("OfficialQuoteCalculationService", () => {
+describe("OfficialEstimateCalculationService", () => {
   it("derives installation area from authoritative resolved dimensions and quantity", async () => {
     const pricing = { calculate: vi.fn(async () => pricingResult()) };
     const installation = {
       loadInstallationSettings: vi.fn(async () => settings),
     };
-    const result = await new OfficialQuoteCalculationService(
+    const result = await new OfficialEstimateCalculationService(
       pricing,
       installation
     ).calculate(request);
@@ -113,12 +113,12 @@ describe("OfficialQuoteCalculationService", () => {
     expect(result.installationSettingsRevision).toBe(3);
   });
 
-  it("does not load additional settings for a product-only quote", async () => {
+  it("does not load additional settings for a product-only estimate", async () => {
     const pricing = { calculate: vi.fn(async () => pricingResult()) };
     const installation = {
       loadInstallationSettings: vi.fn(async () => settings),
     };
-    const result = await new OfficialQuoteCalculationService(
+    const result = await new OfficialEstimateCalculationService(
       pricing,
       installation
     ).calculate({
@@ -137,7 +137,7 @@ describe("OfficialQuoteCalculationService", () => {
       ...original,
       costing: { ...original.costing, resolvedInputs: [] },
     } as OfficialPricingCalculationResult;
-    const result = await new OfficialQuoteCalculationService(
+    const result = await new OfficialEstimateCalculationService(
       { calculate: async () => withoutDimensions },
       { loadInstallationSettings: async () => settings }
     ).calculate({
@@ -172,7 +172,7 @@ describe("OfficialQuoteCalculationService", () => {
       },
     } as OfficialPricingCalculationResult;
 
-    const result = await new OfficialQuoteCalculationService(
+    const result = await new OfficialEstimateCalculationService(
       { calculate: async () => mixedUnits },
       { loadInstallationSettings: async () => settings }
     ).calculate({ ...request, request: { ...request.request, commercialQuantity: "1" } });
@@ -201,7 +201,7 @@ describe("OfficialQuoteCalculationService", () => {
       } as OfficialPricingCalculationResult;
 
       await expect(
-        new OfficialQuoteCalculationService(
+        new OfficialEstimateCalculationService(
           { calculate: async () => invalidDimensions },
           { loadInstallationSettings: async () => settings }
         ).calculate(request)
@@ -225,7 +225,7 @@ describe("OfficialQuoteCalculationService", () => {
     } as OfficialPricingCalculationResult;
 
     await expect(
-      new OfficialQuoteCalculationService(
+      new OfficialEstimateCalculationService(
         { calculate: async () => missingHeight },
         { loadInstallationSettings: async () => settings }
       ).calculate(request)

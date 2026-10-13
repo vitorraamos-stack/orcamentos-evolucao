@@ -2,14 +2,14 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(
-  "src/modules/quotes/pages/QuoteCalculatorPage.tsx",
+  "src/modules/estimator/pages/EstimatorPage.tsx",
   "utf8"
 );
 
-describe("QuoteCalculatorPage re-scope 19A", () => {
+describe("EstimatorPage re-scope 19A", () => {
   it("keeps the official calculation flow and copy summary", () => {
     expect(source).toContain(".loadForm()");
-    expect(source).toContain("quoteRepository.calculate(request)");
+    expect(source).toContain("estimatorRepository.calculate(request)");
     expect(source).toContain("buildTechnicalInputs(");
     expect(source).toContain("availableInstallments");
     expect(source).toContain("installationRequested");
@@ -29,10 +29,10 @@ describe("QuoteCalculatorPage re-scope 19A", () => {
     ])
       expect(source).not.toContain(action);
 
-    expect(source).not.toContain("quoteRepository.save(");
-    expect(source).not.toContain("quoteRepository.load(");
-    expect(source).not.toContain("quoteRepository.history(");
-    expect(source).not.toContain("quoteRepository.transition(");
+    expect(source).not.toContain("estimatorRepository.save(");
+    expect(source).not.toContain("estimatorRepository.load(");
+    expect(source).not.toContain("estimatorRepository.history(");
+    expect(source).not.toContain("estimatorRepository.transition(");
   });
 
   it("blocks stale results after inputs change", () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   PricingPersistenceServiceError,
 } from "../pricing/service.js";
-import { OfficialQuoteFormService } from "./formService";
+import { OfficialEstimatorFormService } from "./formService";
 
 const id = (n: number) =>
   `10000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -57,7 +57,7 @@ const pricing = {
   },
 };
 
-describe("OfficialQuoteFormService", () => {
+describe("OfficialEstimatorFormService", () => {
   it("exposes only client-editable inputs and configured installments", async () => {
     const productEngineering = {
       loadDefinition: async () => definition,
@@ -69,7 +69,7 @@ describe("OfficialQuoteFormService", () => {
       ],
     } as any;
 
-    const result = await new OfficialQuoteFormService(
+    const result = await new OfficialEstimatorFormService(
       dbWithProduct(),
       productEngineering,
       costing,
@@ -93,7 +93,7 @@ describe("OfficialQuoteFormService", () => {
   });
 
   it("keeps installation available when a dimension is server-managed", async () => {
-    const result = await new OfficialQuoteFormService(
+    const result = await new OfficialEstimatorFormService(
       dbWithProduct(),
       { loadDefinition: async () => definition } as any,
       {
@@ -174,7 +174,7 @@ describe("OfficialQuoteFormService", () => {
       },
     };
 
-    const result = await new OfficialQuoteFormService(
+    const result = await new OfficialEstimatorFormService(
       historicalDb,
       { loadDefinition: async () => definition } as any,
       { loadProductParameters: async () => [] } as any,
@@ -212,7 +212,7 @@ describe("OfficialQuoteFormService", () => {
       },
     };
 
-    const result = await new OfficialQuoteFormService(
+    const result = await new OfficialEstimatorFormService(
       restrictedDb,
       { loadDefinition: async () => definition } as any,
       { loadProductParameters: async () => [] } as any,
@@ -235,7 +235,7 @@ describe("OfficialQuoteFormService", () => {
       },
     };
 
-    const result = await new OfficialQuoteFormService(
+    const result = await new OfficialEstimatorFormService(
       dbWithProduct(),
       { loadDefinition: async () => definition } as any,
       { loadProductParameters: async () => [] } as any,

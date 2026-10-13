@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
   client: null as any,
   officialCalculate: vi.fn(),
-  officialQuoteCalculate: vi.fn(),
-  officialQuoteFormLoad: vi.fn(),
+  officialEstimateCalculate: vi.fn(),
+  estimatorFormLoad: vi.fn(),
 }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => state.client }));
 vi.mock("../../api/_shared/pricing/calculationService.js", () => ({
@@ -23,8 +23,8 @@ vi.mock("../../api/_shared/pricing/calculationService.js", () => ({
     }
   },
 }));
-vi.mock("../../api/_shared/quotes/calculationService.js", () => ({
-  OfficialQuoteCalculationError: class OfficialQuoteCalculationError extends Error {
+vi.mock("../../api/_shared/estimator/calculationService.js", () => ({
+  OfficialEstimateCalculationError: class OfficialEstimateCalculationError extends Error {
     status: number;
     code: string;
     constructor(status: number, code: string, message: string) {
@@ -33,14 +33,14 @@ vi.mock("../../api/_shared/quotes/calculationService.js", () => ({
       this.code = code;
     }
   },
-  OfficialQuoteCalculationService: class OfficialQuoteCalculationService {
+  OfficialEstimateCalculationService: class OfficialEstimateCalculationService {
     async calculate(input: unknown) {
-      return state.officialQuoteCalculate(input);
+      return state.officialEstimateCalculate(input);
     }
   },
 }));
-vi.mock("../../api/_shared/quotes/formService.js", () => ({
-  QuoteFormServiceError: class QuoteFormServiceError extends Error {
+vi.mock("../../api/_shared/estimator/formService.js", () => ({
+  EstimatorFormServiceError: class EstimatorFormServiceError extends Error {
     status: number;
     code: string;
     constructor(status: number, code: string, message: string) {
@@ -49,9 +49,9 @@ vi.mock("../../api/_shared/quotes/formService.js", () => ({
       this.code = code;
     }
   },
-  OfficialQuoteFormService: class OfficialQuoteFormService {
+  OfficialEstimatorFormService: class OfficialEstimatorFormService {
     async load() {
-      return state.officialQuoteFormLoad();
+      return state.estimatorFormLoad();
     }
   },
 }));
@@ -195,8 +195,8 @@ describe("Pricing API manager authority", () => {
     process.env.SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "server-secret";
     state.officialCalculate.mockReset();
-    state.officialQuoteCalculate.mockReset();
-    state.officialQuoteFormLoad.mockReset();
+    state.officialEstimateCalculate.mockReset();
+    state.estimatorFormLoad.mockReset();
   });
 
   it("returns 401 without bearer or with an invalid token", async () => {
@@ -366,7 +366,7 @@ describe("Pricing API manager authority", () => {
   );
 
   it.each(["consultor_vendas", "consultor", "gerente", "admin"])(
-    "allows %s to load the official Quote form",
+    "allows %s to load the official Estimator form",
     async role => {
       const form = {
         products: [
@@ -384,7 +384,7 @@ describe("Pricing API manager authority", () => {
         ],
         availableInstallments: [1, 2, 3],
       };
-      state.officialQuoteFormLoad.mockResolvedValueOnce(form);
+      state.estimatorFormLoad.mockResolvedValueOnce(form);
       state.client = client({ id: id(9) }, role);
       const res = response();
 
@@ -392,19 +392,19 @@ describe("Pricing API manager authority", () => {
         {
           method: "POST",
           headers: { authorization: "Bearer valid" },
-          body: { action: "GET_QUOTE_FORM" },
+          body: { action: "GET_ESTIMATOR_FORM" },
         },
         res
       );
 
       expect(res.statusCode).toBe(200);
       expect(res.payload).toEqual({ ok: true, data: form });
-      expect(state.officialQuoteFormLoad).toHaveBeenCalledTimes(1);
+      expect(state.estimatorFormLoad).toHaveBeenCalledTimes(1);
     }
   );
 
   it.each(["arte_finalista", "producao", "instalador"])(
-    "rejects role %s from the official Quote form",
+    "rejects role %s from the official Estimator form",
     async role => {
       state.client = client({ id: id(9) }, role);
       const res = response();
@@ -413,20 +413,20 @@ describe("Pricing API manager authority", () => {
         {
           method: "POST",
           headers: { authorization: "Bearer valid" },
-          body: { action: "GET_QUOTE_FORM" },
+          body: { action: "GET_ESTIMATOR_FORM" },
         },
         res
       );
 
       expect(res.statusCode).toBe(403);
-      expect(state.officialQuoteFormLoad).not.toHaveBeenCalled();
+      expect(state.estimatorFormLoad).not.toHaveBeenCalled();
     }
   );
 
   it.each([
-    "GET_QUOTE_FORM",
+    "GET_ESTIMATOR_FORM",
     "CALCULATE",
-    "CALCULATE_QUOTE",
+    "CALCULATE_ESTIMATE",
   ])(
     "requires the calculadora module server-side for %s",
     async action => {
@@ -456,13 +456,13 @@ describe("Pricing API manager authority", () => {
         },
       });
       expect(state.officialCalculate).not.toHaveBeenCalled();
-      expect(state.officialQuoteCalculate).not.toHaveBeenCalled();
-      expect(state.officialQuoteFormLoad).not.toHaveBeenCalled();
+      expect(state.officialEstimateCalculate).not.toHaveBeenCalled();
+      expect(state.estimatorFormLoad).not.toHaveBeenCalled();
     }
   );
 
   it.each(["consultor_vendas", "consultor", "gerente", "admin"])(
-    "allows %s to request a sanitized official Quote",
+    "allows %s to request a sanitized official estimate",
     async role => {
       const publicResult = {
         calculationVersion: "1.0",
@@ -489,7 +489,7 @@ describe("Pricing API manager authority", () => {
         roundingRule: "BRL_2DP_HALF_UP_V1",
         totalSellingPrice: { currency: "BRL", amount: "870.00" },
       };
-      state.officialQuoteCalculate.mockResolvedValueOnce({ publicResult });
+      state.officialEstimateCalculate.mockResolvedValueOnce({ publicResult });
       state.client = client({ id: id(9) }, role);
       const res = response();
 
@@ -498,7 +498,7 @@ describe("Pricing API manager authority", () => {
           method: "POST",
           headers: { authorization: "Bearer valid" },
           body: {
-            action: "CALCULATE_QUOTE",
+            action: "CALCULATE_ESTIMATE",
             productVersionId: id(5),
             request: {
               commercialQuantity: "1",
@@ -517,7 +517,7 @@ describe("Pricing API manager authority", () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.payload).toEqual({ ok: true, data: publicResult });
-      expect(state.officialQuoteCalculate).toHaveBeenCalledWith({
+      expect(state.officialEstimateCalculate).toHaveBeenCalledWith({
         productVersionId: id(5),
         request: {
           commercialQuantity: "1",
@@ -536,7 +536,7 @@ describe("Pricing API manager authority", () => {
     }
   );
 
-  it("rejects browser-supplied Quote prices", async () => {
+  it("rejects browser-supplied estimate prices", async () => {
     state.client = client({ id: id(9) }, "consultor_vendas");
     const res = response();
     await handler(
@@ -544,7 +544,7 @@ describe("Pricing API manager authority", () => {
         method: "POST",
         headers: { authorization: "Bearer valid" },
         body: {
-          action: "CALCULATE_QUOTE",
+          action: "CALCULATE_ESTIMATE",
           productVersionId: id(5),
           request: { commercialQuantity: "1", technicalInputs: {} },
           installments: 3,
@@ -556,7 +556,7 @@ describe("Pricing API manager authority", () => {
       res
     );
     expect(res.statusCode).toBe(400);
-    expect(state.officialQuoteCalculate).not.toHaveBeenCalled();
+    expect(state.officialEstimateCalculate).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -588,8 +588,8 @@ describe("Pricing API manager authority", () => {
       },
     });
     expect(state.officialCalculate).not.toHaveBeenCalled();
-    expect(state.officialQuoteCalculate).not.toHaveBeenCalled();
-    expect(state.officialQuoteFormLoad).not.toHaveBeenCalled();
+    expect(state.officialEstimateCalculate).not.toHaveBeenCalled();
+    expect(state.estimatorFormLoad).not.toHaveBeenCalled();
   });
 
   it.each(["arte_finalista", "producao", "instalador"])(
@@ -851,4 +851,24 @@ describe("Pricing API manager authority", () => {
       versionId: id(2),
     });
   });
+  it.each(["CALCULATE_QUOTE", "GET_QUOTE_FORM"])(
+    "retires legacy Quote calculation action %s",
+    async action => {
+      state.client = client({ id: id(9) }, "consultor_vendas");
+      const res = response();
+      await handler(
+        {
+          method: "POST",
+          headers: { authorization: "Bearer valid" },
+          body: { action },
+        },
+        res
+      );
+      expect(res.statusCode).toBe(410);
+      expect(res.payload.error.code).toBe("QUOTE_MANAGEMENT_RETIRED");
+      expect(state.officialEstimateCalculate).not.toHaveBeenCalled();
+      expect(state.estimatorFormLoad).not.toHaveBeenCalled();
+    }
+  );
+
 });

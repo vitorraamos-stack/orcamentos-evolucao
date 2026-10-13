@@ -9,7 +9,7 @@ describe("Orçamentista UI boundary 19A", () => {
     const layout = read("src/components/Layout.tsx");
 
     expect(app).toContain('path="/orcamentista"');
-    expect(app).toContain("<QuoteCalculatorPage />");
+    expect(app).toContain("<EstimatorPage />");
 
     expect(app).not.toContain(
       'import QuotesCentralPage from "@/modules/quotes/pages/QuotesCentralPage"'
@@ -24,7 +24,7 @@ describe("Orçamentista UI boundary 19A", () => {
     expect(layout).not.toContain("Orçamentos");
   });
 
-  it("redirects legacy Quote-management URLs back to the estimator", () => {
+  it("redirects legacy legacy quote-management URLs back to the estimator", () => {
     const app = read("src/App.tsx");
 
     expect(app).toContain('path="/orcamentos"');

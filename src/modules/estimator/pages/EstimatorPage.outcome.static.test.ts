@@ -2,11 +2,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(
-  "src/modules/quotes/pages/QuoteCalculatorPage.tsx",
+  "src/modules/estimator/pages/EstimatorPage.tsx",
   "utf8"
 );
 
-describe("QuoteCalculatorPage lifecycle boundary 19A", () => {
+describe("EstimatorPage lifecycle boundary 19A", () => {
   it("does not manage commercial Quote lifecycle or outcome reasons", () => {
     expect(source).not.toContain("TRANSITION_QUOTE");
     expect(source).not.toContain("openOutcomeDialog");

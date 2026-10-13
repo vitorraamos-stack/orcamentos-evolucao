@@ -1,10 +1,10 @@
 import {
-  calculateQuoteCommercial,
-  officialQuotePublicResultSchema,
-  officialQuoteRequestSchema,
-  OFFICIAL_QUOTE_CALCULATION_VERSION,
-  type OfficialQuotePublicResult,
-} from "../../../shared/quotes/index.js";
+  calculateEstimateCommercial,
+  officialEstimatePublicResultSchema,
+  officialEstimateRequestSchema,
+  OFFICIAL_ESTIMATE_CALCULATION_VERSION,
+  type OfficialEstimatePublicResult,
+} from "../../../shared/estimator/index.js";
 import {
   compareDecimal,
   decimalString,
@@ -21,21 +21,21 @@ export interface OfficialPricingCalculator {
   calculate(input: unknown): Promise<OfficialPricingCalculationResult>;
 }
 
-export interface QuoteInstallationSettingsLoader {
+export interface EstimatorInstallationSettingsLoader {
   loadInstallationSettings(): Promise<PricingInstallationSettings>;
 }
 
-export class OfficialQuoteCalculationError extends Error {
+export class OfficialEstimateCalculationError extends Error {
   constructor(
     readonly status: number,
     readonly code:
-      | "INVALID_OFFICIAL_QUOTE_REQUEST"
+      | "INVALID_OFFICIAL_ESTIMATE_REQUEST"
       | "INSTALLATION_AREA_UNAVAILABLE"
-      | "INVALID_OFFICIAL_QUOTE_RESULT",
+      | "INVALID_OFFICIAL_ESTIMATE_RESULT",
     message: string
   ) {
     super(message);
-    this.name = "OfficialQuoteCalculationError";
+    this.name = "OfficialEstimateCalculationError";
   }
 }
 
@@ -49,7 +49,7 @@ function resolvedMeterInput(
     input.value.kind !== "decimal" ||
     input.value.unit === null
   )
-    throw new OfficialQuoteCalculationError(
+    throw new OfficialEstimateCalculationError(
       422,
       "INSTALLATION_AREA_UNAVAILABLE",
       "Installation area cannot be derived from this product."
@@ -60,7 +60,7 @@ function resolvedMeterInput(
       throw new Error("NON_POSITIVE_INSTALLATION_DIMENSION");
     return normalized;
   } catch {
-    throw new OfficialQuoteCalculationError(
+    throw new OfficialEstimateCalculationError(
       422,
       "INSTALLATION_AREA_UNAVAILABLE",
       "Installation area cannot be derived from this product."
@@ -79,26 +79,26 @@ function installationAreaM2(
   );
 }
 
-export interface OfficialQuoteCalculationResult {
-  readonly publicResult: OfficialQuotePublicResult;
+export interface OfficialEstimateCalculationResult {
+  readonly publicResult: OfficialEstimatePublicResult;
   readonly pricing: OfficialPricingCalculationResult;
   readonly installationSettingsRevision: number | null;
   readonly installationSettings: PricingInstallationSettings | null;
 }
 
-export class OfficialQuoteCalculationService {
+export class OfficialEstimateCalculationService {
   constructor(
     private readonly pricing: OfficialPricingCalculator,
-    private readonly installationSettings: QuoteInstallationSettingsLoader
+    private readonly installationSettings: EstimatorInstallationSettingsLoader
   ) {}
 
-  async calculate(input: unknown): Promise<OfficialQuoteCalculationResult> {
-    const parsed = officialQuoteRequestSchema.safeParse(input);
+  async calculate(input: unknown): Promise<OfficialEstimateCalculationResult> {
+    const parsed = officialEstimateRequestSchema.safeParse(input);
     if (!parsed.success)
-      throw new OfficialQuoteCalculationError(
+      throw new OfficialEstimateCalculationError(
         400,
-        "INVALID_OFFICIAL_QUOTE_REQUEST",
-        "Invalid official Quote request."
+        "INVALID_OFFICIAL_ESTIMATE_REQUEST",
+        "Invalid official estimate request."
       );
 
     const request = parsed.data;
@@ -120,7 +120,7 @@ export class OfficialQuoteCalculationService {
       ? request.munck.hours
       : null;
 
-    const commercial = calculateQuoteCommercial({
+    const commercial = calculateEstimateCommercial({
       productSellingPrice: pricing.commercial.priceAfterMinimum.amount,
       financialRate: pricing.commercial.financialRate,
       installationRequested: request.installation.requested,
@@ -129,8 +129,8 @@ export class OfficialQuoteCalculationService {
       settings,
     });
 
-    const publicResult = officialQuotePublicResultSchema.safeParse({
-      calculationVersion: OFFICIAL_QUOTE_CALCULATION_VERSION,
+    const publicResult = officialEstimatePublicResultSchema.safeParse({
+      calculationVersion: OFFICIAL_ESTIMATE_CALCULATION_VERSION,
       productId: pricing.publicResult.productId,
       productVersionId: pricing.publicResult.productVersionId,
       productVersionNumber: pricing.publicResult.productVersionNumber,
@@ -146,10 +146,10 @@ export class OfficialQuoteCalculationService {
     });
 
     if (!publicResult.success)
-      throw new OfficialQuoteCalculationError(
+      throw new OfficialEstimateCalculationError(
         500,
-        "INVALID_OFFICIAL_QUOTE_RESULT",
-        "Official Quote result is incompatible with its public contract."
+        "INVALID_OFFICIAL_ESTIMATE_RESULT",
+        "Official estimate result is incompatible with its public contract."
       );
 
     return {

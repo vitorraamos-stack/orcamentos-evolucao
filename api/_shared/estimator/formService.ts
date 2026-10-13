@@ -1,8 +1,8 @@
 import {
-  quoteFormDefinitionSchema,
-  type QuoteFormDefinition,
-  type QuoteFormProduct,
-} from "../../../shared/quotes/index.js";
+  estimatorFormDefinitionSchema,
+  type EstimatorFormDefinition,
+  type EstimatorFormProduct,
+} from "../../../shared/estimator/index.js";
 import { CostingService } from "../costing/service.js";
 import {
   PricingPersistenceService,
@@ -27,14 +27,14 @@ const unavailableProductPricingCodes = new Set([
   "PRICING_PUBLISHED_VERSION_NOT_FOUND",
 ]);
 
-export class QuoteFormServiceError extends Error {
+export class EstimatorFormServiceError extends Error {
   constructor(
     readonly status: number,
-    readonly code: "QUOTE_FORM_UNAVAILABLE",
+    readonly code: "ESTIMATOR_FORM_UNAVAILABLE",
     message: string
   ) {
     super(message);
-    this.name = "QuoteFormServiceError";
+    this.name = "EstimatorFormServiceError";
   }
 }
 
@@ -50,7 +50,7 @@ const isUnavailableProductPricing = (error: unknown) =>
   error instanceof PricingPersistenceServiceError &&
   unavailableProductPricingCodes.has(error.code);
 
-export class OfficialQuoteFormService {
+export class OfficialEstimatorFormService {
   private readonly productEngineering: ProductEngineeringReader;
   private readonly costing: CostingReader;
   private readonly pricing: PricingReader;
@@ -107,7 +107,7 @@ export class OfficialQuoteFormService {
     version: { id: string; version_number: number; status?: string },
     additionsConfigured: boolean,
     calculationAvailable: boolean
-  ): Promise<QuoteFormProduct> {
+  ): Promise<EstimatorFormProduct> {
     const [definition, parameters] = await Promise.all([
       this.productEngineering.loadDefinition(version.id),
       this.costing.loadProductParameters(product.id),
@@ -135,11 +135,11 @@ export class OfficialQuoteFormService {
     );
 
     return {
-      productId: product.id as QuoteFormProduct["productId"],
+      productId: product.id as EstimatorFormProduct["productId"],
       code: product.code,
       name: product.name,
       productVersionId:
-        version.id as QuoteFormProduct["productVersionId"],
+        version.id as EstimatorFormProduct["productVersionId"],
       productVersionNumber: version.version_number,
       inputs,
       installationAvailable:
@@ -151,7 +151,7 @@ export class OfficialQuoteFormService {
 
   async load(
     includeProductVersionId: string | null = null
-  ): Promise<QuoteFormDefinition> {
+  ): Promise<EstimatorFormDefinition> {
     const [productsResult, installments, additionsConfigured] =
       await Promise.all([
         this.db
@@ -164,13 +164,13 @@ export class OfficialQuoteFormService {
       ]);
 
     if (productsResult.error)
-      throw new QuoteFormServiceError(
+      throw new EstimatorFormServiceError(
         500,
-        "QUOTE_FORM_UNAVAILABLE",
-        "Quote form configuration is unavailable."
+        "ESTIMATOR_FORM_UNAVAILABLE",
+        "Estimator form configuration is unavailable."
       );
 
-    const products: QuoteFormDefinition["products"] = [];
+    const products: EstimatorFormDefinition["products"] = [];
 
     for (const product of productsResult.data ?? []) {
       if (!(await this.productHasUsablePricing(product.id))) continue;
@@ -185,10 +185,10 @@ export class OfficialQuoteFormService {
         .maybeSingle();
 
       if (versionResult.error)
-        throw new QuoteFormServiceError(
+        throw new EstimatorFormServiceError(
           500,
-          "QUOTE_FORM_UNAVAILABLE",
-          "Quote form configuration is unavailable."
+          "ESTIMATOR_FORM_UNAVAILABLE",
+          "Estimator form configuration is unavailable."
         );
       if (!versionResult.data) continue;
 
@@ -216,10 +216,10 @@ export class OfficialQuoteFormService {
         .maybeSingle();
 
       if (versionResult.error)
-        throw new QuoteFormServiceError(
+        throw new EstimatorFormServiceError(
           500,
-          "QUOTE_FORM_UNAVAILABLE",
-          "Quote form configuration is unavailable."
+          "ESTIMATOR_FORM_UNAVAILABLE",
+          "Estimator form configuration is unavailable."
         );
 
       if (versionResult.data) {
@@ -230,10 +230,10 @@ export class OfficialQuoteFormService {
           .maybeSingle();
 
         if (productResult.error)
-          throw new QuoteFormServiceError(
+          throw new EstimatorFormServiceError(
             500,
-            "QUOTE_FORM_UNAVAILABLE",
-            "Quote form configuration is unavailable."
+            "ESTIMATOR_FORM_UNAVAILABLE",
+            "Estimator form configuration is unavailable."
           );
 
         if (productResult.data) {
@@ -254,7 +254,7 @@ export class OfficialQuoteFormService {
       }
     }
 
-    return quoteFormDefinitionSchema.parse({
+    return estimatorFormDefinitionSchema.parse({
       products,
       availableInstallments: installments,
     });

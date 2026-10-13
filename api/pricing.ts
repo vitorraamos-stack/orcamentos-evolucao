@@ -9,9 +9,9 @@ import {
   PricingDomainError,
 } from "../shared/pricing/index.js";
 import {
-  officialQuoteApiRequestSchema,
-  quoteFormApiRequestSchema,
-} from "../shared/quotes/index.js";
+  officialEstimateApiRequestSchema,
+  estimatorFormApiRequestSchema,
+} from "../shared/estimator/index.js";
 import { CostingCompatibilityError } from "./_shared/costing/mappers.js";
 import {
   OfficialCostingCalculationService,
@@ -26,13 +26,13 @@ import {
   OfficialPricingCalculationService,
 } from "./_shared/pricing/calculationService.js";
 import {
-  OfficialQuoteCalculationError,
-  OfficialQuoteCalculationService,
-} from "./_shared/quotes/calculationService.js";
+  OfficialEstimateCalculationError,
+  OfficialEstimateCalculationService,
+} from "./_shared/estimator/calculationService.js";
 import {
-  OfficialQuoteFormService,
-  QuoteFormServiceError,
-} from "./_shared/quotes/formService.js";
+  OfficialEstimatorFormService,
+  EstimatorFormServiceError,
+} from "./_shared/estimator/formService.js";
 import {
   PricingPersistenceCompatibilityError,
 } from "./_shared/pricing/mappers.js";
@@ -115,7 +115,7 @@ const pricingConfigurationErrors: Record<
     message: "The selected installment option is not configured.",
   },
   PRICING_INSTALLATION_SETTINGS_NOT_FOUND: {
-    code: "QUOTE_ADDITIONALS_NOT_CONFIGURED",
+    code: "ESTIMATOR_ADDITIONALS_NOT_CONFIGURED",
     message: "Installation and munck settings are not configured.",
   },
 };
@@ -177,21 +177,23 @@ export default async function handler(req: any, res: any) {
     "GET_QUOTE_METRICS",
     "LIST_QUOTES",
     "TRANSITION_QUOTE",
+    "CALCULATE_QUOTE",
+    "GET_QUOTE_FORM",
   ]);
   const isRetiredQuoteManagementAction =
     typeof action === "string" && retiredQuoteManagementActions.has(action);
   const isPricingCalculation = action === "CALCULATE";
-  const isQuoteCalculation = action === "CALCULATE_QUOTE";
-  const isQuoteFormAction = action === "GET_QUOTE_FORM";
-  const isCalculation = isPricingCalculation || isQuoteCalculation;
-  const requiresCalculatorModule = isCalculation || isQuoteFormAction;
+  const isEstimateCalculation = action === "CALCULATE_ESTIMATE";
+  const isEstimatorFormAction = action === "GET_ESTIMATOR_FORM";
+  const isCalculation = isPricingCalculation || isEstimateCalculation;
+  const requiresCalculatorModule = isCalculation || isEstimatorFormAction;
 
   const log = (
     scope:
       | "pricing"
       | "official_pricing"
-      | "official_quote"
-      | "quote_form",
+      | "official_estimate"
+      | "estimator_form",
     event: string,
     details: Record<string, unknown>
   ) =>
@@ -281,29 +283,29 @@ export default async function handler(req: any, res: any) {
       return send(res, 200, { ok: true, data });
     }
 
-    if (isQuoteFormAction) {
+    if (isEstimatorFormAction) {
       if (!canCalculate)
         return fail(
           res,
           403,
           "FORBIDDEN",
-          "Quote form is restricted to Sales and managers."
+          "Estimator form is restricted to Sales and managers."
         );
 
-      const parsed = quoteFormApiRequestSchema.safeParse(body);
+      const parsed = estimatorFormApiRequestSchema.safeParse(body);
       if (!parsed.success)
         return fail(
           res,
           400,
           "INVALID_PAYLOAD",
-          "Invalid Quote form request.",
+          "Invalid Estimator form request.",
           parsed.error.issues
         );
 
-      const data = await new OfficialQuoteFormService(db).load(
+      const data = await new OfficialEstimatorFormService(db).load(
         parsed.data.productVersionId
       );
-      log("quote_form", "form_loaded", {
+      log("estimator_form", "form_loaded", {
         products: data.products.length,
         availableInstallments: data.availableInstallments,
       });
@@ -327,25 +329,25 @@ export default async function handler(req: any, res: any) {
         pricing
       );
 
-      if (isQuoteCalculation) {
-        const parsed = officialQuoteApiRequestSchema.safeParse(body);
+      if (isEstimateCalculation) {
+        const parsed = officialEstimateApiRequestSchema.safeParse(body);
         if (!parsed.success)
           return fail(
             res,
             400,
             "INVALID_PAYLOAD",
-            "Invalid official Quote request.",
+            "Invalid official estimate request.",
             parsed.error.issues
           );
 
-        log("official_quote", "calculation_started", {
+        log("official_estimate", "calculation_started", {
           productVersionId: parsed.data.productVersionId,
           installments: parsed.data.installments,
           installationRequested: parsed.data.installation.requested,
           munckRequested: parsed.data.munck.requested,
         });
 
-        const calculation = new OfficialQuoteCalculationService(
+        const calculation = new OfficialEstimateCalculationService(
           pricingCalculation,
           pricing
         );
@@ -357,7 +359,7 @@ export default async function handler(req: any, res: any) {
           munck: parsed.data.munck,
         });
 
-        log("official_quote", "calculation_completed", {
+        log("official_estimate", "calculation_completed", {
           productVersionId: result.publicResult.productVersionId,
           installments: result.publicResult.installments,
           installationSettingsRevision: result.installationSettingsRevision,
@@ -422,12 +424,12 @@ export default async function handler(req: any, res: any) {
     });
     return send(res, 200, { ok: true, data });
   } catch (error) {
-    if (isCalculation || isQuoteFormAction) {
+    if (isCalculation || isEstimatorFormAction) {
       log(
-        isQuoteFormAction
-          ? "quote_form"
-          : isQuoteCalculation
-            ? "official_quote"
+        isEstimatorFormAction
+          ? "estimator_form"
+          : isEstimateCalculation
+            ? "official_estimate"
             : "official_pricing",
         "calculation_failed",
         {
@@ -438,7 +440,7 @@ export default async function handler(req: any, res: any) {
         }
       );
 
-      if (error instanceof QuoteFormServiceError)
+      if (error instanceof EstimatorFormServiceError)
         return fail(res, error.status, error.code, error.message);
 
       if (error instanceof PricingPersistenceServiceError) {
@@ -511,7 +513,7 @@ export default async function handler(req: any, res: any) {
         return fail(res, 400, error.code, error.message);
 
       if (
-        error instanceof OfficialQuoteCalculationError &&
+        error instanceof OfficialEstimateCalculationError &&
         (error.status === 400 || error.status === 422)
       )
         return fail(res, error.status, error.code, error.message);
@@ -523,7 +525,7 @@ export default async function handler(req: any, res: any) {
         error instanceof PricingPersistenceCompatibilityError ||
         error instanceof PricingDomainError ||
         error instanceof OfficialPricingCalculationError ||
-        error instanceof OfficialQuoteCalculationError ||
+        error instanceof OfficialEstimateCalculationError ||
         error instanceof z.ZodError
       )
         return fail(

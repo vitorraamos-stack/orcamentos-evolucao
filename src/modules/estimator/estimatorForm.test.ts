@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTechnicalInputs,
-  hydrateQuoteFields,
-  initialQuoteFields,
+  estimatorFingerprint,
+  initialEstimatorFields,
   normalizeUserDecimal,
-  quoteEditableStateFingerprint,
-  quoteFingerprint,
   positiveUserDecimal,
-} from "./quoteForm";
+} from "./estimatorForm";
 import type { ProductInput } from "@shared/product-engineering";
 
 const id = (n: number) =>
@@ -36,21 +34,21 @@ const inputs: ProductInput[] = [
   },
 ];
 
-describe("quote form helpers", () => {
+describe("estimator form helpers", () => {
   it("normalizes Brazilian decimal notation without using JS number", () => {
     expect(normalizeUserDecimal("1.234,50")).toBe("1234.5");
     expect(positiveUserDecimal("2,5", "Quantidade")).toBe("2.5");
   });
 
   it("prefers centimeters for dimensional meter inputs", () => {
-    const initial = initialQuoteFields(inputs);
+    const initial = initialEstimatorFields(inputs);
     expect(initial.units.width).toBe("cm");
     expect(initial.values.number_of_colors).toBe("0");
   });
 
   it("creates the same fingerprint regardless of object key order", () => {
     expect(
-      quoteFingerprint({
+      estimatorFingerprint({
         request: {
           technicalInputs: {
             width: { kind: "decimal", value: "1", unit: "m" },
@@ -60,7 +58,7 @@ describe("quote form helpers", () => {
         },
       })
     ).toBe(
-      quoteFingerprint({
+      estimatorFingerprint({
         request: {
           commercialQuantity: "1",
           technicalInputs: {
@@ -70,52 +68,6 @@ describe("quote form helpers", () => {
         },
       })
     );
-  });
-
-  it("tracks only the editable Quote state for persisted dirty checks", () => {
-    const base = {
-      productVersionId: id(9),
-      fieldValues: { width: "150.5", number_of_colors: "2" },
-      fieldUnits: { width: "cm" as const, number_of_colors: null },
-      quantity: "1",
-      installments: "3",
-      installationRequested: false,
-      munckRequested: false,
-      munckHours: "4",
-      commercial: {
-        customerName: " Cliente Teste ",
-        customerPhone: " 48999999999 ",
-        title: " Letreiro ",
-      },
-    };
-
-    expect(quoteEditableStateFingerprint(base)).toBe(
-      quoteEditableStateFingerprint({
-        ...base,
-        munckHours: "99",
-        commercial: {
-          customerName: "Cliente Teste",
-          customerPhone: "48999999999",
-          title: "Letreiro",
-        },
-      })
-    );
-    expect(
-      quoteEditableStateFingerprint({
-        ...base,
-        fieldValues: { ...base.fieldValues, width: "151" },
-      })
-    ).not.toBe(quoteEditableStateFingerprint(base));
-  });
-
-  it("hydrates a persisted Quote back into editable fields", () => {
-    const hydrated = hydrateQuoteFields(inputs, {
-      width: { kind: "decimal", value: "150.5", unit: "cm" },
-      number_of_colors: { kind: "decimal", value: "2", unit: null },
-    });
-    expect(hydrated.values.width).toBe("150.5");
-    expect(hydrated.units.width).toBe("cm");
-    expect(hydrated.values.number_of_colors).toBe("2");
   });
 
   it("builds typed technical inputs using the selected unit", () => {
