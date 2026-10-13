@@ -98,7 +98,7 @@ export class OfficialEstimateCalculationService {
       throw new OfficialEstimateCalculationError(
         400,
         "INVALID_OFFICIAL_ESTIMATE_REQUEST",
-        "Invalid official Quote request."
+        "Invalid official estimate request."
       );
 
     const request = parsed.data;

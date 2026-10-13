@@ -536,7 +536,7 @@ describe("Pricing API manager authority", () => {
     }
   );
 
-  it("rejects browser-supplied Quote prices", async () => {
+  it("rejects browser-supplied estimate prices", async () => {
     state.client = client({ id: id(9) }, "consultor_vendas");
     const res = response();
     await handler(
