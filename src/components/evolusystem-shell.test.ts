@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const layout = readFileSync(new URL("./Layout.tsx", import.meta.url), "utf8");
+const shellStyles = readFileSync(new URL("./evolusystem-shell.css", import.meta.url), "utf8");
 const dashboard = readFileSync(new URL("../modules/dashboard/OperationalDashboardPage.tsx", import.meta.url), "utf8");
 const login = readFileSync(new URL("../pages/Login.tsx", import.meta.url), "utf8");
 
@@ -11,6 +12,17 @@ describe("EvoluSystem premium shell", () => {
     expect(layout).not.toContain("Evolução OS 2.0");
     expect(layout).toContain("evolu-shell__navigation min-h-0 flex-1 overflow-y-auto");
     expect(layout).toContain("setMobileOpen(false)");
+  });
+
+  it("shows only the EvoluSystem wordmark in desktop and mobile sidebars", () => {
+    const sidebarBrands = layout.match(/className="evolu-shell__brand-name"/g) ?? [];
+    expect(sidebarBrands).toHaveLength(2);
+    expect(layout).not.toContain('src="/logo-branca.png"');
+    expect(layout).not.toContain("evolu-shell__company-logo");
+    expect(layout).not.toContain("evolu-shell__brand-description");
+    expect(layout).not.toContain("evolu-shell__cmyk");
+    expect(shellStyles).not.toContain("evolu-shell__company-logo");
+    expect(login).toContain('src="/logo-branca.png"');
   });
 
   it("keeps account identification in the sidebar and a compact mobile-only header", () => {

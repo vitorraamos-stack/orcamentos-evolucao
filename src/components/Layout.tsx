@@ -292,10 +292,7 @@ export default function Layout({ children }: LayoutProps) {
     )}>
       <aside className="evolu-shell__sidebar hidden w-[264px] shrink-0 flex-col text-white md:flex" aria-label="Menu lateral">
         <div className="evolu-shell__branding">
-          <img src="/logo-branca.png" alt="Evolução Comunicação Visual" className="evolu-shell__company-logo" />
           <div className="evolu-shell__brand-name">Evolu<span>System</span></div>
-          <p className="evolu-shell__brand-description">Controle Operacional</p>
-          <div className="evolu-shell__cmyk" aria-hidden="true"><i /><i /><i /></div>
         </div>
         <nav className="evolu-shell__navigation min-h-0 flex-1 overflow-y-auto px-3 py-3" aria-label="Navegação principal">
           <NavItems />
@@ -326,10 +323,7 @@ export default function Layout({ children }: LayoutProps) {
               <SheetContent side="left" className="w-[min(85vw,300px)] gap-0 border-r-0 bg-[#071A34] p-0 text-white">
                 <SheetTitle className="sr-only">Menu do EvoluSystem</SheetTitle>
                 <div className="evolu-shell__branding shrink-0">
-                  <img src="/logo-branca.png" alt="Evolução Comunicação Visual" className="evolu-shell__company-logo" />
                   <div className="evolu-shell__brand-name">Evolu<span>System</span></div>
-                  <p className="evolu-shell__brand-description">Controle Operacional</p>
-                  <div className="evolu-shell__cmyk" aria-hidden="true"><i /><i /><i /></div>
                 </div>
                 <nav
                   aria-label="Navegação principal"
