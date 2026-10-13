@@ -4,19 +4,16 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(
   "src/modules/quotes/pages/QuoteCalculatorPage.tsx",
   "utf8"
-).replaceAll("\r\n", "\n");
+);
 
-describe("QuoteCalculatorPage commercial outcome 18L", () => {
-  it("opens a reason dialog instead of directly rejecting or cancelling", () => {
-    expect(source).toContain('openOutcomeDialog("REJECTED")');
-    expect(source).toContain('openOutcomeDialog("CANCELLED")');
-    expect(source).toContain("Registrar orçamento recusado");
-    expect(source).toContain("Registre o motivo");
-  });
-
-  it("renders only the sanitized outcome reason from history", () => {
-    expect(source).toContain("item.outcomeReason");
-    expect(source).toContain("OUTCOME_REASON_LABEL");
-    expect(source).not.toContain("item.payload");
+describe("QuoteCalculatorPage lifecycle boundary 19A", () => {
+  it("does not manage commercial Quote lifecycle or outcome reasons", () => {
+    expect(source).not.toContain("TRANSITION_QUOTE");
+    expect(source).not.toContain("openOutcomeDialog");
+    expect(source).not.toContain("QuoteOutcomeReason");
+    expect(source).not.toContain("REJECTED_REASON_OPTIONS");
+    expect(source).not.toContain("CANCELLED_REASON_OPTIONS");
+    expect(source).not.toContain("Marcar enviado");
+    expect(source).not.toContain("Criar OS a partir deste orçamento");
   });
 });

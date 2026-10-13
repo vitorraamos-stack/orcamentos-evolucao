@@ -4,21 +4,14 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(
   "src/modules/quotes/pages/QuoteCalculatorPage.tsx",
   "utf8"
-).replaceAll("\r\n", "\n");
+);
 
-describe("QuoteCalculatorPage history 18K", () => {
-  it("renders a sanitized timeline and reloads it by Quote revision", () => {
-    expect(source).toMatch(
-      /quoteRepository\s*\.\s*history\(saved\.quoteId\)/
-    );
-    expect(source).toMatch(
-      /\[\s*saved\?\.quoteId,\s*saved\?\.revision\s*\]/
-    );
-    expect(source).toMatch(/>\s*Histórico\s*</);
-    expect(source).toContain("Ajuste gerencial");
-    expect(source).toContain("item.totalSellingPrice.amount");
-    expect(source).not.toContain("item.minimumAllowedTotal");
-    expect(source).not.toContain("item.payload");
-    expect(source).not.toContain("item.negotiationPrivateSnapshot");
+describe("QuoteCalculatorPage stateless history boundary 19A", () => {
+  it("does not load or render persisted Quote history", () => {
+    expect(source).not.toContain("quoteRepository.history(");
+    expect(source).not.toContain("QuoteHistoryItem");
+    expect(source).not.toContain("historyItems");
+    expect(source).not.toContain("Histórico");
+    expect(source).not.toContain("Snapshot v");
   });
 });
