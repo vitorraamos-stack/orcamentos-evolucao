@@ -3,15 +3,8 @@
   background: radial-gradient(ellipse at 105% 5%, #11365d, #071a34 68%);
 }
 .evolu-shell__branding { border-bottom: 1px solid rgba(159,195,225,.15); padding: 25px 22px 22px; }
-.evolu-shell__company-logo { display:block; height: 58px; width:auto; max-width:190px; object-fit:contain; object-position:left center; }
-.evolu-shell__brand-name { margin-top:16px; color:white; font-size:26px; font-weight:800; letter-spacing:-.055em; line-height:1.1; }
+.evolu-shell__brand-name { margin-top:0; color:white; font-size:26px; font-weight:800; letter-spacing:-.055em; line-height:1.1; }
 .evolu-shell__brand-name span { color:#31b6f5; }
-.evolu-shell__brand-description { margin-top:4px; color:#a9c2db; font-size:10px; font-weight:650; letter-spacing:.19em; text-transform:uppercase; }
-.evolu-shell__cmyk { display:flex; overflow:hidden; width:72px; height:3px; margin-top:16px; border-radius:99px; }
-.evolu-shell__cmyk i { flex:1; }
-.evolu-shell__cmyk i:nth-child(1) { background:#00adee; }
-.evolu-shell__cmyk i:nth-child(2) { background:#ee168f; }
-.evolu-shell__cmyk i:nth-child(3) { background:#f5dc00; }
 .evolu-shell__navigation { scrollbar-color:#395979 transparent; scrollbar-width:thin; }
 .evolu-shell__navigation .evolu-nav__section { color:#8aa9c9; letter-spacing:.14em; }
 .evolu-shell__navigation .evolu-nav__item {
@@ -37,6 +30,5 @@
   .evolu-shell__topbar { height:56px; }
   .evolu-shell__main { padding:16px; }
   .evolu-shell__branding { padding-top:22px; padding-bottom:18px; }
-  .evolu-shell__company-logo { height:48px; }
 }
 @media(prefers-reduced-motion:reduce) { .evolu-shell__navigation .evolu-nav__item { transition:none; } }
