@@ -1,6 +1,6 @@
 .evolu-orders {
-  --orders-line: #e2eaf3;
-  --orders-blue: #087fcb;
+  --orders-line: var(--evolu-ui-border);
+  --orders-blue: var(--evolu-ui-primary);
   color: #182e48;
 }
 
@@ -22,12 +22,7 @@
   width: 28px; height: 2px;
   background: linear-gradient(90deg,#00a0e3 0 42%,#ec008c 42% 74%,#fce000 74%);
 }
-.evolu-orders__new-button {
-  min-height: 43px; padding-inline: 17px; border-radius: 11px;
-  background: #0784d1; color: white; font-weight: 700;
-  box-shadow: 0 9px 20px -12px rgba(9,113,183,.75);
-}
-.evolu-orders__new-button:hover { background: #006fad; }
+/* Primary action styling is shared with the dashboard via .evolu-ui-primary-action. */
 .evolu-orders [aria-label="Resumo das ordens"] { gap: 12px; }
 .evolu-orders [aria-label="Resumo das ordens"] > [data-slot="card"] {
   min-width: 0; border: 1px solid var(--orders-line); border-radius: 16px;
@@ -42,10 +37,7 @@
 .evolu-orders [aria-label="Resumo das ordens"] [data-slot="card-content"] p.text-2xl {
   font-size: 27px; letter-spacing: -.045em; color: #172d46;
 }
-.evolu-orders__quick-filters {
-  padding: 17px 18px 14px; border: 1px solid var(--orders-line);
-  border-radius: 16px; background: #fff;
-}
+.evolu-orders__quick-filters { padding: 17px 18px 14px; }
 .evolu-orders__quick-label {
   display: flex; justify-content: space-between; align-items: baseline;
   gap: 12px; margin-bottom: 12px; font-size: 13px;
@@ -56,23 +48,14 @@
   display: flex; gap: 8px; overflow-x: auto; padding-bottom: 3px;
   scrollbar-width: thin;
 }
-.evolu-orders__quick-button {
-  flex: 0 0 auto; min-height: 37px; padding-inline: 14px; border-radius: 99px;
-  font-size: 12px; font-weight: 650;
-}
+.evolu-orders__quick-button { flex: 0 0 auto; }
 .evolu-orders__quick-button[aria-pressed="true"] {
   border-color: var(--orders-blue); background: var(--orders-blue); color: #fff;
 }
-.evolu-orders__filter-card {
-  border: 1px solid var(--orders-line); border-radius: 16px; background: #fff;
-  box-shadow: 0 12px 32px -30px rgba(24,54,91,.55);
-}
-.evolu-orders__toolbar input { min-height: 42px; border-radius: 10px; background: #f9fbfe; }
+/* Filter cards share the same surface composition as the other operational panels. */
+.evolu-orders__toolbar input { min-height: 42px; }
 .evolu-orders__advanced-button { min-height: 42px; border-radius: 10px; }
-.evolu-orders__table {
-  overflow: hidden; border: 1px solid var(--orders-line); border-radius: 17px;
-  background: #fff;
-}
+.evolu-orders__table { overflow: hidden; }
 .evolu-orders__table-heading {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
   gap: 8px; padding: 19px 20px; border-bottom: 1px solid var(--orders-line);

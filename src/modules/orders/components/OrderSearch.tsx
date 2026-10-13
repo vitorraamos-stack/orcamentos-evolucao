@@ -13,7 +13,7 @@ export function OrderSearch({
       <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
       <Input
         aria-label="Buscar ordens de serviço"
-        className="pl-9"
+        className="pl-9 evolu-ui-field"
         placeholder="Buscar por OS, cliente, título ou descrição..."
         value={value}
         onChange={event => onChange(event.target.value)}

@@ -8,6 +8,8 @@ import {
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import "../styles/evolusystem-primitives.css";
 
 export function PageHeader({
   title,
@@ -112,12 +114,9 @@ export function ErrorState({
       <AlertCircle className="h-7 w-7 text-destructive" />
       <p>{message}</p>
       {retry && (
-        <button
-          className="text-sm font-medium text-primary underline"
-          onClick={retry}
-        >
+        <Button type="button" variant="outline" size="sm" onClick={retry}>
           Tentar novamente
-        </button>
+        </Button>
       )}
     </div>
   );

@@ -1,0 +1,68 @@
+/* EvoluSystem — presentation tokens for operational screens.
+ * Opt-in via .evolu-ui-* classes; intentionally no changes to shadcn/ui defaults
+ * or authentication screens. Business logic and data contracts stay untouched. */
+.evolu-dashboard, .evolu-orders {
+  --evolu-ui-primary: #087fcb;
+  --evolu-ui-primary-hover: #006fad;
+  --evolu-ui-border: #e2eaf3;
+  --evolu-ui-surface: #fff;
+  --evolu-ui-field-bg: #f9fbfe;
+  --evolu-ui-surface-radius: 16px;
+  --evolu-ui-control-radius: 10px;
+  --evolu-ui-shadow: 0 8px 28px -24px rgba(24, 54, 91, .42);
+}
+.dark .evolu-dashboard, .dark .evolu-orders {
+  --evolu-ui-primary: var(--primary);
+  --evolu-ui-primary-hover: var(--primary);
+  --evolu-ui-border: var(--border);
+  --evolu-ui-surface: var(--card);
+  --evolu-ui-field-bg: var(--background);
+  --evolu-ui-shadow: none;
+}
+
+/* Shared panel composition: content and padding remain page-owned. */
+.evolu-ui-panel {
+  border: 1px solid var(--evolu-ui-border);
+  border-radius: var(--evolu-ui-surface-radius);
+  background: var(--evolu-ui-surface);
+  box-shadow: var(--evolu-ui-shadow);
+}
+.evolu-ui-filter-control {
+  min-height: 40px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding-inline: 14px;
+  font-size: 12px;
+  font-weight: 650;
+}
+.evolu-ui-field {
+  min-height: 42px;
+  border-radius: var(--evolu-ui-control-radius);
+  background: var(--evolu-ui-field-bg);
+}
+.evolu-ui-primary-action {
+  min-height: 43px;
+  border-radius: 11px;
+  padding-inline: 17px;
+  background: var(--evolu-ui-primary);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 9px 20px -12px rgba(9, 113, 183, .75);
+}
+.evolu-ui-primary-action:hover:not(:disabled) {
+  background: var(--evolu-ui-primary-hover);
+}
+.dark .evolu-ui-primary-action {
+  color: var(--primary-foreground);
+  box-shadow: none;
+}
+/* Visible keyboard focus on both light and dark operational pages. */
+:is(.evolu-ui-filter-control, .evolu-ui-field, .evolu-ui-primary-action):focus-visible {
+  outline: 2px solid var(--evolu-ui-primary);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.evolu-ui-filter-control, .evolu-ui-field, .evolu-ui-primary-action) {
+    transition: none;
+  }
+}
