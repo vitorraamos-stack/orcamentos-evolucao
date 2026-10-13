@@ -73,16 +73,29 @@ export default function Layout({ children }: LayoutProps) {
   const canViewConfiguracoes =
     hubPermissions.canManageUsers && hasModuleAccess("configuracoes");
   const canViewFinanceiro = hasModuleAccess("hub_os_financeiro");
-  const hasOtherModules =
-    canViewFinanceiro ||
-    canViewGaleria ||
-    canViewCalculadora ||
-    canViewMateriais;
+  // Os agrupamentos apenas organizam a navegação; os controles de acesso
+  // continuam sendo os mesmos usados nas rotas de cada módulo.
+  const hasCommercialModules = canViewOrcamentista || canViewCalculadora;
+  const hasResourceModules = canViewGaleria || canViewMateriais;
+  const hasManagementModules = canViewFinanceiro || canViewConfiguracoes;
+
+  const operationalLinks = [
+    { href: "/hub-os", label: "Dashboard", Icon: LayoutDashboard, active: location === "/hub-os" },
+    { href: "/os", label: "Ordens de Serviço", Icon: ClipboardList, active: operationalNav.orders },
+    { href: "/os/arte", label: "Arte", Icon: Palette, active: operationalNav.art },
+    { href: "/os/producao", label: "Produção", Icon: Factory, active: operationalNav.production },
+    ...(hubPermissions.canViewInstallations
+      ? [{ href: "/instalacoes", label: "Instalações", Icon: CalendarDays, active: location.startsWith("/instalacoes") }]
+      : []),
+    ...(hubPermissions.canViewDeliveries
+      ? [{ href: "/entregas", label: "Entregas", Icon: Truck, active: location.startsWith("/entregas") }]
+      : []),
+  ];
 
   const SectionLabel = ({ children }: { children: React.ReactNode }) => (
-    <p className="evolu-nav__section px-3 pb-2 pt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/55">
+    <h2 className="evolu-nav__section px-3 pb-2 pt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/55">
       {children}
-    </p>
+    </h2>
   );
 
   const NavItems = () => (
@@ -90,67 +103,13 @@ export default function Layout({ children }: LayoutProps) {
       {canViewHubOs && (
         <>
           <SectionLabel>Operação</SectionLabel>
-          {[
-            ["/hub-os", "Dashboard", LayoutDashboard],
-            ["/os", "Ordens de Serviço", ClipboardList],
-            ...(hubPermissions.canViewInstallations
-              ? [["/instalacoes", "Instalações", CalendarDays]]
-              : []),
-            ...(hubPermissions.canViewDeliveries
-              ? [["/entregas", "Entregas", Truck]]
-              : []),
-          ].map(([href, label, Icon]) => (
-            <Link href={href as string} key={href as string}>
-              <Button
-                variant={
-                  (
-                    href === "/hub-os"
-                      ? location === href
-                      : href === "/os"
-                        ? operationalNav.orders
-                        : location.startsWith(href as string)
-                  )
-                    ? "secondary"
-                    : "ghost"
-                }
-                className={cn(
-                  "evolu-nav__item w-full justify-start",
-                  (href === "/hub-os"
-                    ? location === href
-                    : href === "/os"
-                      ? operationalNav.orders
-                      : location.startsWith(href as string)) &&
-                    "bg-sidebar-accent text-sidebar-accent-foreground"
-                )}
-              >
-                <Icon className="mr-2 h-4 w-4" />
-                {label as string}
-              </Button>
-            </Link>
-          ))}
-          {(
-            [
-              ["/os/arte", "Arte", Palette],
-              ["/os/producao", "Produção", Factory],
-            ] as const
-          ).map(([href, label, Icon]) => (
+          {operationalLinks.map(({ href, label, Icon, active }) => (
             <Link href={href} key={href}>
               <Button
-                variant={
-                  (
-                    href === "/os/arte"
-                      ? operationalNav.art
-                      : operationalNav.production
-                  )
-                    ? "secondary"
-                    : "ghost"
-                }
+                variant={active ? "secondary" : "ghost"}
                 className={cn(
                   "evolu-nav__item w-full justify-start",
-                  (href === "/os/arte"
-                    ? operationalNav.art
-                    : operationalNav.production) &&
-                    "bg-sidebar-accent text-sidebar-accent-foreground"
+                  active && "bg-sidebar-accent text-sidebar-accent-foreground"
                 )}
               >
                 <Icon className="mr-2 h-4 w-4" />
@@ -161,41 +120,7 @@ export default function Layout({ children }: LayoutProps) {
         </>
       )}
 
-      {hasOtherModules && <SectionLabel>Outros módulos</SectionLabel>}
-
-      {canViewFinanceiro && (
-        <Link href="/hub-os/financeiro">
-          <Button
-            variant={
-              location.startsWith("/hub-os/financeiro") ? "secondary" : "ghost"
-            }
-            className={cn(
-              "evolu-nav__item w-full justify-start",
-              location.startsWith("/hub-os/financeiro") &&
-                "bg-sidebar-accent text-sidebar-accent-foreground"
-            )}
-          >
-            <BadgeDollarSign className="mr-2 h-4 w-4" />
-            Financeiro
-          </Button>
-        </Link>
-      )}
-
-      {canViewGaleria && (
-        <Link href="/galeria">
-          <Button
-            variant={location === "/galeria" ? "secondary" : "ghost"}
-            className={cn(
-              "evolu-nav__item w-full justify-start",
-              location === "/galeria" &&
-                "bg-sidebar-accent text-sidebar-accent-foreground"
-            )}
-          >
-            <Image className="mr-2 h-4 w-4" />
-            Galeria
-          </Button>
-        </Link>
-      )}
+      {hasCommercialModules && <SectionLabel>Comercial</SectionLabel>}
 
       {canViewOrcamentista && (
         <Link href="/orcamentista">
@@ -229,55 +154,89 @@ export default function Layout({ children }: LayoutProps) {
         </Link>
       )}
 
-      {canViewMateriais && (
-        <>
-          <Link href="/materiais">
-            <Button
-              variant={location === "/materiais" ? "secondary" : "ghost"}
-              className={cn(
-                "evolu-nav__item w-full justify-start",
-                location === "/materiais" &&
-                  "bg-sidebar-accent text-sidebar-accent-foreground"
-              )}
-            >
-              <Package className="mr-2 h-4 w-4" />
-              Materiais
-            </Button>
-          </Link>
-        </>
+      {hasResourceModules && <SectionLabel>Recursos</SectionLabel>}
+
+      {canViewGaleria && (
+        <Link href="/galeria">
+          <Button
+            variant={location === "/galeria" ? "secondary" : "ghost"}
+            className={cn(
+              "evolu-nav__item w-full justify-start",
+              location === "/galeria" &&
+                "bg-sidebar-accent text-sidebar-accent-foreground"
+            )}
+          >
+            <Image className="mr-2 h-4 w-4" />
+            Galeria
+          </Button>
+        </Link>
       )}
 
-      {canViewConfiguracoes && (
+      {canViewMateriais && (
+        <Link href="/materiais">
+          <Button
+            variant={location === "/materiais" ? "secondary" : "ghost"}
+            className={cn(
+              "evolu-nav__item w-full justify-start",
+              location === "/materiais" &&
+                "bg-sidebar-accent text-sidebar-accent-foreground"
+            )}
+          >
+            <Package className="mr-2 h-4 w-4" />
+            Materiais
+          </Button>
+        </Link>
+      )}
+
+      {hasManagementModules && (
         <div className="mt-3 border-t border-sidebar-border/50 pt-3">
           <SectionLabel>Administração</SectionLabel>
-          <Link href="/configuracoes/precos">
-            <Button
-              variant={
-                location === "/configuracoes/precos" ? "secondary" : "ghost"
-              }
-              className={cn(
-                "evolu-nav__item w-full justify-start",
-                location === "/configuracoes/precos" &&
-                  "bg-sidebar-accent text-sidebar-accent-foreground"
-              )}
-            >
-              <SlidersHorizontal className="mr-2 h-4 w-4" />
-              Preços e Custos
-            </Button>
-          </Link>
-          <Link href="/configuracoes">
-            <Button
-              variant={location === "/configuracoes" ? "secondary" : "ghost"}
-              className={cn(
-                "evolu-nav__item w-full justify-start",
-                location === "/configuracoes" &&
-                  "bg-sidebar-accent text-sidebar-accent-foreground"
-              )}
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              Usuários
-            </Button>
-          </Link>
+          {canViewFinanceiro && (
+            <Link href="/hub-os/financeiro">
+              <Button
+                variant={location.startsWith("/hub-os/financeiro") ? "secondary" : "ghost"}
+                className={cn(
+                  "evolu-nav__item w-full justify-start",
+                  location.startsWith("/hub-os/financeiro") &&
+                    "bg-sidebar-accent text-sidebar-accent-foreground"
+                )}
+              >
+                <BadgeDollarSign className="mr-2 h-4 w-4" />
+                Financeiro
+              </Button>
+            </Link>
+          )}
+
+          {canViewConfiguracoes && (
+            <>
+              <Link href="/configuracoes/precos">
+                <Button
+                  variant={location === "/configuracoes/precos" ? "secondary" : "ghost"}
+                  className={cn(
+                    "evolu-nav__item w-full justify-start",
+                    location === "/configuracoes/precos" &&
+                      "bg-sidebar-accent text-sidebar-accent-foreground"
+                  )}
+                >
+                  <SlidersHorizontal className="mr-2 h-4 w-4" />
+                  Preços e Custos
+                </Button>
+              </Link>
+              <Link href="/configuracoes">
+                <Button
+                  variant={location === "/configuracoes" ? "secondary" : "ghost"}
+                  className={cn(
+                    "evolu-nav__item w-full justify-start",
+                    location === "/configuracoes" &&
+                      "bg-sidebar-accent text-sidebar-accent-foreground"
+                  )}
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  Usuários
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
       )}
     </div>
