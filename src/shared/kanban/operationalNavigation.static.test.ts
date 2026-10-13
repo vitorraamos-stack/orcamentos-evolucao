@@ -29,8 +29,14 @@ describe("Fase 3.2 operational navigation", () => {
   });
 
   it("keeps only the two compact board destinations in the sidebar", () => {
-    expect(layout).toContain('["/os/arte", "Arte", Palette]');
-    expect(layout).toContain('["/os/producao", "Produção", Factory]');
+    // A navegação utiliza objetos nomeados para manter a ordem operacional.
+    // Validamos a presença de cada quadro, sem depender do formato antigo de arrays.
+    expect(layout).toContain('href: "/os/arte", label: "Arte", Icon: Palette');
+    expect(layout).toContain('href: "/os/producao", label: "Produção", Icon: Factory');
+    expect(layout.match(/href: "\/os\/arte"/g)).toHaveLength(1);
+    expect(layout.match(/href: "\/os\/producao"/g)).toHaveLength(1);
+    expect(layout).toContain("active: operationalNav.art");
+    expect(layout).toContain("active: operationalNav.production");
     expect(layout).not.toContain('"Aprovações"');
     expect(layout).not.toContain('"Quadro Geral"');
     expect(layout).not.toContain('"Produção Externa"');
