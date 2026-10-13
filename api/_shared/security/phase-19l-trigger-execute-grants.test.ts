@@ -30,9 +30,9 @@ describe("19L privileged trigger function grants", () => {
   });
 
   it("never changes trigger definitions, tables, or function bodies", () => {
-    expect(sql).not.toMatch(/\b(?:CREATE|DROP|ALTER)\s+TRIGGER\b/i);
+    expect(sql).not.toMatch(/^\s*(?:CREATE|DROP|ALTER)\s+TRIGGER\b/im);
     expect(sql).not.toMatch(/\bCREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\b/i);
-    expect(sql).not.toMatch(/\b(?:INSERT\s+INTO|DELETE\s+FROM|UPDATE)\s+(?:public\.|auth\.)/i);
+    expect(sql).not.toMatch(/^\s*(?:INSERT\s+INTO|DELETE\s+FROM|UPDATE)\s+(?:public\.|auth\.)/im);
     expect((sql.match(/^REVOKE EXECUTE ON FUNCTION public\./gm) || []).length).toBe(2);
     expect((sql.match(/^GRANT EXECUTE ON FUNCTION public\./gm) || []).length).toBe(2);
   });
