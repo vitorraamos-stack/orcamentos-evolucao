@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -42,11 +42,7 @@ import type {
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ARTE_STATUSES, PRODUCAO_STATUSES } from "../statuses";
-import {
-  MAX_ASSET_FILE_SIZE_BYTES,
-  resolveAssetContentType,
-  sanitizeFilename,
-} from "@/features/hubos/assetUtils";
+import { getPaymentRecoveryPlan, preparePaymentFile, type PaymentSubmissionStage } from "../paymentSubmissionSafety";
 import { invokeEdgeFunction } from "@/lib/supabase/invokeEdgeFunction";
 import { KioskShell } from "../kiosk/KioskShell";
 import { OsLayoutPreviewDialog } from "../components/OsLayoutPreviewDialog";
@@ -95,6 +91,8 @@ export default function OsDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
+  const paymentSubmissionInFlight = useRef(false);
+  const [paymentSubmissionNeedsReview, setPaymentSubmissionNeedsReview] = useState(false);
   const [openingPaymentId, setOpeningPaymentId] = useState<string | null>(null);
   const [layoutAsset, setLayoutAsset] = useState<OsLayoutAsset | null>(null);
   const [layoutCandidates, setLayoutCandidates] = useState<OsLayoutAsset[]>([]);
@@ -421,7 +419,11 @@ export default function OsDetailPage() {
   };
 
   const handlePaymentSubmit = async () => {
-    if (!order) return;
+    if (!order || paymentSubmissionInFlight.current) return;
+    if (paymentSubmissionNeedsReview) {
+      toast.error("Pagamento pendente de conferência. Não reenvie antes da revisão.");
+      return;
+    }
 
     const parsed = paymentSchema.safeParse({
       method: paymentMethod,
@@ -438,11 +440,14 @@ export default function OsDetailPage() {
       return;
     }
 
+    paymentSubmissionInFlight.current = true;
     let createdProof: OsPaymentProof | null = null;
-    let uploadedKey: string | null = null;
+    let stage: PaymentSubmissionStage = "preflight";
 
     try {
       setSaving(true);
+      const attachment = preparePaymentFile(paymentFile);
+      stage = "proof_create_started";
       let proof = await createPaymentProof({
         os_id: order.id,
         method: parsed.data.method,
@@ -460,15 +465,10 @@ export default function OsDetailPage() {
         created_by: user?.id ?? null,
       });
       createdProof = proof;
+      stage = "proof_created";
 
-      if (paymentFile) {
-        if (paymentFile.size > MAX_ASSET_FILE_SIZE_BYTES) {
-          throw new Error("Arquivo acima de 500MB.");
-        }
-
-        const contentType = resolveAssetContentType(paymentFile);
-        const sizeBytes = paymentFile.size;
-        const sanitizedName = sanitizeFilename(paymentFile.name);
+      if (paymentFile && attachment) {
+        const { contentType, sizeBytes, sanitizedName } = attachment;
         const key = `os_orders/${order.id}/payment_proofs/${proof.id}/Financeiro/Comprovante/${Date.now()}-${sanitizedName}`;
 
         const presignData = await invokeEdgeFunction<{
@@ -484,6 +484,8 @@ export default function OsDetailPage() {
           throw new Error("Falha ao gerar URL de upload (R2).");
         }
 
+        // The remote PUT may succeed even if the response fails or times out.
+        stage = "r2_upload_started";
         const uploadResponse = await fetch(presignData.uploadUrl, {
           method: "PUT",
           headers: {
@@ -501,7 +503,7 @@ export default function OsDetailPage() {
 
         const r2Etag =
           uploadResponse.headers.get("etag")?.replace(/"/g, "") ?? null;
-        uploadedKey = key;
+        stage = "r2_uploaded";
 
         proof = await updatePaymentProof(proof.id, {
           attachment_path: key,
@@ -512,6 +514,7 @@ export default function OsDetailPage() {
           content_type: contentType,
           size_bytes: sizeBytes,
         });
+        stage = "metadata_saved";
       }
 
       const nextStatus = resolvePaymentStatus({
@@ -521,17 +524,21 @@ export default function OsDetailPage() {
         quoteTotal: order.quote_total,
       });
 
+      stage = "status_update_started";
       const updated = await updateOs(order.id, {
         payment_status: nextStatus,
         updated_at: new Date().toISOString(),
       });
+      stage = "status_updated";
 
+      stage = "event_insert_started";
       await createOsEvent({
         os_id: order.id,
         type: "PAYMENT_SUBMITTED",
         payload: { payment_id: proof.id, status: nextStatus },
         created_by: user?.id ?? null,
       });
+      stage = "complete";
 
       setOrder(updated);
       setPayments(prev => [proof, ...prev]);
@@ -543,17 +550,28 @@ export default function OsDetailPage() {
       toast.success("Comprovante enviado.");
     } catch (error) {
       console.error(error);
-      if (createdProof && paymentFile && !uploadedKey) {
+      const recovery = getPaymentRecoveryPlan(stage, paymentFile !== null);
+      let cleanupFailed = false;
+      if (createdProof && recovery.safeToDeletePendingProof) {
         try {
           await deletePaymentProof(createdProof.id);
         } catch (cleanupError) {
+          cleanupFailed = true;
           console.error("Falha ao limpar comprovante pendente:", cleanupError);
         }
       }
-      toast.error(
-        error instanceof Error ? error.message : "Erro ao enviar comprovante."
-      );
+      if (recovery.manualReviewRequired || cleanupFailed) {
+        setPaymentSubmissionNeedsReview(true);
+        toast.error(
+          "Registro financeiro inconclusivo. Não reenvie: solicite conferência do comprovante, do arquivo e do histórico da OS."
+        );
+      } else {
+        toast.error(
+          error instanceof Error ? error.message : "Erro ao enviar comprovante."
+        );
+      }
     } finally {
+      paymentSubmissionInFlight.current = false;
       setSaving(false);
     }
   };
@@ -1139,7 +1157,15 @@ export default function OsDetailPage() {
               />
             </div>
 
-            <Button onClick={handlePaymentSubmit} disabled={saving}>
+            {paymentSubmissionNeedsReview && (
+              <div role="alert" className="rounded-md border bg-muted/50 p-3 text-sm">
+                <strong>Pagamento pendente de conferência.</strong> O envio pode ter
+                sido registrado parcialmente. Não tente enviar novamente antes
+                de verificar o comprovante, o armazenamento e o histórico da OS.
+              </div>
+            )}
+
+            <Button onClick={handlePaymentSubmit} disabled={saving || paymentSubmissionNeedsReview}>
               Enviar comprovante
             </Button>
 
