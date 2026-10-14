@@ -1,64 +1,59 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { OsOrder } from "@/features/hubos/types";
-import { isOrderUrgent } from "@/features/hubos/orderUrgency";
-import {
-  ART_STATUS_LABELS,
-  PRODUCTION_STATUS_LABELS,
-} from "@/shared/kanban/statusLabels";
+
 const field = (label: string, value: React.ReactNode) => (
-  <div>
+  <div className="min-w-0">
     <dt className="text-xs text-muted-foreground">{label}</dt>
-    <dd className="mt-1 break-words text-sm font-medium">{value || "—"}</dd>
+    <dd className="mt-1 whitespace-pre-wrap break-words text-sm font-medium">
+      {value || "—"}
+    </dd>
   </div>
 );
+
 export function OrderSummaryTab({ order }: { order: OsOrder }) {
+  // The header already provides the client, OS number, title, current stage,
+  // priority, contracted deadline, general assignee and logistics.
+  const briefing = order.description?.trim() ?? "";
+  const hasSeparateBriefing = Boolean(briefing && order.title?.trim() && briefing !== order.title.trim());
+  const showAddress =
+    order.logistic_type !== "retirada" || Boolean(order.address?.trim());
+
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <Card>
-        <CardHeader>
-          <CardTitle>Informações gerais</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid gap-4 sm:grid-cols-2">
-            {field("Cliente", order.client_name)}
-            {field("Venda / OS", order.sale_number)}
-            {field("Título", order.title)}
-            {field(
-              "Criada em",
-              new Date(order.created_at).toLocaleString("pt-BR", {
-                timeZone: "America/Sao_Paulo",
-              })
-            )}
-            {field("Descrição", order.description)}
-            {field("Prazo final", order.delivery_date)}
-          </dl>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Operação</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid gap-4 sm:grid-cols-2">
-            {field("Arte", ART_STATUS_LABELS[order.art_status])}
-            {field(
-              "Produção",
-              order.prod_status
-                ? PRODUCTION_STATUS_LABELS[order.prod_status]
-                : null
-            )}
-            {field("Prioridade", isOrderUrgent(order) ? "Urgente" : "Normal")}
-            {field("Logística", order.logistic_type)}
-            {field("Endereço", order.address)}
-            {field(
-              "Observações",
-              order.insumos_details || order.insumos_return_notes
-            )}
-            {order.production_tag === "PRODUCAO_EXTERNA" &&
-              field("Produção externa", "Marcada como produção externa")}
-          </dl>
-        </CardContent>
-      </Card>
-    </div>
+    <Card className="min-w-0">
+      <CardHeader>
+        <CardTitle>Informações complementares</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {hasSeparateBriefing && (
+          <section
+            aria-labelledby="os-summary-briefing-title"
+            className="rounded-xl border bg-muted/20 p-4"
+          >
+            <h3 id="os-summary-briefing-title" className="text-sm font-semibold">
+              Briefing e orientações
+            </h3>
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed">
+              {briefing}
+            </p>
+          </section>
+        )}
+        <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+          {field("Número da venda", order.sale_number)}
+          {field(
+            "Criada em",
+            new Date(order.created_at).toLocaleString("pt-BR", {
+              timeZone: "America/Sao_Paulo",
+            })
+          )}
+          {showAddress && field("Endereço do serviço", order.address)}
+          {order.insumos_details?.trim() &&
+            field("Observações de insumos", order.insumos_details)}
+          {order.insumos_return_notes?.trim() &&
+            field("Retorno de insumos", order.insumos_return_notes)}
+          {order.production_tag === "PRODUCAO_EXTERNA" &&
+            field("Produção externa", "Sim")}
+        </dl>
+      </CardContent>
+    </Card>
   );
 }

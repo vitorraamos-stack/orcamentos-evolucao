@@ -32,7 +32,18 @@ describe("EvoluSystem — OS detail premium visual contract", () => {
     expect(tabsListEnd).toBeGreaterThan(tabsIndex);
     expect(summaryIndex).toBeGreaterThan(tabsListEnd);
     expect(tabsClose).toBeGreaterThan(summaryIndex);
-    expect(managementIndex).toBeGreaterThan(tabsClose);
+    const summaryEnd = detail.indexOf("</TabsContent>", summaryIndex);
+    const itemsStart = detail.indexOf('<TabsContent className="evolu-detail__tab-content" value="items">');
+
+    expect(managementIndex).toBeGreaterThan(summaryIndex);
+    expect(managementIndex).toBeLessThan(summaryEnd);
+    expect(summaryEnd).toBeLessThan(itemsStart);
+    expect(tabsClose).toBeGreaterThan(managementIndex);
+    expect((detail.match(/<section aria-label="Responsáveis e prazos"/g) ?? []).length).toBe(1);
+    expect(detail.slice(summaryIndex, summaryEnd)).toContain("<OrderAssigneesCard");
+    expect(detail.slice(summaryIndex, summaryEnd)).toContain("<OrderDeadlinesCard");
+    expect(detail.slice(itemsStart, tabsClose)).not.toContain('aria-label="Responsáveis e prazos"');
+    expect(detail.slice(summaryIndex, summaryEnd)).toContain('className="evolu-detail__management-grid grid gap-4 xl:grid-cols-2"');
     expect((detail.match(/<OrderFlowProgress order={detail.order} \/>/g) ?? []).length).toBe(1);
   });
 
