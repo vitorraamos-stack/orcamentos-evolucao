@@ -49,6 +49,9 @@ describe("19S legacy payment proof rollback-only deletion", () => {
 
   it("revokes RLS-bypassing table privileges and never touches data or unrelated policies", () => {
     expect(sql).toContain("REVOKE TRUNCATE, TRIGGER ON TABLE public.os_payment_proof");
+    expect(sql).toContain("REVOKE TRUNCATE, TRIGGER ON TABLE public.os_event");
+    expect(sql).toContain("19S_ABORTED_EVENT_TABLE_GRANTS_CHANGED");
+    expect(sql).toContain("19S_ABORTED_POSTCONDITION_EVENT_TABLE_GRANTS");
     expect(sql).toContain("FROM PUBLIC, anon, authenticated;");
     const alteredPolicies=sql.match(/^ALTER POLICY .*$/gm)??[];
     expect(alteredPolicies).toEqual([

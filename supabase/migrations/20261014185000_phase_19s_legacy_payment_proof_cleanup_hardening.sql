@@ -8,7 +8,9 @@
 -- UPDATE and DELETE RLS are restricted independently. DELETE allows only a temporary
 -- unsubmitted proof created by the authenticated user, with no attached file or synced metadata.
 -- Revoke TRUNCATE/TRIGGER privileges that bypass or threaten row-level security.
--- Existing status and event policies (19R), OS delete policy (19Q), and operational tables untouched.
+-- Existing status and event RLS policies (19R) and OS delete policy (19Q) stay unchanged.
+-- Only os_event table TRUNCATE/TRIGGER privileges are additionally narrowed so the
+-- submitted-payment evidence cannot be erased through RLS-bypassing TRUNCATE.
 
 DO $preflight$
 DECLARE
@@ -35,6 +37,18 @@ BEGIN
     OR NOT has_table_privilege('anon','public.os_payment_proof','TRIGGER')
     OR NOT has_table_privilege('service_role','public.os_payment_proof','TRIGGER')
   THEN RAISE EXCEPTION '19S_ABORTED_TABLE_ACL_DRIFT'; END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_class c
+    WHERE c.oid='public.os_event'::regclass
+      AND c.relkind='r' AND c.relrowsecurity
+      AND pg_get_userbyid(c.relowner)='postgres'
+      AND c.relacl::text='{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}'
+      AND has_table_privilege('authenticated',c.oid,'TRUNCATE')
+      AND has_table_privilege('anon',c.oid,'TRUNCATE')
+      AND has_table_privilege('authenticated',c.oid,'TRIGGER')
+      AND has_table_privilege('anon',c.oid,'TRIGGER')
+  ) THEN RAISE EXCEPTION '19S_ABORTED_EVENT_TABLE_GRANTS_CHANGED'; END IF;
 
   IF (SELECT count(*) FROM public.os_payment_proof)<>0
   THEN RAISE EXCEPTION '19S_ABORTED_EXISTING_PROOFS_NEED_DATA_REVIEW'; END IF;
@@ -182,6 +196,8 @@ ALTER POLICY os_payment_delete ON public.os_payment_proof
 -- RLS does NOT protect TRUNCATE. Prevent user-level TRUNCATE and user-created triggers.
 REVOKE TRUNCATE, TRIGGER ON TABLE public.os_payment_proof
   FROM PUBLIC, anon, authenticated;
+REVOKE TRUNCATE, TRIGGER ON TABLE public.os_event
+  FROM PUBLIC, anon, authenticated;
 
 DO $postcheck$
 BEGIN
@@ -213,6 +229,14 @@ BEGIN
     OR NOT has_table_privilege('service_role','public.os_payment_proof','TRUNCATE')
     OR NOT has_table_privilege('service_role','public.os_payment_proof','TRIGGER')
   THEN RAISE EXCEPTION '19S_ABORTED_POSTCONDITION_TABLE_GRANTS'; END IF;
+
+  IF has_table_privilege('anon','public.os_event','TRUNCATE')
+    OR has_table_privilege('authenticated','public.os_event','TRUNCATE')
+    OR has_table_privilege('anon','public.os_event','TRIGGER')
+    OR has_table_privilege('authenticated','public.os_event','TRIGGER')
+    OR NOT has_table_privilege('service_role','public.os_event','TRUNCATE')
+    OR NOT has_table_privilege('service_role','public.os_event','TRIGGER')
+  THEN RAISE EXCEPTION '19S_ABORTED_POSTCONDITION_EVENT_TABLE_GRANTS'; END IF;
 
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
