@@ -88,30 +88,42 @@ export function OrderHistoryTab({
   loading: boolean;
   error: string | null;
 }) {
-  if (loading)
+  if (loading) {
     return (
-      <p className="text-sm text-muted-foreground">Carregando histórico…</p>
+      <p role="status" className="text-sm text-muted-foreground">
+        Carregando histórico…
+      </p>
     );
-  if (error) return <p className="text-sm text-destructive">{error}</p>;
-  if (!activities.length)
+  }
+  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>;
+  if (!activities.length) {
     return (
       <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
         Nenhum evento registrado.
       </p>
     );
+  }
+
   return (
-    <ol className="relative ml-2 border-l">
+    <ol aria-label="Linha do tempo da OS" className="relative ml-2 space-y-3 border-l border-border pl-6">
       {activities.map(activity => (
-        <li key={activity.id} className="mb-6 ml-5">
-          <span className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full bg-primary" />
-          <time className="text-xs text-muted-foreground">
-            {new Date(activity.created_at).toLocaleString("pt-BR", {
-              timeZone: "America/Sao_Paulo",
-            })}
-          </time>
-          <p className="font-medium">{formatOrderActivity(activity)}</p>
-          <p className="text-xs text-muted-foreground">
-            {activity.actor?.name ?? "Sistema"}
+        <li key={activity.id} className="relative min-w-0 rounded-xl border bg-card p-4">
+          <span
+            aria-hidden="true"
+            className="absolute -left-[31px] top-5 size-3 rounded-full border-2 border-background bg-primary"
+          />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <time dateTime={activity.created_at}>
+              {new Date(activity.created_at).toLocaleString("pt-BR", {
+                timeZone: "America/Sao_Paulo",
+              })}
+            </time>
+            <span className="break-words">
+              Registrado por <span className="font-medium text-foreground">{activity.actor?.name ?? "Sistema"}</span>
+            </span>
+          </div>
+          <p className="mt-2 whitespace-pre-wrap text-sm font-medium leading-relaxed [overflow-wrap:anywhere]">
+            {formatOrderActivity(activity)}
           </p>
         </li>
       ))}
