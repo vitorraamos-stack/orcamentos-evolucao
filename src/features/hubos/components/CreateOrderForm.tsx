@@ -110,21 +110,46 @@ type ExistingOrder = {
   prod_status: string | null;
 };
 
+const createOrderSections = [
+  { id: "os-identificacao", label: "Dados" },
+  { id: "os-itens", label: "Itens" },
+  { id: "os-briefing", label: "Briefing" },
+  { id: "os-arte-prioridade", label: "Arte" },
+  { id: "os-prazo", label: "Prazo" },
+  { id: "os-logistica", label: "Logística" },
+  { id: "os-arquivos", label: "Arquivos" },
+] as const;
+
 const Section = ({
+  id,
+  step,
   title,
   subtitle,
   children,
 }: {
+  id: string;
+  step: number;
   title: string;
   subtitle?: string;
   children: React.ReactNode;
 }) => (
-  <Card>
-    <CardHeader className="pb-3">
-      <CardTitle className="text-lg">{title}</CardTitle>
-      {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+  <Card id={id} role="region" aria-labelledby={`${id}-heading`} className="scroll-mt-24 border-border/80 shadow-sm">
+    <CardHeader className="border-b bg-muted/20 pb-4">
+      <div className="flex items-start gap-3">
+        <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+          {String(step).padStart(2, "0")}
+        </span>
+        <div className="min-w-0 space-y-1">
+          <CardTitle className="text-base sm:text-lg">
+            <h2 id={`${id}-heading`} tabIndex={-1} className="outline-none focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-primary">
+              {title}
+            </h2>
+          </CardTitle>
+          {subtitle && <p className="text-sm leading-relaxed text-muted-foreground">{subtitle}</p>}
+        </div>
+      </div>
     </CardHeader>
-    <CardContent className="space-y-4">{children}</CardContent>
+    <CardContent className="space-y-4 pt-5">{children}</CardContent>
   </Card>
 );
 const FieldError = ({ id, children }: { id: string; children?: string }) =>
@@ -488,7 +513,26 @@ export default function CreateOrderForm({
     <>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <main className="space-y-5 p-4 sm:p-6">
+          <nav aria-label="Navegação entre seções da OS" className="flex gap-2 overflow-x-auto pb-2" >
+            {createOrderSections.map((section, index) => (
+              <button
+                key={section.id}
+                type="button"
+                className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                onClick={() => {
+                  const heading = document.getElementById(`${section.id}-heading`);
+                  heading?.focus({ preventScroll: true });
+                  heading?.scrollIntoView({ block: "start" });
+                }}
+              >
+                <span aria-hidden="true" className="text-primary">{String(index + 1).padStart(2, "0")}</span>
+                {section.label}
+              </button>
+            ))}
+          </nav>
           <Section
+            id="os-identificacao"
+            step={1}
             title="Informações da OS"
             subtitle="Esta OS será criada na Caixa de Entrada do setor de Arte."
           >
@@ -543,7 +587,7 @@ export default function CreateOrderForm({
             )}
           </Section>
 
-          <Section
+          <Section id="os-itens" step={2}
             title="Itens do pedido"
             subtitle="Descreva o que será produzido, sem informações comerciais."
           >
@@ -577,6 +621,7 @@ export default function CreateOrderForm({
                     value={String(item.name)}
                     onChange={e => updateItem(index, { name: e.target.value })}
                     aria-invalid={Boolean(errors[`item-${index}-name`])}
+                    aria-describedby={`item-${index}-name-error`}
                   />
                   <FieldError id={`item-${index}-name-error`}>
                     {errors[`item-${index}-name`]}
@@ -595,14 +640,16 @@ export default function CreateOrderForm({
                         updateItem(index, { quantity: e.target.value })
                       }
                       aria-invalid={Boolean(errors[`item-${index}-quantity`])}
+                      aria-describedby={`item-${index}-quantity-error`}
                     />
                     <FieldError id={`item-${index}-quantity-error`}>
                       {errors[`item-${index}-quantity`]}
                     </FieldError>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Largura ({item.measurement_unit})</Label>
+                    <Label htmlFor={`item-${index}-width`}>Largura ({item.measurement_unit})</Label>
                     <Input
+                      id={`item-${index}-width`}
                       type="number"
                       min="0"
                       value={item.width_cm == null ? "" : String(item.width_cm)}
@@ -612,8 +659,9 @@ export default function CreateOrderForm({
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Altura ({item.measurement_unit})</Label>
+                    <Label htmlFor={`item-${index}-height`}>Altura ({item.measurement_unit})</Label>
                     <Input
+                      id={`item-${index}-height`}
                       type="number"
                       min="0"
                       value={
@@ -657,8 +705,9 @@ export default function CreateOrderForm({
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Descrição / especificação</Label>
+                  <Label htmlFor={`item-${index}-description`}>Descrição / especificação</Label>
                   <Textarea
+                    id={`item-${index}-description`}
                     value={String(item.description ?? "")}
                     onChange={e =>
                       updateItem(index, { description: e.target.value })
@@ -666,8 +715,9 @@ export default function CreateOrderForm({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Observações</Label>
+                  <Label htmlFor={`item-${index}-notes`}>Observações</Label>
                   <Input
+                    id={`item-${index}-notes`}
                     value={String(item.notes ?? "")}
                     onChange={e => updateItem(index, { notes: e.target.value })}
                   />
@@ -689,7 +739,7 @@ export default function CreateOrderForm({
               </Button>
           </Section>
 
-          <Section
+          <Section id="os-briefing" step={3}
             title="Briefing / Orientações para Arte"
             subtitle="Informe o que o setor de Arte precisa saber para executar este pedido."
           >
@@ -740,15 +790,16 @@ export default function CreateOrderForm({
                 }
                 aria-invalid={Boolean(errors.description)}
                 aria-describedby="briefing-error"
+                aria-label="Briefing e orientações para o setor de Arte"
               />
             </div>
             <FieldError id="briefing-error">{errors.description}</FieldError>
           </Section>
 
-          <Section title="Arte e Prioridade">
+          <Section id="os-arte-prioridade" step={4} title="Arte e Prioridade">
             <div className="space-y-1.5">
               <Label>Necessidade da Arte *</Label>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div role="group" aria-label="Necessidade da Arte" aria-describedby="art-error" aria-invalid={Boolean(errors.artDirection)} tabIndex={-1} className="grid gap-3 sm:grid-cols-2">
                 {ART_DIRECTION_CHOICES.map(tag => (
                   <button
                     key={tag}
@@ -791,11 +842,11 @@ export default function CreateOrderForm({
             </div>
           </Section>
 
-          <Section
+          <Section id="os-prazo" step={5}
             title="Prazo de Produção"
             subtitle="Definido pelo Comercial/Gerência. A contagem começa após a aprovação da arte."
           >
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div role="group" aria-label="Prazo de produção" aria-describedby="deadline-error" aria-invalid={Boolean(errors.deadline)} tabIndex={-1} className="grid gap-3 sm:grid-cols-2">
               {DELIVERY_DEADLINE_PRESETS.map(value => (
                 <button
                   type="button"
@@ -826,6 +877,7 @@ export default function CreateOrderForm({
                   value={deliveryDate}
                   onChange={e => setDeliveryDate(e.target.value)}
                   aria-invalid={Boolean(errors.deliveryDate)}
+                  aria-describedby="delivery-date-error"
                 />
                 <FieldError id="delivery-date-error">
                   {errors.deliveryDate}
@@ -834,7 +886,7 @@ export default function CreateOrderForm({
             )}
           </Section>
 
-          <Section title="Logística">
+          <Section id="os-logistica" step={6} title="Logística">
             <div className="grid gap-3 sm:grid-cols-3">
               {logistics.map(({ value, label, icon: Icon }) => (
                 <button
@@ -857,6 +909,7 @@ export default function CreateOrderForm({
                   value={address}
                   onChange={e => setAddress(e.target.value)}
                   aria-invalid={Boolean(errors.address)}
+                  aria-describedby="address-error"
                 />
                 <FieldError id="address-error">{errors.address}</FieldError>
                 {logisticType === "instalacao" && (
@@ -869,7 +922,7 @@ export default function CreateOrderForm({
             )}
           </Section>
 
-          <Section
+          <Section id="os-arquivos" step={7}
             title="Arquivos e documentos"
             subtitle={`Formatos permitidos · até ${Math.round(MAX_ASSET_FILE_SIZE_BYTES / 1024 / 1024)} MB por arquivo`}
           >
@@ -899,7 +952,8 @@ export default function CreateOrderForm({
                 className="grid gap-2 rounded-lg border p-3 sm:grid-cols-3"
               >
                 <select
-                  className="rounded-md border bg-background px-3"
+                  className="min-h-10 rounded-md border bg-background px-3"
+                  aria-label={`Tipo do documento financeiro ${index + 1}`}
                   value={doc.type}
                   onChange={e =>
                     setFinancialDocs(current =>
@@ -916,7 +970,8 @@ export default function CreateOrderForm({
                 </select>
                 {doc.type === "PAYMENT_PROOF" && (
                   <select
-                    className="rounded-md border bg-background px-3"
+                    className="min-h-10 rounded-md border bg-background px-3"
+                    aria-label={`Parcela do comprovante ${index + 1}`}
                     value={doc.installmentLabel}
                     onChange={e =>
                       setFinancialDocs(current =>
@@ -941,6 +996,7 @@ export default function CreateOrderForm({
                   doc.installmentLabel === "1/2" && (
                     <Input
                       type="date"
+                      aria-label={`Vencimento da segunda parcela do comprovante ${index + 1}`}
                       value={doc.secondDueDate ?? ""}
                       onChange={e =>
                         setFinancialDocs(current =>
@@ -1058,6 +1114,7 @@ function UploadBox({
         <input
           ref={inputRef}
           className="hidden"
+          aria-label={`Adicionar arquivos: ${title}`}
           type="file"
           multiple
           accept={ACCEPTED_ASSET_CONTENT_TYPES.join(",")}
