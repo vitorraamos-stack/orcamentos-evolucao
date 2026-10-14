@@ -1,0 +1,24 @@
+/* Create OS mobile ergonomics, isolated from other pages and workflows. */
+@media (max-width: 1023px) {
+  .evolu-os-form [data-slot="input"],
+  .evolu-os-form [data-slot="select-trigger"] {
+    min-height: 44px;
+  }
+
+  .evolu-os-form__actions {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -10px 30px -20px rgba(12, 37, 64, 0.32);
+  }
+}
+
+@media (min-width: 1024px) {
+  .evolu-os-form__actions {
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evolu-os-form details svg {
+    transition: none;
+  }
+}

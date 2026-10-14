@@ -15,8 +15,8 @@ describe("EvoluSystem OS form usability", () => {
     expect(creation).toContain('type="button"');
     expect(creation).toContain('heading?.focus({ preventScroll: true })');
     expect(creation).toContain('heading?.scrollIntoView({ block: "start" })');
-    expect(creation).toContain('className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]"');
-    expect(creation).toContain('<aside className="p-4 sm:p-6 lg:p-0">');
+    expect(creation).toContain('className="grid gap-6 pb-44 lg:grid-cols-[minmax(0,1fr)_340px] lg:pb-0"');
+    expect(creation).toContain('<aside className="hidden lg:block lg:p-0">');
   });
 
   it("adds keyboard-accessible headings and properly labelled item measurements", () => {

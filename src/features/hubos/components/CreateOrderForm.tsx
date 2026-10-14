@@ -22,10 +22,12 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import "./create-order-mobile.css";
 import {
   Bold,
   CalendarDays,
   Check,
+  ChevronDown,
   Circle,
   FileText,
   Flame,
@@ -511,8 +513,30 @@ export default function CreateOrderForm({
 
   return (
     <>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <main className="space-y-5 p-4 sm:p-6">
+      <div className="grid gap-6 pb-44 lg:grid-cols-[minmax(0,1fr)_340px] lg:pb-0">
+        <main className="evolu-os-form space-y-5 p-4 sm:p-6">
+          <details className="group rounded-xl border bg-card shadow-sm lg:hidden">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
+              <span>Resumo da OS</span>
+              <span className="ml-auto text-xs font-medium text-muted-foreground">
+                {completeCount}/6 concluídas
+              </span>
+              <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="border-t p-3">
+              <Summary
+                sale={saleNumber}
+                client={clientName}
+                items={items.length}
+                art={artDirection}
+                urgent={isUrgent}
+                deadline={deadline}
+                logisticsValue={logisticType}
+                fileCount={files.length + financialDocs.length}
+                completion={completion}
+              />
+            </div>
+          </details>
           <nav aria-label="Navegação entre seções da OS" className="flex gap-2 overflow-x-auto pb-2" >
             {createOrderSections.map((section, index) => (
               <button
@@ -627,12 +651,13 @@ export default function CreateOrderForm({
                     {errors[`item-${index}-name`]}
                   </FieldError>
                 </div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 min-[390px]:grid-cols-2 sm:grid-cols-4">
                   <div className="space-y-1.5">
                     <Label htmlFor={`item-${index}-quantity`}>Qtd. *</Label>
                     <Input
                       id={`item-${index}-quantity`}
                       type="number"
+                      inputMode="decimal"
                       min="0.001"
                       step="0.001"
                       value={String(item.quantity)}
@@ -651,6 +676,7 @@ export default function CreateOrderForm({
                     <Input
                       id={`item-${index}-width`}
                       type="number"
+                      inputMode="decimal"
                       min="0"
                       value={item.width_cm == null ? "" : String(item.width_cm)}
                       onChange={e =>
@@ -663,6 +689,7 @@ export default function CreateOrderForm({
                     <Input
                       id={`item-${index}-height`}
                       type="number"
+                      inputMode="decimal"
                       min="0"
                       value={
                         item.height_cm == null ? "" : String(item.height_cm)
@@ -1013,7 +1040,7 @@ export default function CreateOrderForm({
             ))}
           </Section>
         </main>
-        <aside className="p-4 sm:p-6 lg:p-0">
+        <aside className="hidden lg:block lg:p-0">
           <div className="lg:sticky lg:top-6">
             <Summary
               sale={saleNumber}
@@ -1029,22 +1056,32 @@ export default function CreateOrderForm({
           </div>
         </aside>
       </div>
-      <footer className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-2 border-t bg-background/95 px-4 py-3 backdrop-blur">
-        <span className="text-sm text-muted-foreground">
+      <footer
+        aria-label="Ações da nova Ordem de Serviço"
+        className="evolu-os-form__actions fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 pt-2 backdrop-blur lg:sticky lg:inset-x-auto lg:z-10 lg:flex lg:items-center lg:justify-between lg:px-4 lg:py-3"
+      >
+        <span className="block text-xs text-muted-foreground lg:text-sm">
           {completeCount}/6 seções concluídas
         </span>
-        <div className="flex gap-2">
-          <Button variant="ghost" onClick={requestClose} disabled={saving}>
+        <div className="mt-2 grid grid-cols-2 gap-2 lg:mt-0 lg:flex lg:items-center">
+          <Button type="button" className="min-h-10 w-full lg:w-auto" variant="ghost" onClick={requestClose} disabled={saving}>
             Cancelar
           </Button>
           <Button
-              variant="outline"
-              onClick={() => void submit(true)}
-              disabled={saving}
-            >
-              Salvar rascunho
-            </Button>
-          <Button onClick={() => void submit(false)} disabled={saving}>
+            type="button"
+            className="min-h-10 w-full lg:w-auto"
+            variant="outline"
+            onClick={() => void submit(true)}
+            disabled={saving}
+          >
+            Salvar rascunho
+          </Button>
+          <Button
+            type="button"
+            className="col-span-2 min-h-11 w-full lg:w-auto"
+            onClick={() => void submit(false)}
+            disabled={saving}
+          >
             {saving
               ? "CRIANDO OS..."
               : pendingOrder
