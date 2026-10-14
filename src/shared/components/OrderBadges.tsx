@@ -2,6 +2,27 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { OrderRisk } from "@/modules/orders/risk";
 
+const riskTones: Record<OrderRisk, "success" | "warning" | "danger"> = {
+  NORMAL: "success",
+  ATENCAO: "warning",
+  CRITICO: "danger",
+};
+
+const statusTones: Record<string, "neutral" | "info" | "active" | "warning" | "success"> = {
+  "Caixa de Entrada": "neutral",
+  "Fila de Arte": "info",
+  "Em Criação": "info",
+  "Para Aprovação": "active",
+  Ajustes: "warning",
+  Produzir: "active",
+  Produção: "active",
+  "Em Acabamento": "warning",
+  "Pronto / Avisar Cliente": "success",
+  "Logística (Entrega/Transportadora)": "info",
+  "Instalação Agendada": "active",
+  Finalizados: "success",
+};
+
 const riskStyles: Record<OrderRisk, string> = {
   NORMAL: "border-emerald-200 bg-emerald-50 text-emerald-700",
   ATENCAO: "border-amber-200 bg-amber-50 text-amber-800",
@@ -10,7 +31,12 @@ const riskStyles: Record<OrderRisk, string> = {
 
 export function OrderRiskBadge({ risk }: { risk: OrderRisk }) {
   return (
-    <Badge variant="outline" className={cn("font-semibold", riskStyles[risk])}>
+    <Badge
+      variant="outline"
+      data-order-indicator="risk"
+      data-tone={riskTones[risk]}
+      className={cn("evolu-order-indicator font-semibold", riskStyles[risk])}
+    >
       {risk === "ATENCAO" ? "ATENÇÃO" : risk}
     </Badge>
   );
@@ -36,8 +62,11 @@ export function OrderStatusBadge({ status }: { status?: string | null }) {
   return (
     <Badge
       variant="outline"
+      data-order-indicator="status"
+      data-tone={statusTones[status || ""] ?? "neutral"}
+      title={status || "Entrada"}
       className={cn(
-        "max-w-44 truncate font-medium",
+        "evolu-order-indicator max-w-44 truncate font-medium",
         statusStyles[status || ""] ?? "bg-muted text-muted-foreground"
       )}
     >
@@ -50,11 +79,14 @@ export function OrderPriorityBadge({ urgent }: { urgent?: boolean }) {
   return (
     <Badge
       variant="outline"
-      className={
+      data-order-indicator="priority"
+      data-tone={urgent ? "danger" : "neutral"}
+      className={cn(
+        "evolu-order-indicator",
         urgent
           ? "border-red-200 bg-red-50 text-red-700"
           : "text-muted-foreground"
-      }
+      )}
     >
       {urgent ? "Urgente" : "Normal"}
     </Badge>
