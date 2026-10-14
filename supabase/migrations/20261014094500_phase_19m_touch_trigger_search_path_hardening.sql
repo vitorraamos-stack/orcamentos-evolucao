@@ -142,7 +142,7 @@ BEGIN
       AND p.prorettype='trigger'::regtype
       AND NOT p.prosecdef
       AND md5(p.prosrc)='608ef48381668ad5cc300914a52c93f5'
-      AND p.proconfig @> ARRAY['search_path=']::text[]
+      AND p.proconfig @> ARRAY['search_path=""']::text[]
   ) OR NOT EXISTS (
     SELECT 1 FROM pg_trigger t
     WHERE t.tgfoid='public.hub_os_order_flow_state_touch_updated_at()'::regprocedure
@@ -159,7 +159,7 @@ BEGIN
       AND p.prorettype='trigger'::regtype
       AND NOT p.prosecdef
       AND md5(p.prosrc)='608ef48381668ad5cc300914a52c93f5'
-      AND p.proconfig @> ARRAY['search_path=']::text[]
+      AND p.proconfig @> ARRAY['search_path=""']::text[]
   ) OR NOT EXISTS (
     SELECT 1 FROM pg_trigger t
     WHERE t.tgfoid='public.os_kiosk_board_touch_updated_at()'::regprocedure
@@ -176,7 +176,7 @@ BEGIN
       AND p.prorettype='trigger'::regtype
       AND NOT p.prosecdef
       AND md5(p.prosrc)='0c35a013f9fab2ad61698db68776b8eb'
-      AND p.proconfig @> ARRAY['search_path=']::text[]
+      AND p.proconfig @> ARRAY['search_path=""']::text[]
   ) OR NOT EXISTS (
     SELECT 1 FROM pg_trigger t
     WHERE t.tgfoid='public.set_os_orders_updated_at()'::regprocedure
@@ -193,7 +193,7 @@ BEGIN
       AND p.prorettype='trigger'::regtype
       AND NOT p.prosecdef
       AND md5(p.prosrc)='204b9b9355e61b7541bc0633bbc9294c'
-      AND p.proconfig @> ARRAY['search_path=']::text[]
+      AND p.proconfig @> ARRAY['search_path=""']::text[]
   ) OR NOT EXISTS (
     SELECT 1 FROM pg_trigger t
     WHERE t.tgfoid='public.set_portfolio_photos_updated_at()'::regprocedure
@@ -210,7 +210,7 @@ BEGIN
       AND p.prorettype='trigger'::regtype
       AND NOT p.prosecdef
       AND md5(p.prosrc)='204b9b9355e61b7541bc0633bbc9294c'
-      AND p.proconfig @> ARRAY['search_path=']::text[]
+      AND p.proconfig @> ARRAY['search_path=""']::text[]
   ) OR NOT EXISTS (
     SELECT 1 FROM pg_trigger t
     WHERE t.tgfoid='public.set_updated_at_timestamp()'::regprocedure

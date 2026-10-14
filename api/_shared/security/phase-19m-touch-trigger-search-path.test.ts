@@ -54,7 +54,7 @@ describe("19M search_path for timestamp trigger functions", () => {
     expect(alterations).toHaveLength(functions.length);
     for (const f of functions) {
       expect(alterations).toContain(`ALTER FUNCTION public.${f.n}() SET search_path TO '';`);
-      expect(sql).toContain("p.proconfig @> ARRAY['search_path=']::text[]");
+      expect(sql).toContain("p.proconfig @> ARRAY['search_path=\"\"']::text[]");
     }
   });
 
