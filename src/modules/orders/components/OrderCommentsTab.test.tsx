@@ -35,7 +35,7 @@ describe("EvoluSystem OS comments", () => {
     for (const expected of ["Equipe de Arte", "Produção", "Confirmar medidas do letreiro.", "Aguardando retorno da equipe.", "Aguardando a aprovação do arquivo."]) {
       expect(html).toContain(expected);
     }
-    expect(html).toContain('dateTime="2026-10-14T12:00:00Z"'.replace("dateTime", "dateTime") === "unused" ? "never" : 'dateTime="2026-10-14T12:00:00Z"');
+    expect(html).toContain('dateTime="2026-10-14T12:00:00Z"');
     expect(html).toContain("whitespace-pre-wrap");
     expect(html).toContain("overflow-wrap:anywhere");
     expect(html).toContain('aria-label="Comentários da OS"');
