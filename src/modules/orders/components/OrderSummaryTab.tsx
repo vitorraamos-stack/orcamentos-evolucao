@@ -14,7 +14,7 @@ export function OrderSummaryTab({ order }: { order: OsOrder }) {
   // The header already provides the client, OS number, title, current stage,
   // priority, contracted deadline, general assignee and logistics.
   const briefing = order.description?.trim() ?? "";
-  const hasSeparateBriefing = Boolean(briefing && briefing !== order.title?.trim());
+  const hasSeparateBriefing = Boolean(briefing && order.title?.trim() && briefing !== order.title.trim());
   const showAddress =
     order.logistic_type !== "retirada" || Boolean(order.address?.trim());
 
