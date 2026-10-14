@@ -75,7 +75,7 @@ export default function OrderDetailPage() {
       production: { current: operations, set: setOperations, request: async () => { return await reloadProductionData(); } },
     } as const;
     const config = configs[tab as keyof typeof configs] as { current: LoadState<unknown[]>; set: (value: LoadState<never[]>) => void; request: () => Promise<unknown[]> } | undefined;
-    if (!config || config.current.loaded || config.current.loading) return;
+    if (!config || config.current.loading || (config.current.loaded && !config.current.error)) return;
     config.set({ ...config.current, loading: true } as never);
     try { const data = await config.request(); config.set({ data, loading: false, error: null, loaded: true } as never); }
     catch (error) { config.set({ ...config.current, loading: false, loaded: true, error: message(error) } as never); }
