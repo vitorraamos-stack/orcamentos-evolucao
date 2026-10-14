@@ -30,7 +30,7 @@ describe("New order sticky summary layout", () => {
       '<aside className="p-4 sm:p-6 lg:sticky lg:top-6 lg:self-start lg:p-0">'
     );
     expect(source).toContain(
-      'className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]"'
+      'className="grid gap-6 pb-44 lg:grid-cols-[minmax(0,1fr)_340px] lg:pb-0"'
     );
     expect(source).not.toContain(
       'className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]"'
