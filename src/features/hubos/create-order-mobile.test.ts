@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const form = readFileSync(new URL("../components/CreateOrderForm.tsx", import.meta.url), "utf8");
-const css = readFileSync(new URL("../components/create-order-mobile.css", import.meta.url), "utf8");
+const form = readFileSync(new URL("./components/CreateOrderForm.tsx", import.meta.url), "utf8");
+const css = readFileSync(new URL("./components/create-order-mobile.css", import.meta.url), "utf8");
 
 describe("EvoluSystem mobile OS creation", () => {
   it("keeps a compact summary accessible before the section navigation on mobile", () => {
