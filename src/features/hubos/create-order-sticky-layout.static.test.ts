@@ -23,7 +23,7 @@ describe("New order sticky summary layout", () => {
     );
 
     expect(source).toContain(
-      '<aside className="p-4 sm:p-6 lg:p-0">\n' +
+      '<aside className="hidden lg:block lg:p-0">\n' +
         '          <div className="lg:sticky lg:top-6">'
     );
     expect(source).not.toContain(
