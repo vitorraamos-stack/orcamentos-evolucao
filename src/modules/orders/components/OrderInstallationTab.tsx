@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { OrderDeliverySummary, OrderPickupSummary } from "./OrderLogisticsSummary";
 import { supabase } from "@/lib/supabase";
 import type { OsOrder } from "@/features/hubos/types";
 import {
@@ -20,11 +21,6 @@ import type {
   InstallationEvidence,
 } from "@/modules/installations/types";
 import { Button } from "@/components/ui/button";
-import {
-  DELIVERY_MODE_LABEL,
-  DELIVERY_STATUS_LABEL,
-  pickupState,
-} from "@/modules/deliveries/services/deliveries";
 import type { Installation } from "@/modules/installations/types";
 import type { Delivery } from "@/modules/deliveries/types";
 import type { HubOrderFlowRow } from "@/modules/hub-os/order-flow-api";
@@ -102,16 +98,16 @@ export function OrderInstallationTab({ order }: { order: OsOrder }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Instalação / Entrega</CardTitle>
+        <CardTitle>{order.logistic_type === "instalacao" ? "Instalação" : order.logistic_type === "entrega" ? "Entrega" : order.logistic_type === "retirada" ? "Retirada" : "Instalação / Entrega"}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-5">
         {installation ? (
           <>
             <div>
               <span className="text-sm text-muted-foreground">Status: </span>
               <Badge>{INSTALLATION_STATUS_LABEL[installation.status]}</Badge>
             </div>
-            <dl className="grid gap-3 text-sm sm:grid-cols-2">
+            <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
               <div>
                 <dt className="text-muted-foreground">Data / hora</dt>
                 <dd>{formatAgendaDate(installation.scheduled_start)}</dd>
@@ -174,21 +170,25 @@ export function OrderInstallationTab({ order }: { order: OsOrder }) {
               )}
             </dl>
             <div className="flex flex-wrap gap-2">
-              <Button asChild size="sm" variant="outline">
+              <Button asChild size="sm" variant="outline" className="min-h-11 sm:min-h-9">
                 <a
                   target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Abrir endereço no Google Maps"
                   href={buildMapsUrl({
                     address,
                     lat: installation.address_lat,
                     lng: installation.address_lng,
                   })}
                 >
-                  Maps
+                  Google Maps
                 </a>
               </Button>
-              <Button asChild size="sm" variant="outline">
+              <Button asChild size="sm" variant="outline" className="min-h-11 sm:min-h-9">
                 <a
                   target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Abrir endereço no Waze"
                   href={buildWazeUrl({
                     address,
                     lat: installation.address_lat,
@@ -259,21 +259,7 @@ export function OrderInstallationTab({ order }: { order: OsOrder }) {
           </p>
         ) : null}
         {delivery ? (
-          <>
-            <Badge>{DELIVERY_STATUS_LABEL[delivery.status]}</Badge>
-            <p>
-              {DELIVERY_MODE_LABEL[delivery.mode]} ·{" "}
-              {delivery.scheduled_at
-                ? formatAgendaDate(delivery.scheduled_at)
-                : "Sem horário"}
-            </p>
-            <p>
-              {delivery.carrier_name ||
-                delivery.vehicle_label ||
-                "Responsável não informado"}{" "}
-              · Rastreio: {delivery.tracking_code || "—"}
-            </p>
-          </>
+          <OrderDeliverySummary delivery={delivery} />
         ) : order.logistic_type === "entrega" ? (
           <p>
             Aguardando agendamento.{" "}
@@ -283,21 +269,7 @@ export function OrderInstallationTab({ order }: { order: OsOrder }) {
           </p>
         ) : null}
         {order.logistic_type === "retirada" && (
-          <>
-            <Badge>{pickupState(pickup ?? undefined)}</Badge>
-            <p>
-              Aviso:{" "}
-              {pickup?.avisado_at
-                ? formatAgendaDate(pickup.avisado_at)
-                : "pendente"}
-            </p>
-            <p>
-              Retirada:{" "}
-              {pickup?.retirado_at
-                ? formatAgendaDate(pickup.retirado_at)
-                : "pendente"}
-            </p>
-          </>
+          <OrderPickupSummary pickup={pickup} />
         )}
       </CardContent>
     </Card>
