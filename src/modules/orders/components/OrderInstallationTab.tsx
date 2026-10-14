@@ -36,9 +36,20 @@ export function OrderInstallationTab({ order }: { order: OsOrder }) {
     checklist: InstallationChecklistItem[];
     evidence: InstallationEvidence[];
   }>({ checklist: [], evidence: [] });
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [executionError, setExecutionError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   useEffect(() => {
     let alive = true;
+    setLoading(true);
+    setLoadError(null);
+    setExecutionError(false);
+    setRecord(null);
+    setInstallationHistory([]);
+    setFieldData({ checklist: [], evidence: [] });
     void (async () => {
+      try {
       if (order.logistic_type === "instalacao") {
         const rows = await loadInstallationsForOrder(order.id);
         if (alive) {
@@ -55,7 +66,9 @@ export function OrderInstallationTab({ order }: { order: OsOrder }) {
                     evidence: data.evidence,
                   })
               )
-              .catch(() => {});
+              .catch(() => {
+                if (alive) setExecutionError(true);
+              });
         }
         return;
       }
@@ -74,13 +87,19 @@ export function OrderInstallationTab({ order }: { order: OsOrder }) {
               .eq("source_type", "os_orders")
               .eq("source_id", order.id)
               .maybeSingle();
-      const { data } = await query;
+      const { data, error } = await query;
+      if (error) throw error;
       if (alive) setRecord(data as typeof record);
+      } catch {
+        if (alive) setLoadError("Não foi possível carregar os dados de logística. Tente novamente.");
+      } finally {
+        if (alive) setLoading(false);
+      }
     })();
     return () => {
       alive = false;
     };
-  }, [order.id, order.logistic_type]);
+  }, [order.id, order.logistic_type, reloadKey]);
   const installation =
     order.logistic_type === "instalacao"
       ? (record as Installation | null)
@@ -101,6 +120,19 @@ export function OrderInstallationTab({ order }: { order: OsOrder }) {
         <CardTitle>{order.logistic_type === "instalacao" ? "Instalação" : order.logistic_type === "entrega" ? "Entrega" : order.logistic_type === "retirada" ? "Retirada" : "Instalação / Entrega"}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
+        {loading ? (
+          <p role="status" className="text-sm text-muted-foreground">
+            Carregando informações de logística…
+          </p>
+        ) : loadError ? (
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 p-4">
+            <p className="min-w-0 text-sm text-destructive">{loadError}</p>
+            <Button type="button" size="sm" variant="outline" className="min-h-11 sm:min-h-9" onClick={() => setReloadKey(key => key + 1)}>
+              Tentar novamente
+            </Button>
+          </div>
+        ) : (
+          <>
         {installation ? (
           <>
             <div>
@@ -270,6 +302,16 @@ export function OrderInstallationTab({ order }: { order: OsOrder }) {
         ) : null}
         {order.logistic_type === "retirada" && (
           <OrderPickupSummary pickup={pickup} />
+        )}
+        {executionError && (
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 p-4">
+            <p className="min-w-0 text-sm text-destructive">Não foi possível carregar o checklist e as evidências da instalação.</p>
+            <Button type="button" size="sm" variant="outline" className="min-h-11 sm:min-h-9" onClick={() => setReloadKey(key => key + 1)}>
+              Tentar novamente
+            </Button>
+          </div>
+        )}
+          </>
         )}
       </CardContent>
     </Card>
