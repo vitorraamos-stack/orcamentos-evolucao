@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -67,9 +68,14 @@ export function OrderEditDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Editar dados operacionais</DialogTitle>
+          <DialogDescription>
+            Atualize as informações da OS. As alterações só serão enviadas ao salvar.
+          </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4">
-          <div>
+        <div className="grid gap-5">
+          <section aria-labelledby="edit-os-servico" className="space-y-3 rounded-xl border bg-muted/10 p-4">
+            <h3 id="edit-os-servico" className="text-sm font-semibold">Serviço e briefing</h3>
+          <div className="space-y-1.5">
             <Label htmlFor="order-title">Título</Label>
             <Input
               id="order-title"
@@ -79,7 +85,7 @@ export function OrderEditDialog({
               }
             />
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label htmlFor="order-description">Descrição</Label>
             <Textarea
               id="order-description"
@@ -89,8 +95,11 @@ export function OrderEditDialog({
               }
             />
           </div>
+          </section>
+          <section aria-labelledby="edit-os-prazo-logistica" className="space-y-3 rounded-xl border bg-muted/10 p-4">
+            <h3 id="edit-os-prazo-logistica" className="text-sm font-semibold">Prazo e logística</h3>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="order-deadline">Prazo final</Label>
               <Input
                 id="order-deadline"
@@ -104,8 +113,8 @@ export function OrderEditDialog({
                 }
               />
             </div>
-            <div>
-              <Label>Logística</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="order-logistics">Logística</Label>
               <Select
                 value={value.logistic_type}
                 onValueChange={logistic_type =>
@@ -115,7 +124,7 @@ export function OrderEditDialog({
                   }))
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger id="order-logistics" aria-label="Logística">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -126,7 +135,7 @@ export function OrderEditDialog({
               </Select>
             </div>
           </div>
-          <div>
+          <div className="space-y-1.5">
             <Label htmlFor="order-address">Endereço</Label>
             <Input
               id="order-address"
@@ -136,15 +145,18 @@ export function OrderEditDialog({
               }
             />
           </div>
-          <div>
-            <Label>Prioridade</Label>
+          </section>
+          <section aria-labelledby="edit-os-prioridade" className="space-y-3 rounded-xl border bg-muted/10 p-4">
+            <h3 id="edit-os-prioridade" className="text-sm font-semibold">Prioridade</h3>
+          <div className="space-y-1.5">
+            <Label htmlFor="order-priority">Classificação</Label>
             <Select
               value={value.is_urgent ? "URGENTE" : "NORMAL"}
               onValueChange={priority =>
                 setValue(v => ({ ...v, is_urgent: priority === "URGENTE" }))
               }
             >
-              <SelectTrigger>
+              <SelectTrigger id="order-priority" aria-label="Classificação da prioridade">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -153,12 +165,14 @@ export function OrderEditDialog({
               </SelectContent>
             </Select>
           </div>
+          </section>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
           <Button
+            type="button"
             disabled={saving}
             onClick={async () => {
               setSaving(true);
