@@ -28,6 +28,10 @@ const operationStatusStyles: Record<OperationStatus, string> = {
   BLOCKED: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-200",
 };
 
+/** Only non-blank reasons may block an operation, and not during a pending action. */
+export const canConfirmOperationBlock = (reason: string, busy: boolean) =>
+  !busy && Boolean(reason.trim());
+
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : "Não foi possível atualizar a operação.";
 const emptyDraft: OperationEditDraft = { workCenter: "PRINTING", assigned: "none", isRequired: true, notes: "", sortOrder: 0 };
 
@@ -87,6 +91,57 @@ export function OrderProductionTab({ items, operations, users, canOperate, canMa
         </DialogFooter>
       </DialogContent>
     </Dialog>
-    <Dialog open={Boolean(blocking)} onOpenChange={open => !open && setBlocking(null)}><DialogContent><DialogHeader><DialogTitle>Bloquear operação</DialogTitle></DialogHeader><div><Label>Motivo do bloqueio *</Label><Textarea value={blockedReason} onChange={event => setBlockedReason(event.target.value)} maxLength={1000} rows={4} /></div><DialogFooter><Button variant="outline" onClick={() => setBlocking(null)}>Cancelar</Button><Button variant="destructive" disabled={busy || !blockedReason.trim()} onClick={() => blocking && void act(async () => { await onStatus(blocking.id, "BLOCKED", blockedReason.trim()); setBlocking(null); })}>Bloquear operação</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={Boolean(blocking)} onOpenChange={open => { if (!open && !busy) setBlocking(null); }}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg" aria-describedby="os-operation-block-context">
+        <DialogHeader>
+          <DialogTitle>Bloquear operação</DialogTitle>
+          <DialogDescription id="os-operation-block-context">
+            Setor: {blocking ? WORK_CENTER_LABELS[blocking.work_center] : "Não informado"} · Item: {items.find(item => item.id === blocking?.item_id)?.name ?? "Não identificado"}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-2">
+          <Label htmlFor="os-operation-block-reason">Motivo do bloqueio *</Label>
+          <Textarea
+            id="os-operation-block-reason"
+            aria-describedby="os-operation-block-help"
+            aria-required="true"
+            required
+            value={blockedReason}
+            onChange={event => setBlockedReason(event.target.value)}
+            maxLength={1000}
+            rows={4}
+            placeholder="Ex.: aguardando material para continuar"
+            className="resize-y"
+            disabled={busy}
+          />
+          <p id="os-operation-block-help" className="text-xs text-muted-foreground">
+            Informe o impedimento para orientar quem vai retomar a operação.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-11 sm:min-h-9"
+            disabled={busy}
+            onClick={() => setBlocking(null)}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            className="min-h-11 sm:min-h-9"
+            disabled={!canConfirmOperationBlock(blockedReason, busy)}
+            onClick={() => blocking && canConfirmOperationBlock(blockedReason, busy) && void act(async () => {
+              await onStatus(blocking.id, "BLOCKED", blockedReason.trim());
+              setBlocking(null);
+            })}
+          >
+            {busy ? "Bloqueando…" : "Confirmar bloqueio"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>;
 }
