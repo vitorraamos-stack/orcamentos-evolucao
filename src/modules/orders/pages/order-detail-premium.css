@@ -338,3 +338,69 @@
 @media (prefers-reduced-motion: reduce) {
   .evolu-detail__back-link { transition: none; }
 }
+
+/* Read-only quick navigation between existing OS tabs and operational cards. */
+.evolu-detail__shortcuts {
+  overflow: hidden;
+  border: 1px solid var(--detail-border);
+  border-radius: 16px;
+  background: #fff;
+  padding: 15px 17px 17px;
+  box-shadow: 0 8px 30px -26px rgba(20,54,96,.4);
+}
+.evolu-detail__shortcuts-intro h2 {
+  color: #253f5e;
+  font-size: 14px;
+  font-weight: 750;
+}
+.evolu-detail__shortcuts-intro p {
+  margin-top: 3px;
+  color: var(--detail-muted);
+  font-size: 12px;
+}
+.evolu-detail__shortcuts-grid {
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 9px;
+  margin-top: 13px;
+}
+.evolu-detail__shortcut {
+  height: auto;
+  min-height: 46px;
+  min-width: 0;
+  justify-content: flex-start;
+  gap: 9px;
+  border-radius: 10px;
+  background: #f9fbfe;
+  padding: 10px 12px;
+  color: #345370;
+  white-space: normal;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+}
+.evolu-detail__shortcut:hover { border-color: #a9d6f3; background: #f0f8ff; }
+.evolu-detail__shortcut--accent {
+  border-color: #addcf6;
+  background: #eaf6ff;
+  color: #087ab9;
+}
+.evolu-detail__shortcut:focus-visible { outline: 2px solid var(--detail-blue); outline-offset: 2px; }
+#os-detail-tabs, #os-detail-management { scroll-margin-top: 14px; }
+#os-detail-management:focus { outline: none; }
+#os-detail-management:focus-visible { outline: 2px solid var(--detail-blue); outline-offset: 4px; }
+.dark .evolu-detail__shortcuts { border-color: var(--border); background: var(--card); }
+.dark .evolu-detail__shortcuts-intro h2 { color: var(--foreground); }
+.dark .evolu-detail__shortcut { border-color: var(--border); background: var(--background); color: var(--foreground); }
+.dark .evolu-detail__shortcut:hover, .dark .evolu-detail__shortcut--accent {
+  border-color: var(--primary);
+  background: var(--accent);
+  color: var(--foreground);
+}
+@media (max-width: 900px) {
+  .evolu-detail__shortcuts-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 390px) {
+  .evolu-detail__shortcuts { padding: 14px 12px; }
+  .evolu-detail__shortcut { padding-inline: 10px; }
+}

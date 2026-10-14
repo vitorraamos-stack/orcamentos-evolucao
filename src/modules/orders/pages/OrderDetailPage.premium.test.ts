@@ -10,7 +10,9 @@ describe("EvoluSystem — OS detail premium visual contract", () => {
     expect(detail).toContain('href="/os"');
     expect(detail).toContain("Voltar à Central de OS");
     expect(detail).toContain('aria-label="Caminho"');
-    expect(detail).toContain('onValueChange={loadTab}');
+    expect(detail).toContain('onValueChange={changeTab}');
+    expect(detail).toContain('value={activeTab}');
+    expect(detail).toContain('<OrderDetailShortcuts onOpenTab={jumpToTab} onOpenManagement={jumpToManagement} />');
     expect((detail.match(/<TabsTrigger className="evolu-detail__tab"/g) ?? []).length).toBe(7);
     for (const section of ["summary", "items", "production", "installation", "files", "comments", "history"]) {
       expect(detail).toContain('value="' + section + '"');

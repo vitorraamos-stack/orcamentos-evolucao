@@ -10,6 +10,7 @@ import type { OsOrderLayoutAsset } from "@/features/hubos/types";
 import { fetchOsAssetDownloadUrl } from "@/modules/hub-os/api";
 import { OrderHeader } from "../components/OrderHeader";
 import { OrderFlowProgress } from "../components/OrderFlowProgress";
+import { OrderDetailShortcuts, type OrderDetailShortcutTab } from "../components/OrderDetailShortcuts";
 import { OrderAssigneesCard } from "../components/OrderAssigneesCard";
 import { OrderDeadlinesCard } from "../components/OrderDeadlinesCard";
 import { OrderSummaryTab } from "../components/OrderSummaryTab";
@@ -46,6 +47,7 @@ export default function OrderDetailPage() {
   const canEditOrder = hubPermissions.isManager; const canManageAssignees = hubPermissions.isManager; const canManageDeadlines = hubPermissions.isManager; const canManageItems = hubPermissions.isManager; const canMoveArt = hubPermissions.canMoveArteBoard; const canMoveProduction = hubPermissions.canMoveProducaoBoard; const canComment = hubPermissions.canViewHubOS;
   const [detail, setDetail] = useState<OrderDetail | null>(null); const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(true); const [pageError, setPageError] = useState<string | null>(null); const [editOpen, setEditOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("summary");
   const [archiveOpen,setArchiveOpen]=useState(false); const [deleteOpen,setDeleteOpen]=useState(false);
   const [items, setItems] = useState(state<OrderItem[]>([])); const [comments, setComments] = useState(state<OrderComment[]>([]));
   const [activities, setActivities] = useState(state<OrderActivity[]>([])); const [files, setFiles] = useState(state<OsOrderLayoutAsset[]>([])); const [operations, setOperations] = useState(state<ItemOperation[]>([]));
@@ -80,6 +82,17 @@ export default function OrderDetailPage() {
     try { const data = await config.request(); config.set({ data, loading: false, error: null, loaded: true } as never); }
     catch (error) { config.set({ ...config.current, loading: false, loaded: true, error: message(error) } as never); }
   }, [activities, comments, files, items, operations, orderId, reloadProductionData]);
+
+  const changeTab = (value: string) => { setActiveTab(value); void loadTab(value); };
+  const jumpToTab = (value: OrderDetailShortcutTab) => {
+    changeTab(value);
+    document.getElementById("os-detail-tabs")?.scrollIntoView({ block: "start" });
+  };
+  const jumpToManagement = () => {
+    const section = document.getElementById("os-detail-management");
+    section?.scrollIntoView({ block: "start" });
+    section?.focus({ preventScroll: true });
+  };
 
   if (loading) return <div className="space-y-4"><Skeleton className="h-56 w-full" /><Skeleton className="h-24 w-full" /></div>;
   if (pageError || !detail) return <div className="rounded-lg border border-destructive/40 p-6"><h1 className="font-semibold">Não foi possível abrir a OS</h1><p className="mt-2 text-sm text-muted-foreground">{pageError ?? "OS não encontrada."}</p></div>;
@@ -132,8 +145,9 @@ export default function OrderDetailPage() {
     </nav>
     <OrderHeader order={detail.order} assignees={detail.assignees} canEdit={canEditOrder} canManage={hubPermissions.isManager} onArchive={()=>setArchiveOpen(true)} onDelete={()=>setDeleteOpen(true)} transitions={allowed} onTransition={moveStatus} onEdit={() => setEditOpen(true)} />
     <OrderFlowProgress order={detail.order} />
-    <Tabs className="evolu-detail__tabs" defaultValue="summary" onValueChange={loadTab}><div className="evolu-detail__tabs-scroll overflow-x-auto"><TabsList className="evolu-detail__tabs-list w-max min-w-full justify-start"><TabsTrigger className="evolu-detail__tab" value="summary">Resumo</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="items">Itens</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="production">Produção</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="installation">Instalação / Entrega</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="files">Arquivos</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="comments">Comentários</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="history">Histórico</TabsTrigger></TabsList></div>
+    <OrderDetailShortcuts onOpenTab={jumpToTab} onOpenManagement={jumpToManagement} />
+    <Tabs id="os-detail-tabs" className="evolu-detail__tabs" value={activeTab} onValueChange={changeTab}><div className="evolu-detail__tabs-scroll overflow-x-auto"><TabsList className="evolu-detail__tabs-list w-max min-w-full justify-start"><TabsTrigger className="evolu-detail__tab" value="summary">Resumo</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="items">Itens</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="production">Produção</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="installation">Instalação / Entrega</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="files">Arquivos</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="comments">Comentários</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="history">Histórico</TabsTrigger></TabsList></div>
       <TabsContent className="evolu-detail__tab-content" value="summary"><OrderSummaryTab order={detail.order} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="items"><OrderItemsTab items={items.data} loading={items.loading} error={items.error} canEdit={canManageItems} onCreate={createItem} onUpdate={updateItem} onRemove={removeItem} onMove={moveItem} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="production"><OrderProductionTab items={items.data} operations={operations.data} users={users} canOperate={canMoveProduction} canManage={hubPermissions.isManager} onCreate={async input => { await createItemOperation(input); await reloadProductionData(); toast.success("Operação adicionada."); }} onUpdate={async (id,input) => { await updateItemOperation(id,input); await reloadProductionData(); toast.success("Operação editada."); }} onStatus={async (id,status,reason) => { await setItemOperationStatus(id,status,reason); await reloadProductionData(); toast.success("Operação atualizada."); }} onDelete={async id => { await deleteItemOperation(id); await reloadProductionData(); toast.success("Operação excluída."); }} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="installation"><OrderInstallationTab order={detail.order} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="files"><OrderFilesTab assets={files.data} loading={files.loading} error={files.error} onOpen={openAsset} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="comments"><OrderCommentsTab comments={comments.data} loading={comments.loading} error={comments.error} currentUserId={user?.id} canComment={canComment} canRemoveAny={hubPermissions.isManager} onCreate={createComment} onUpdate={editComment} onRemove={removeComment} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="history"><OrderHistoryTab activities={activities.data} loading={activities.loading} error={activities.error} /></TabsContent></Tabs>
-    <section aria-label="Responsáveis e prazos" className="evolu-detail__management-grid grid gap-4 xl:grid-cols-2"><OrderAssigneesCard assignees={detail.assignees} users={users} canEdit={canManageAssignees} onChange={updateAssignee} /><OrderDeadlinesCard order={detail.order} deadlines={detail.deadlines} canEdit={canManageDeadlines} onChange={updateDeadline} onComplete={scope => deadlineAction(scope, "complete")} onReopen={scope => deadlineAction(scope, "reopen")} onRemove={scope => deadlineAction(scope, "remove")} /></section>
+    <section aria-label="Responsáveis e prazos" id="os-detail-management" tabIndex={-1} className="evolu-detail__management-grid grid gap-4 xl:grid-cols-2"><OrderAssigneesCard assignees={detail.assignees} users={users} canEdit={canManageAssignees} onChange={updateAssignee} /><OrderDeadlinesCard order={detail.order} deadlines={detail.deadlines} canEdit={canManageDeadlines} onChange={updateDeadline} onComplete={scope => deadlineAction(scope, "complete")} onReopen={scope => deadlineAction(scope, "reopen")} onRemove={scope => deadlineAction(scope, "remove")} /></section>
     <OrderEditDialog order={detail.order} open={editOpen} onOpenChange={setEditOpen} onSave={saveOrder} /><ArchiveOrderDialog open={archiveOpen} onOpenChange={setArchiveOpen} onConfirm={archive}/><DeleteOrderDialog open={deleteOpen} onOpenChange={setDeleteOpen} loadPreview={()=>getOrderDeletionPreview(detail.order.id)} onDelete={deleted} onArchive={()=>{setDeleteOpen(false);setArchiveOpen(true)}} onCleanup={cleanup} onGoToCentral={()=>navigate("/os")}/></main>;
 }
