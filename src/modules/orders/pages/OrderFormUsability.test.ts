@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const creation = readFileSync(new URL("../../features/hubos/components/CreateOrderForm.tsx", import.meta.url), "utf8");
+const creation = readFileSync(new URL("../../../features/hubos/components/CreateOrderForm.tsx", import.meta.url), "utf8");
 const editing = readFileSync(new URL("../components/OrderEditDialog.tsx", import.meta.url), "utf8");
 
 describe("EvoluSystem OS form usability", () => {
