@@ -22,7 +22,7 @@ describe("EvoluSystem — OS detail premium visual contract", () => {
   it("places flow above the tab navigation, which stays directly above the details", () => {
     const headerIndex = detail.indexOf("<OrderHeader order={detail.order}");
     const flowIndex = detail.indexOf("<OrderFlowProgress order={detail.order}");
-    const tabsIndex = detail.indexOf('<Tabs className="evolu-detail__tabs"');
+    const tabsIndex = detail.indexOf('<Tabs id="os-detail-tabs" className="evolu-detail__tabs"');
     const tabsListEnd = detail.indexOf("</TabsList>", tabsIndex);
     const summaryIndex = detail.indexOf("<OrderSummaryTab order={detail.order}");
     const tabsClose = detail.indexOf("</Tabs>", tabsIndex);
