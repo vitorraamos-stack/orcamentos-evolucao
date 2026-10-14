@@ -1,6 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { OrderItem } from "../types/orderDetail";
+// Isolate the item list from the editing dialog's Supabase repository dependency.
+vi.mock("./OrderItemDialog", () => ({ OrderItemDialog: () => null }));
 import { OrderItemsTab } from "./OrderItemsTab";
 
 const createItem = (changes: Partial<OrderItem> = {}): OrderItem => ({
