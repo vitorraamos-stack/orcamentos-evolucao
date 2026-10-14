@@ -230,7 +230,8 @@ BEGIN
       AND roles=ARRAY['authenticated']::name[]
       AND qual LIKE '%(created_by = auth.uid())%'
       AND qual LIKE '%PAYMENT_SUBMITTED%'
-      AND qual LIKE '%24 hours%'
+      AND qual LIKE '%created_at%'
+      AND qual LIKE '%now()%'
       AND qual LIKE '%attachment_path IS NULL%'
       AND qual LIKE '%synced_to_smb_at IS NULL%'
   ) THEN RAISE EXCEPTION '19S_ABORTED_POSTCONDITION_DELETE_PENDING_ONLY'; END IF;
