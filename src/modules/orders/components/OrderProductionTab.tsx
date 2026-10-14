@@ -3,13 +3,12 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { OrderItem, UserOption } from "../types/orderDetail";
-import { OPERATION_STATUS_LABELS, WORK_CENTERS, WORK_CENTER_LABELS, operationSummary, type ItemOperation, type OperationStatus, type WorkCenter } from "@/modules/production/operations";
+import { OperationFormFields } from "./OperationFormFields";
+import { OPERATION_STATUS_LABELS, WORK_CENTER_LABELS, operationSummary, type ItemOperation, type OperationStatus, type WorkCenter } from "@/modules/production/operations";
 
 export type OperationEditInput = { workCenter: WorkCenter; assignedTo: string | null; isRequired: boolean; notes: string; sortOrder: number };
 export type OperationEditDraft = Omit<OperationEditInput, "assignedTo"> & { assigned: string };
@@ -52,13 +51,6 @@ export function OrderProductionTab({ items, operations, users, canOperate, canMa
   const openEdit = (operation: ItemOperation) => { setDraft(operationEditDraft(operation)); setEditing(operation); };
   const statusActions = (operation: ItemOperation): { label: string; status: OperationStatus }[] => operation.status === "PENDING" ? [{ label: "Iniciar", status: "IN_PROGRESS" }] : operation.status === "IN_PROGRESS" ? [{ label: "Concluir", status: "COMPLETED" }, { label: "Bloquear", status: "BLOCKED" }] : operation.status === "BLOCKED" ? [{ label: "Retomar", status: "IN_PROGRESS" }] : canManage ? [{ label: "Reabrir", status: "IN_PROGRESS" }] : [];
 
-  const fields = <div className="space-y-4">
-    <div><Label>Setor *</Label><Select value={draft.workCenter} onValueChange={value => setDraft(current => ({ ...current, workCenter: value as WorkCenter }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{WORK_CENTERS.map(value => <SelectItem key={value} value={value}>{WORK_CENTER_LABELS[value]}</SelectItem>)}</SelectContent></Select></div>
-    <div><Label>Responsável</Label><Select value={draft.assigned} onValueChange={assigned => setDraft(current => ({ ...current, assigned }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Não atribuído</SelectItem>{users.map(user => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}</SelectContent></Select></div>
-    <label className="flex items-center gap-2 text-sm"><Checkbox checked={draft.isRequired} onCheckedChange={value => setDraft(current => ({ ...current, isRequired: Boolean(value) }))} />Obrigatória</label>
-    <div><Label>Observação</Label><Textarea value={draft.notes} onChange={event => setDraft(current => ({ ...current, notes: event.target.value }))} maxLength={4000} rows={4} /></div>
-  </div>;
-
   return <div className="space-y-4">
     {items.map((item, index) => { const values = operations.filter(value => value.item_id === item.id); const summary = operationSummary(values); return <Card key={item.id}>
       <CardHeader className="flex-col items-start justify-between gap-3 sm:flex-row sm:items-center"><div className="min-w-0"><CardTitle className="break-words text-base">Item {String(index + 1).padStart(2, "0")} — {item.name}</CardTitle>{summary.total > 0 && <p className="mt-1 text-sm text-muted-foreground">{summary.completed} de {summary.total} operações obrigatórias concluídas</p>}</div>{canOperate && <Button size="sm" className="min-h-11 w-full shrink-0 sm:min-h-9 sm:w-auto" onClick={() => openCreate(item.id)}>Adicionar operação</Button>}</CardHeader>
@@ -69,8 +61,32 @@ export function OrderProductionTab({ items, operations, users, canOperate, canMa
       </div>)}</CardContent>
     </Card>; })}
 
-    <Dialog open={Boolean(createItemId)} onOpenChange={open => !open && setCreateItemId(null)}><DialogContent><DialogHeader><DialogTitle>Adicionar operação</DialogTitle></DialogHeader>{fields}<DialogFooter><Button disabled={busy} onClick={() => createItemId && void act(async () => { const input = operationEditInput(draft); await onCreate({ itemId: createItemId, ...input }); setCreateItemId(null); })}>Adicionar</Button></DialogFooter></DialogContent></Dialog>
-    <Dialog open={Boolean(editing)} onOpenChange={open => !open && setEditing(null)}><DialogContent><DialogHeader><DialogTitle>Editar operação</DialogTitle></DialogHeader>{fields}<DialogFooter><Button variant="outline" onClick={() => setEditing(null)}>Cancelar</Button><Button disabled={busy} onClick={() => editing && void act(async () => { await onUpdate(editing.id, operationEditInput(draft)); setEditing(null); })}>Salvar alterações</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={Boolean(createItemId)} onOpenChange={open => !open && setCreateItemId(null)}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Adicionar operação</DialogTitle>
+          <DialogDescription>Item: {items.find(item => item.id === createItemId)?.name ?? "Não identificado"}</DialogDescription>
+        </DialogHeader>
+        <OperationFormFields draft={draft} users={users} setDraft={setDraft} />
+        <DialogFooter>
+          <Button type="button" variant="outline" className="min-h-11 sm:min-h-9" disabled={busy} onClick={() => setCreateItemId(null)}>Cancelar</Button>
+          <Button type="button" className="min-h-11 sm:min-h-9" disabled={busy} onClick={() => createItemId && void act(async () => { const input = operationEditInput(draft); await onCreate({ itemId: createItemId, ...input }); setCreateItemId(null); })}>Adicionar operação</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    <Dialog open={Boolean(editing)} onOpenChange={open => !open && setEditing(null)}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Editar operação</DialogTitle>
+          <DialogDescription>Item: {items.find(item => item.id === editing?.item_id)?.name ?? "Não identificado"}</DialogDescription>
+        </DialogHeader>
+        <OperationFormFields draft={draft} users={users} setDraft={setDraft} />
+        <DialogFooter>
+          <Button type="button" variant="outline" className="min-h-11 sm:min-h-9" disabled={busy} onClick={() => setEditing(null)}>Cancelar</Button>
+          <Button type="button" className="min-h-11 sm:min-h-9" disabled={busy} onClick={() => editing && void act(async () => { await onUpdate(editing.id, operationEditInput(draft)); setEditing(null); })}>Salvar alterações</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     <Dialog open={Boolean(blocking)} onOpenChange={open => !open && setBlocking(null)}><DialogContent><DialogHeader><DialogTitle>Bloquear operação</DialogTitle></DialogHeader><div><Label>Motivo do bloqueio *</Label><Textarea value={blockedReason} onChange={event => setBlockedReason(event.target.value)} maxLength={1000} rows={4} /></div><DialogFooter><Button variant="outline" onClick={() => setBlocking(null)}>Cancelar</Button><Button variant="destructive" disabled={busy || !blockedReason.trim()} onClick={() => blocking && void act(async () => { await onStatus(blocking.id, "BLOCKED", blockedReason.trim()); setBlocking(null); })}>Bloquear operação</Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }
