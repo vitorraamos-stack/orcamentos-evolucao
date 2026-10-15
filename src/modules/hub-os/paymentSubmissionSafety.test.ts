@@ -29,9 +29,8 @@ describe("19U: legacy payment client safeguards (synthetic, no network)", () => 
     ["r2_upload_started", true, false, true],
     ["r2_uploaded", true, false, true],
     ["metadata_saved", true, false, true],
-    ["status_update_started", false, false, true],
-    ["status_updated", false, false, true],
-    ["event_insert_started", true, false, true],
+    ["finalization_started", false, false, true],
+    ["finalization_started", true, false, true],
   ] as const)(
     "%s file=%s -> cleanup=%s review=%s",
     (stage, selected, safeToDeletePendingProof, manualReviewRequired) => {
@@ -54,17 +53,27 @@ describe("19U: legacy payment client safeguards (synthetic, no network)", () => 
     expect(handler.indexOf("preparePaymentFile(paymentFile)"))
       .toBeLessThan(handler.indexOf("createPaymentProof({"));
     expect(handler).toContain('stage = "r2_upload_started"');
-    expect(handler).toContain('stage = "status_update_started"');
-    expect(handler).toContain('stage = "event_insert_started"');
+    expect(handler).toContain('stage = "finalization_started"');
+    expect(handler).toContain("finalizeLegacyPaymentSubmission(proof.id)");
+    expect(handler).toContain("hasOwnSubmittedPaymentEvent(freshEvents, createdProof.id, user.id)");
     expect(handler).toContain("setPaymentSubmissionNeedsReview(true)");
     expect(ui).toContain('role="alert"');
     expect(ui).toContain("disabled={saving || paymentSubmissionNeedsReview}");
   });
 
-  it("does not remove the established R2 + payment event contract", () => {
+  it("preserves R2 proof metadata but moves status and event into the RPC", () => {
     const ui = readFileSync("src/modules/hub-os/pages/OsDetailPage.tsx", "utf8");
-    expect(ui).toContain("updatePaymentProof(proof.id, {");
-    expect(ui).toContain('type: "PAYMENT_SUBMITTED"');
-    expect(ui).toContain("payload: { payment_id: proof.id, status: nextStatus }");
+    const submit = ui.slice(
+      ui.indexOf("const handlePaymentSubmit = async () => {"),
+      ui.indexOf("\n  if (loading) {")
+    );
+    expect(submit).toContain("updatePaymentProof(proof.id, {");
+    expect(submit).toContain('stage = "finalization_started"');
+    expect(submit).toContain("finalizeLegacyPaymentSubmission(proof.id)");
+    expect(submit).not.toContain('type: "PAYMENT_SUBMITTED"');
+    expect(submit).not.toContain("payment_status: nextStatus");
+    expect(submit).toContain("fetchOsEvents(order.id)");
+    expect(submit).toContain("fetchOsPayments(order.id)");
+    expect(submit).toContain("fetchOsById(order.id)");
   });
 });
