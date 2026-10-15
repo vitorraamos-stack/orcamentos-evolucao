@@ -1,90 +1,57 @@
-# 19V-A — Migration aditiva de finalização financeira (candidata)
+# 19V-A — Supabase migration application record
 
-**ESTADO: SQL PREPARADO, NÃO GERADO PELA CLI, NÃO APLICADO.**
+**STATUS: Applied in Supabase; GitHub migration history synchronized in this Draft PR.**
 
-A infraestrutura deste turno não dispõe da Supabase CLI e a instalação
-temporária não foi concluída. Para cumprir o processo de migrations,
-gerar o arquivo definitivo com `supabase migration new
-phase_19va_atomic_payment_finalization` em uma máquina autorizada,
-transferindo o conteúdo revisado de
-`docs/tasks/phase-19va-migration-CANDIDATE.sql`. Não inventar versões de
-migration nem executar o conteúdo por copiar/colar em produção.
+- Project: `evolucao-orcamentos` (`zffpvykekwrmkbyjsgbh`)
+- Supabase migration history: `20261015134750_phase_19va_atomic_payment_finalization`
+- Applied on: 2026-10-15, using the official Supabase migration connector
+- Applied source: candidate `docs/tasks/phase-19va-migration-CANDIDATE.sql`
+  from commit `d6054bbb25de434d733450dd70f6d43559a070b4`
+- Corresponding repository file:
+  `supabase/migrations/20261015134750_phase_19va_atomic_payment_finalization.sql`
+- The repository migration was created **after** connector execution
+  using the **actual Supabase-generated version**. The Supabase CLI was
+  unavailable; do **not** claim the CLI generated or tested this file.
+- No merge and no manual Vercel deployment were authorized/performed.
 
-A aplicação no Supabase exigirá **autorização nova**, distinta da revisão
-do PR e do merge. Um merge isolado deste PR **não aplica** SQL porque
-o arquivo permanece fora de `supabase/migrations`.
+## Read-only verification after applying
 
-## Base verificada por consultas somente-leitura
+1. `public.finalize_legacy_payment_submission(uuid)` exists,
+   `SECURITY INVOKER` (`prosecdef=false`), empty search path, owned by postgres.
+2. `authenticated` has EXECUTE; `anon` and `service_role` **do not**.
+3. New index `os_event_payment_submission_once` is unique and applies to
+   `PAYMENT_SUBMITTED` events with `payment_id` present.
+4. The 19T proof guard remains unchanged, MD5
+   `8af26088723a9b4fb8dfb8863108affc`.
+5. Policies for updating `os`, adding/deleting `os_event` and updating
+   `os_payment_proof` remain as they were before this phase.
+6. Legacy `os`, `os_payment_proof` and `os_event` retained zero rows
+   immediately after applying. This does not characterize newer Hub OS data.
 
-- Supabase de produção: `evolucao-orcamentos`
-  (`zffpvykekwrmkbyjsgbh`).
-- Migração mais recente: 19T,
-  `20261014185916_phase_19t_legacy_payment_financial_immutability`.
-- Gatilho `trg_guard_legacy_payment_proof_mutations` habilitado e
-  fonte `guard_legacy_payment_proof_mutations()` MD5
-  `8af26088723a9b4fb8dfb8863108affc`.
-- Tabelas legadas `os`, `os_payment_proof`, `os_event`: **0
-  registros no momento da auditoria**, não é promessa para aplicação
-  futura. Isso não descreve as tabelas mais novas do EvoluSystem.
-- `os_event` tem apenas `os_event_pkey`, sem índice de unicidade de
-  submissão; nenhum evento duplicado ou malformado encontrado.
-- Políticas `os_update`, `os_event_insert` e `os_event_read`
-  preservam permissão por módulo `hub_os` para `authenticated`.
+## Exact scope and limitations
 
-## Alcance do candidato
+This is an **additive backend change only**. The existing frontend
+still writes `os.payment_status` and `PAYMENT_SUBMITTED` separately.
+The transactional RPC has **not been used by the frontend**.
 
-1. Pré-condições abortam ao detectar colisão de objeto, RLS, 19T,
-   grants/policies, histórico inválido ou duplicidade inesperados.
-2. Novo índice parcial
-   `os_event_payment_submission_once` evita dois eventos
-   `PAYMENT_SUBMITTED` para a mesma OS e comprovante.
-3. Novo RPC
-   `public.finalize_legacy_payment_submission(p_proof_id uuid)`
-   executado com `SECURITY INVOKER` e `search_path` vazio.
-4. Valida `auth.uid()`, acesso ao módulo, autor, estado e metadados
-   do comprovante; trava primeiro a OS, depois o comprovante.
-5. Atualiza `os.payment_status` e insere o evento na mesma chamada
-   transacional. Se falhar o INSERT, o UPDATE é revertido.
-6. Repetição do mesmo `payment_id` retorna
-   `already_submitted=true` sem nova gravação, desde que o evento
-   existente tenha autor válido.
-7. Calcula o status no servidor considerando o dia de São Paulo.
-8. Restringe EXECUTE da função a usuários `authenticated` e verifica
-   pós-condições. Não altera políticas das tabelas nem frontend.
+- No synthetic financial transactions were written to production.
+- No real RLS/JWT, idempotency, concurrency, rollback or R2/SMB E2E
+  tests were performed. GitHub CI/static contracts are not substitutes.
+- Direct UPDATE/INSERT/DELETE paths remain accessible under existing
+  RLS. Full enforcement is **NOT** complete until separate 19V-B
+  (frontend adoption) and 19V-C (server-side direct write restrictions).
+- Event deletion by manager and tampering through existing direct-write
+  paths still require review; the 19V-A RPC by itself is insufficient.
+- Supabase security advisors reported pre-existing lints outside
+  this narrowly scoped migration; no unrelated schema changes were made.
 
-## Limitações técnicas que impedem atestar homologação
+## Next authorization gates
 
-- SQL não foi executado nem compilado contra PostgreSQL neste turno.
-  GitHub Actions executará **testes de contrato estáticos**, não
-  transações reais, RLS de usuários nem concorrência do banco.
-- Um objeto R2 pode existir mesmo se o banco não tiver metadados;
-  uma transação PostgreSQL não é transação distribuída com R2.
-- Escritas diretas continuam disponíveis com grants atuais. O novo
-  índice limita duplicação por chave, mas 19V-C precisa impedir
-  inserção falsificada de eventos, atualização do status e exclusão
-  por gerente sem rito de reconciliação.
-- `updateOsPaymentStatus` permanece no API legado. O cliente ainda
-  chama `updateOs` e `createOsEvent` separadamente até 19V-B.
-- Atualização e evento para duas provas **diferentes** da mesma OS
-  são serializados; status financeiro final ainda reflete a operação
-  mais recente (sem agregação de recebimentos).
-- Se houver diferenças no fuso do navegador, a antiga regra de
-  pagamento recebido hoje pode divergir da nova regra do servidor.
-- A checagem 19T usa um hash fixo, propositalmente falha quando a
-  função existente for alterada.
-
-## Implantação futura (somente com aprovação)
-
-1. Validar o SQL em ambiente PostgreSQL compatível, com dados
-   sintéticos e papéis autenticado/não autorizado. O usuário optou
-   por **não configurar sandbox remoto**; não usar produção para
-   executar cenários destrutivos.
-2. Regenerar uma migration versionada com Supabase CLI e revisar
-   diff, dependências, grants, RLS, e tempo de bloqueio do índice.
-3. Fazer nova inspeção de leitura na produção para verificar o drift.
-4. Após autorização explícita, aplicar somente 19V-A e conferir os
-   pós-checks. Não conectar o frontend à função antes disso.
-5. 19V-B e 19V-C são fases separadas com autorizações próprias.
-
-PR de arquitetura relacionado: #488. A proposta desse PR permanece
-independente; não realizar merges cruzados entre os dois.
+1. Review and **separately authorize merge** of this migration-history PR.
+   Until then the PR remains Draft even though the DB migration is applied.
+2. Before 19V-B, specify retry semantics for already submitted proofs
+   and refresh `os` / `os_event` after the RPC.
+3. 19V-B frontend changes and 19V-C enforcement are different PRs and
+   require separate authorization to merge / apply migrations.
+4. Do not configure sandbox or modify client records to produce
+   fake E2E evidence.
