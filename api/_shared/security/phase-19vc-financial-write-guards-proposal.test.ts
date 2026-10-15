@@ -44,6 +44,11 @@ describe("19V-C candidate — static architecture checks, no DB execution", () =
     expect(grant).toContain("status_producao");
     expect(grant).toContain("status_id");
     expect(sql).toContain("19VC_POSTCHECK_FAILED");
+    expect(sql).toContain("19VC_POLICY_DRIFT");
+    expect(sql).toContain("19VC_ROLE_INHERITANCE_DRIFT");
+    expect(sql).toContain("19VC_PRIVATE_HELPER_GRANTS_INVALID");
+    expect(sql).toContain("pg_catalog.has_schema_privilege(");
+    expect(sql).toContain("pg_catalog.has_function_privilege(");
     expect(sql).toContain("REVOKE TRUNCATE, TRIGGER, REFERENCES ON public.os");
     expect(sql).toContain("REVOKE TRIGGER, REFERENCES ON public.os_event,public.os_payment_proof");
     expect(sql).toContain("pg_catalog.has_table_privilege('authenticated','public.os','TRUNCATE')");

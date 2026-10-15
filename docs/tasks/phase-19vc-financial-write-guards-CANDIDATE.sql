@@ -40,6 +40,27 @@ BEGIN
       AND md5(p.prosrc)='8af26088723a9b4fb8dfb8863108affc'
   ) THEN RAISE EXCEPTION '19VC_FINANCE_FUNCTION_DRIFT' USING ERRCODE='55000'; END IF;
 
+  -- Prevent changing the public RPC against a different privilege or
+  -- tenancy baseline. Existing app policies must still gate module access.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_policies p
+    WHERE p.schemaname='public' AND p.tablename='os'
+      AND p.policyname='os_update' AND p.cmd='UPDATE'
+      AND p.roles=ARRAY['authenticated']::name[]
+      AND p.qual='has_module_access(auth.uid(), ''hub_os''::text)'
+      AND p.with_check='has_module_access(auth.uid(), ''hub_os''::text)'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_policies p
+    WHERE p.schemaname='public' AND p.tablename='os_event'
+      AND p.policyname='os_event_insert' AND p.cmd='INSERT'
+      AND p.roles=ARRAY['authenticated']::name[]
+      AND p.with_check='has_module_access(auth.uid(), ''hub_os''::text)'
+  ) THEN RAISE EXCEPTION '19VC_POLICY_DRIFT' USING ERRCODE='55000'; END IF;
+
+  IF pg_catalog.pg_has_role('authenticated','postgres','MEMBER')
+     OR pg_catalog.pg_has_role('authenticated','service_role','MEMBER')
+  THEN RAISE EXCEPTION '19VC_ROLE_INHERITANCE_DRIFT' USING ERRCODE='55000'; END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM pg_catalog.pg_class c
     WHERE c.oid='public.os'::regclass AND c.relrowsecurity
@@ -393,6 +414,24 @@ BEGIN
         AND p.prosecdef AND p.proconfig=ARRAY['search_path=""']::text[]
     )
   THEN RAISE EXCEPTION '19VC_POSTCHECK_FAILED' USING ERRCODE='55000'; END IF;
+
+  -- Check privileged helper's *effective* EXECUTE and schema USAGE.
+  IF NOT pg_catalog.has_schema_privilege(
+      'authenticated','evolusystem_finance_private','USAGE')
+    OR pg_catalog.has_schema_privilege(
+      'anon','evolusystem_finance_private','USAGE')
+    OR pg_catalog.has_schema_privilege(
+      'service_role','evolusystem_finance_private','USAGE')
+    OR pg_catalog.has_schema_privilege(
+      'authenticated','evolusystem_finance_private','CREATE')
+    OR NOT pg_catalog.has_function_privilege(
+      'authenticated','evolusystem_finance_private.finalize_legacy_payment_submission(uuid)','EXECUTE')
+    OR pg_catalog.has_function_privilege(
+      'anon','evolusystem_finance_private.finalize_legacy_payment_submission(uuid)','EXECUTE')
+    OR pg_catalog.has_function_privilege(
+      'service_role','evolusystem_finance_private.finalize_legacy_payment_submission(uuid)','EXECUTE')
+  THEN RAISE EXCEPTION '19VC_PRIVATE_HELPER_GRANTS_INVALID'
+    USING ERRCODE='55000'; END IF;
 
   IF (SELECT count(*) FROM pg_catalog.pg_trigger t
       WHERE t.tgrelid='public.os_event'::regclass

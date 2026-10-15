@@ -149,6 +149,13 @@ credenciais. A política deles exige auditoria própria.
 - Conferir que o GRANT original de `TRUNCATE` em `os` e de
   `TRIGGER/REFERENCES` nas três tabelas foi removido dos clientes,
   preservando somente papéis de serviço com essas capacidades.
+- Os checks SQL adicionais agora exigem manutenção das policies
+  `os_update` e `os_event_insert` e proíbem que `authenticated`
+  herde `postgres`/`service_role`. A pós-condição verifica
+  `USAGE`/EXECUTE efetivo do schema/função privados: autorizado
+  somente para `authenticated`, sem `CREATE`, sem acesso
+  do `anon` e do `service_role`. O papel `postgres` proprietário
+  mantém privilégios internos por design.
 - Para voltar atrás, elaborar migration **separada e autorizada** que
   restaure o corpo 19V-A do RPC e somente as permissões operacionais
   necessárias; remover triggers/helpers em ordem segura e nunca
