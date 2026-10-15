@@ -37,15 +37,20 @@ const auditText = (value: unknown): string | null => {
   return null;
 };
 
-export const scopeLabel = (value: unknown) =>
-  ({
-    ART: "Arte",
-    APPROVAL: "Aprovação",
-    PRODUCTION: "Produção",
-    FINISHING: "Acabamento",
-    INSTALLATION: "Instalação",
-    GENERAL: "Responsável geral",
-  })[String(value)] ?? auditText(value) ?? "Não informado";
+const scopeLabels: Record<string, string> = {
+  ART: "Arte",
+  APPROVAL: "Aprovação",
+  PRODUCTION: "Produção",
+  FINISHING: "Acabamento",
+  INSTALLATION: "Instalação",
+  GENERAL: "Responsável geral",
+};
+export const scopeLabel = (value: unknown) => {
+  const text = auditText(value);
+  return text && Object.prototype.hasOwnProperty.call(scopeLabels, text)
+    ? scopeLabels[text]
+    : text ?? "Não informado";
+};
 export function formatOrderActivity(
   activity: Pick<OrderActivity, "type" | "payload">
 ) {
@@ -85,8 +90,11 @@ export function formatOrderActivity(
   if (activity.type === "returned_to_art") return "OS retornada para Arte";
   if (activity.type === "production_tag_changed")
     return `Tag de Produção alterada: ${auditText(from) ?? "—"} → ${auditText(to) ?? "—"}`;
+  const knownLabel = Object.prototype.hasOwnProperty.call(labels, activity.type)
+    ? labels[activity.type]
+    : null;
   return (
-    labels[activity.type] ??
+    knownLabel ??
     ([auditText(name), auditText(from) && `${auditText(from)} → ${auditText(to) ?? "—"}`, auditText(due_date)]
       .filter(Boolean)
       .join(" · ") ||
