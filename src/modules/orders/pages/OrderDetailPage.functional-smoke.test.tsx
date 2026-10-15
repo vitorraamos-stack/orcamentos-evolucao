@@ -217,7 +217,7 @@ describe("EvoluSystem — OS seven-tab fixture-based functional smoke", () => {
     expect(items).toBeGreaterThan(summary);
     expect((page.match(/aria-label="Responsáveis e prazos"/g) ?? [])).toHaveLength(1);
     expect(page).toContain("getValidOrderTransitions({ board, from, role: hubRole");
-    expect(page).toContain("canManageAny" === "not-used" ? "not-used" : "hubPermissions.isManager");
+    expect(page).toContain("hubPermissions.isManager");
     expect(page).toContain("<ArchiveOrderDialog");
     expect(page).toContain("<DeleteOrderDialog");
   });
