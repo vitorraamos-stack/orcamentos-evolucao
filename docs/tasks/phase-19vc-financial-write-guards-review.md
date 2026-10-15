@@ -24,6 +24,11 @@ leitura. Não foi compilado ou executado em PostgreSQL.
   `public.os` e INSERT/DELETE em `public.os_event`.
 - `os_event` e `os` não têm triggers de cliente protegendo
   alterações financeiras, enquanto `os_payment_proof` mantém 19T.
+- As permissões atuais concedem **TRUNCATE, TRIGGER e REFERENCES**
+  em `public.os` tanto a `authenticated` quanto a `anon`.
+  `TRUNCATE` ignora RLS e gatilhos de linha; o SQL candidato
+  revoga esses privilégios e revisa `TRIGGER/REFERENCES` nos
+  dois objetos financeiros vinculados.
 - Em `public.os`, UPDATE de `status_arte`, `status_producao`,
   `status_id` e `updated_at` precisa ser preservado.
 - O frontend 19V-B usa `supabase.rpc("finalize_legacy_payment_submission",
@@ -63,11 +68,14 @@ clientes que tenham acesso SQL.
    colunas não-financeiras a `authenticated`.
    Bloquear UPDATE direto de `payment_status` **e `quote_total`**,
    sem bloquear `status_arte`, `status_producao` e `status_id`.
+   Também revogar TRUNCATE/TRIGGER/REFERENCES desnecessários dos
+   papéis de cliente, pois RLS não restringe TRUNCATE.
 4. BEFORE INSERT/UPDATE/DELETE em `os_event` impede que papéis
    sem privilégios de integração criem, alterem ou excluam
    `PAYMENT_SUBMITTED`, mantendo intactos outros eventos e RLS.
 5. BEFORE INSERT em `os` impede que clientes criem OS já como
-   RELEASED/BLOCKED/SCHEDULED. BEFORE DELETE bloqueia exclusão
+   RELEASED/BLOCKED/SCHEDULED, ou injetem `quote_total` ou
+   `quote_id` na criação de uma OS legada. BEFORE DELETE bloqueia exclusão
    de OS com **qualquer comprovante financeiro** ou
    `PAYMENT_SUBMITTED`, preservando a exclusão de OS sem
    comprovantes/eventos financeiros conforme RLS anterior.
@@ -127,13 +135,20 @@ credenciais. A política deles exige auditoria própria.
 - Confirmar fora deste protótipo que o schema interno não será exposto
   nas configurações do Data API/PostgREST. A auditoria SQL não confirma
   a configuração da API.
-- Avaliar a origem de `os.quote_total` na criação da OS e integrações
-  administrativas que atualizem `quote_total` ou `quote_id`.
-  Esta proposta restringe UPDATE, mas não valida o total na criação.
-  Não alegar que o valor do orçamento já está completamente protegido.
+- A criação canônica de OS por orçamento utiliza `public.os_orders`
+  no fluxo 18E; as tabelas `public.os` são **legadas**. A proposta
+  bloqueia `quote_total` e `quote_id` informados diretamente por
+  clientes na criação legada, além de UPDATE direto. Verificar
+  **todos os possíveis agentes externos** que criem OS legada vinculada
+  a orçamento: esta restrição pode rejeitar integrações existentes.
+  Ainda não se deve alegar equivalência com o vínculo canônico,
+  nem segurança global sem homologação.
 - Confirmar explicitamente as permissões de `PUBLIC`, grants herdados,
   triggers habilitados, privilégios de `service_role`, e o impacto
   das FKs CASCADE antes de aplicar.
+- Conferir que o GRANT original de `TRUNCATE` em `os` e de
+  `TRIGGER/REFERENCES` nas três tabelas foi removido dos clientes,
+  preservando somente papéis de serviço com essas capacidades.
 - Para voltar atrás, elaborar migration **separada e autorizada** que
   restaure o corpo 19V-A do RPC e somente as permissões operacionais
   necessárias; remover triggers/helpers em ordem segura e nunca

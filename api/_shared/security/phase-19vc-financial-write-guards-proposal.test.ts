@@ -44,6 +44,9 @@ describe("19V-C candidate — static architecture checks, no DB execution", () =
     expect(grant).toContain("status_producao");
     expect(grant).toContain("status_id");
     expect(sql).toContain("19VC_POSTCHECK_FAILED");
+    expect(sql).toContain("REVOKE TRUNCATE, TRIGGER, REFERENCES ON public.os");
+    expect(sql).toContain("REVOKE TRIGGER, REFERENCES ON public.os_event,public.os_payment_proof");
+    expect(sql).toContain("pg_catalog.has_table_privilege('authenticated','public.os','TRUNCATE')");
     expect(sql).toContain("19VC_TRIGGER_POSTCHECK_FAILED");
     expect(sql).toContain("pg_catalog.has_table_privilege('anon','public.os','UPDATE')");
     expect(sql).toContain("pg_catalog.has_column_privilege('authenticated','public.os','quote_id','UPDATE')");
@@ -59,6 +62,8 @@ describe("19V-C candidate — static architecture checks, no DB execution", () =
     expect(sql).toContain("os_payment_proof_os_id_fkey");
     expect(sql).toContain("os_event_os_id_fkey");
     expect(sql).toContain("19VC_DIRECT_FINANCIAL_OS_INSERT_BLOCKED");
+    expect(sql).toContain("NEW.quote_total IS NOT NULL");
+    expect(sql).toContain("NEW.quote_id IS NOT NULL");
     expect(sql).toContain("current_user NOT IN ('postgres','service_role')");
   });
   it("does not alter proof guard, R2 integration or production SQL", () => {
@@ -67,7 +72,8 @@ describe("19V-C candidate — static architecture checks, no DB execution", () =
     expect(sql).not.toContain("DROP TABLE");
     expect(sql).not.toContain("ALTER TABLE public.os_payment_proof");
     expect(doc).toContain("PostgreSQL local isolado");
-    expect(doc).toContain("Esta proposta restringe UPDATE, mas não valida o total na criação");
+    expect(doc).toContain("bloqueia `quote_total` e `quote_id`");
+    expect(doc).toContain("TRUNCATE");
     expect(doc).toContain("não será exposto");
     expect(doc).toContain("não pode excluir OS com comprovantes");
   });

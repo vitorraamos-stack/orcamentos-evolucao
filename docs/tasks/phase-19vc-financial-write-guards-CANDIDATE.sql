@@ -284,13 +284,20 @@ CREATE TRIGGER trg_guard_legacy_financial_event_writes
   BEFORE INSERT OR UPDATE OR DELETE ON public.os_event
   FOR EACH ROW EXECUTE FUNCTION public.guard_legacy_financial_event_writes();
 
--- For authenticated clients, no OS can start in RELEASED/SCHEDULED/etc.
+-- For authenticated clients, OS must start with pending financial status
+-- AND without client-supplied quote_id/quote_total. Trusted quote handoff
+-- is on the separate os_orders path; integration compatibility must still
+-- be reviewed before deployment (especially third-party legacy writers).
 CREATE FUNCTION public.guard_legacy_os_financial_insert()
 RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path TO ''
 AS $osinsert$
 BEGIN
   IF current_user NOT IN ('postgres','service_role')
-    AND NEW.payment_status IS DISTINCT FROM 'PENDING'
+    AND (
+      NEW.payment_status IS DISTINCT FROM 'PENDING'
+      OR NEW.quote_total IS NOT NULL
+      OR NEW.quote_id IS NOT NULL
+    )
   THEN RAISE EXCEPTION '19VC_DIRECT_FINANCIAL_OS_INSERT_BLOCKED'
     USING ERRCODE='42501'; END IF;
   RETURN NEW;
@@ -336,6 +343,14 @@ REVOKE UPDATE ON public.os FROM authenticated,anon;
 -- Operational fields retain UPDATE; financial and OS-identity fields excluded.
 GRANT UPDATE (customer_name, customer_phone, title, description, folder_path, status_id, assigned_to, updated_at, sale_number, client_name, delivery_date, delivery_type, shipping_carrier, tracking_code, address, notes, installation_date, installation_time_window, on_site_contact, status_arte, status_producao, is_reproducao, repro_motivo, has_letra_caixa, is_producao_externa) ON public.os TO authenticated;
 
+-- RLS does NOT guard TRUNCATE, TRIGGER or REFERENCES table privileges.
+-- Existing grants on legacy OS are too broad for browser-facing roles.
+-- Clients must not erase entire tables or introduce their own triggers/FKs.
+REVOKE TRUNCATE, TRIGGER, REFERENCES ON public.os
+  FROM authenticated,anon;
+REVOKE TRIGGER, REFERENCES ON public.os_event,public.os_payment_proof
+  FROM authenticated,anon;
+
 -- No need to permit invoking trigger functions as standalone RPCs.
 REVOKE ALL ON FUNCTION public.guard_legacy_financial_event_writes()
   FROM PUBLIC,authenticated,anon,service_role;
@@ -348,6 +363,12 @@ DO $postcheck$
 BEGIN
   IF pg_catalog.has_table_privilege('authenticated','public.os','UPDATE')
     OR pg_catalog.has_table_privilege('anon','public.os','UPDATE')
+    OR pg_catalog.has_table_privilege('authenticated','public.os','TRUNCATE')
+    OR pg_catalog.has_table_privilege('anon','public.os','TRUNCATE')
+    OR pg_catalog.has_table_privilege('authenticated','public.os','TRIGGER')
+    OR pg_catalog.has_table_privilege('anon','public.os','TRIGGER')
+    OR pg_catalog.has_table_privilege('authenticated','public.os','REFERENCES')
+    OR pg_catalog.has_table_privilege('anon','public.os','REFERENCES')
     OR pg_catalog.has_column_privilege('anon','public.os','payment_status','UPDATE')
     OR pg_catalog.has_column_privilege('authenticated','public.os','payment_status','UPDATE')
     OR pg_catalog.has_column_privilege('authenticated','public.os','quote_total','UPDATE')
@@ -358,6 +379,10 @@ BEGIN
     OR NOT pg_catalog.has_column_privilege('authenticated','public.os','status_producao','UPDATE')
     OR NOT pg_catalog.has_column_privilege('authenticated','public.os','status_id','UPDATE')
     OR NOT pg_catalog.has_column_privilege('authenticated','public.os','updated_at','UPDATE')
+    OR pg_catalog.has_table_privilege('authenticated','public.os_event','TRIGGER')
+    OR pg_catalog.has_table_privilege('anon','public.os_event','TRIGGER')
+    OR pg_catalog.has_table_privilege('authenticated','public.os_payment_proof','TRIGGER')
+    OR pg_catalog.has_table_privilege('anon','public.os_payment_proof','TRIGGER')
     OR NOT pg_catalog.has_function_privilege(
         'authenticated','public.finalize_legacy_payment_submission(uuid)','EXECUTE')
     OR pg_catalog.has_function_privilege(
