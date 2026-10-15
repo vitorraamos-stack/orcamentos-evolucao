@@ -62,6 +62,22 @@ BEGIN
       AND NOT t.tgisinternal
   ) THEN RAISE EXCEPTION '19VC_TRIGGER_COLLISION' USING ERRCODE='55000'; END IF;
 
+  -- Parent deletion cascades to payment proofs AND events. Ensure both FKs
+  -- have their expected behavior before relying on parent-row protection.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_constraint c
+    WHERE c.conname='os_event_os_id_fkey'
+      AND c.conrelid='public.os_event'::regclass
+      AND c.confrelid='public.os'::regclass
+      AND c.contype='f' AND c.confdeltype='c'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_constraint c
+    WHERE c.conname='os_payment_proof_os_id_fkey'
+      AND c.conrelid='public.os_payment_proof'::regclass
+      AND c.confrelid='public.os'::regclass
+      AND c.contype='f' AND c.confdeltype='c'
+  ) THEN RAISE EXCEPTION '19VC_PARENT_CASCADE_DRIFT' USING ERRCODE='55000'; END IF;
+
   IF EXISTS (
     SELECT 1 FROM public.os_event e
     WHERE e.type='PAYMENT_SUBMITTED'
@@ -285,18 +301,25 @@ CREATE TRIGGER trg_guard_legacy_os_financial_insert
   BEFORE INSERT ON public.os
   FOR EACH ROW EXECUTE FUNCTION public.guard_legacy_os_financial_insert();
 
--- An OS deletion cascades payment events/proofs via FK; block that path for
--- non-privileged users if even one financial event exists.
+-- An OS deletion cascades payment events/proofs via FK. Blocking only
+-- PAYMENT_SUBMITTED events would still let users erase pending or attached
+-- proofs with no submission event. Preserve ALL payment artifacts.
 CREATE FUNCTION public.guard_legacy_paid_os_deletion()
 RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path TO ''
 AS $osdelete$
 BEGIN
   IF current_user NOT IN ('postgres','service_role')
-    AND EXISTS (
-      SELECT 1 FROM public.os_event e
-      WHERE e.os_id=OLD.id AND e.type='PAYMENT_SUBMITTED'
+    AND (
+      EXISTS (
+        SELECT 1 FROM public.os_event e
+        WHERE e.os_id=OLD.id AND e.type='PAYMENT_SUBMITTED'
+      )
+      OR EXISTS (
+        SELECT 1 FROM public.os_payment_proof p
+        WHERE p.os_id=OLD.id
+      )
     )
-  THEN RAISE EXCEPTION '19VC_PAID_OS_DELETE_BLOCKED'
+  THEN RAISE EXCEPTION '19VC_OS_WITH_FINANCIAL_ARTIFACT_DELETE_BLOCKED'
     USING ERRCODE='42501'; END IF;
   RETURN OLD;
 END;
@@ -324,8 +347,13 @@ REVOKE ALL ON FUNCTION public.guard_legacy_os_financial_insert()
 DO $postcheck$
 BEGIN
   IF pg_catalog.has_table_privilege('authenticated','public.os','UPDATE')
+    OR pg_catalog.has_table_privilege('anon','public.os','UPDATE')
+    OR pg_catalog.has_column_privilege('anon','public.os','payment_status','UPDATE')
     OR pg_catalog.has_column_privilege('authenticated','public.os','payment_status','UPDATE')
     OR pg_catalog.has_column_privilege('authenticated','public.os','quote_total','UPDATE')
+    OR pg_catalog.has_column_privilege('authenticated','public.os','quote_id','UPDATE')
+    OR pg_catalog.has_column_privilege('authenticated','public.os','created_by','UPDATE')
+    OR pg_catalog.has_column_privilege('authenticated','public.os','os_number','UPDATE')
     OR NOT pg_catalog.has_column_privilege('authenticated','public.os','status_arte','UPDATE')
     OR NOT pg_catalog.has_column_privilege('authenticated','public.os','status_producao','UPDATE')
     OR NOT pg_catalog.has_column_privilege('authenticated','public.os','status_id','UPDATE')
@@ -340,6 +368,21 @@ BEGIN
         AND p.prosecdef AND p.proconfig=ARRAY['search_path=""']::text[]
     )
   THEN RAISE EXCEPTION '19VC_POSTCHECK_FAILED' USING ERRCODE='55000'; END IF;
+
+  IF (SELECT count(*) FROM pg_catalog.pg_trigger t
+      WHERE t.tgrelid='public.os_event'::regclass
+        AND t.tgname='trg_guard_legacy_financial_event_writes'
+        AND t.tgenabled='O'
+     )<>1
+     OR (SELECT count(*) FROM pg_catalog.pg_trigger t
+      WHERE t.tgrelid='public.os'::regclass
+        AND t.tgname IN (
+          'trg_guard_legacy_os_financial_insert',
+          'trg_guard_legacy_paid_os_deletion'
+        ) AND t.tgenabled='O'
+     )<>2
+  THEN RAISE EXCEPTION '19VC_TRIGGER_POSTCHECK_FAILED'
+    USING ERRCODE='55000'; END IF;
 END;
 $postcheck$;
 

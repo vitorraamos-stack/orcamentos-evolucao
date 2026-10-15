@@ -44,13 +44,20 @@ describe("19V-C candidate — static architecture checks, no DB execution", () =
     expect(grant).toContain("status_producao");
     expect(grant).toContain("status_id");
     expect(sql).toContain("19VC_POSTCHECK_FAILED");
+    expect(sql).toContain("19VC_TRIGGER_POSTCHECK_FAILED");
+    expect(sql).toContain("pg_catalog.has_table_privilege('anon','public.os','UPDATE')");
+    expect(sql).toContain("pg_catalog.has_column_privilege('authenticated','public.os','quote_id','UPDATE')");
   });
   it("preserves nonfinancial events and blocks submitted event/OS tampering", () => {
     expect(sql).toContain("BEFORE INSERT OR UPDATE OR DELETE ON public.os_event");
     expect(sql).toContain("19VC_DIRECT_FINANCIAL_EVENT_INSERT_BLOCKED");
     expect(sql).toContain("19VC_DIRECT_FINANCIAL_EVENT_UPDATE_BLOCKED");
     expect(sql).toContain("19VC_DIRECT_FINANCIAL_EVENT_DELETE_BLOCKED");
-    expect(sql).toContain("19VC_PAID_OS_DELETE_BLOCKED");
+    expect(sql).toContain("19VC_OS_WITH_FINANCIAL_ARTIFACT_DELETE_BLOCKED");
+    expect(sql).toContain("SELECT 1 FROM public.os_payment_proof p");
+    expect(sql).toContain("19VC_PARENT_CASCADE_DRIFT");
+    expect(sql).toContain("os_payment_proof_os_id_fkey");
+    expect(sql).toContain("os_event_os_id_fkey");
     expect(sql).toContain("19VC_DIRECT_FINANCIAL_OS_INSERT_BLOCKED");
     expect(sql).toContain("current_user NOT IN ('postgres','service_role')");
   });
@@ -60,5 +67,8 @@ describe("19V-C candidate — static architecture checks, no DB execution", () =
     expect(sql).not.toContain("DROP TABLE");
     expect(sql).not.toContain("ALTER TABLE public.os_payment_proof");
     expect(doc).toContain("PostgreSQL local isolado");
+    expect(doc).toContain("Esta proposta restringe UPDATE, mas não valida o total na criação");
+    expect(doc).toContain("não será exposto");
+    expect(doc).toContain("não pode excluir OS com comprovantes");
   });
 });

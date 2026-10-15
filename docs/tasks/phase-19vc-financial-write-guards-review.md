@@ -28,8 +28,12 @@ leitura. Não foi compilado ou executado em PostgreSQL.
   `status_id` e `updated_at` precisa ser preservado.
 - O frontend 19V-B usa `supabase.rpc("finalize_legacy_payment_submission",
   {p_proof_id: proofId})` e não deve mudar.
-- DELETE de OS pode excluir comprovantes/eventos por cascata, inclusive
-  após um pagamento, caso não haja uma proteção do registro pai.
+- As duas FKs `os_event_os_id_fkey` e
+  `os_payment_proof_os_id_fkey` usam ON DELETE CASCADE. Logo,
+  proteger somente `PAYMENT_SUBMITTED` **não** impede exclusão de
+  comprovantes pendentes ou já anexados sem evento. A proteção do pai
+  precisa bloquear se houver **qualquer comprovante** ou evento
+  financeiro, inclusive comprovante pendente sem anexo.
 
 ## Por que não apenas REVOKE UPDATE
 
@@ -64,8 +68,10 @@ clientes que tenham acesso SQL.
    `PAYMENT_SUBMITTED`, mantendo intactos outros eventos e RLS.
 5. BEFORE INSERT em `os` impede que clientes criem OS já como
    RELEASED/BLOCKED/SCHEDULED. BEFORE DELETE bloqueia exclusão
-   de OS com evento financeiro, preservando a exclusão de OS sem
-   pagamentos conforme RLS anterior.
+   de OS com **qualquer comprovante financeiro** ou
+   `PAYMENT_SUBMITTED`, preservando a exclusão de OS sem
+   comprovantes/eventos financeiros conforme RLS anterior.
+   O preflight verifica explicitamente ambas as FKs de cascata.
 6. Não alterar o trigger 19T nem o frontend, nem a infraestrutura R2.
    Registrar preflight e pós-checks falha-fechada.
 
@@ -100,12 +106,42 @@ credenciais. A política deles exige auditoria própria.
   diretamente, mas continua movimentando arte, produção e status.
 - Cliente não consegue inserir, atualizar nem excluir evento
   `PAYMENT_SUBMITTED`; eventos operacionais seguem funcionando.
-- Gerente não pode excluir OS após submissão financeira; pode
-  excluir OS sem pagamentos se atender à RLS.
+- Gerente não pode excluir OS com comprovantes, mesmo PENDING,
+  sem arquivo ou sem evento; também não pode excluir OS com evento
+  `PAYMENT_SUBMITTED`. Pode excluir OS sem artefatos financeiros,
+  desde que atenda à RLS.
 - O mesmo `p_proof_id` retorna `already_submitted` sem nova
   gravação; outro usuário não consegue finalizar comprovante alheio.
 - Falha no INSERT do evento deve fazer rollback do UPDATE financeiro.
 - Nenhuma elevação de privilégio via chamada direta ao helper.
+
+## Revisão de segurança adicional — pontos que continuam bloqueando aplicação
+
+- A helper `SECURITY DEFINER` contorna RLS. Validar em PostgreSQL
+  os casos dono/não dono, usuário sem módulo, anônimo, gerência,
+  concorrência e idempotência. A combinação
+  `GRANT USAGE` de schema interno + `GRANT EXECUTE` ao autenticado
+  é uma superfície de execução privilegiada, mesmo fora do Data API.
+  As mesmas verificações devem ser efetivas ao chamar a helper
+  diretamente via SQL, não apenas pelo wrapper.
+- Confirmar fora deste protótipo que o schema interno não será exposto
+  nas configurações do Data API/PostgREST. A auditoria SQL não confirma
+  a configuração da API.
+- Avaliar a origem de `os.quote_total` na criação da OS e integrações
+  administrativas que atualizem `quote_total` ou `quote_id`.
+  Esta proposta restringe UPDATE, mas não valida o total na criação.
+  Não alegar que o valor do orçamento já está completamente protegido.
+- Confirmar explicitamente as permissões de `PUBLIC`, grants herdados,
+  triggers habilitados, privilégios de `service_role`, e o impacto
+  das FKs CASCADE antes de aplicar.
+- Para voltar atrás, elaborar migration **separada e autorizada** que
+  restaure o corpo 19V-A do RPC e somente as permissões operacionais
+  necessárias; remover triggers/helpers em ordem segura e nunca
+  apagar evidências financeiras ou desfazer a 19T. Não executar um
+  rollback improvisado via SQL Editor.
+- Não marcar como apta a produção antes de testes reais de função
+  privilegiada e concorrência. Sem ambiente isolado e sem uso de
+  dados de cliente, a revisão pode concluir apenas testes estáticos.
 
 **Não alegar homologação real:** testes estáticos do GitHub não
 demonstram fronteira segura de roles nem comportamento transacional.
