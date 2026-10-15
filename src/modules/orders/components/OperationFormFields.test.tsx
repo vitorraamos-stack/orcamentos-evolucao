@@ -33,8 +33,8 @@ describe("EvoluSystem production operation forms", () => {
     expect((page.match(/<OperationFormFields draft={draft} users={users} setDraft={setDraft} \/>/g) ?? []).length).toBe(2);
     expect(page).toContain("items.find(item => item.id === createItemId)?.name");
     expect(page).toContain("items.find(item => item.id === editing?.item_id)?.name");
-    expect(page).toContain("onClick={() => setCreateItemId(null)}>Cancelar</Button>");
-    expect(page).toContain("onClick={() => setEditing(null)}>Cancelar</Button>");
+    expect(page).toContain("onClick={() => { setCreateItemId(null); setFailure(null); }}>Cancelar</Button>");
+    expect(page).toContain("onClick={() => { setEditing(null); setFailure(null); }}>Cancelar</Button>");
     expect(page).toContain('max-h-[90dvh] overflow-y-auto sm:max-w-lg');
   });
 
@@ -43,7 +43,7 @@ describe("EvoluSystem production operation forms", () => {
       "onCreate({ itemId: createItemId, ...input })",
       "onUpdate(editing.id, operationEditInput(draft))",
       'onStatus(blocking.id, "BLOCKED", blockedReason.trim())',
-      "onDelete(operation.id)",
+      "onDelete(deleting.id)",
       "canOperate &&", "canManage &&", "disabled={busy}",
     ]) expect(page).toContain(action);
   });
