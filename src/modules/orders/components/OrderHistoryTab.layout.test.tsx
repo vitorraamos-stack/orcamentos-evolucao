@@ -106,6 +106,7 @@ describe("EvoluSystem OS activity timeline", () => {
   it("clarifies the query limit without suppressing or reordering audit entries", () => {
     const events = Array.from({ length: 100 }, (_, index) => activity({
       id: `audit-${index}`,
+      type: "CUSTOM_EVENT",
       payload: { name: `Entrada ${index}` },
     }));
     const html = view(events);
