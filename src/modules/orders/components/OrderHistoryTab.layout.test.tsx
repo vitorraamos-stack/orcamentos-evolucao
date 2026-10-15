@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { OrderActivity } from "../types/orderDetail";
-import { OrderHistoryTab, formatOrderActivity } from "./OrderHistoryTab";
+import { OrderHistoryTab, formatOrderActivity, scopeLabel } from "./OrderHistoryTab";
 
 const source = readFileSync(new URL("./OrderHistoryTab.tsx", import.meta.url), "utf8");
 const activity = (overrides: Partial<OrderActivity> = {}): OrderActivity => ({
@@ -67,7 +67,53 @@ describe("EvoluSystem OS activity timeline", () => {
   it("does not add action controls or replace the event formatter", () => {
     expect(view([activity()])).not.toContain("<button");
     expect(source).toContain("{formatOrderActivity(activity)}");
-    expect(source).not.toContain("onClick=");
+    expect(source).toContain("onClick={onRetry}");
     expect(source).not.toContain("onRemove");
   });
+  it("retries a failed history read without changing the immutable timeline", () => {
+    const html = renderToStaticMarkup(
+      <OrderHistoryTab activities={[]} loading={false} error="Falha na rede" onRetry={vi.fn()} />
+    );
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("Tentar novamente");
+    expect(view([], false, "Falha na rede")).not.toContain("Tentar novamente");
+    expect(view([activity()])).not.toContain("<button");
+    expect(source).not.toContain("activities.sort");
+  });
+
+  it("does not call an event with a known author a system action when the name is missing", () => {
+    const unknownUser = view([activity({ actor: undefined, created_by: "user-unknown" })]);
+    expect(unknownUser).toContain("Usuário não identificado");
+    expect(unknownUser).not.toContain("Registrado por <span class=\"font-medium text-foreground\">Sistema");
+    const system = view([activity({ actor: undefined, created_by: null })]);
+    expect(system).toContain("Sistema");
+  });
+
+  it("avoids undefined, object dumps and empty block reasons in human-readable audit text", () => {
+    expect(formatOrderActivity({ type: "status_change", payload: { from: "Arte" } })).toBe("Etapa da OS alterada");
+    expect(formatOrderActivity({ type: "status_change", payload: { to: "Produção" } })).toBe("OS movida para Produção");
+    expect(formatOrderActivity({
+      type: "ITEM_OPERATION_STATUS_CHANGED",
+      payload: { work_center: "PRINTING", to_status: "BLOCKED" },
+    })).toContain("bloqueada.");
+    expect(formatOrderActivity({
+      type: "ITEM_OPERATION_STATUS_CHANGED",
+      payload: { work_center: "PRINTING", to_status: "BLOCKED", blocked_reason: { secret: "value" } },
+    })).not.toContain("[object Object]");
+    expect(scopeLabel({ arbitrary: "object" })).toBe("Não informado");
+  });
+
+  it("clarifies the query limit without suppressing or reordering audit entries", () => {
+    const events = Array.from({ length: 100 }, (_, index) => activity({
+      id: `audit-${index}`,
+      type: "CUSTOM_EVENT",
+      payload: { name: `Entrada ${index}` },
+    }));
+    const html = view(events);
+    expect(html).toContain("Exibindo os 100 eventos mais recentes da OS.");
+    expect((html.match(/<li /g) ?? []).length).toBe(100);
+    expect(html.indexOf("Entrada 0")).toBeLessThan(html.indexOf("Entrada 99"));
+    expect(view(events.slice(0, 99))).not.toContain("Exibindo os 100 eventos");
+  });
+
 });

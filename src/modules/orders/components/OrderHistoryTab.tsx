@@ -1,4 +1,5 @@
 import type { OrderActivity } from "../types/orderDetail";
+import { Button } from "@/components/ui/button";
 import {
   WORK_CENTER_LABELS,
   type WorkCenter,
@@ -30,15 +31,26 @@ const labels: Record<string, string> = {
   details_updated: "OS atualizada",
   order_archived: "OS arquivada",
 };
-export const scopeLabel = (value: unknown) =>
-  ({
-    ART: "Arte",
-    APPROVAL: "Aprovação",
-    PRODUCTION: "Produção",
-    FINISHING: "Acabamento",
-    INSTALLATION: "Instalação",
-    GENERAL: "Responsável geral",
-  })[String(value)] ?? String(value ?? "");
+const auditText = (value: unknown): string | null => {
+  if (typeof value === "string") return value.trim() || null;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return null;
+};
+
+const scopeLabels: Record<string, string> = {
+  ART: "Arte",
+  APPROVAL: "Aprovação",
+  PRODUCTION: "Produção",
+  FINISHING: "Acabamento",
+  INSTALLATION: "Instalação",
+  GENERAL: "Responsável geral",
+};
+export const scopeLabel = (value: unknown) => {
+  const text = auditText(value);
+  return text && Object.prototype.hasOwnProperty.call(scopeLabels, text)
+    ? scopeLabels[text]
+    : text ?? "Não informado";
+};
 export function formatOrderActivity(
   activity: Pick<OrderActivity, "type" | "payload">
 ) {
@@ -53,11 +65,13 @@ export function formatOrderActivity(
       return `${center} removida do item.`;
     if (activity.type === "ITEM_OPERATION_UPDATED")
       return `${center} atualizada.`;
-    const status = String(activity.payload.to_status);
+    const status = auditText(activity.payload.to_status);
     if (status === "IN_PROGRESS") return `${center} iniciada ou retomada.`;
     if (status === "COMPLETED") return `${center} concluída.`;
-    if (status === "BLOCKED")
-      return `${center} bloqueada: ${String(activity.payload.blocked_reason)}`;
+    if (status === "BLOCKED") {
+      const reason = auditText(activity.payload.blocked_reason);
+      return reason ? `${center} bloqueada: ${reason}` : `${center} bloqueada.`;
+    }
     return `${center} voltou para pendente.`;
   }
   if (activity.type === "assignee_changed")
@@ -66,14 +80,22 @@ export function formatOrderActivity(
       : `Responsável de ${scopeLabel(scope)} alterado`;
   if (activity.type.startsWith("deadline_"))
     return `Prazo de ${scopeLabel(scope)} ${activity.type.replace("deadline_", "").replace("completed", "concluído").replace("reopened", "reaberto").replace("removed", "removido").replace("changed", "alterado")}`;
-  if (activity.type === "status_change" || activity.type === "status_changed")
-    return `OS movida de ${String(from)} para ${String(to)}`;
+  if (activity.type === "status_change" || activity.type === "status_changed") {
+    const previous = auditText(from);
+    const next = auditText(to);
+    if (previous && next) return `OS movida de ${previous} para ${next}`;
+    if (next) return `OS movida para ${next}`;
+    return "Etapa da OS alterada";
+  }
   if (activity.type === "returned_to_art") return "OS retornada para Arte";
   if (activity.type === "production_tag_changed")
-    return `Tag de Produção alterada: ${String(from ?? "—")} → ${String(to ?? "—")}`;
+    return `Tag de Produção alterada: ${auditText(from) ?? "—"} → ${auditText(to) ?? "—"}`;
+  const knownLabel = Object.prototype.hasOwnProperty.call(labels, activity.type)
+    ? labels[activity.type]
+    : null;
   return (
-    labels[activity.type] ??
-    ([name, from && `${String(from)} → ${String(to ?? "—")}`, due_date]
+    knownLabel ??
+    ([auditText(name), auditText(from) && `${auditText(from)} → ${auditText(to) ?? "—"}`, auditText(due_date)]
       .filter(Boolean)
       .join(" · ") ||
       "Atividade da OS")
@@ -83,10 +105,12 @@ export function OrderHistoryTab({
   activities,
   loading,
   error,
+  onRetry,
 }: {
   activities: OrderActivity[];
   loading: boolean;
   error: string | null;
+  onRetry?: () => void;
 }) {
   if (loading) {
     return (
@@ -95,7 +119,12 @@ export function OrderHistoryTab({
       </p>
     );
   }
-  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>;
+  if (error) return (
+    <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 p-4">
+      <p className="min-w-0 break-words text-sm text-destructive">Não foi possível carregar o histórico: {error}</p>
+      {onRetry && <Button type="button" variant="outline" onClick={onRetry}>Tentar novamente</Button>}
+    </div>
+  );
   if (!activities.length) {
     return (
       <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -105,6 +134,12 @@ export function OrderHistoryTab({
   }
 
   return (
+    <div className="space-y-3">
+    {activities.length >= 100 && (
+      <p role="note" className="text-xs text-muted-foreground">
+        Exibindo os 100 eventos mais recentes da OS.
+      </p>
+    )}
     <ol aria-label="Linha do tempo da OS" className="relative ml-2 space-y-3 border-l border-border pl-6">
       {activities.map(activity => (
         <li key={activity.id} className="relative min-w-0 rounded-xl border bg-card p-4">
@@ -119,7 +154,7 @@ export function OrderHistoryTab({
               })}
             </time>
             <span className="break-words">
-              Registrado por <span className="font-medium text-foreground">{activity.actor?.name ?? "Sistema"}</span>
+              Registrado por <span className="font-medium text-foreground">{activity.actor?.name?.trim() || (activity.created_by ? "Usuário não identificado" : "Sistema")}</span>
             </span>
           </div>
           <p className="mt-2 whitespace-pre-wrap text-sm font-medium leading-relaxed [overflow-wrap:anywhere]">
@@ -128,5 +163,6 @@ export function OrderHistoryTab({
         </li>
       ))}
     </ol>
+    </div>
   );
 }
