@@ -96,3 +96,18 @@ backend review.
 3. Any frontend/backend switch requires its **own authorization and merge**.
 4. Verify CI + Vercel automatic Preview (no manual deploy).
 5. Never write synthetic financial rows to production to prove behavior.
+
+## Auditoria de acesso direto (revisão seguinte)
+
+A revisão documentada em
+[`phase-19v-direct-write-security-audit.md`](./phase-19v-direct-write-security-audit.md)
+mostrou que `os_update` e `os_event_insert` continuam permitindo
+modificações diretas por usuários do módulo, e `os_event_delete` permite
+exclusão de eventos por gerente. Por isso a implantação foi dividida
+em **19V-A (RPC aditiva)**, **19V-B (frontend passa a usar RPC)** e
+**19V-C (restrição dos acessos diretos)**. É incorreto marcar
+19V-C como atendida pela função `SECURITY INVOKER` proposta.
+
+O protótipo SQL continua em `docs/tasks` e não pode ser aplicado sem
+migração gerada via CLI, revisão e autorização separada. Nenhum passo
+acima exige configurar sandbox ou fazer testes de escrita em produção.

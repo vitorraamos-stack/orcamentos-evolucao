@@ -1,8 +1,10 @@
 -- EVOLUSYSTEM / PHASE 19V - REVIEW ONLY, NOT A MIGRATION.
 -- DO NOT EXECUTE, MERGE AS A MIGRATION, OR APPLY IN PRODUCTION WITHOUT
 -- NEW, EXPLICIT, SEPARATE APPROVAL AND TESTS.
--- This SQL is a design draft. Production preflight/rollback, direct-write
--- hardening, and authenticated integration tests are outstanding.
+-- This SQL is an ADDITIVE design draft, NOT A COMPLETE SECURITY MIGRATION.
+-- Production preflight/rollback, direct-write hardening, and authenticated
+-- integration tests are outstanding. Existing direct writes can still bypass
+-- the proposed RPC until a separately authorized enforcement phase.
 
 DO $preflight$
 BEGIN
@@ -86,12 +88,17 @@ BEGIN
     RETURN jsonb_build_object(
       'payment_id', p_proof_id,
       'payment_status', v_existing_payload->>'status',
+      'current_os_payment_status', v_order.payment_status,
       'already_submitted', true
     );
   END IF;
 
   IF v_proof.status <> 'PENDING' OR v_proof.storage_provider <> 'r2'
   THEN RAISE EXCEPTION '19V_PROOF_NOT_READY' USING ERRCODE='23514'; END IF;
+
+  IF v_proof.amount <= 0
+     OR v_proof.method NOT IN ('PIX', 'CARTAO', 'AGENDADO', 'OUTRO')
+  THEN RAISE EXCEPTION '19V_FINANCIAL_VALUES_INVALID' USING ERRCODE='23514'; END IF;
 
   -- An empty proof is allowed. If there is an attachment, require minimum
   -- completed metadata; never use an unverified R2 key from client arguments.
