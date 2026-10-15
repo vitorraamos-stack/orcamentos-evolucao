@@ -27,10 +27,11 @@ import {
   fetchOsById,
   fetchOsEvents,
   fetchOsPayments,
+  finalizeLegacyPaymentSubmission,
   updateOs,
   updatePaymentProof,
 } from "../api";
-import { generateFolderPath, resolvePaymentStatus } from "../utils";
+import { generateFolderPath } from "../utils";
 import type {
   DeliveryType,
   Os,
@@ -43,6 +44,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ARTE_STATUSES, PRODUCAO_STATUSES } from "../statuses";
 import { getPaymentRecoveryPlan, preparePaymentFile, type PaymentSubmissionStage } from "../paymentSubmissionSafety";
+import { hasOwnSubmittedPaymentEvent } from "../paymentFinalization";
 import { invokeEdgeFunction } from "@/lib/supabase/invokeEdgeFunction";
 import { KioskShell } from "../kiosk/KioskShell";
 import { OsLayoutPreviewDialog } from "../components/OsLayoutPreviewDialog";
@@ -517,39 +519,75 @@ export default function OsDetailPage() {
         stage = "metadata_saved";
       }
 
-      const nextStatus = resolvePaymentStatus({
-        method: parsed.data.method,
-        amount: parsed.data.amount,
-        receivedDate: parsed.data.received_date,
-        quoteTotal: order.quote_total,
-      });
-
-      stage = "status_update_started";
-      const updated = await updateOs(order.id, {
-        payment_status: nextStatus,
-        updated_at: new Date().toISOString(),
-      });
-      stage = "status_updated";
-
-      stage = "event_insert_started";
-      await createOsEvent({
-        os_id: order.id,
-        type: "PAYMENT_SUBMITTED",
-        payload: { payment_id: proof.id, status: nextStatus },
-        created_by: user?.id ?? null,
-      });
+      // The DB RPC atomically updates payment_status and appends PAYMENT_SUBMITTED.
+      // A lost response is ambiguous; never compensate by creating another payment.
+      stage = "finalization_started";
+      const finalization = await finalizeLegacyPaymentSubmission(proof.id);
       stage = "complete";
 
-      setOrder(updated);
-      setPayments(prev => [proof, ...prev]);
+      setOrder(prev => prev
+        ? { ...prev, payment_status: finalization.current_os_payment_status }
+        : prev
+      );
+      setPayments(prev => prev.some(item => item.id === proof.id) ? prev : [proof, ...prev]);
       setPaymentAmount("");
       setPaymentDate("");
       setPaymentInstallments("");
       setCadastroCompleto(false);
       setPaymentFile(null);
-      toast.success("Comprovante enviado.");
+      toast.success(
+        finalization.already_submitted
+          ? "Comprovante já finalizado; nenhum evento duplicado foi criado."
+          : "Comprovante enviado."
+      );
+
+      // Confirmation is separate from UI refresh: a read failure cannot undo
+      // the committed payment, and must not turn a success into a retry.
+      try {
+        const [freshOrder, freshEvents, freshPayments] = await Promise.all([
+          fetchOsById(order.id),
+          fetchOsEvents(order.id),
+          fetchOsPayments(order.id),
+        ]);
+        setOrder(freshOrder);
+        setEvents(freshEvents);
+        setPayments(freshPayments);
+        if (!hasOwnSubmittedPaymentEvent(freshEvents, proof.id, user?.id)) {
+          setPaymentSubmissionNeedsReview(true);
+          toast.warning("Pagamento confirmado, mas o evento não foi encontrado na atualização. Confira o histórico.");
+        }
+      } catch (refreshError) {
+        console.error("Falha ao atualizar OS após pagamento confirmado:", refreshError);
+        setPaymentSubmissionNeedsReview(true);
+        toast.warning("Pagamento confirmado, mas não foi possível atualizar a tela. Reabra a OS para conferir.");
+      }
     } catch (error) {
       console.error(error);
+      // A failed RPC response may still have committed successfully. Check
+      // persisted evidence using read-only queries; do NOT retry submission.
+      if (stage === "finalization_started" && createdProof && user?.id) {
+        try {
+          const freshEvents = await fetchOsEvents(order.id);
+          if (hasOwnSubmittedPaymentEvent(freshEvents, createdProof.id, user.id)) {
+            const [freshOrder, freshPayments] = await Promise.all([
+              fetchOsById(order.id),
+              fetchOsPayments(order.id),
+            ]);
+            setOrder(freshOrder);
+            setEvents(freshEvents);
+            setPayments(freshPayments);
+            setPaymentAmount("");
+            setPaymentDate("");
+            setPaymentInstallments("");
+            setCadastroCompleto(false);
+            setPaymentFile(null);
+            toast.success("Comprovante confirmado no histórico após falha de comunicação.");
+            return;
+          }
+        } catch (reconcileError) {
+          console.error("Não foi possível verificar a conclusão do pagamento:", reconcileError);
+        }
+      }
       const recovery = getPaymentRecoveryPlan(stage, paymentFile !== null);
       let cleanupFailed = false;
       if (createdProof && recovery.safeToDeletePendingProof) {

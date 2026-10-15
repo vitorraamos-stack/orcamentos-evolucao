@@ -3,6 +3,7 @@ import {
   EdgeFunctionInvokeError,
   invokeEdgeFunction,
 } from "@/lib/supabase/invokeEdgeFunction";
+import { parseLegacyPaymentFinalization } from "./paymentFinalization";
 import type {
   Os,
   OsEvent,
@@ -217,6 +218,15 @@ export const createOsEvent = async (payload: Partial<OsEvent>) => {
     .single();
   if (error) throw error;
   return data as OsEvent;
+};
+
+/** Atomic server-side finalization (phase 19V-A), never update status/event here. */
+export const finalizeLegacyPaymentSubmission = async (proofId: string) => {
+  const { data, error } = await supabase.rpc("finalize_legacy_payment_submission", {
+    p_proof_id: proofId,
+  });
+  if (error) throw error;
+  return parseLegacyPaymentFinalization(data, proofId);
 };
 
 export const createPaymentProof = async (payload: Partial<OsPaymentProof>) => {

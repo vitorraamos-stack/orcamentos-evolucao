@@ -11,9 +11,7 @@ export type PaymentSubmissionStage =
   | "r2_upload_started"
   | "r2_uploaded"
   | "metadata_saved"
-  | "status_update_started"
-  | "status_updated"
-  | "event_insert_started"
+  | "finalization_started"
   | "complete";
 
 export const preparePaymentFile = (file: File | null) => {
