@@ -15,6 +15,7 @@ import { OrderDeadlinesCard } from "../components/OrderDeadlinesCard";
 import { OrderSummaryTab } from "../components/OrderSummaryTab";
 import { OrderItemsTab, type ItemDraft } from "../components/OrderItemsTab";
 import { OrderCommentsTab } from "../components/OrderCommentsTab";
+import { prependPublishedComment } from "../services/publishedComment";
 import { OrderHistoryTab } from "../components/OrderHistoryTab";
 import { OrderFilesTab } from "../components/OrderFilesTab";
 import { OrderProductionTab } from "../components/OrderProductionTab";
@@ -91,7 +92,26 @@ export default function OrderDetailPage() {
   const removeItem = async (id: string) => { try { const removed = items.data.find(item => item.id === id); await removeOrderItem(id); await event("item_removed", { item_id: id, name: removed?.name }); setItems(value => ({ ...value, data: value.data.filter(item => item.id !== id) })); } catch (error) { toast.error(message(error)); } };
   const updateItem = async (id: string, input: Partial<OrderItem>) => { try { const previous = items.data.find(item => item.id === id); const updated = await updateOrderItem(id, input); const audited = ["name", "quantity", "status", "width_cm", "height_cm", "unit"] as const; const changes = Object.fromEntries(audited.filter(key => key in input && previous?.[key] !== updated[key]).map(key => [key, { from: previous?.[key] ?? null, to: updated[key] ?? null }])); await event("item_updated", { item_id: id, name: updated.name, changes }); setItems(value => ({ ...value, data: value.data.map(item => item.id === id ? updated : item) })); } catch (error) { toast.error(message(error)); } };
   const moveItem = async (index: number, direction: -1 | 1) => { const next = [...items.data]; const target = index + direction; [next[index], next[target]] = [next[target], next[index]]; const ordered = next.map((item, sort_order) => ({ ...item, sort_order })); try { await reorderOrderItems(ordered); await event("item_updated", { item_id: next[target].id, action: "reordered" }); setItems(value => ({ ...value, data: ordered })); } catch (error) { toast.error(message(error)); } };
-  const createComment = async (text: string) => { try { const created = await createOrderComment(detail.order.id, text); await event("comment_created", { comment_id: created.id }); setComments(value => ({ ...value, loaded: false })); await loadTab("comments"); } catch (error) { toast.error(message(error)); } };
+  const createComment = async (text: string) => {
+    try {
+      const created = await createOrderComment(detail.order.id, text);
+      const author = user ? {
+        id: user.id,
+        name: user.user_metadata?.full_name || user.email || "Usuário",
+        email: user.email ?? null,
+      } : undefined;
+      setComments(value => ({
+        ...value,
+        data: prependPublishedComment(value.data, created, author),
+        error: null,
+        loaded: true,
+      }));
+      await event("comment_created", { comment_id: created.id });
+    } catch (error) {
+      toast.error(message(error));
+      throw error;
+    }
+  };
   const removeComment = async (id: string) => { try { await removeOrderComment(id); await event("comment_removed", { comment_id: id }); setComments(value => ({ ...value, data: value.data.filter(comment => comment.id !== id) })); } catch (error) { toast.error(message(error)); } };
   const editComment = async (id: string, text: string) => { try { const updated = await updateOrderComment(id, text); await event("comment_updated", { comment_id: id, user_id: updated.user_id }); setComments(value => ({ ...value, data: value.data.map(comment => comment.id === id ? { ...comment, message: updated.message, updated_at: updated.updated_at } : comment) })); } catch (error) { toast.error(message(error)); } };
   const saveOrder = async (input: OrderEditInput) => { try { await updateOrderOperationalFields(detail.order.id, input); await loadDetail(); toast.success("OS atualizada."); } catch (error) { toast.error(message(error)); throw error; } };
