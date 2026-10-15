@@ -37,13 +37,14 @@ const emptyDraft: OperationEditDraft = { workCenter: "PRINTING", assigned: "none
 
 type Props = {
   items: OrderItem[]; operations: ItemOperation[]; users: UserOption[]; canOperate: boolean; canManage: boolean;
+  loading?: boolean; error?: string | null; onRetry?: () => void;
   onCreate: (input: { itemId: string; workCenter: WorkCenter; assignedTo: string | null; isRequired: boolean; notes: string }) => Promise<void>;
   onUpdate: (id: string, input: OperationEditInput) => Promise<void>;
   onStatus: (id: string, status: OperationStatus, reason?: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 };
 
-export function OrderProductionTab({ items, operations, users, canOperate, canManage, onCreate, onUpdate, onStatus, onDelete }: Props) {
+export function OrderProductionTab({ items, operations, users, canOperate, canManage, loading = false, error = null, onRetry, onCreate, onUpdate, onStatus, onDelete }: Props) {
   const [createItemId, setCreateItemId] = useState<string | null>(null);
   const [editing, setEditing] = useState<ItemOperation | null>(null);
   const [blocking, setBlocking] = useState<ItemOperation | null>(null);
@@ -54,6 +55,9 @@ export function OrderProductionTab({ items, operations, users, canOperate, canMa
   const openCreate = (itemId: string) => { setDraft(emptyDraft); setCreateItemId(itemId); };
   const openEdit = (operation: ItemOperation) => { setDraft(operationEditDraft(operation)); setEditing(operation); };
   const statusActions = (operation: ItemOperation): { label: string; status: OperationStatus }[] => operation.status === "PENDING" ? [{ label: "Iniciar", status: "IN_PROGRESS" }] : operation.status === "IN_PROGRESS" ? [{ label: "Concluir", status: "COMPLETED" }, { label: "Bloquear", status: "BLOCKED" }] : operation.status === "BLOCKED" ? [{ label: "Retomar", status: "IN_PROGRESS" }] : canManage ? [{ label: "Reabrir", status: "IN_PROGRESS" }] : [];
+
+  if (loading) return <p role="status" aria-live="polite" className="text-sm text-muted-foreground">Carregando operações de produção…</p>;
+  if (error) return <div role="alert" className="space-y-3 rounded-lg border border-destructive/40 p-4"><p className="text-sm text-destructive">Não foi possível carregar a produção: {error}</p>{onRetry && <Button type="button" variant="outline" onClick={onRetry}>Tentar novamente</Button>}</div>;
 
   return <div className="space-y-4">
     {items.map((item, index) => { const values = operations.filter(value => value.item_id === item.id); const summary = operationSummary(values); return <Card key={item.id}>
