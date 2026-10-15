@@ -1,4 +1,5 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,10 +12,24 @@ type Props = {
   currentUserId?: string;
   canComment: boolean;
   canRemoveAny: boolean;
+  onRetry?: () => void;
   onCreate: (message: string) => Promise<void>;
   onUpdate: (id: string, message: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
 };
+
+export async function attemptCommentAction(
+  action: () => Promise<void>,
+  onFailure: () => void,
+): Promise<boolean> {
+  try {
+    await action();
+    return true;
+  } catch {
+    onFailure();
+    return false;
+  }
+}
 
 const commentDate = (date: string) =>
   new Date(date).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
@@ -22,50 +37,63 @@ const commentDate = (date: string) =>
 /** The original permissions and callbacks are unchanged; this is a presentation refinement. */
 export function OrderCommentsTab({
   comments, loading, error, currentUserId, canComment, canRemoveAny,
-  onCreate, onUpdate, onRemove,
+  onCreate, onUpdate, onRemove, onRetry,
 }: Props) {
   const composeId = useId();
   const [message, setMessage] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [editMessage, setEditMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<"create" | "update" | "remove" | null>(null);
+  const [failure, setFailure] = useState<{ kind: "create" | "update" | "remove"; id?: string } | null>(null);
+  const [removing, setRemoving] = useState<OrderComment | null>(null);
+  const inFlight = useRef(false);
+
+  const runAction = async (
+    kind: "create" | "update" | "remove",
+    action: () => Promise<void>,
+    id?: string,
+  ) => {
+    // The ref prevents a second request before React commits the busy state.
+    if (inFlight.current) return false;
+    inFlight.current = true;
+    setBusy(true);
+    setPending(kind);
+    setFailure(null);
+    try {
+      return await attemptCommentAction(action, () => setFailure({ kind, id }));
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+      setPending(null);
+    }
+  };
 
   const submitComment = async () => {
     if (busy || !canComment || !message.trim()) return;
-    setBusy(true);
-    try {
+    await runAction("create", async () => {
       await onCreate(message);
       setMessage("");
-    } catch {
-      // The page displays the error. Keep the draft so the user can retry.
-    } finally {
-      setBusy(false);
-    }
+    });
   };
 
   const saveComment = async (id: string) => {
-    if (busy || !editMessage.trim()) return;
-    setBusy(true);
-    try {
-      await onUpdate(id, editMessage);
-      setEditing(null);
-    } finally {
-      setBusy(false);
-    }
+    if (busy || editing !== id || !editMessage.trim()) return;
+    const saved = await runAction("update", () => onUpdate(id, editMessage), id);
+    if (saved) setEditing(null);
   };
 
   const removeComment = async (id: string) => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await onRemove(id);
-    } finally {
-      setBusy(false);
-    }
+    if (busy || removing?.id !== id) return;
+    const removed = await runAction("remove", () => onRemove(id), id);
+    if (removed) setRemoving(null);
   };
 
   if (loading) return <p role="status" className="text-sm text-muted-foreground">Carregando comentários…</p>;
-  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>;
+  if (error) return <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 p-4">
+    <p className="min-w-0 break-words text-sm text-destructive">Não foi possível carregar os comentários: {error}</p>
+    {onRetry && <Button type="button" variant="outline" onClick={onRetry}>Tentar novamente</Button>}
+  </div>;
 
   return (
     <div className="space-y-5">
@@ -84,6 +112,11 @@ export function OrderCommentsTab({
               className="min-h-24 resize-y"
             />
           </div>
+          {failure?.kind === "create" && (
+            <p role="alert" className="text-sm text-destructive">
+              Não foi possível publicar o comentário. Seu texto foi preservado; tente novamente.
+            </p>
+          )}
           <div className="flex justify-end">
             <Button
               type="button"
@@ -91,7 +124,7 @@ export function OrderCommentsTab({
               disabled={busy || !message.trim()}
               onClick={() => void submitComment()}
             >
-              {busy ? "Aguarde…" : "Comentar"}
+              {pending === "create" ? "Publicando…" : "Comentar"}
             </Button>
           </div>
         </section>
@@ -127,9 +160,10 @@ export function OrderCommentsTab({
                           size="sm"
                           variant="ghost"
                           className="min-h-10 sm:min-h-9"
-                          disabled={busy}
+                          disabled={busy || (editing !== null && editing !== comment.id)}
                           aria-label={`Editar comentário de ${comment.user?.name ?? "Usuário"}`}
                           onClick={() => {
+                            setFailure(null);
                             setEditing(comment.id);
                             setEditMessage(comment.message);
                           }}
@@ -145,7 +179,7 @@ export function OrderCommentsTab({
                           className="min-h-10 text-destructive hover:text-destructive sm:min-h-9"
                           disabled={busy}
                           aria-label={`Remover comentário de ${comment.user?.name ?? "Usuário"}`}
-                          onClick={() => void removeComment(comment.id)}
+                          onClick={() => { setFailure(null); setRemoving(comment); }}
                         >
                           Remover
                         </Button>
@@ -168,6 +202,11 @@ export function OrderCommentsTab({
                         className="min-h-28 resize-y"
                       />
                     </div>
+                    {failure?.kind === "update" && failure.id === comment.id && (
+                      <p role="alert" className="text-sm text-destructive">
+                        Não foi possível salvar a edição. Seu texto permanece aqui para uma nova tentativa.
+                      </p>
+                    )}
                     <div className="flex flex-wrap justify-end gap-2">
                       <Button
                         type="button"
@@ -175,7 +214,7 @@ export function OrderCommentsTab({
                         size="sm"
                         className="min-h-11 sm:min-h-9"
                         disabled={busy}
-                        onClick={() => setEditing(null)}
+                        onClick={() => { setEditing(null); setFailure(null); }}
                       >
                         Cancelar
                       </Button>
@@ -186,7 +225,7 @@ export function OrderCommentsTab({
                         disabled={busy || !editMessage.trim()}
                         onClick={() => void saveComment(comment.id)}
                       >
-                        {busy ? "Salvando…" : "Salvar alterações"}
+                        {pending === "update" ? "Salvando…" : "Salvar alterações"}
                       </Button>
                     </div>
                   </div>
@@ -200,6 +239,30 @@ export function OrderCommentsTab({
           })}
         </div>
       )}
+      <AlertDialog open={Boolean(removing)} onOpenChange={open => {
+        if (!open && !busy) { setRemoving(null); setFailure(null); }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover comentário?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O comentário de {removing?.user?.name ?? "Usuário"} será removido da OS.
+              Confirme para continuar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {failure?.kind === "remove" && failure.id === removing?.id && (
+            <p role="alert" className="text-sm text-destructive">
+              Não foi possível remover este comentário. Tente novamente.
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancelar</AlertDialogCancel>
+            <Button type="button" variant="destructive" disabled={busy} onClick={() => removing && void removeComment(removing.id)}>
+              {pending === "remove" ? "Removendo…" : "Confirmar remoção"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
