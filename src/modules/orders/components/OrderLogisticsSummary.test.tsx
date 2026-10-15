@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { Delivery } from "@/modules/deliveries/types";
 import type { HubOrderFlowRow } from "@/modules/hub-os/order-flow-api";
-import { OrderDeliverySummary, OrderPickupSummary } from "./OrderLogisticsSummary";
+import { OrderDeliverySummary, OrderPickupSummary, installationExecutionViewState } from "./OrderLogisticsSummary";
 
 const parent = readFileSync(new URL("./OrderInstallationTab.tsx", import.meta.url), "utf8");
 const delivery: Delivery = {
@@ -84,5 +84,38 @@ describe("EvoluSystem — read-only logistics summary", () => {
       "Abrir Instalações", "Abrir Entregas",
     ]) expect(parent).toContain(required);
     expect(parent).toContain('rel="noopener noreferrer"');
+  });
+});
+
+describe("EvoluSystem — installation field-data feedback", () => {
+  const currentId = "installation-fixture-1";
+
+  it("distinguishes absent agenda from pending checklist and evidence", () => {
+    const idle = { installationId: null, status: "idle" as const };
+    expect(installationExecutionViewState(idle, null)).toBe("none");
+    expect(installationExecutionViewState(idle, currentId)).toBe("loading");
+  });
+
+  it("does not expose data or a stale failure belonging to another installation", () => {
+    const stale = { installationId: "installation-old", status: "ready" as const };
+    expect(installationExecutionViewState(stale, currentId)).toBe("loading");
+    expect(installationExecutionViewState({ ...stale, status: "error" }, currentId)).toBe("loading");
+  });
+
+  it("reports loading, ready and failed states only for the current installation", () => {
+    for (const status of ["loading", "ready", "error"] as const) {
+      expect(installationExecutionViewState({ installationId: currentId, status }, currentId)).toBe(status);
+    }
+  });
+
+  it("keeps logistics and execution retries independent, without writes", () => {
+    expect(parent).toContain("Carregando checklist e evidências da instalação");
+    expect(parent).toContain('fieldView === "ready" && fieldData.checklist.length > 0');
+    expect(parent).toContain('fieldView === "ready" && fieldData.evidence.length > 0');
+    expect(parent).toContain('fieldView === "error"');
+    expect(parent).toContain("setReloadKey(key => key + 1)");
+    expect(parent).toContain("setExecutionReloadKey(key => key + 1)");
+    expect(parent).toContain("[primaryInstallationId, executionReloadKey]");
+    expect(parent).toContain("return () => { alive = false; };");
   });
 });

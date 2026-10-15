@@ -23,16 +23,17 @@ describe("EvoluSystem OS tabs — reliable loading and error recovery", () => {
   it("offers retry on logistics lookup errors while clearing stale records", () => {
     for (const fragment of [
       "if (error) throw error;", "setLoading(false)", "setRecord(null)",
-      "setInstallationHistory([])", "setFieldData({ checklist: [], evidence: [] })",
+      "setInstallationHistory([])", 'setFieldData({ installationId: null, status: "idle"',
       "setReloadKey(key => key + 1)", "[order.id, order.logistic_type, reloadKey]",
       'role="alert"', "Tentar novamente",
     ]) expect(logistics).toContain(fragment);
   });
 
   it("keeps checklist failures separate from the agenda and exposes a retry", () => {
-    expect(logistics).toContain("if (alive) setExecutionError(true)");
+    expect(logistics).toContain('status: "error"');
     expect(logistics).toContain("Não foi possível carregar o checklist e as evidências da instalação.");
-    expect(logistics).toContain("{executionError && (");
+    expect(logistics).toContain('{fieldView === "error" && (');
+    expect(logistics).toContain("setExecutionReloadKey(key => key + 1)");
   });
 
   it("preserves logistics operations and the seven existing tabs", () => {

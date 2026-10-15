@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { OrderDeliverySummary, OrderPickupSummary } from "./OrderLogisticsSummary";
+import { OrderDeliverySummary, OrderPickupSummary, installationExecutionViewState } from "./OrderLogisticsSummary";
 import { supabase } from "@/lib/supabase";
 import type { OsOrder } from "@/features/hubos/types";
 import {
@@ -33,42 +33,28 @@ export function OrderInstallationTab({ order }: { order: OsOrder }) {
     Installation[]
   >([]);
   const [fieldData, setFieldData] = useState<{
+    installationId: string | null;
+    status: "idle" | "loading" | "ready" | "error";
     checklist: InstallationChecklistItem[];
     evidence: InstallationEvidence[];
-  }>({ checklist: [], evidence: [] });
+  }>({ installationId: null, status: "idle", checklist: [], evidence: [] });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [executionError, setExecutionError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [executionReloadKey, setExecutionReloadKey] = useState(0);
   useEffect(() => {
     let alive = true;
     setLoading(true);
     setLoadError(null);
-    setExecutionError(false);
     setRecord(null);
     setInstallationHistory([]);
-    setFieldData({ checklist: [], evidence: [] });
     void (async () => {
       try {
       if (order.logistic_type === "instalacao") {
         const rows = await loadInstallationsForOrder(order.id);
         if (alive) {
           setInstallationHistory(rows);
-          const primary = selectPrimaryInstallation(rows);
-          setRecord(primary);
-          if (primary)
-            void loadInstallationExecution(primary.id)
-              .then(
-                data =>
-                  alive &&
-                  setFieldData({
-                    checklist: data.checklist,
-                    evidence: data.evidence,
-                  })
-              )
-              .catch(() => {
-                if (alive) setExecutionError(true);
-              });
+          setRecord(selectPrimaryInstallation(rows));
         }
         return;
       }
@@ -101,14 +87,52 @@ export function OrderInstallationTab({ order }: { order: OsOrder }) {
     };
   }, [order.id, order.logistic_type, reloadKey]);
   const installation =
-    order.logistic_type === "instalacao"
-      ? (record as Installation | null)
+    order.logistic_type === "instalacao" &&
+    (record as Installation | null)?.os_id === order.id
+      ? (record as Installation)
       : null;
+  const primaryInstallationId = installation?.id ?? null;
+
+  // The agenda is independent from checklist and evidence loading. A failed
+  // field-data request can be retried without querying the agenda again.
+  useEffect(() => {
+    let alive = true;
+    if (!primaryInstallationId) {
+      setFieldData({ installationId: null, status: "idle", checklist: [], evidence: [] });
+      return () => { alive = false; };
+    }
+    const primary = { id: primaryInstallationId };
+    setFieldData({ installationId: primary.id, status: "loading", checklist: [], evidence: [] });
+    void loadInstallationExecution(primary.id)
+      .then(data => {
+        if (alive) setFieldData({
+          installationId: primary.id,
+          status: "ready",
+          checklist: data.checklist,
+          evidence: data.evidence,
+        });
+      })
+      .catch(() => {
+        if (alive) setFieldData({
+          installationId: primary.id,
+          status: "error",
+          checklist: [],
+          evidence: [],
+        });
+      });
+    return () => { alive = false; };
+  }, [primaryInstallationId, executionReloadKey]);
+
+  const fieldView = installationExecutionViewState(fieldData, primaryInstallationId);
   const delivery =
-    order.logistic_type === "entrega" ? (record as Delivery | null) : null;
+    order.logistic_type === "entrega" &&
+    (record as Delivery | null)?.os_id === order.id
+      ? (record as Delivery)
+      : null;
   const pickup =
-    order.logistic_type === "retirada"
-      ? (record as HubOrderFlowRow | null)
+    order.logistic_type === "retirada" &&
+    (record as HubOrderFlowRow | null)?.source_id === order.id
+      ? (record as HubOrderFlowRow)
       : null;
   const address = installation?.address_snapshot || order.address;
   const previousInstallations = installationHistory.filter(
@@ -231,7 +255,17 @@ export function OrderInstallationTab({ order }: { order: OsOrder }) {
                 </a>
               </Button>
             </div>
-            {fieldData.checklist.length > 0 && (
+            {fieldView === "loading" && (
+              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+                Carregando checklist e evidências da instalação…
+              </p>
+            )}
+            {fieldView === "ready" && fieldData.checklist.length === 0 && fieldData.evidence.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Nenhum checklist ou evidência cadastrado nesta instalação.
+              </p>
+            )}
+            {fieldView === "ready" && fieldData.checklist.length > 0 && (
               <section className="grid gap-5 border-t pt-4 md:grid-cols-2">
                 <InstallationChecklist
                   title="Checklist pré-instalação"
@@ -249,7 +283,7 @@ export function OrderInstallationTab({ order }: { order: OsOrder }) {
                 />
               </section>
             )}
-            {fieldData.evidence.length > 0 && (
+            {fieldView === "ready" && fieldData.evidence.length > 0 && (
               <section className="border-t pt-4">
                 <h3 className="mb-3 font-medium">Galeria de evidências</h3>
                 <InstallationEvidenceGallery evidence={fieldData.evidence} />
@@ -303,10 +337,10 @@ export function OrderInstallationTab({ order }: { order: OsOrder }) {
         {order.logistic_type === "retirada" && (
           <OrderPickupSummary pickup={pickup} />
         )}
-        {executionError && (
+        {fieldView === "error" && (
           <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 p-4">
             <p className="min-w-0 text-sm text-destructive">Não foi possível carregar o checklist e as evidências da instalação.</p>
-            <Button type="button" size="sm" variant="outline" className="min-h-11 sm:min-h-9" onClick={() => setReloadKey(key => key + 1)}>
+            <Button type="button" size="sm" variant="outline" className="min-h-11 sm:min-h-9" onClick={() => setExecutionReloadKey(key => key + 1)}>
               Tentar novamente
             </Button>
           </div>

@@ -13,6 +13,17 @@ const deliveryStyles: Record<DeliveryStatus, string> = {
   CANCELLED: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-200",
 };
 
+export type InstallationExecutionView = "none" | "loading" | "ready" | "error";
+export function installationExecutionViewState(
+  state: { installationId: string | null; status: "idle" | "loading" | "ready" | "error" },
+  currentInstallationId: string | null,
+): InstallationExecutionView {
+  if (!currentInstallationId) return "none";
+  // Never display stale checklists or an empty state for another installation.
+  if (state.installationId !== currentInstallationId || state.status === "idle") return "loading";
+  return state.status;
+}
+
 /** Read-only logistics summary; does not change any existing status transitions. */
 export function OrderDeliverySummary({ delivery }: { delivery: Delivery }) {
   const transport = delivery.carrier_name || delivery.vehicle_label || "Responsável não informado";
