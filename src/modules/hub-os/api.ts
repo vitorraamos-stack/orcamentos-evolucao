@@ -10,7 +10,6 @@ import type {
   OsLayoutAsset,
   OsPaymentProof,
   OsStatus,
-  PaymentStatus,
 } from "./types";
 import { lookupOrderForKiosk } from "./orderRepository";
 
@@ -199,7 +198,20 @@ export const createOs = async (payload: Partial<Os>) => {
   return data as Os;
 };
 
-export const updateOs = async (id: string, payload: Partial<Os>) => {
+/**
+ * Operational updates only. Financial mutations must go through
+ * finalizeLegacyPaymentSubmission and the server's transaction.
+ * Runtime guard protects callers that bypass TypeScript's excess checks.
+ */
+type OperationalOsUpdate = Omit<Partial<Os>, "payment_status" | "quote_total" | "quote_id">;
+
+export const updateOs = async (id: string, payload: OperationalOsUpdate) => {
+  if (["payment_status", "quote_total", "quote_id"].some(
+    field => Object.prototype.hasOwnProperty.call(payload, field)
+  )) {
+    throw new Error("Campos financeiros exigem fluxo de atualização autorizado.");
+  }
+
   const { data, error } = await supabase
     .from("os")
     .update(payload)
@@ -261,16 +273,3 @@ export const deletePaymentProof = async (id: string) => {
   if (error) throw error;
 };
 
-export const updateOsPaymentStatus = async (
-  osId: string,
-  status: PaymentStatus
-) => {
-  const { data, error } = await supabase
-    .from("os")
-    .update({ payment_status: status, updated_at: new Date().toISOString() })
-    .eq("id", osId)
-    .select("*")
-    .single();
-  if (error) throw error;
-  return data as Os;
-};
