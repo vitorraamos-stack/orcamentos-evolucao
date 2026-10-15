@@ -15,7 +15,7 @@ describe("19V-C candidate — static architecture checks, no DB execution", () =
   it("cannot be mistaken for applied or deployable migration", () => {
     expect(sql).toContain("DESIGN CANDIDATE, NOT APPLIED");
     expect(sql).toContain("DO NOT EXECUTE WITHOUT SEPARATE AUTHORIZATION");
-    expect(doc).toContain("não aplicado");
+    expect(doc).toContain("não aplicada");
     expect(doc).toContain("fora");
   });
   it("retains public invoker RPC and scopes the definer to private schema", () => {
