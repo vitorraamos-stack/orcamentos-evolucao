@@ -36,6 +36,8 @@ export function OrderCommentsTab({
     try {
       await onCreate(message);
       setMessage("");
+    } catch {
+      // The page displays the error. Keep the draft so the user can retry.
     } finally {
       setBusy(false);
     }
