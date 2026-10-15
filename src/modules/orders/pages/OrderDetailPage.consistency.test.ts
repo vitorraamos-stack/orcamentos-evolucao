@@ -23,7 +23,7 @@ describe("EvoluSystem OS tabs — reliable loading and error recovery", () => {
   it("offers retry on logistics lookup errors while clearing stale records", () => {
     for (const fragment of [
       "if (error) throw error;", "setLoading(false)", "setRecord(null)",
-      "setInstallationHistory([])", "setFieldData({ installationId: null, status: \\"idle\\"",
+      "setInstallationHistory([])", 'setFieldData({ installationId: null, status: "idle"',
       "setReloadKey(key => key + 1)", "[order.id, order.logistic_type, reloadKey]",
       'role="alert"', "Tentar novamente",
     ]) expect(logistics).toContain(fragment);
