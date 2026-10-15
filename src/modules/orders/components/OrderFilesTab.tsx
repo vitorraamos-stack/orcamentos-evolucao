@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import { ClipboardList, ExternalLink, FileImage, FileText, Paperclip, ReceiptText, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { OsOrderLayoutAsset } from "@/features/hubos/types";
@@ -31,19 +32,83 @@ export function orderFileSize(size: number | null | undefined): string {
   return `${format(size / 1024 ** 3)} GB`;
 }
 
+export type OrderFilePopup = {
+  opener: unknown;
+  location: { replace: (url: string) => void };
+  close: () => void;
+};
+
+/**
+ * A new tab must be opened synchronously from the user's click; waiting for
+ * the signed URL first is commonly blocked as an unsolicited popup.
+ * The presigned URL remains private to the browser and is never rendered.
+ */
+export async function openOrderFileWindow(
+  requestSignedUrl: () => Promise<string>,
+  openBlankWindow: () => OrderFilePopup | null,
+): Promise<void> {
+  const popup = openBlankWindow();
+  if (!popup) {
+    throw new Error("O navegador bloqueou a nova aba. Permita pop-ups para este site e tente novamente.");
+  }
+  try {
+    popup.opener = null;
+    const url = await requestSignedUrl();
+    const destination = new URL(url);
+    if (destination.protocol !== "https:" || !destination.hostname) {
+      throw new Error("Link temporário inválido.");
+    }
+    popup.location.replace(url);
+  } catch (error) {
+    popup.close();
+    throw error;
+  }
+}
+
+function safeFileOpenError(error: unknown): string {
+  if (error instanceof Error && error.message.startsWith("O navegador bloqueou a nova aba.")) {
+    return error.message;
+  }
+  // Backend errors may contain private storage paths or signed-link details.
+  return "Não foi possível abrir este arquivo. Verifique seu acesso ou tente novamente.";
+}
+
 export function OrderFilesTab({
   assets,
   loading,
   error,
   onOpen,
+  onRetry,
 }: {
   assets: OsOrderLayoutAsset[];
   loading: boolean;
   error: string | null;
-  onOpen: (asset: OsOrderLayoutAsset) => void;
+  onOpen: (asset: OsOrderLayoutAsset) => Promise<void>;
+  onRetry?: () => void;
 }) {
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const [openError, setOpenError] = useState<{ assetId: string; text: string } | null>(null);
+  const openingRef = useRef(false);
+  const openFile = async (asset: OsOrderLayoutAsset) => {
+    if (openingRef.current) return;
+    openingRef.current = true;
+    setOpeningId(asset.id);
+    setOpenError(null);
+    try {
+      await onOpen(asset);
+    } catch (error) {
+      setOpenError({ assetId: asset.id, text: safeFileOpenError(error) });
+    } finally {
+      openingRef.current = false;
+      setOpeningId(null);
+    }
+  };
+
   if (loading) return <p role="status" className="text-sm text-muted-foreground">Carregando arquivos…</p>;
-  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>;
+  if (error) return <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 p-4">
+    <p className="min-w-0 break-words text-sm text-destructive">Não foi possível carregar os arquivos: {error}</p>
+    {onRetry && <Button type="button" variant="outline" onClick={onRetry}>Tentar novamente</Button>}
+  </div>;
   if (!assets.length) {
     return (
       <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -58,7 +123,8 @@ export function OrderFilesTab({
         const name = orderFileName(asset);
         const AssetIcon = ASSET_ICON[asset.asset_type] ?? FileText;
         return (
-          <div key={asset.id} className="flex min-w-0 items-start gap-3 rounded-lg border p-4">
+          <div key={asset.id} className="min-w-0 space-y-2">
+            <div className="flex min-w-0 items-start gap-3 rounded-lg border p-4">
             <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground">
               <AssetIcon className="size-5" />
             </span>
@@ -75,11 +141,17 @@ export function OrderFilesTab({
               variant="outline"
               className="min-h-11 shrink-0 gap-1.5 sm:min-h-9"
               aria-label={`Abrir arquivo: ${name}`}
-              onClick={() => onOpen(asset)}
+              aria-busy={openingId === asset.id}
+              disabled={openingId !== null}
+              onClick={() => void openFile(asset)}
             >
-              Abrir
+              {openingId === asset.id ? "Abrindo…" : "Abrir"}
               <ExternalLink aria-hidden="true" className="size-3.5" />
             </Button>
+            </div>
+            {openError?.assetId === asset.id && (
+              <p role="alert" className="break-words px-1 text-sm text-destructive">{openError.text}</p>
+            )}
           </div>
         );
       })}
