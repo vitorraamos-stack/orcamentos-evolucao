@@ -2,9 +2,10 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { OrderComment } from "../types/orderDetail";
-import { OrderCommentsTab } from "./OrderCommentsTab";
+import { OrderCommentsTab, attemptCommentAction } from "./OrderCommentsTab";
 
 const source = readFileSync(new URL("./OrderCommentsTab.tsx", import.meta.url), "utf8");
+const page = readFileSync(new URL("../pages/OrderDetailPage.tsx", import.meta.url), "utf8");
 const first: OrderComment = {
   id: "comment-1", order_id: "os-1", user_id: "user-1",
   message: "Confirmar medidas do letreiro.\nAguardando retorno da equipe.",
@@ -19,13 +20,14 @@ const second: OrderComment = {
 };
 const render = (comments: OrderComment[] = [first, second], options: {
   canComment?: boolean; canRemoveAny?: boolean; currentUserId?: string;
-  loading?: boolean; error?: string | null;
+  loading?: boolean; error?: string | null; withRetry?: boolean;
 } = {}) => renderToStaticMarkup(
   <OrderCommentsTab
     comments={comments} loading={options.loading ?? false}
     error={options.error ?? null} currentUserId={options.currentUserId ?? "user-1"}
     canComment={options.canComment ?? true} canRemoveAny={options.canRemoveAny ?? false}
     onCreate={vi.fn()} onUpdate={vi.fn()} onRemove={vi.fn()}
+    onRetry={options.withRetry ? vi.fn() : undefined}
   />
 );
 
@@ -69,21 +71,72 @@ describe("EvoluSystem OS comments", () => {
   it("preserves loading, errors and empty state", () => {
     expect(render([], { loading: true })).toContain('role="status"');
     expect(render([], { error: "Falha na consulta" })).toContain('role="alert"');
+    expect(render([], { error: "Falha na consulta", withRetry: true })).toContain("Tentar novamente");
     expect(render([])).toContain("Nenhum comentário interno.");
   });
 
   it("retains original create, edit and remove payloads while preventing duplicate requests", () => {
     for (const expected of [
       "await onCreate(message);",
-      "await onUpdate(id, editMessage);",
-      "await onRemove(id);",
+      "onUpdate(id, editMessage)",
+      "onRemove(id)",
       "disabled={busy || !message.trim()}",
       "disabled={busy || !editMessage.trim()}",
-      "if (busy) return;",
+      "if (busy || removing?.id !== id) return;",
       "setEditing(comment.id);",
       "setEditMessage(comment.message);",
       "maxLength={4000}",
     ]) expect(source).toContain(expected);
     expect(source).not.toContain("sort(");
+  });
+});
+
+describe("OS comments — safe action feedback", () => {
+  it("resolves successful callbacks and reports no error", async () => {
+    const fn = vi.fn().mockResolvedValue(undefined);
+    const failure = vi.fn();
+    expect(await attemptCommentAction(fn, failure)).toBe(true);
+    expect(fn).toHaveBeenCalledOnce();
+    expect(failure).not.toHaveBeenCalled();
+  });
+
+  it("handles rejected callbacks without an unhandled promise", async () => {
+    const failure = vi.fn();
+    const result = await attemptCommentAction(() => Promise.reject(new Error("Falha de conexão")), failure);
+    expect(result).toBe(false);
+    expect(failure).toHaveBeenCalledOnce();
+  });
+
+  it("keeps create and edit drafts until their saves have succeeded", () => {
+    expect(source).toContain('await onCreate(message);');
+    expect(source).toContain('setMessage("");');
+    expect(source).toContain('if (saved) setEditing(null);');
+    expect(source).toContain('failure?.kind === "create"');
+    expect(source).toContain('failure?.kind === "update"');
+    expect(source).toContain("inFlight.current");
+  });
+
+  it("requires removal confirmation and retains it on failure", () => {
+    expect(source).toContain('onClick={() => { setFailure(null); setRemoving(comment); }}');
+    expect(source).toContain('<AlertDialog open={Boolean(removing)}');
+    expect(source).toContain("Confirmar remoção");
+    expect(source).toContain('if (removed) setRemoving(null);');
+    expect(source).toContain('failure?.kind === "remove"');
+    expect(source).toContain('disabled={busy}');
+  });
+
+  it("propagates edit and removal errors to the component", () => {
+    const remove = page.slice(page.indexOf("const removeComment ="), page.indexOf("const editComment ="));
+    const edit = page.slice(page.indexOf("const editComment ="), page.indexOf("const saveOrder ="));
+    expect(remove).toContain("throw error;");
+    expect(edit).toContain("throw error;");
+    expect(page).toContain('onRetry={() => void loadTab("comments")}');
+  });
+
+  it("preserves the original author and manager action boundaries", () => {
+    expect(source).toContain("const canEdit = own;");
+    expect(source).toContain("const canRemove = own || canRemoveAny;");
+    expect(render([second], { currentUserId: "user-1", canRemoveAny: true })).not.toContain("Editar comentário de Produção");
+    expect(render([second], { currentUserId: "user-1", canRemoveAny: true })).toContain("Remover comentário de Produção");
   });
 });
