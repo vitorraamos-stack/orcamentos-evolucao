@@ -18,7 +18,7 @@ describe("19V-A: recorded production migration is in GitHub history", () => {
   it("records the exact Supabase-generated version and source", () => {
     expect(instructions).toContain("20261015134750_phase_19va_atomic_payment_finalization");
     expect(instructions).toContain("Supabase CLI was");
-    expect(migration).toContain("actual Supabase-generated version");
+    expect(migration).toContain("recorded version 20261015134750");
     expect(migration).toContain("finalize_legacy_payment_submission");
   });
   it("changes only documentation comments from the reviewed SQL", () => {
