@@ -40,11 +40,13 @@ describe("EvoluSystem — safe production operation block dialog", () => {
     expect(block).toContain('{busy ? "Bloqueando…" : "Confirmar bloqueio"}');
   });
 
-  it("does not alter the original status transition permissions", () => {
+  it("preserves status transition permissions and confirms deletion", () => {
     expect(source).toContain("canOperate &&");
     expect(source).toContain("canManage &&");
     expect(source).toContain('status: "BLOCKED"');
     expect(source).toContain('setBlockedReason(""), setBlocking(operation)');
-    expect(source).toContain("onDelete(operation.id)");
+    expect(source).toContain("onDelete(deleting.id)");
+    expect(source).toContain("<AlertDialog open={Boolean(deleting)}");
+    expect(source).toContain("Confirmar exclusão");
   });
 });
