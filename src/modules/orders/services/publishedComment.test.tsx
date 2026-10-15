@@ -71,8 +71,9 @@ describe("EvoluSystem — newly published comments", () => {
     const submit = tab.slice(submitStart, tab.indexOf("const saveComment = async", submitStart));
     expect(submit).toContain("await onCreate(message);");
     expect(submit.indexOf("await onCreate(message);")).toBeLessThan(submit.indexOf('setMessage("");'));
-    expect(submit).toContain("} catch {");
-    expect(submit).toContain("setBusy(false)");
+    expect(submit).toContain('await runAction("create", async () => {');
+    expect(tab).toContain("return await attemptCommentAction(action, () => setFailure({ kind, id }));");
+    expect(tab).toContain("setBusy(false);");
     expect(tab).toContain("disabled={busy || !message.trim()}");
   });
 });
