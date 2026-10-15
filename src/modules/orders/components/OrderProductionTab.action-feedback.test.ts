@@ -17,7 +17,8 @@ describe("OS production action feedback", () => {
   it("surfaces a rejected mutation and keeps the caller on the failure path", async () => {
     const failure = vi.fn();
     expect(await runProductionAction(() => Promise.reject(new Error("Permissão negada")), failure)).toBe(false);
-    expect(failure).toHaveBeenCalledExactlyOnceWith("Permissão negada");
+    expect(failure).toHaveBeenCalledOnce();
+    expect(failure).toHaveBeenCalledWith("Permissão negada");
   });
 
   it("provides safe feedback for a non-Error rejection", async () => {
