@@ -26,6 +26,7 @@ export type InstallationChecklistItem = {
   completed_by: string | null;
   completed_at: string | null;
   sort_order: number;
+  updated_at: string;
 };
 export type InstallationEvidencePhase = "BEFORE" | "DURING" | "AFTER";
 export type InstallationEvidence = {

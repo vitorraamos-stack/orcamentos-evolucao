@@ -42,6 +42,7 @@ import {
 import type {
   Installation,
   InstallationChecklistItem,
+  InstallationChecklistStatus,
   InstallationEvidence,
   InstallationEvidencePhase,
 } from "../types";
@@ -54,6 +55,8 @@ export default function InstallationExecutionPage() {
   const [evidence, setEvidence] = useState<InstallationEvidence[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [savingChecklistItemId, setSavingChecklistItemId] = useState<string | null>(null);
+  const checklistSaveRef = useRef(false);
   const [uploading, setUploading] = useState<InstallationEvidencePhase | null>(
     null
   );
@@ -145,6 +148,25 @@ export default function InstallationExecutionPage() {
   const readonly = ["COMPLETED", "CANCELLED"].includes(installation.status);
   const notesDirty = notesDraft.text !== notesDraft.baseText;
   const notesActiveInstallation = notesDraft.installationId === installation.id;
+  const updateChecklist = async (item: InstallationChecklistItem, status: InstallationChecklistStatus) => {
+    if (checklistSaveRef.current) return;
+    checklistSaveRef.current = true;
+    setSavingChecklistItemId(item.id);
+    try {
+      await setChecklistItem(item, status);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      // In success and conflict, the server remains authoritative.
+      // Show its latest state without allowing a second click in flight.
+      try {
+        await load();
+      } finally {
+        checklistSaveRef.current = false;
+        setSavingChecklistItemId(null);
+      }
+    }
+  };
   const action = async (kind: "start" | "complete") => {
     setBusy(true);
     try {
@@ -263,21 +285,15 @@ export default function InstallationExecutionPage() {
             title="Antes da instalação"
             items={pre}
             readOnly={installation.status !== "SCHEDULED"}
-            onChange={async (item, status) => {
-              try {
-                await setChecklistItem(item.id, status);
-                await load();
-              } catch (e) {
-                toast.error((e as Error).message);
-              }
-            }}
+            savingItemId={savingChecklistItemId}
+            onChange={updateChecklist}
           />
           {installation.status === "SCHEDULED" && (
             <>
               <div className="mt-4">
                 <Button
                   className="h-12 w-full"
-                  disabled={!preReady || busy}
+                  disabled={!preReady || busy || savingChecklistItemId !== null}
                   onClick={() => action("start")}
                 >
                   Iniciar instalação
@@ -368,14 +384,8 @@ export default function InstallationExecutionPage() {
               title="Conferência final"
               items={completion}
               readOnly={installation.status !== "IN_PROGRESS"}
-              onChange={async (item, status) => {
-                try {
-                  await setChecklistItem(item.id, status);
-                  await load();
-                } catch (e) {
-                  toast.error((e as Error).message);
-                }
-              }}
+              savingItemId={savingChecklistItemId}
+              onChange={updateChecklist}
             />
             <div>
               <Label htmlFor="completion-notes">Observações finais</Label>
@@ -449,7 +459,7 @@ export default function InstallationExecutionPage() {
             <InstallationCompletionReadiness {...readiness} />
             <Button
               className="h-12 w-full"
-              disabled={!readiness.ready || busy}
+              disabled={!readiness.ready || busy || savingChecklistItemId !== null}
               onClick={() => action("complete")}
             >
               Concluir instalação
