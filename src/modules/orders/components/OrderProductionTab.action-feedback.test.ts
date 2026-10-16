@@ -42,13 +42,13 @@ describe("OS production action feedback", () => {
   it("requires confirmation before deleting an operation", () => {
     expect(tab).toContain("<AlertDialog open={Boolean(deleting)}");
     expect(tab).toContain("Confirmar exclusão");
-    expect(tab).toContain("await onDelete(deleting.id); setDeleting(null);");
+    expect(tab).toContain("await onDelete(deleting.id, deleting.updated_at); setDeleting(null);");
   });
 
   it("does not claim a persisted write failed merely because refresh failed", () => {
     expect(page).toContain("const refreshProductionAfterWrite = async");
     expect(page).toContain("A alteração foi salva, mas não foi possível atualizar a lista.");
-    for (const action of ["createItemOperation(input)", "updateItemOperation(id,input)", "setItemOperationStatus(id,status,reason)", "deleteItemOperation(id)"]) {
+    for (const action of ["createItemOperation(input)", "updateItemOperation(id,input,revision)", "setItemOperationStatus(id,status,revision,reason)", "deleteItemOperation(id,revision)"]) {
       expect(page).toContain("await " + action + "; await refreshProductionAfterWrite(");
     }
   });

@@ -41,9 +41,9 @@ describe("EvoluSystem production operation forms", () => {
   it("keeps original submission callbacks, status and permissions", () => {
     for (const action of [
       "onCreate({ itemId: createItemId, ...input })",
-      "onUpdate(editing.id, operationEditInput(draft))",
-      'onStatus(blocking.id, "BLOCKED", blockedReason.trim())',
-      "onDelete(deleting.id)",
+      "onUpdate(editing.id, operationEditInput(draft), editing.updated_at)",
+      'onStatus(blocking.id, "BLOCKED", blocking.updated_at, blockedReason.trim())',
+      "onDelete(deleting.id, deleting.updated_at)",
       "canOperate &&", "canManage &&", "disabled={busy}",
     ]) expect(page).toContain(action);
   });

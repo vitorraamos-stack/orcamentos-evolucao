@@ -48,9 +48,9 @@ type Props = {
   items: OrderItem[]; operations: ItemOperation[]; users: UserOption[]; canOperate: boolean; canManage: boolean;
   loading?: boolean; error?: string | null; onRetry?: () => void;
   onCreate: (input: { itemId: string; workCenter: WorkCenter; assignedTo: string | null; isRequired: boolean; notes: string }) => Promise<void>;
-  onUpdate: (id: string, input: OperationEditInput) => Promise<void>;
-  onStatus: (id: string, status: OperationStatus, reason?: string) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onUpdate: (id: string, input: OperationEditInput, expectedUpdatedAt: string) => Promise<void>;
+  onStatus: (id: string, status: OperationStatus, expectedUpdatedAt: string, reason?: string) => Promise<void>;
+  onDelete: (id: string, expectedUpdatedAt: string) => Promise<void>;
 };
 
 export function OrderProductionTab({ items, operations, users, canOperate, canManage, loading = false, error = null, onRetry, onCreate, onUpdate, onStatus, onDelete }: Props) {
@@ -95,7 +95,7 @@ export function OrderProductionTab({ items, operations, users, canOperate, canMa
       <CardContent className="space-y-3">{values.length === 0 ? <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">Nenhuma operação de produção cadastrada.</div> : values.map(operation => <div key={operation.id} className="rounded-lg border p-3">
         <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="break-words font-medium">{WORK_CENTER_LABELS[operation.work_center]}</p><p className="break-words text-sm text-muted-foreground">Responsável: {users.find(user => user.id === operation.assigned_to)?.name ?? "Não atribuído"}</p></div><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" data-operation-status={operation.status} className={`rounded-full ${operationStatusStyles[operation.status]}`}>{OPERATION_STATUS_LABELS[operation.status]}</Badge><span className="text-xs text-muted-foreground">{operation.is_required ? "Obrigatória" : "Opcional"}</span></div></div>
         {operation.notes && <p className="mt-2 whitespace-pre-wrap text-sm">{operation.notes}</p>}{operation.blocked_reason && <p className="mt-2 text-sm font-medium text-destructive">Motivo: {operation.blocked_reason}</p>}{operation.completed_at && <p className="mt-1 text-xs text-muted-foreground">Concluída em {new Date(operation.completed_at).toLocaleString("pt-BR")}</p>}
-        {canOperate && <div className="mt-3 flex flex-wrap gap-2">{statusActions(operation).map(action => <Button key={action.status} disabled={busy} size="sm" className="min-h-10 sm:min-h-9" aria-label={`${action.label} operação de ${WORK_CENTER_LABELS[operation.work_center]}`} variant={action.status === "BLOCKED" ? "destructive" : "outline"} onClick={() => action.status === "BLOCKED" ? (setFailure(null), setBlockedReason(""), setBlocking(operation)) : void act({ kind: "status", operationId: operation.id, message: `${action.label} operação de ${WORK_CENTER_LABELS[operation.work_center]}…` }, () => onStatus(operation.id, action.status))}>{pending?.kind === "status" && pending.operationId === operation.id ? "Processando…" : action.label}</Button>)}<Button disabled={busy} size="sm" variant="ghost" className="min-h-10 sm:min-h-9" aria-label={`Editar operação de ${WORK_CENTER_LABELS[operation.work_center]}`} onClick={() => openEdit(operation)}>Editar</Button>{canManage && <Button disabled={busy} size="sm" variant="ghost" className="min-h-10 sm:min-h-9" aria-label={`Excluir operação de ${WORK_CENTER_LABELS[operation.work_center]}`} onClick={() => { setFailure(null); setDeleting(operation); }}>Excluir</Button>}</div>}
+        {canOperate && <div className="mt-3 flex flex-wrap gap-2">{statusActions(operation).map(action => <Button key={action.status} disabled={busy} size="sm" className="min-h-10 sm:min-h-9" aria-label={`${action.label} operação de ${WORK_CENTER_LABELS[operation.work_center]}`} variant={action.status === "BLOCKED" ? "destructive" : "outline"} onClick={() => action.status === "BLOCKED" ? (setFailure(null), setBlockedReason(""), setBlocking(operation)) : void act({ kind: "status", operationId: operation.id, message: `${action.label} operação de ${WORK_CENTER_LABELS[operation.work_center]}…` }, () => onStatus(operation.id, action.status, operation.updated_at))}>{pending?.kind === "status" && pending.operationId === operation.id ? "Processando…" : action.label}</Button>)}<Button disabled={busy} size="sm" variant="ghost" className="min-h-10 sm:min-h-9" aria-label={`Editar operação de ${WORK_CENTER_LABELS[operation.work_center]}`} onClick={() => openEdit(operation)}>Editar</Button>{canManage && <Button disabled={busy} size="sm" variant="ghost" className="min-h-10 sm:min-h-9" aria-label={`Excluir operação de ${WORK_CENTER_LABELS[operation.work_center]}`} onClick={() => { setFailure(null); setDeleting(operation); }}>Excluir</Button>}</div>}
       </div>)}</CardContent>
     </Card>; })}
 
@@ -123,7 +123,7 @@ export function OrderProductionTab({ items, operations, users, canOperate, canMa
         {failure?.kind === "edit" && <p role="alert" className="text-sm text-destructive">{failure.message}</p>}
         <DialogFooter>
           <Button type="button" variant="outline" className="min-h-11 sm:min-h-9" disabled={busy} onClick={() => { setEditing(null); setFailure(null); }}>Cancelar</Button>
-          <Button type="button" className="min-h-11 sm:min-h-9" disabled={busy} onClick={() => editing && void act({ kind: "edit", operationId: editing.id, message: "Salvando operação…" }, async () => { await onUpdate(editing.id, operationEditInput(draft)); setEditing(null); })}>{pending?.kind === "edit" ? "Salvando…" : "Salvar alterações"}</Button>
+          <Button type="button" className="min-h-11 sm:min-h-9" disabled={busy} onClick={() => editing && void act({ kind: "edit", operationId: editing.id, message: "Salvando operação…" }, async () => { await onUpdate(editing.id, operationEditInput(draft), editing.updated_at); setEditing(null); })}>{pending?.kind === "edit" ? "Salvando…" : "Salvar alterações"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -171,7 +171,7 @@ export function OrderProductionTab({ items, operations, users, canOperate, canMa
             className="min-h-11 sm:min-h-9"
             disabled={!canConfirmOperationBlock(blockedReason, busy)}
             onClick={() => blocking && canConfirmOperationBlock(blockedReason, busy) && void act({ kind: "block", operationId: blocking.id, message: "Bloqueando operação…" }, async () => {
-              await onStatus(blocking.id, "BLOCKED", blockedReason.trim());
+              await onStatus(blocking.id, "BLOCKED", blocking.updated_at, blockedReason.trim());
               setBlocking(null);
             })}
           >
@@ -191,7 +191,7 @@ export function OrderProductionTab({ items, operations, users, canOperate, canMa
         {failure?.kind === "delete" && <p role="alert" className="text-sm text-destructive">{failure.message}</p>}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancelar</AlertDialogCancel>
-          <Button type="button" variant="destructive" disabled={busy} onClick={() => deleting && void act({ kind: "delete", operationId: deleting.id, message: "Excluindo operação…" }, async () => { await onDelete(deleting.id); setDeleting(null); })}>{pending?.kind === "delete" ? "Excluindo…" : "Confirmar exclusão"}</Button>
+          <Button type="button" variant="destructive" disabled={busy} onClick={() => deleting && void act({ kind: "delete", operationId: deleting.id, message: "Excluindo operação…" }, async () => { await onDelete(deleting.id, deleting.updated_at); setDeleting(null); })}>{pending?.kind === "delete" ? "Excluindo…" : "Confirmar exclusão"}</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
