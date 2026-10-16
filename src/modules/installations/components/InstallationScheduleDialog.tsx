@@ -43,9 +43,12 @@ export function InstallationScheduleDialog({
   const [vehicle, setVehicle] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   useEffect(() => {
     if (open) {
+      setSaveError(null);
       setStart(installation?.scheduled_start ? toSaoPauloDateTimeLocal(installation.scheduled_start) : "");
+      setDuration(String(installation?.estimated_duration_minutes ?? 120));
       setTeam(installation?.team_id ?? "");
       setResponsible(installation?.responsible_id ?? "");
       setVehicle(installation?.vehicle_label ?? "");
@@ -53,7 +56,11 @@ export function InstallationScheduleDialog({
     }
   }, [open, installation]);
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={next => {
+      if (busy && !next) return;
+      if (!next) setSaveError(null);
+      onOpenChange(next);
+    }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
@@ -126,10 +133,17 @@ export function InstallationScheduleDialog({
             <Label>Observação</Label>
             <Textarea value={notes} onChange={e => setNotes(e.target.value)} />
           </div>
+          {saveError && (
+            <p role="alert" aria-live="assertive" className="text-sm text-destructive">
+              {saveError}
+            </p>
+          )}
           <Button
             disabled={!start || busy}
             onClick={async () => {
+              if (busy) return;
               setBusy(true);
+              setSaveError(null);
               try {
                 await onSave({
                   osId: order?.id ?? installation!.os_id,
@@ -141,6 +155,12 @@ export function InstallationScheduleDialog({
                   notes: notes || null,
                 });
                 onOpenChange(false);
+              } catch (cause) {
+                // Keep the edited schedule on screen if a concurrent change
+                // or validation error prevents saving.
+                setSaveError(cause instanceof Error
+                  ? cause.message
+                  : "Não foi possível salvar o agendamento. Revise os dados e tente novamente.");
               } finally {
                 setBusy(false);
               }
