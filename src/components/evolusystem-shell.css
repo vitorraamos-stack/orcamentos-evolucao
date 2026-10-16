@@ -46,9 +46,5 @@
   color: #fff;
 }
 .dark .evolu-shell__main { background: linear-gradient(165deg, #101c2b 0%, #152235 100%); }
-.dark .evolu-shell__main :where(.bg-white, [class~="bg-[#FFFFFF]"], [class~="bg-[#fff]"], [class~="bg-[#F8FAFC]"], [class~="bg-[#F9FAFB]"], [class~="bg-[#F4F7FB]"], [class~="bg-[#F7F9FC]"]) {
-  background-color: var(--card);
-}
-.dark .evolu-shell__main :where([class~="text-[#172D49]"], [class~="text-[#172D46]"], [class~="text-[#182E48]"]) {
-  color: var(--foreground);
-}
+/* Dark surfaces are owned by each module. Avoid globally recoloring white art
+   previews, logos or print mockups rendered inside the operational area. */
