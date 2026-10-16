@@ -9,7 +9,7 @@ Controle operacional simples de bobinas identificadas individualmente e estoque 
 - **Tintas:** registrar entrada em estoque e abastecimento manual de reservatórios. Não há estimativa de tinta por impressão.
 - **Histórico:** toda movimentação possui usuário, data, identificador idempotente e quantidade; eventos não são editáveis pelo cliente.
 
-## Segurança
+## Segurança\nO `request_id` é acompanhado de um payload canônico: uma repetição idêntica é segura, mas valores diferentes com o mesmo identificador são rejeitados. As baixas podem resolver tanto `sale_number` quanto `os_number`, recusando referências ambíguas.\n
 A migration cria `print_inventory_rolls`, `print_inventory_inks` e `print_inventory_events` e o módulo `impressao_estoque`. RLS restringe leitura ao módulo. Não há permissão de INSERT/UPDATE/DELETE para o cliente: alterações ocorrem por RPCs atômicas `SECURITY DEFINER`, com checagem de acesso, bloqueio de linha, saldo não negativo e `request_id` idempotente.
 
 Gerentes recebem o módulo no momento da migration. Demais usuários devem receber a permissão pelo fluxo administrativo existente.
@@ -17,9 +17,9 @@ Gerentes recebem o módulo no momento da migration. Demais usuários devem receb
 ## Ordem para habilitar (não executada pelo PR)
 1. Revisar a migration com atenção à matriz de privilégios da base atual.
 2. Aplicar em Supabase apenas após autorização explícita.
-3. Liberar módulo `impressao_estoque` aos operadores envolvidos pelo sistema de permissões existente.
-4. Homologar com uma OS de teste, cadastrar bobina, imprimir, ajustar saldo e movimentar tinta. Conferir eventos, integridade dos saldos e concorrência entre dois operadores.
-5. Fazer merge/publicar somente após validação dos testes e da integração real.
+3. Confirmar a migration aplicada e verificar os privilégios e as políticas RLS antes da liberação.\n4. Liberar módulo `impressao_estoque` aos operadores envolvidos pelo sistema de permissões existente.
+5. Homologar com uma OS de teste, cadastrar bobina, imprimir, ajustar saldo e movimentar tinta. Conferir eventos, integridade dos saldos e concorrência entre dois operadores.
+6. Fazer merge/publicar somente após validação dos testes e da integração real.
 
 ## Limites conhecidos desta primeira entrega
 - A OS é validada no servidor pelo campo `sale_number`. Não são aceitos números de OS inexistentes.

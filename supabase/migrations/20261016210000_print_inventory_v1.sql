@@ -1,6 +1,7 @@
 -- EvoluSystem | Impressao & Estoque V1
 -- Revisao em PR: NAO executar automaticamente em producao.
 create sequence if not exists public.print_inventory_roll_seq;
+revoke all on sequence public.print_inventory_roll_seq from public, anon, authenticated;
 
 insert into public.app_modules (module_key, label, route_prefixes)
 values ('impressao_estoque', 'Impressão & Estoque', '["/impressao-estoque"]'::jsonb)
@@ -31,6 +32,7 @@ insert into public.print_inventory_inks(color) values ('C'),('M'),('Y'),('K') on
 create table if not exists public.print_inventory_events (
  id uuid primary key default gen_random_uuid(),
  request_id uuid not null unique,
+ request_payload jsonb not null,
  kind text not null check (kind in ('ROLL_IN','PRINT','REPRINT','ROLL_ADJUST','INK_IN','INK_USE')),
  roll_id uuid references public.print_inventory_rolls(id) on delete restrict,
  color text references public.print_inventory_inks(color),
@@ -78,7 +80,7 @@ revoke all on function public.print_inventory_assert_access() from public, anon,
 create or replace function public.print_inventory_add_roll(
  p_request_id uuid,p_material text,p_width_cm numeric,p_length_m numeric
 ) returns uuid language plpgsql security definer set search_path = '' as $$
-declare v_id uuid;
+declare v_id uuid; v_existing uuid; v_payload jsonb;
 begin
  perform public.print_inventory_assert_access();
  if p_request_id is null or length(btrim(coalesce(p_material,''))) not between 2 and 120
@@ -86,16 +88,20 @@ begin
     or p_length_m is null or p_length_m<=0 or p_length_m>10000 then
   raise exception 'Dados inválidos para cadastrar bobina.' using errcode='22023';
  end if;
+ v_payload := jsonb_build_object('kind','ROLL_IN','material',btrim(p_material),'width_cm',p_width_cm,'length_m',p_length_m);
  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(p_request_id::text));
- select roll_id into v_id from public.print_inventory_events where request_id=p_request_id and kind='ROLL_IN';
- if found then return v_id; end if;
- if exists(select 1 from public.print_inventory_events where request_id=p_request_id) then
-  raise exception 'Identificador de operação já utilizado.' using errcode='23505';
+ select id,roll_id into v_existing,v_id from public.print_inventory_events where request_id=p_request_id;
+ if found then
+  if not exists(select 1 from public.print_inventory_events where id=v_existing and kind='ROLL_IN'
+     and request_payload=v_payload and created_by=auth.uid()) then
+   raise exception 'Esta operação já foi utilizada com dados diferentes.' using errcode='23505';
+  end if;
+  return v_id;
  end if;
  insert into public.print_inventory_rolls(material,width_cm,initial_length_m,remaining_length_m,created_by)
  values (btrim(p_material),p_width_cm,p_length_m,p_length_m,auth.uid()) returning id into v_id;
- insert into public.print_inventory_events(request_id,kind,roll_id,delta_m,created_by)
- values (p_request_id,'ROLL_IN',v_id,p_length_m,auth.uid());
+ insert into public.print_inventory_events(request_id,request_payload,kind,roll_id,delta_m,created_by)
+ values (p_request_id,v_payload,'ROLL_IN',v_id,p_length_m,auth.uid());
  return v_id;
 end;
 $$;
@@ -104,7 +110,7 @@ create or replace function public.print_inventory_record_print(
  p_request_id uuid,p_roll_id uuid,p_os_ref text,p_width_cm numeric,p_length_cm numeric,
  p_copies integer,p_waste_cm numeric default 0,p_reprint boolean default false,p_reason text default null
 ) returns uuid language plpgsql security definer set search_path = '' as $$
-declare v_roll public.print_inventory_rolls%rowtype; v_order_id uuid; v_delta numeric(12,4); v_event uuid;
+declare v_roll public.print_inventory_rolls%rowtype; v_order_id uuid; v_order_count integer; v_delta numeric(12,4); v_event uuid; v_payload jsonb;
 begin
  perform public.print_inventory_assert_access();
  if p_request_id is null or p_roll_id is null or length(btrim(coalesce(p_os_ref,'')))=0
@@ -113,20 +119,32 @@ begin
     or (p_reprint and length(btrim(coalesce(p_reason,'')))=0) then
   raise exception 'Dados inválidos para registrar impressão.' using errcode='22023';
  end if;
+ v_payload := jsonb_build_object('kind',case when coalesce(p_reprint,false) then 'REPRINT' else 'PRINT' end,
+   'roll_id',p_roll_id,'os_ref',btrim(p_os_ref),'width_cm',p_width_cm,'length_cm',p_length_cm,
+   'copies',p_copies,'waste_cm',p_waste_cm,'reason',nullif(btrim(p_reason),''));
  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(p_request_id::text));
- select id into v_event from public.print_inventory_events where request_id=p_request_id and kind in ('PRINT','REPRINT');
- if found then return v_event; end if;
- if exists(select 1 from public.print_inventory_events where request_id=p_request_id) then
-  raise exception 'Identificador de operação já utilizado.' using errcode='23505';
+ select id into v_event from public.print_inventory_events where request_id=p_request_id;
+ if found then
+  if not exists(select 1 from public.print_inventory_events e where e.id=v_event
+    and e.kind=case when coalesce(p_reprint,false) then 'REPRINT' else 'PRINT' end
+    and e.request_payload=v_payload and e.created_by=auth.uid()) then
+   raise exception 'Esta operação já foi utilizada com dados diferentes.' using errcode='23505';
+  end if;
+  return v_event;
  end if;
  select * into v_roll from public.print_inventory_rolls where id=p_roll_id for update;
  if not found then raise exception 'Bobina não encontrada.' using errcode='P0002'; end if;
  if p_width_cm>v_roll.width_cm then
   raise exception 'A arte excede a largura da bobina.' using errcode='22023';
  end if;
- select id into v_order_id from public.os_orders where sale_number=btrim(p_os_ref) limit 1;
- if v_order_id is null then
+ select count(*)::integer, min(id::text)::uuid into v_order_count,v_order_id
+ from public.os_orders
+ where sale_number=btrim(p_os_ref)
+    or (os_number is not null and os_number::text=btrim(p_os_ref));
+ if v_order_count=0 then
   raise exception 'OS não encontrada. Confira o número cadastrado na Ordem de Serviço.' using errcode='P0002';
+ elsif v_order_count>1 then
+  raise exception 'Mais de uma OS encontrada para este número. Confira a identificação.' using errcode='22023';
  end if;
  v_delta:=round((p_length_cm*p_copies+p_waste_cm)/100,4);
  if v_delta<=0 or v_delta>v_roll.remaining_length_m then
@@ -134,8 +152,8 @@ begin
  end if;
  update public.print_inventory_rolls set remaining_length_m=remaining_length_m-v_delta where id=p_roll_id;
  insert into public.print_inventory_events
- (request_id,kind,roll_id,delta_m,os_ref,order_id,width_cm,length_cm,copies,waste_cm,reason,created_by)
- values(p_request_id,case when p_reprint then 'REPRINT' else 'PRINT' end,p_roll_id,-v_delta,
+ (request_id,request_payload,kind,roll_id,delta_m,os_ref,order_id,width_cm,length_cm,copies,waste_cm,reason,created_by)
+ values(p_request_id,v_payload,case when coalesce(p_reprint,false) then 'REPRINT' else 'PRINT' end,p_roll_id,-v_delta,
  btrim(p_os_ref),v_order_id,p_width_cm,p_length_cm,p_copies,p_waste_cm,nullif(btrim(p_reason),''),auth.uid())
  returning id into v_event;
  return v_event;
@@ -145,18 +163,22 @@ $$;
 create or replace function public.print_inventory_adjust_roll(
  p_request_id uuid,p_roll_id uuid,p_new_length_m numeric,p_reason text
 ) returns uuid language plpgsql security definer set search_path = '' as $$
-declare v_roll public.print_inventory_rolls%rowtype; v_event uuid;
+declare v_roll public.print_inventory_rolls%rowtype; v_event uuid; v_payload jsonb;
 begin
  perform public.print_inventory_assert_access();
  if p_request_id is null or p_roll_id is null or p_new_length_m is null or p_new_length_m<0
    or length(btrim(coalesce(p_reason,'')))<3 then
   raise exception 'Saldo e motivo são obrigatórios.' using errcode='22023';
  end if;
+ v_payload:=jsonb_build_object('kind','ROLL_ADJUST','roll_id',p_roll_id,'new_length_m',p_new_length_m,'reason',btrim(p_reason));
  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(p_request_id::text));
- select id into v_event from public.print_inventory_events where request_id=p_request_id and kind='ROLL_ADJUST';
- if found then return v_event; end if;
- if exists(select 1 from public.print_inventory_events where request_id=p_request_id) then
-  raise exception 'Identificador de operação já utilizado.' using errcode='23505';
+ select id into v_event from public.print_inventory_events where request_id=p_request_id;
+ if found then
+  if not exists(select 1 from public.print_inventory_events e where e.id=v_event and e.kind='ROLL_ADJUST'
+    and e.request_payload=v_payload and e.created_by=auth.uid()) then
+   raise exception 'Esta operação já foi utilizada com dados diferentes.' using errcode='23505';
+  end if;
+  return v_event;
  end if;
  select * into v_roll from public.print_inventory_rolls where id=p_roll_id for update;
  if not found then raise exception 'Bobina não encontrada.' using errcode='P0002'; end if;
@@ -164,8 +186,8 @@ begin
   raise exception 'Saldo ajustado não pode superar a metragem inicial.' using errcode='22023';
  end if;
  update public.print_inventory_rolls set remaining_length_m=p_new_length_m where id=p_roll_id;
- insert into public.print_inventory_events(request_id,kind,roll_id,delta_m,reason,created_by)
- values(p_request_id,'ROLL_ADJUST',p_roll_id,p_new_length_m-v_roll.remaining_length_m,btrim(p_reason),auth.uid())
+ insert into public.print_inventory_events(request_id,request_payload,kind,roll_id,delta_m,reason,created_by)
+ values(p_request_id,v_payload,'ROLL_ADJUST',p_roll_id,p_new_length_m-v_roll.remaining_length_m,btrim(p_reason),auth.uid())
  returning id into v_event;
  return v_event;
 end;
@@ -174,28 +196,34 @@ $$;
 create or replace function public.print_inventory_move_ink(
  p_request_id uuid,p_color text,p_quantity_ml numeric,p_entry boolean
 ) returns uuid language plpgsql security definer set search_path = '' as $$
-declare v_current numeric; v_delta numeric; v_event uuid;
+declare v_current numeric; v_delta numeric; v_event uuid; v_payload jsonb;
 begin
  perform public.print_inventory_assert_access();
  if p_request_id is null or p_color is null or p_color not in ('C','M','Y','K')
     or p_quantity_ml is null or p_quantity_ml<=0 or p_quantity_ml>100000 then
   raise exception 'Dados inválidos de tinta.' using errcode='22023';
  end if;
+ v_payload:=jsonb_build_object('kind',case when coalesce(p_entry,false) then 'INK_IN' else 'INK_USE' end,
+   'color',p_color,'quantity_ml',p_quantity_ml);
  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(p_request_id::text));
- select id into v_event from public.print_inventory_events where request_id=p_request_id and kind in ('INK_IN','INK_USE');
- if found then return v_event; end if;
- if exists(select 1 from public.print_inventory_events where request_id=p_request_id) then
-  raise exception 'Identificador de operação já utilizado.' using errcode='23505';
+ select id into v_event from public.print_inventory_events where request_id=p_request_id;
+ if found then
+  if not exists(select 1 from public.print_inventory_events e where e.id=v_event
+   and e.kind=case when coalesce(p_entry,false) then 'INK_IN' else 'INK_USE' end
+   and e.request_payload=v_payload and e.created_by=auth.uid()) then
+   raise exception 'Esta operação já foi utilizada com dados diferentes.' using errcode='23505';
+  end if;
+  return v_event;
  end if;
  select balance_ml into v_current from public.print_inventory_inks where color=p_color for update;
  if not found then raise exception 'Cor não encontrada.' using errcode='P0002'; end if;
- v_delta:=case when p_entry then p_quantity_ml else -p_quantity_ml end;
+ v_delta:=case when coalesce(p_entry,false) then p_quantity_ml else -p_quantity_ml end;
  if v_current+v_delta<0 then
   raise exception 'Estoque de tinta insuficiente.' using errcode='22023';
  end if;
  update public.print_inventory_inks set balance_ml=balance_ml+v_delta,updated_at=now() where color=p_color;
- insert into public.print_inventory_events(request_id,kind,color,delta_ml,created_by)
- values(p_request_id,case when p_entry then 'INK_IN' else 'INK_USE' end,p_color,v_delta,auth.uid())
+ insert into public.print_inventory_events(request_id,request_payload,kind,color,delta_ml,created_by)
+ values(p_request_id,v_payload,case when coalesce(p_entry,false) then 'INK_IN' else 'INK_USE' end,p_color,v_delta,auth.uid())
  returning id into v_event;
  return v_event;
 end;
