@@ -23,6 +23,7 @@ type Props = {
   items: OrderItem[];
   loading: boolean;
   error: string | null;
+  onRetry?: () => void;
   canEdit: boolean;
   onCreate: (draft: ItemDraft) => Promise<void>;
   onUpdate: (id: string, input: Partial<OrderItem>) => Promise<void>;
@@ -31,14 +32,17 @@ type Props = {
 };
 
 export function OrderItemsTab({
-  items, loading, error, canEdit, onCreate, onUpdate, onRemove, onMove,
+  items, loading, error, onRetry, canEdit, onCreate, onUpdate, onRemove, onMove,
 }: Props) {
   const [dialog, setDialog] = useState<"create" | "edit" | null>(null);
   const [selected, setSelected] = useState<OrderItem | null>(null);
   const [removing, setRemoving] = useState<OrderItem | null>(null);
 
-  if (loading) return <p className="text-sm text-muted-foreground">Carregando itens…</p>;
-  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>;
+  if (loading) return <p role="status" aria-live="polite" className="text-sm text-muted-foreground">Carregando itens…</p>;
+  if (error) return <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 p-4">
+    <p className="min-w-0 break-words text-sm text-destructive">Não foi possível carregar os itens: {error}</p>
+    {onRetry && <Button type="button" variant="outline" className="min-h-11 sm:min-h-9" onClick={onRetry}>Tentar novamente</Button>}
+  </div>;
 
   return (
     <div className="space-y-4">
