@@ -17,6 +17,7 @@ import {
   Settings,
   SlidersHorizontal,
   BadgeDollarSign,
+  Printer,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import "./evolusystem-shell.css";
@@ -65,6 +66,7 @@ export default function Layout({ children }: LayoutProps) {
 
   // Componente de navegação interno com tipos corretos
   const canViewHubOs = hubPermissions.canViewHubOS && hasModuleAccess("hub_os");
+  const canViewPrinting = hasModuleAccess("impressao_estoque");
   const canViewGaleria = hasModuleAccess("galeria");
   const canViewCalculadora = hasModuleAccess("calculadora");
   const canViewOrcamentista =
@@ -100,10 +102,10 @@ export default function Layout({ children }: LayoutProps) {
 
   const NavItems = () => (
     <div className="space-y-1">
-      {canViewHubOs && (
+      {(canViewHubOs || canViewPrinting) && (
         <>
           <SectionLabel>Operação</SectionLabel>
-          {operationalLinks.map(({ href, label, Icon, active }) => (
+          {canViewHubOs && operationalLinks.map(({ href, label, Icon, active }) => (
             <Link href={href} key={href}>
               <Button
                 variant={active ? "secondary" : "ghost"}
@@ -117,6 +119,20 @@ export default function Layout({ children }: LayoutProps) {
               </Button>
             </Link>
           ))}
+          {canViewPrinting && (
+            <Link href="/impressao-estoque">
+              <Button
+                variant={location.startsWith("/impressao-estoque") ? "secondary" : "ghost"}
+                className={cn(
+                  "evolu-nav__item w-full justify-start",
+                  location.startsWith("/impressao-estoque") && "bg-sidebar-accent text-sidebar-accent-foreground"
+                )}
+              >
+                <Printer className="mr-2 h-4 w-4" />
+                Impressão & Estoque
+              </Button>
+            </Link>
+          )}
         </>
       )}
 
