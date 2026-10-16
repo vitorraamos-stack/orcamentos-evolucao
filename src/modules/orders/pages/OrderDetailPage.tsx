@@ -181,7 +181,7 @@ export default function OrderDetailPage() {
   };
   const removeComment = async (id: string) => { try { await removeOrderComment(id); await event("comment_removed", { comment_id: id }); setComments(value => ({ ...value, data: value.data.filter(comment => comment.id !== id) })); } catch (error) { toast.error(message(error)); throw error; } };
   const editComment = async (id: string, text: string, expectedUpdatedAt: string) => { try { const updated = await updateOrderCommentIfUnchanged(id, text, expectedUpdatedAt); await event("comment_updated", { comment_id: id, user_id: updated.user_id }); setComments(value => ({ ...value, data: value.data.map(comment => comment.id === id ? { ...comment, message: updated.message, updated_at: updated.updated_at } : comment) })); } catch (error) { toast.error(message(error)); throw error; } };
-  const saveOrder = async (input: OrderEditInput) => { try { await updateOrderOperationalFields(detail.order.id, input); await loadDetail(); toast.success("OS atualizada."); } catch (error) { toast.error(message(error)); throw error; } };
+  const saveOrder = async (input: OrderEditInput, expectedUpdatedAt: string) => { try { await updateOrderOperationalFields(detail.order.id, input, expectedUpdatedAt); await loadDetail(); toast.success("OS atualizada."); } catch (error) { toast.error(message(error)); throw error; } };
   const refreshProductionAfterWrite = async (successText: string) => {
     try { const refreshed = await reloadProductionData(); if (refreshed !== null) toast.success(successText); }
     catch {
