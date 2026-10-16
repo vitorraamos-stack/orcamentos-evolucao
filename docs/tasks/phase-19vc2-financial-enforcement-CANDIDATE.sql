@@ -437,12 +437,15 @@ REVOKE UPDATE ON public.os FROM authenticated,anon;
 -- Operational fields retain UPDATE; financial and OS-identity fields excluded.
 GRANT UPDATE (customer_name, customer_phone, title, description, folder_path, status_id, assigned_to, updated_at, sale_number, client_name, delivery_date, delivery_type, shipping_carrier, tracking_code, address, notes, installation_date, installation_time_window, on_site_contact, status_arte, status_producao, is_reproducao, repro_motivo, has_letra_caixa, is_producao_externa) ON public.os TO authenticated;
 
--- RLS does NOT guard TRUNCATE, TRIGGER or REFERENCES table privileges.
--- Existing grants on legacy OS are too broad for browser-facing roles.
--- Clients must not erase entire tables or introduce their own triggers/FKs.
+-- RLS does NOT guard TRUNCATE, TRIGGER, REFERENCES or MAINTAIN privileges.
+-- C1 already removed the first three. MAINTAIN remains on all three
+-- legacy finance tables and must not be inherited by browser-facing roles.
+-- Neither operation changes service_role privileges.
 REVOKE TRUNCATE, TRIGGER, REFERENCES ON public.os
   FROM authenticated,anon;
 REVOKE TRIGGER, REFERENCES ON public.os_event,public.os_payment_proof
+  FROM authenticated,anon;
+REVOKE MAINTAIN ON public.os,public.os_event,public.os_payment_proof
   FROM authenticated,anon;
 
 -- No need to permit invoking trigger functions as standalone RPCs.
@@ -520,6 +523,8 @@ BEGIN
       OR pg_catalog.has_table_privilege('authenticated',c.oid,'TRIGGER')
       OR pg_catalog.has_table_privilege('anon',c.oid,'REFERENCES')
       OR pg_catalog.has_table_privilege('authenticated',c.oid,'REFERENCES')
+      OR pg_catalog.has_table_privilege('anon',c.oid,'MAINTAIN')
+      OR pg_catalog.has_table_privilege('authenticated',c.oid,'MAINTAIN')
     )
   ) THEN RAISE EXCEPTION '19VC2_C1_POSTCHECK_FAILED'
     USING ERRCODE='55000'; END IF;

@@ -19,6 +19,16 @@ describe("19V-C2 read-only authorization dependency contract",()=>{
   expect(candidate).toContain("user_module_access_insert_manager");
   expect(candidate).toContain("has_function_privilege(");
   expect(candidate).toContain("p.with_check='is_manager(auth.uid())'");
+  expect(candidate).toContain(
+   "REVOKE MAINTAIN ON public.os,public.os_event,public.os_payment_proof"
+  );
+  expect(candidate).toContain(
+   "pg_catalog.has_table_privilege('anon',c.oid,'MAINTAIN')"
+  );
+  expect(candidate).toContain(
+   "pg_catalog.has_table_privilege('authenticated',c.oid,'MAINTAIN')"
+  );
+  expect(candidate).not.toMatch(/REVOKE MAINTAIN[^;]+FROM[^;]*service_role/);
  });
  it("keeps reproducible metadata checks READ-ONLY",()=>{
   expect(audit).toContain("SELECT");
@@ -32,6 +42,9 @@ describe("19V-C2 read-only authorization dependency contract",()=>{
  });
  it("records unverified API settings and no production finance migration",()=>{
   expect(review).toContain("não prova");
+  expect(review).toContain("graphql_public");
+  expect(review).toContain("Automatically expose new");
+  expect(review).toContain("30 das 51");
   expect(review).toContain("não executar a 19V-C2 em produção");
   expect(candidate).toContain("REVIEW CANDIDATE, NOT APPLIED");
  });

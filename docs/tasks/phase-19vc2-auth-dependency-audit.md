@@ -50,3 +50,34 @@ https://supabase.com/dashboard/project/zffpvykekwrmkbyjsgbh/integrations/data_ap
 **Bloqueado:** converter o candidato em migration aplicável.
 Sem autorização e testes transacionais com usuários reais em um
 ambiente de homologação compatível, não executar a 19V-C2 em produção.
+
+## Atualização de auditoria — exposição da API e MAINTAIN
+
+A configuração **Data API → Settings** foi confirmada visualmente em
+16/10/2026: os únicos **Exposed Schemas** eram `graphql_public` e
+`public`, enquanto o **Extra Search Path** continha `public` e
+`extensions`. O futuro schema `evolusystem_finance_private` não
+constava de nenhum desses campos. A opção **Automatically expose new
+tables** foi desativada pelo administrador.
+
+A migration `20261016184345_public_default_acl_postgres_elevated_privilege_hardening`
+já removeu concessões administrativas padrão de **futuras** tabelas
+criadas por `postgres`. Porém, a consulta ao catálogo confirmou que
+`anon` e `authenticated` continuam com `MAINTAIN` em **30 das 51**
+tabelas já existentes em `public`, inclusive nas três financeiras
+legadas (`os`, `os_event`, `os_payment_proof`). Isso não equivale a
+um endpoint de manutenção pela API REST, mas mantém um privilégio
+administrativo desnecessário para papéis client-side.
+
+O candidato 19V-C2 passa a incluir `REVOKE MAINTAIN` somente para
+essas três tabelas financeiras, sem retirar nenhum privilégio de
+`service_role`. O postcheck exige que `anon` e `authenticated`
+não mantenham esse privilégio. As outras 27 tabelas e as ACLs de
+`supabase_admin` continuam fora do escopo desta etapa.
+
+**Importante:** a verificação visual dos schemas não é garantia
+permanente: conferir novamente as configurações antes da eventual
+implantação. O código continua **não aplicado**, não houve testes
+com JWT real, nem testes transacionais com dados reais. Não executar
+a 19V-C2 em produção sem uma autorização própria e validação
+operacional compatível.
