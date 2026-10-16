@@ -1,4 +1,4 @@
-import { Check, Circle } from "lucide-react";
+import { Check, Circle, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type {
   InstallationChecklistItem,
@@ -8,11 +8,13 @@ export function InstallationChecklist({
   title,
   items,
   readOnly,
+  savingItemId = null,
   onChange,
 }: {
   title: string;
   items: InstallationChecklistItem[];
   readOnly: boolean;
+  savingItemId?: string | null;
   onChange?: (
     item: InstallationChecklistItem,
     status: InstallationChecklistStatus
@@ -32,14 +34,16 @@ export function InstallationChecklist({
           <div key={item.id} className="rounded-lg border p-3">
             <button
               type="button"
-              disabled={readOnly}
-              aria-label={`${item.label}: ${item.status === "PENDING" ? "Pendente" : "Concluído"}`}
+              disabled={readOnly || savingItemId !== null}
+              aria-label={`${item.label}: ${item.status === "PENDING" ? "Pendente" : item.status === "NOT_APPLICABLE" ? "Não se aplica" : "Concluído"}`}
               className="flex min-h-11 w-full items-center gap-3 text-left disabled:cursor-default"
               onClick={() =>
                 onChange?.(item, item.status === "DONE" ? "PENDING" : "DONE")
               }
             >
-              {item.status === "DONE" ? (
+              {savingItemId === item.id ? (
+                <LoaderCircle className="size-6 animate-spin" aria-hidden="true" />
+              ) : item.status === "DONE" ? (
                 <Check className="size-6 text-emerald-600" />
               ) : item.status === "NOT_APPLICABLE" ? (
                 <span className="w-6 text-center text-xs font-bold">N/A</span>
@@ -47,6 +51,9 @@ export function InstallationChecklist({
                 <Circle className="size-6" />
               )}
               <span>{item.label}</span>
+              {savingItemId === item.id && (
+                <span className="ml-auto text-xs text-muted-foreground" role="status">Salvando…</span>
+              )}
             </button>
             {!readOnly && item.allow_not_applicable && (
               <Button
@@ -54,6 +61,7 @@ export function InstallationChecklist({
                 size="sm"
                 variant="ghost"
                 className="ml-8"
+                disabled={savingItemId !== null}
                 onClick={() =>
                   onChange?.(
                     item,

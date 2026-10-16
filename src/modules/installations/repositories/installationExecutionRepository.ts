@@ -5,6 +5,7 @@ import { loadHubUsersByIds } from "@/shared/repositories/hubUsersRepository";
 import type {
   Installation,
   InstallationChecklistItem,
+  InstallationChecklistStatus,
   InstallationEvidence,
   InstallationEvidencePhase,
 } from "../types";
@@ -68,15 +69,23 @@ export async function loadInstallationExecution(id: string) {
   };
 }
 export async function setChecklistItem(
-  id: string,
-  status: string,
-  note?: string | null
-) {
-  const { error } = await supabase.rpc(
-    "hub_os_set_installation_checklist_item_secure",
-    { p_item_id: id, p_status: status, p_note: note ?? null }
+  item: InstallationChecklistItem,
+  status: InstallationChecklistStatus
+): Promise<InstallationChecklistItem> {
+  // Fail closed when a fixture or old response lacks a server revision.
+  const revision = z.iso.datetime({ offset: true }).parse(item.updated_at);
+  const { data, error } = await supabase.rpc(
+    "hub_os_set_installation_checklist_item_if_current",
+    {
+      p_item_id: item.id,
+      p_expected_updated_at: revision,
+      p_status: status,
+      // Preserve any existing checklist note during a status-only toggle.
+      p_note: item.note,
+    }
   );
   fail(error);
+  return data as InstallationChecklistItem;
 }
 export async function saveCompletionNotes(
   id: string,

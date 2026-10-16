@@ -21,6 +21,7 @@ const item = (
   completed_by: null,
   completed_at: null,
   sort_order: 0,
+  updated_at: "2026-10-16T20:00:00.000Z",
 });
 describe("installation execution readiness", () => {
   it("blocks empty and incomplete pre-start checklists", () => {
