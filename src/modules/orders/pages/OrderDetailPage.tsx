@@ -24,7 +24,7 @@ import { OrderProductionTab } from "../components/OrderProductionTab";
 import { OrderInstallationTab } from "../components/OrderInstallationTab";
 import { OrderEditDialog, type OrderEditInput } from "../components/OrderEditDialog";
 import {
-  completeOrderDeadline, createOrderComment, createOrderItem, getOrderDetail, listAssignableUsers, listOrderActivities, listOrderComments, listOrderFiles, listOrderItems, listItemOperations, createItemOperation, setItemOperationStatus, updateItemOperation, deleteItemOperation, recordOrderEvent, removeOrderAssignee, removeOrderComment, removeOrderDeadline, removeOrderItem, reopenOrderDeadline, reorderOrderItems, setOrderAssignee, updateOrderComment, updateOrderItemIfUnchanged, updateOrderOperationalFields, upsertOrderDeadline,
+  completeOrderDeadline, createOrderComment, createOrderItem, getOrderDetail, listAssignableUsers, listOrderActivities, listOrderComments, listOrderFiles, listOrderItems, listItemOperations, createItemOperation, setItemOperationStatus, updateItemOperation, deleteItemOperation, recordOrderEvent, removeOrderAssignee, removeOrderComment, removeOrderDeadline, removeOrderItem, reopenOrderDeadline, reorderOrderItems, setOrderAssignee, updateOrderCommentIfUnchanged, updateOrderItemIfUnchanged, updateOrderOperationalFields, upsertOrderDeadline,
 } from "../repositories/orderDetailRepository";
 import type { AssigneeScope, DeadlineScope, OrderActivity, OrderComment, OrderDetail, OrderItem, UserOption, ItemOperation } from "../types/orderDetail";
 import { getValidOrderTransitions } from "../services/orderTransitions";
@@ -180,7 +180,7 @@ export default function OrderDetailPage() {
     }
   };
   const removeComment = async (id: string) => { try { await removeOrderComment(id); await event("comment_removed", { comment_id: id }); setComments(value => ({ ...value, data: value.data.filter(comment => comment.id !== id) })); } catch (error) { toast.error(message(error)); throw error; } };
-  const editComment = async (id: string, text: string) => { try { const updated = await updateOrderComment(id, text); await event("comment_updated", { comment_id: id, user_id: updated.user_id }); setComments(value => ({ ...value, data: value.data.map(comment => comment.id === id ? { ...comment, message: updated.message, updated_at: updated.updated_at } : comment) })); } catch (error) { toast.error(message(error)); throw error; } };
+  const editComment = async (id: string, text: string, expectedUpdatedAt: string) => { try { const updated = await updateOrderCommentIfUnchanged(id, text, expectedUpdatedAt); await event("comment_updated", { comment_id: id, user_id: updated.user_id }); setComments(value => ({ ...value, data: value.data.map(comment => comment.id === id ? { ...comment, message: updated.message, updated_at: updated.updated_at } : comment) })); } catch (error) { toast.error(message(error)); throw error; } };
   const saveOrder = async (input: OrderEditInput) => { try { await updateOrderOperationalFields(detail.order.id, input); await loadDetail(); toast.success("OS atualizada."); } catch (error) { toast.error(message(error)); throw error; } };
   const refreshProductionAfterWrite = async (successText: string) => {
     try { const refreshed = await reloadProductionData(); if (refreshed !== null) toast.success(successText); }

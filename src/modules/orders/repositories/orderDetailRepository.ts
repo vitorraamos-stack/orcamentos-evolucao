@@ -424,16 +424,33 @@ export async function createOrderComment(orderId: string, message: string) {
   throwIfError(error);
   return data as OrderComment;
 }
-export async function updateOrderComment(id: string, message: string) {
+/**
+ * Edit only the comment revision the author originally opened.
+ * One conditional UPDATE prevents another collaborator's newer text being lost.
+ * RLS remains responsible for enforcing who may update a comment.
+ */
+export async function updateOrderCommentIfUnchanged(
+  id: string,
+  message: string,
+  expectedUpdatedAt: string
+): Promise<OrderComment> {
   uuid.parse(id);
+  const expected = z.iso.datetime({ offset: true }).parse(expectedUpdatedAt);
   const value = z.string().trim().min(1).max(4000).parse(message);
   const { data, error } = await supabase
     .from("os_order_comments")
     .update({ message: value })
     .eq("id", id)
+    .eq("updated_at", expected)
+    .is("deleted_at", null)
     .select()
-    .single();
+    .maybeSingle();
   throwIfError(error);
+  if (!data) {
+    throw new Error(
+      "Este comentário foi alterado, removido ou está indisponível. Seu texto não foi salvo; copie o que precisar e recarregue a OS para consultar a versão atual."
+    );
+  }
   return data as OrderComment;
 }
 export async function removeOrderComment(id: string) {

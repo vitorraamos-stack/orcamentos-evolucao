@@ -14,7 +14,7 @@ type Props = {
   canRemoveAny: boolean;
   onRetry?: () => void;
   onCreate: (message: string) => Promise<void>;
-  onUpdate: (id: string, message: string) => Promise<void>;
+  onUpdate: (id: string, message: string, expectedUpdatedAt: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
 };
 
@@ -43,6 +43,7 @@ export function OrderCommentsTab({
   const [message, setMessage] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [editMessage, setEditMessage] = useState("");
+  const [editVersion, setEditVersion] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<"create" | "update" | "remove" | null>(null);
   const [failure, setFailure] = useState<{ kind: "create" | "update" | "remove"; id?: string } | null>(null);
@@ -78,9 +79,9 @@ export function OrderCommentsTab({
   };
 
   const saveComment = async (id: string) => {
-    if (busy || editing !== id || !editMessage.trim()) return;
-    const saved = await runAction("update", () => onUpdate(id, editMessage), id);
-    if (saved) setEditing(null);
+    if (busy || editing !== id || !editMessage.trim() || !editVersion) return;
+    const saved = await runAction("update", () => onUpdate(id, editMessage, editVersion), id);
+    if (saved) { setEditing(null); setEditVersion(null); }
   };
 
   const removeComment = async (id: string) => {
@@ -166,6 +167,7 @@ export function OrderCommentsTab({
                             setFailure(null);
                             setEditing(comment.id);
                             setEditMessage(comment.message);
+                            setEditVersion(comment.updated_at);
                           }}
                         >
                           Editar
@@ -204,7 +206,7 @@ export function OrderCommentsTab({
                     </div>
                     {failure?.kind === "update" && failure.id === comment.id && (
                       <p role="alert" className="text-sm text-destructive">
-                        Não foi possível salvar a edição. Seu texto permanece aqui para uma nova tentativa.
+                        Não foi possível salvar a edição. O comentário pode ter sido alterado por outra pessoa. Seu texto continua aqui; confira a versão atual antes de tentar novamente.
                       </p>
                     )}
                     <div className="flex flex-wrap justify-end gap-2">
@@ -214,7 +216,7 @@ export function OrderCommentsTab({
                         size="sm"
                         className="min-h-11 sm:min-h-9"
                         disabled={busy}
-                        onClick={() => { setEditing(null); setFailure(null); }}
+                        onClick={() => { setEditing(null); setEditVersion(null); setFailure(null); }}
                       >
                         Cancelar
                       </Button>
@@ -222,7 +224,7 @@ export function OrderCommentsTab({
                         type="button"
                         size="sm"
                         className="min-h-11 sm:min-h-9"
-                        disabled={busy || !editMessage.trim()}
+                        disabled={busy || !editMessage.trim() || !editVersion}
                         onClick={() => void saveComment(comment.id)}
                       >
                         {pending === "update" ? "Salvando…" : "Salvar alterações"}
