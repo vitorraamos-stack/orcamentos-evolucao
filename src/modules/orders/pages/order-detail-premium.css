@@ -347,3 +347,75 @@
 @media (prefers-reduced-motion: reduce) {
   .evolu-detail__back-link { transition: none; }
 }
+
+
+/* Dark mode contrast refinements for OS detail controls and status timeline.
+   Preserve the light theme and brand/status semantics. */
+.dark .evolu-detail {
+  --detail-border: var(--border);
+  --detail-ink: var(--foreground);
+  --detail-muted: var(--muted-foreground);
+  --detail-blue: #63c8ff;
+}
+.dark .evolu-detail__breadcrumb [aria-current="page"],
+.dark .evolu-detail__section-heading p,
+.dark .evolu-detail__service,
+.dark .evolu-detail__tab-content dl > div dt,
+.dark .evolu-detail__quick-info dt,
+.dark .evolu-detail__stage-label {
+  color: var(--muted-foreground);
+}
+.dark .evolu-detail__back-link,
+.dark .evolu-detail__number,
+.dark .evolu-detail__eyebrow {
+  color: #80d2ff;
+}
+.dark .evolu-detail__back-link:hover {
+  background: var(--accent);
+}
+.dark .evolu-detail__transition-button {
+  border-color: var(--border);
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+}
+.dark .evolu-detail__transition-button:hover {
+  background: var(--accent);
+}
+.dark .evolu-detail__quick-info-icon {
+  background: color-mix(in oklab, var(--primary) 18%, var(--card));
+  color: #80d2ff;
+}
+.dark .evolu-detail__current-stage {
+  border-color: color-mix(in oklab, var(--primary) 40%, var(--border));
+  background: color-mix(in oklab, var(--primary) 14%, var(--card));
+  color: #a0dfff;
+}
+.dark .evolu-detail__stage-bubble--current {
+  box-shadow: 0 0 0 5px color-mix(in oklab, var(--primary) 15%, var(--card));
+}
+.dark .evolu-detail__stage-bubble--completed {
+  border-color: #187b9c;
+  background: #10374e;
+  color: #8fdaff;
+}
+.dark .evolu-detail__stage-bubble--pending {
+  border-color: var(--border);
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+.dark .evolu-detail__management-grid > [data-slot="card"] > [data-slot="card-header"] {
+  border-color: var(--border);
+}
+.dark .evolu-detail__management-grid [data-slot="select-trigger"] {
+  background: var(--background);
+}
+.dark .evolu-detail__tab {
+  color: var(--muted-foreground);
+}
+.dark .evolu-detail__tab:hover:not([data-state="active"]) {
+  background: var(--accent);
+  color: var(--foreground);
+}
+.dark .evolu-detail__tab[data-state="active"] {
+  box-shadow: inset 0 -2px 0 var(--primary);
+}

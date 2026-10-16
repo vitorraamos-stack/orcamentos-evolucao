@@ -25,6 +25,7 @@ import "./evolusystem-shell.css";
 import { cn } from "@/lib/utils";
 import { getRoleLabel } from "@/lib/hubRoles";
 import { getOperationalNavState } from "./operationalNavState";
+import ThemeSwitcher from "./ThemeSwitcher";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -307,6 +308,7 @@ export default function Layout({ children }: LayoutProps) {
               <p className="truncate text-xs text-[#9BB6D3]">{getRoleLabel(role)}</p>
             </div>
           </div>
+          <ThemeSwitcher />
           <Button variant="ghost" className="evolu-shell__signout flex w-full items-center justify-start" onClick={() => signOut()}>
             <LogOut className="mr-2 h-4 w-4" aria-hidden="true" /> Sair do sistema
           </Button>
@@ -338,6 +340,7 @@ export default function Layout({ children }: LayoutProps) {
                 </nav>
                 <div className="evolu-shell__account shrink-0 px-3 py-4">
                   <p className="mb-3 truncate px-2 text-xs text-[#C2D2E5]">{user.email}</p>
+                  <ThemeSwitcher />
                   <Button variant="ghost" className="evolu-shell__signout w-full justify-start" onClick={() => { setMobileOpen(false); void signOut(); }}>
                     <LogOut className="mr-2 h-4 w-4" aria-hidden="true" /> Sair do sistema
                   </Button>

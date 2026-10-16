@@ -8,6 +8,20 @@
       content="EvoluSystem — Controle Operacional da Evolução Comunicação Visual."
     />
     <title>EvoluSystem | Controle Operacional</title>
+    <script>
+      // Apply saved preference before React paints to avoid a light-theme flash.
+      (function () {
+        try {
+          var saved = localStorage.getItem("evolusystem-theme");
+          var dark = saved === "dark" ||
+            (saved === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.toggle("dark", dark);
+          document.documentElement.style.colorScheme = dark ? "dark" : "light";
+        } catch (_) {
+          document.documentElement.classList.remove("dark");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
