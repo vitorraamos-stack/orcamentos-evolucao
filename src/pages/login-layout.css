@@ -244,3 +244,6 @@
     display: none;
   }
 }
+
+/* The approved premium sign-in keeps its intentionally light form in either app theme. */
+.evolu-login { color-scheme: light; }

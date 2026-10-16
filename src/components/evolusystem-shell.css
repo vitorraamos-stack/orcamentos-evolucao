@@ -32,3 +32,23 @@
   .evolu-shell__branding { padding-top:22px; padding-bottom:18px; }
 }
 @media(prefers-reduced-motion:reduce) { .evolu-shell__navigation .evolu-nav__item { transition:none; } }
+
+/* Dark mode: keep the institutional navy sidebar, with a softer contrast on
+   operational surfaces. Do not restyle status badges or CMYK accents here. */
+.evolu-shell__theme-trigger {
+  min-height: 38px;
+  color: #c2d4e6;
+}
+.evolu-shell__theme-trigger:hover,
+.evolu-shell__theme-trigger:focus-visible,
+.evolu-shell__theme-trigger[data-state="open"] {
+  background: rgba(91,150,207,.16);
+  color: #fff;
+}
+.dark .evolu-shell__main { background: linear-gradient(165deg, #101c2b 0%, #152235 100%); }
+.dark .evolu-shell__main :where(.bg-white, [class~="bg-[#FFFFFF]"], [class~="bg-[#fff]"], [class~="bg-[#F8FAFC]"], [class~="bg-[#F9FAFB]"], [class~="bg-[#F4F7FB]"], [class~="bg-[#F7F9FC]"]) {
+  background-color: var(--card);
+}
+.dark .evolu-shell__main :where([class~="text-[#172D49]"], [class~="text-[#172D46]"], [class~="text-[#182E48]"]) {
+  color: var(--foreground);
+}
