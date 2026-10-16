@@ -12,8 +12,12 @@ describe("19V-C legacy OS client write-path defense (static)",()=>{
   });
   it("prevents generic OS updates from passing sensitive fields",()=>{
     expect(api).toContain('Omit<Partial<Os>, "payment_status" | "quote_total" | "quote_id">');
-    expect(api).toContain('Object.prototype.hasOwnProperty.call(payload, field)');
-    expect(api).toContain('"Campos financeiros exigem fluxo de atualização autorizado."');
+    const guards = readFileSync("src/modules/hub-os/financeWriteGuards.ts","utf8");
+    expect(guards).toContain('Object.prototype.hasOwnProperty.call(payload, field)');
+    expect(api).toContain("assertOperationalOsUpdate(payload);");
+    expect(guards).toContain('"Campos financeiros exigem fluxo de atualização autorizado."');
+    expect(api).toContain("assertOperationalOsCreate(payload);");
+    expect(api).toContain("assertOperationalOsEvent(payload);");
   });
   it("preserves the approved transactional payment RPC",()=>{
     expect(api).toContain('supabase.rpc("finalize_legacy_payment_submission"');

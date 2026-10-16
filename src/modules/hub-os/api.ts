@@ -4,6 +4,11 @@ import {
   invokeEdgeFunction,
 } from "@/lib/supabase/invokeEdgeFunction";
 import { parseLegacyPaymentFinalization } from "./paymentFinalization";
+import {
+  assertOperationalOsCreate,
+  assertOperationalOsEvent,
+  assertOperationalOsUpdate,
+} from "./financeWriteGuards";
 import type {
   Os,
   OsEvent,
@@ -189,6 +194,7 @@ export const fetchOsAssetBlobUrl = async (
 };
 
 export const createOs = async (payload: Partial<Os>) => {
+  assertOperationalOsCreate(payload);
   const { data, error } = await supabase
     .from("os")
     .insert(payload)
@@ -206,11 +212,7 @@ export const createOs = async (payload: Partial<Os>) => {
 type OperationalOsUpdate = Omit<Partial<Os>, "payment_status" | "quote_total" | "quote_id">;
 
 export const updateOs = async (id: string, payload: OperationalOsUpdate) => {
-  if (["payment_status", "quote_total", "quote_id"].some(
-    field => Object.prototype.hasOwnProperty.call(payload, field)
-  )) {
-    throw new Error("Campos financeiros exigem fluxo de atualização autorizado.");
-  }
+  assertOperationalOsUpdate(payload);
 
   const { data, error } = await supabase
     .from("os")
@@ -223,6 +225,7 @@ export const updateOs = async (id: string, payload: OperationalOsUpdate) => {
 };
 
 export const createOsEvent = async (payload: Partial<OsEvent>) => {
+  assertOperationalOsEvent(payload);
   const { data, error } = await supabase
     .from("os_event")
     .insert(payload)
