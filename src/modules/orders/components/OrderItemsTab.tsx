@@ -26,7 +26,7 @@ type Props = {
   onRetry?: () => void;
   canEdit: boolean;
   onCreate: (draft: ItemDraft) => Promise<void>;
-  onUpdate: (id: string, input: Partial<OrderItem>) => Promise<void>;
+  onUpdate: (id: string, input: Partial<OrderItem>, expectedUpdatedAt: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onMove: (index: number, direction: -1 | 1) => Promise<void>;
 };
@@ -146,7 +146,7 @@ export function OrderItemsTab({
         onOpenChange={open => !open && setDialog(null)}
         item={selected}
         sortOrder={items.length}
-        onSave={value => selected ? onUpdate(selected.id, value) : onCreate(value)}
+        onSave={value => selected ? onUpdate(selected.id, value, selected.updated_at) : onCreate(value)}
       />
       <AlertDialog open={Boolean(removing)} onOpenChange={open => !open && setRemoving(null)}>
         <AlertDialogContent>
