@@ -108,9 +108,9 @@ export default function LibraryCatalogPage({management=false}:{management?:boole
   };
   const create=()=>{if(!user)return;void perform(async()=>{
     const id=await createLibraryDraft(user.id,emptyLibraryDraft());
-    await load();open(id);
-    // A lista é recarregada de modo assíncrono: o ID basta para selecionar a nova ficha.
+    // A consulta atualiza a lista de fichas; não abrir usando estado anterior.
     setSelectedId(id);setEdit(emptyLibraryDraft());setSection("info");
+    await load();
   },"Rascunho criado.");};
   const update=(patch:Partial<LibraryDraft>)=>{setEdit(old=>({...old,...patch}));setConfirmPublish(false);};
   const save=()=>{if(!selectedDraft||!dirty)return;void perform(async()=>{

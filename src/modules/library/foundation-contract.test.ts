@@ -5,6 +5,8 @@ const read=(path:string)=>readFileSync(new URL(path,import.meta.url),"utf8");
 const migration=read("../../../supabase/migrations/20261016224000_library_products_foundation.sql");
 const app=read("../../App.tsx");
 const layout=read("../../components/Layout.tsx");
+const adminUsers=read("../../../api/admin-users.ts");
+const modules=read("../../../shared/app-modules.ts");
 
 describe("Biblioteca: contratos de implantação fase 1",()=>{
   it("usa uma estrutura separada das tabelas de custos",()=>{
@@ -35,5 +37,7 @@ describe("Biblioteca: contratos de implantação fase 1",()=>{
     expect(app).toContain("hubPermissions.canCreateOs ? <LibraryCatalogPage />");
     expect(layout).toContain('hasModuleAccess("biblioteca_produtos") && hubPermissions.canCreateOs');
     expect(layout).toContain("const canManageLibrary = canViewLibrary && isAdmin");
+    expect(adminUsers).toContain("'biblioteca_produtos'");
+    expect(modules).toContain("key: 'biblioteca_produtos'");
   });
 });
