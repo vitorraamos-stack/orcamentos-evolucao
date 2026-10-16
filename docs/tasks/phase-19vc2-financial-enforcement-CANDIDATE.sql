@@ -170,7 +170,9 @@ BEGIN
   IF p_proof_id IS NULL OR NOT public.has_module_access(v_actor,'hub_os')
   THEN RAISE EXCEPTION '19VA_MODULE_REQUIRED' USING ERRCODE='42501'; END IF;
 
-  -- Discover under RLS, then lock OS first, proof second to serialize RPCs.
+  -- SECURITY DEFINER bypasses RLS: discovery below is NOT RLS-scoped.
+  -- Explicit auth.uid(), module access and proof.created_by checks above
+  -- are mandatory access controls; lock OS first, proof second.
   SELECT p.os_id INTO v_os_id
   FROM public.os_payment_proof p
   WHERE p.id=p_proof_id AND p.created_by=v_actor;
