@@ -38,7 +38,7 @@ export function OrderEditDialog({
   order: OsOrder;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (input: OrderEditInput) => Promise<void>;
+  onSave: (input: OrderEditInput, expectedUpdatedAt: string) => Promise<void>;
 }) {
   const [value, setValue] = useState<OrderEditInput>({
     title: order.title,
@@ -50,8 +50,15 @@ export function OrderEditDialog({
     is_urgent: order.is_urgent,
   });
   const [saving, setSaving] = useState(false);
+  const [openedUpdatedAt, setOpenedUpdatedAt] = useState(order.updated_at);
+  const [saveError, setSaveError] = useState<string | null>(null);
   useEffect(
-    () =>
+    () => {
+      if (!open) return;
+      // Freeze the server revision when this editing session opens; a
+      // background refresh must not silently replace the user's draft.
+      setOpenedUpdatedAt(order.updated_at);
+      setSaveError(null);
       setValue({
         title: order.title,
         description: order.description,
@@ -60,11 +67,14 @@ export function OrderEditDialog({
         address: order.address,
         art_direction_tag: order.art_direction_tag,
         is_urgent: order.is_urgent,
-      }),
-    [order]
+      });
+    },
+    // Updating the OS object while the modal stays open must preserve the draft.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [open, order.id]
   );
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={nextOpen => { if (!saving) onOpenChange(nextOpen); }}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Editar dados operacionais</DialogTitle>
@@ -167,8 +177,13 @@ export function OrderEditDialog({
           </div>
           </section>
         </div>
+        {saveError && (
+          <p role="alert" className="break-words text-sm text-destructive">
+            {saveError}
+          </p>
+        )}
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
           <Button
@@ -177,8 +192,12 @@ export function OrderEditDialog({
             onClick={async () => {
               setSaving(true);
               try {
-                await onSave(value);
+                setSaveError(null);
+                await onSave(value, openedUpdatedAt);
                 onOpenChange(false);
+              } catch (error) {
+                // The user must retain the current text if the revision changed.
+                setSaveError(error instanceof Error ? error.message : "Não foi possível salvar a OS. Suas alterações foram preservadas.");
               } finally {
                 setSaving(false);
               }
