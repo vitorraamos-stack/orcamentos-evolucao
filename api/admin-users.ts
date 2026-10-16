@@ -8,6 +8,7 @@ const APP_MODULE_KEYS = [
   'hub_os_insumos',
   'hub_os_producao_externa',
   'hub_os_kiosk',
+  'biblioteca_produtos',
   'galeria',
   'calculadora',
   'materiais',

@@ -28,6 +28,7 @@ import InstallationExecutionPage from "@/modules/installations/pages/Installatio
 import DeliveriesPage from "@/modules/deliveries/pages/DeliveriesPage";
 import AwaitingSuppliesPage from "@/modules/supplies/pages/AwaitingSuppliesPage";
 import PrintingInventoryPage from "@/modules/printing/pages/PrintingInventoryPage";
+import LibraryCatalogPage from "@/modules/library/pages/LibraryCatalogPage";
 import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -139,6 +140,22 @@ function Router() {
             ) : (
               <Redirect to="/" />
             )}
+          </RequireModule>
+        </Layout>
+      </Route>
+
+      <Route path="/biblioteca/gestao">
+        <Layout>
+          <RequireModule moduleKey="biblioteca_produtos">
+            {hubPermissions.isManager ? <LibraryCatalogPage management /> : <Redirect to="/" />}
+          </RequireModule>
+        </Layout>
+      </Route>
+
+      <Route path="/biblioteca">
+        <Layout>
+          <RequireModule moduleKey="biblioteca_produtos">
+            {hubPermissions.canCreateOs ? <LibraryCatalogPage /> : <Redirect to="/" />}
           </RequireModule>
         </Layout>
       </Route>
