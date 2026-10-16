@@ -1079,7 +1079,7 @@ export default function DeliveriesPage() {
         onOpenChange={setDialog}
         onSave={async input => {
           try {
-            if (editing) await updateDelivery(editing.id, input);
+            if (editing) await updateDelivery(editing.id, input, editing.updated_at ?? "");
             else await scheduleDelivery(input);
             toast.success(
               editing ? "Entrega atualizada." : "Entrega agendada."

@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { z } from "zod";
 import { listOrderFlowState } from "@/modules/hub-os/order-flow-api";
 import type { LogisticsOrder } from "@/modules/installations/types";
 import { loadHubUsersByRoles } from "@/shared/repositories/hubUsersRepository";
@@ -37,9 +38,12 @@ export async function loadDeliveryWorkspace() {
     profiles,
   };
 }
-export async function updateDelivery(id: string, input: DeliveryUpdateInput) {
-  const { error } = await supabase.rpc("hub_os_update_delivery_secure", {
+/** Conflicts are checked in one database transaction before legacy workflow/audit. */
+export async function updateDelivery(id: string, input: DeliveryUpdateInput, expectedUpdatedAt: string) {
+  const expected = z.iso.datetime({ offset: true }).parse(expectedUpdatedAt);
+  const { error } = await supabase.rpc("hub_os_update_delivery_if_current", {
     p_delivery_id: id,
+    p_expected_updated_at: expected,
     p_scheduled_at: input.scheduledAt ?? null,
     p_assigned_to: input.assignedTo ?? null,
     p_vehicle_label: input.vehicleLabel ?? null,

@@ -20,6 +20,8 @@ export type Delivery = {
   completed_at: string | null;
   cancelled_at: string | null;
   cancelled_reason: string | null;
+  /** Optional for older fixture callers; writes always require a real server revision. */
+  updated_at?: string;
   order?: LogisticsOrder | null;
 };
 export type DeliveryInput = {

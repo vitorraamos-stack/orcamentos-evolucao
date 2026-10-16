@@ -32,9 +32,15 @@ export function DeliveryScheduleDialog({
   const [tracking, setTracking] = useState("");
   const [assigned, setAssigned] = useState(""); const [vehicle, setVehicle] = useState(""); const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (!open) return; setMode(delivery?.mode ?? "OWN_DELIVERY"); setDate(delivery?.scheduled_at ? toSaoPauloDateTimeLocal(delivery.scheduled_at) : ""); setCarrier(delivery?.carrier_name ?? ""); setTracking(delivery?.tracking_code ?? ""); setAssigned(delivery?.assigned_to ?? ""); setVehicle(delivery?.vehicle_label ?? ""); setNotes(delivery?.notes ?? ""); }, [open, delivery]);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  useEffect(() => { if (!open) return; setSaveError(null); setMode(delivery?.mode ?? "OWN_DELIVERY"); setDate(delivery?.scheduled_at ? toSaoPauloDateTimeLocal(delivery.scheduled_at) : ""); setCarrier(delivery?.carrier_name ?? ""); setTracking(delivery?.tracking_code ?? ""); setAssigned(delivery?.assigned_to ?? ""); setVehicle(delivery?.vehicle_label ?? ""); setNotes(delivery?.notes ?? ""); }, [open, delivery]);
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={next => {
+      // A pending write must finish before the dialog can be dismissed.
+      if (busy && !next) return;
+      if (!next) setSaveError(null);
+      onOpenChange(next);
+    }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{delivery ? "Editar detalhes da entrega" : "Agendar entrega"}</DialogTitle>
@@ -80,10 +86,13 @@ export function DeliveryScheduleDialog({
           )}
           {mode === "OWN_DELIVERY" && <><div><Label>Responsável</Label><select className="h-10 w-full rounded-md border bg-background px-3" value={assigned} onChange={e => setAssigned(e.target.value)}><option value="">Não definido</option>{profiles.map(p => <option key={p.id} value={p.id}>{p.name || p.email}</option>)}</select></div><div><Label>Veículo</Label><Input value={vehicle} onChange={e => setVehicle(e.target.value)} /></div></>}
           <div><Label>Observações</Label><Textarea value={notes} onChange={e => setNotes(e.target.value)} /></div>
+          {saveError && <p role="alert" aria-live="assertive" className="text-sm text-destructive">{saveError}</p>}
           <Button
             disabled={busy || (!order && !delivery)}
             onClick={async () => {
+              if (busy) return;
               setBusy(true);
+              setSaveError(null);
               try {
                 await onSave({
                   osId: order?.id ?? delivery!.os_id,
@@ -96,6 +105,11 @@ export function DeliveryScheduleDialog({
                   notes: notes || null,
                 });
                 onOpenChange(false);
+              } catch (cause) {
+                // Preserve all edited fields and avoid an unhandled click rejection.
+                setSaveError(cause instanceof Error
+                  ? cause.message
+                  : "Não foi possível salvar a entrega. Revise os dados e tente novamente.");
               } finally {
                 setBusy(false);
               }
