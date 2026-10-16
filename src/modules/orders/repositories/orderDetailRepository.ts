@@ -313,13 +313,16 @@ export async function createItemOperation(input: {
 export async function setItemOperationStatus(
   id: string,
   status: OperationStatus,
+  expectedUpdatedAt: string,
   blockedReason?: string | null
 ) {
   uuid.parse(id);
+  const expected = z.iso.datetime({ offset: true }).parse(expectedUpdatedAt);
   const { data, error } = await supabase.rpc(
-    "hub_os_set_item_operation_status_secure",
+    "hub_os_set_item_operation_status_if_current",
     {
       p_operation_id: id,
+      p_expected_updated_at: expected,
       p_status: status,
       p_blocked_reason: blockedReason ?? null,
       p_notes: null,
@@ -336,13 +339,16 @@ export async function updateItemOperation(
     isRequired: boolean;
     notes?: string | null;
     sortOrder: number;
-  }
+  },
+  expectedUpdatedAt: string
 ) {
   uuid.parse(id);
+  const expected = z.iso.datetime({ offset: true }).parse(expectedUpdatedAt);
   const { data, error } = await supabase.rpc(
-    "hub_os_update_item_operation_secure",
+    "hub_os_update_item_operation_if_current",
     {
       p_operation_id: id,
+      p_expected_updated_at: expected,
       p_work_center: input.workCenter,
       p_assigned_to: input.assignedTo ?? null,
       p_is_required: input.isRequired,
@@ -353,11 +359,12 @@ export async function updateItemOperation(
   throwIfError(error);
   return data as ItemOperation;
 }
-export async function deleteItemOperation(id: string) {
+export async function deleteItemOperation(id: string, expectedUpdatedAt: string) {
   uuid.parse(id);
+  const expected = z.iso.datetime({ offset: true }).parse(expectedUpdatedAt);
   const { data, error } = await supabase.rpc(
-    "hub_os_delete_item_operation_secure",
-    { p_operation_id: id }
+    "hub_os_delete_item_operation_if_current",
+    { p_operation_id: id, p_expected_updated_at: expected }
   );
   throwIfError(error);
   return data as ItemOperation;
