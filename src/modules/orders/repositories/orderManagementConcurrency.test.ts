@@ -70,7 +70,7 @@ describe("management card optimistic concurrency", () => {
   it("server proposal serializes absence, locks existing children and audits transactionally", () => {
     expect(sql).toContain("perform 1 from public.os_orders o where o.id = p_os_id for update");
     expect(sql).toContain("perform 1 from public.os_orders o where o.id=p_os_id for update");
-    expect((sql.match(/for update;/g) ?? []).length).toBe(2);
+    expect((sql.match(/for update;/g) ?? []).length).toBe(4); // Parent and child row in each of two RPCs
     expect(sql).toContain("v_existing.updated_at is distinct from p_expected_updated_at");
     expect(sql).toContain("not v_found and p_expected_updated_at is not null");
     expect(sql).toContain("insert into public.os_orders_event");
