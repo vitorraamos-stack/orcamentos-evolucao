@@ -343,6 +343,39 @@ export async function updateOrderItem(
   throwIfError(error);
   return data as OrderItem;
 }
+/**
+ * Optimistic locking for an item editor opened from a known server version.
+ * The timestamp predicate is part of the same UPDATE statement, so two
+ * concurrent saves cannot both overwrite the same version.
+ *
+ * Keep updateOrderItem for existing non-editor operations (e.g. reordering);
+ * those writes will receive their own conflict policy in a later phase.
+ */
+export async function updateOrderItemIfUnchanged(
+  id: string,
+  input: Partial<z.input<typeof itemInputSchema>>,
+  expectedUpdatedAt: string
+): Promise<OrderItem> {
+  uuid.parse(id);
+  const expected = z.iso.datetime({ offset: true }).parse(expectedUpdatedAt);
+  const value = itemInputSchema.partial().parse(input);
+  const { data, error } = await supabase
+    .from("os_order_items")
+    .update(value)
+    .eq("id", id)
+    .eq("updated_at", expected)
+    .is("deleted_at", null)
+    .select()
+    .maybeSingle();
+  throwIfError(error);
+  if (!data) {
+    throw new Error(
+      "Este item foi alterado por outra pessoa ou não está mais disponível. Suas alterações não foram enviadas. Copie o que precisar e reabra a OS para conferir a versão atual."
+    );
+  }
+  return data as OrderItem;
+}
+
 export async function removeOrderItem(id: string) {
   uuid.parse(id);
   const { error } = await supabase
