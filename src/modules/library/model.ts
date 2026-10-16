@@ -20,6 +20,7 @@ export type LibraryPhoto = {
   kind: "application" | "detail" | "render" | "process";
   caption: string;
   visibility: LibraryVisibility;
+  cover?: boolean;
 };
 
 export type LibraryComplement = {
@@ -28,6 +29,25 @@ export type LibraryComplement = {
   mode: "separate" | "included" | "internal";
   visibility: "commercial" | "internal";
   when: "always" | "install" | "noart";
+};
+
+export type LibraryRules = {
+  photos_policy?: "recommend" | "required" | "waive";
+  waiver_reason?: string;
+};
+
+export type LibraryTemplate = {
+  id: string;
+  name: string;
+  category: string;
+  fields: LibraryField[];
+  version: number;
+  updated_at: string;
+};
+
+export type LibraryComplementTemplate = LibraryComplement & {
+  version: number;
+  updated_at: string;
 };
 
 export type LibraryDraft = {
@@ -40,13 +60,15 @@ export type LibraryDraft = {
   complements: LibraryComplement[];
   consultant_guidance: string;
   internal_guidance: string;
-  rules: Record<string, unknown>;
+  rules: LibraryRules;
+  source_template?: { id: string; version: number };
 };
 
 export type LibraryPublication = Pick<LibraryDraft, "name" | "category" | "description" | "applications" | "fields"> & {
   gallery: Omit<LibraryPhoto, "visibility">[];
   complements: (Pick<LibraryComplement, "id" | "name" | "mode" | "when"> & {visibility?: LibraryComplement["visibility"]})[];
   guidance: string;
+  rules?: { photos_policy: "recommend" | "required" | "waive"; special_fixing_review: true };
 };
 
 export type LibraryProductRecord = {
@@ -76,7 +98,7 @@ export const emptyLibraryDraft = (): LibraryDraft => ({
   complements: [],
   consultant_guidance: "",
   internal_guidance: "",
-  rules: {},
+  rules: {photos_policy:"recommend"},
 });
 
 export const libraryCategories = [
@@ -98,8 +120,15 @@ export function validateLibraryDraft(draft: LibraryDraft): string[] {
   if (draft.fields.some(f => ["select","multi"].includes(f.type) && (!Array.isArray(f.options) || f.options.length === 0))) {
     errors.push("Campos de seleção precisam de opções.");
   }
-  if (draft.gallery.some(photo => photo.visibility === "consultor" && !/^https:\/\//i.test(photo.url))) {
-    errors.push("Imagens comerciais precisam de uma URL HTTPS válida.");
+  if (draft.gallery.some(photo => photo.visibility === "consultor" &&
+    !(/^https:\/\//i.test(photo.url) || /^storage:\/\/library-product-images\/[0-9a-f-]{36}\/[a-z0-9_.-]+$/i.test(photo.url)))) {
+    errors.push("Imagens comerciais precisam de URL HTTPS ou arquivo armazenado.");
+  }
+  if ((draft.rules?.photos_policy || "recommend")==="waive" && (draft.rules?.waiver_reason||"").trim().length<10) {
+    errors.push("Explique a dispensa das fotografias (mínimo 10 caracteres).");
+  }
+  if (draft.fields.some(f=>f.when!=="always" && !draft.fields.some(x=>x.id===({paint:"acabamento",install:"instalacao",noart:"arte_vetorial"} as Record<string,string>)[f.when]))) {
+    errors.push("Existem campos condicionais sem o campo controlador.");
   }
   return errors;
 }
