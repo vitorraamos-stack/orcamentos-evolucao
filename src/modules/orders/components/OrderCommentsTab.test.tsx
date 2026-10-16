@@ -78,10 +78,10 @@ describe("EvoluSystem OS comments", () => {
   it("retains original create, edit and remove payloads while preventing duplicate requests", () => {
     for (const expected of [
       "await onCreate(message);",
-      "onUpdate(id, editMessage)",
+      "onUpdate(id, editMessage, editVersion)",
       "onRemove(id)",
       "disabled={busy || !message.trim()}",
-      "disabled={busy || !editMessage.trim()}",
+      "disabled={busy || !editMessage.trim() || !editVersion}",
       "if (busy || removing?.id !== id) return;",
       "setEditing(comment.id);",
       "setEditMessage(comment.message);",
@@ -131,6 +131,26 @@ describe("OS comments — safe action feedback", () => {
     expect(remove).toContain("throw error;");
     expect(edit).toContain("throw error;");
     expect(page).toContain('onRetry={() => void loadTab("comments")}');
+  });
+
+  it("pins the server revision at the instant editing begins", () => {
+    expect(source).toContain("setEditVersion(comment.updated_at);");
+    expect(source).toContain("editing !== id || !editMessage.trim() || !editVersion");
+    expect(source).toContain('onUpdate(id, editMessage, editVersion)');
+    expect(source).toContain("if (saved) { setEditing(null); setEditVersion(null); }");
+    expect(source).toContain("setEditVersion(null); setFailure(null);");
+    expect(page).toContain("updateOrderCommentIfUnchanged(id, text, expectedUpdatedAt)");
+  });
+
+  it("preserves an unsaved edited message after a remote update conflict", () => {
+    expect(source).toContain('failure?.kind === "update"');
+    expect(source).toContain("Seu texto continua aqui");
+    expect(source).toContain("if (saved) { setEditing(null); setEditVersion(null); }");
+    const saveStart = source.indexOf("const saveComment = async");
+    const removeStart = source.indexOf("const removeComment = async", saveStart);
+    const handler = source.slice(saveStart, removeStart);
+    expect(handler).not.toContain('setEditMessage("")');
+    expect(handler).not.toContain("setEditing(null);\n");
   });
 
   it("preserves the original author and manager action boundaries", () => {
