@@ -535,6 +535,11 @@ export async function listOrderFiles(orderId: string) {
   throwIfError(error);
   return (data ?? []) as OsOrderLayoutAsset[];
 }
+/**
+ * Atomic concurrency check is performed in the separately deployed,
+ * manager-only RPC. Do not fall back to the legacy unguarded mutation:
+ * a missing RPC must fail closed rather than overwrite a collaborator.
+ */
 export async function updateOrderOperationalFields(
   orderId: string,
   input: {
@@ -545,12 +550,15 @@ export async function updateOrderOperationalFields(
     address?: string | null;
     art_direction_tag?: OsOrder["art_direction_tag"];
     is_urgent?: boolean;
-  }
+  },
+  expectedUpdatedAt: string
 ) {
   uuid.parse(orderId);
-  const { data, error } = await supabase.rpc("hub_os_update_order_secure", {
+  const expected = z.iso.datetime({ offset: true }).parse(expectedUpdatedAt);
+  const { data, error } = await supabase.rpc("hub_os_update_order_if_current", {
     p_os_id: orderId,
     p_patch: input,
+    p_expected_updated_at: expected,
     p_event_type: "details_updated",
     p_event_payload: { fields: Object.keys(input) },
   });
