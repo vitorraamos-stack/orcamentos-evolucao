@@ -78,4 +78,25 @@ describe("EvoluSystem OS tabs — reliable loading and error recovery", () => {
     expect((detail.match(/aria-label="Responsáveis e prazos"/g) ?? []).length).toBe(1);
   });
 
+  it("scopes OS and lazy tab reads to the current order and drops late responses", () => {
+    expect(detail).toContain("readCoordinator.current.begin(orderId, \"detail\", true)");
+    expect(detail).toContain("readCoordinator.current.begin(orderId, `tab:${tab}`)");
+    expect(detail).toContain("readCoordinator.current.isCurrent(ticket)");
+    expect(detail).toContain("readCoordinator.current.finish(ticket)");
+    expect(detail).toContain("coordinator.invalidate()");
+    expect(detail).toContain("coordinator.activate(orderId ?? null)");
+    expect(detail).toContain("setItems(state<OrderItem[]>([]))");
+    expect(detail).toContain("setComments(state<OrderComment[]>([]))");
+    expect(detail).toContain('key={orderId} defaultValue="summary"');
+    expect(detail).toContain("detail.order.id !== orderId");
+  });
+
+  it("keeps a read-after-write production refresh from overwriting newer results", () => {
+    expect(detail).toContain('readCoordinator.current.begin(orderId, "production-data", true)');
+    expect(detail).toContain("if (!readCoordinator.current.isCurrent(ticket)) return null;");
+    expect(detail).toContain("if (refreshed !== null) toast.success(successText)");
+    expect(detail).toContain("listItemOperations(orderId)");
+    expect(detail).toContain("listOrderItems(orderId)");
+  });
+
 });
