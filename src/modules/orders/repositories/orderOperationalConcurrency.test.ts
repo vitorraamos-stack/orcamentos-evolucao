@@ -26,7 +26,8 @@ describe("EvoluSystem OS — general details optimistic concurrency", () => {
       originalVersion
     )).resolves.toEqual(result);
 
-    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith(
+    expect(mocks.rpc).toHaveBeenCalledOnce();
+    expect(mocks.rpc).toHaveBeenCalledWith(
       "hub_os_update_order_if_current",
       {
         p_os_id: orderId,
