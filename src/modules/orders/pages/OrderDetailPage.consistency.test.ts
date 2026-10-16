@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const detail = readFileSync(new URL("./OrderDetailPage.tsx", import.meta.url), "utf8");
+const styles = readFileSync(new URL("./order-detail-premium.css", import.meta.url), "utf8");
 const logistics = readFileSync(new URL("../components/OrderInstallationTab.tsx", import.meta.url), "utf8");
 
 describe("EvoluSystem OS tabs — reliable loading and error recovery", () => {
@@ -49,4 +50,32 @@ describe("EvoluSystem OS tabs — reliable loading and error recovery", () => {
     expect(detail).toContain("hubPermissions.isManager");
     expect((detail.match(/<TabsTrigger className="evolu-detail__tab"/g) ?? []).length).toBe(7);
   });
+  it("offers consistent retry for every remotely loaded order tab", () => {
+    for (const name of ["items", "production", "files", "comments", "history"]) {
+      expect(detail).toContain('onRetry={() => void loadTab("' + name + '")}');
+    }
+    expect(detail).toContain('onClick={() => void loadDetail()}');
+    expect(detail).toContain("Não foi possível abrir a OS");
+    expect(detail).toContain("Voltar à Central de OS");
+  });
+
+  it("retains exactly seven labeled and keyboard-accessible sections", () => {
+    expect(detail).toContain('aria-label="Seções da ordem de serviço"');
+    expect((detail.match(/<TabsTrigger className="evolu-detail__tab"/g) ?? []).length).toBe(7);
+    expect(styles).toContain("scroll-snap-type: x proximity");
+    expect(styles).toContain("scroll-snap-align: start");
+    expect(styles).toContain("overscroll-behavior-x: contain");
+    expect(styles).toContain(".evolu-detail__tab:focus-visible");
+  });
+
+  it("does not duplicate responsibility or deadline cards outside Resumo", () => {
+    const summary = detail.indexOf('value="summary"><OrderSummaryTab');
+    const management = detail.indexOf('aria-label="Responsáveis e prazos"');
+    const items = detail.indexOf('value="items"><OrderItemsTab');
+    expect(summary).toBeGreaterThan(-1);
+    expect(management).toBeGreaterThan(summary);
+    expect(items).toBeGreaterThan(management);
+    expect((detail.match(/aria-label="Responsáveis e prazos"/g) ?? []).length).toBe(1);
+  });
+
 });
