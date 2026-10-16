@@ -260,6 +260,8 @@
   padding: 7px;
   scrollbar-width: thin;
   scrollbar-color: #cadae9 transparent;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: 8px;
 }
 .evolu-detail__tabs-list {
   height: 42px;
@@ -332,8 +334,15 @@
   .evolu-detail__number { margin-top: 12px; }
   .evolu-detail__flow { padding: 16px 10px 10px; }
   .evolu-detail__section-heading { padding-inline: 8px; }
-  .evolu-detail__tabs-scroll { padding: 5px; }
-  .evolu-detail__tab { padding-inline: 13px; }
+  .evolu-detail__tabs-scroll {
+    padding: 5px;
+    scroll-snap-type: x proximity;
+  }
+  .evolu-detail__tab {
+    min-height: 44px;
+    padding-inline: 13px;
+    scroll-snap-align: start;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .evolu-detail__back-link { transition: none; }
