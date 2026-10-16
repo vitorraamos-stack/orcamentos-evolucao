@@ -7,6 +7,12 @@ const app=readFileSync(new URL("../../App.tsx",import.meta.url),"utf8");
 const page=readFileSync(new URL("./pages/LibraryV28Page.tsx",import.meta.url),"utf8");
 
 describe("Biblioteca V28 individual",()=>{
+  it("gera uma única função SQL sem corpo duplicado",()=>{
+    expect(migration.match(/create or replace function public\.library_publish_product/g)).toHaveLength(1);
+    expect(migration.match(/\$\$;/g)).toHaveLength(1);
+    expect(migration).not.toContain("$;))");
+    expect(migration.trim().endsWith("$;")).toBe(true);
+  });
   it("não introduz projetos ou preparações multiproduto",()=>{
     expect(migration).not.toMatch(/create table public\.library_(projects|project_items|prepared_items)/);
     expect(page).not.toContain("Instalação conjunta");

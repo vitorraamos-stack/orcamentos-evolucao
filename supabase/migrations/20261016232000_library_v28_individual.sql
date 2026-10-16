@@ -146,7 +146,7 @@ begin
   if exists (
     select 1 from jsonb_array_elements(coalesce(v_product.draft->'gallery','[]'::jsonb)) as g(value)
     where g.value->>'visibility'='consultor'
-      and (g.value->>'url' is null or (g.value->>'url' !~* '^https://' and g.value->>'url' !~ '^storage://library-product-images/[0-9a-f-]{36}/[0-9a-zA-Z_.-]+
+      and (g.value->>'url' is null or (g.value->>'url' !~* '^https://' and g.value->>'url' !~ '^storage://library-product-images/[0-9a-f-]{36}/[0-9a-zA-Z_.-]+$'))
   ) then
     raise exception 'Imagens comerciais precisam de uma URL HTTPS.' using errcode='22023';
   end if;
@@ -260,6 +260,7 @@ begin
     raise exception 'Justificativa obrigatória para dispensar fotografias.' using errcode='22023';
   end if;
 
+
   if jsonb_typeof(coalesce(v_product.draft->'rules'->'conditions','[]'::jsonb))<>'array' then
     raise exception 'Lista de regras inválida.' using errcode='22023';
   end if;
@@ -307,137 +308,6 @@ begin
       'special_fixing_review',true,
       'conditions',v_conditions
     )
-  );
-
-  v_version:=v_product.published_version+1;
-  v_published_at:=now();
-  insert into public.library_product_history(product_id,version,snapshot,published_at,published_by)
-  values(p_product_id,v_version,v_product.draft,v_published_at,auth.uid());
-
-  insert into public.library_publications(product_id,version,content,published_at,published_by)
-  values(p_product_id,v_version,v_content,v_published_at,auth.uid())
-  on conflict (product_id) do update
-  set version=excluded.version,content=excluded.content,
-      published_at=excluded.published_at,published_by=excluded.published_by;
-
-  update public.library_products
-  set status='published',published_version=v_version,published_revision=v_product.revision
-  where id=p_product_id;
-  return v_version;
-end;
-$$;))
-  ) then
-    raise exception 'Imagens comerciais precisam de uma URL HTTPS.' using errcode='22023';
-  end if;
-
-
-  -- Falha fechada: nenhum campo dependente pode ser publicado sem seu controlador
-  -- comercial. A aplicação da condição é validada novamente no servidor.
-  if exists (
-    select 1 from jsonb_array_elements(coalesce(v_product.draft->'fields','[]'::jsonb)) as f(value)
-    where coalesce(f.value->>'visibility','consultor')='consultor'
-      and f.value->>'when' in ('paint','install','noart')
-      and not exists (
-        select 1 from jsonb_array_elements(coalesce(v_product.draft->'fields','[]'::jsonb)) as controller(value)
-        where controller.value->>'id'=case f.value->>'when'
-          when 'paint' then 'acabamento'
-          when 'install' then 'instalacao'
-          when 'noart' then 'arte_vetorial'
-        end
-        and coalesce(controller.value->>'visibility','consultor')='consultor'
-        and controller.value->>'type'=case f.value->>'when'
-          when 'paint' then 'select' else 'yesno'
-        end
-      )
-  ) then
-    raise exception 'Existe campo condicional sem controlador comercial válido.' using errcode='22023';
-  end if;
-
-  -- As exigências centrais da V28 nunca podem ser dispensadas apenas
-  -- por editar o formulário no navegador.
-  if exists (
-    select 1 from jsonb_array_elements(coalesce(v_product.draft->'fields','[]'::jsonb)) as f(value)
-    where f.value->>'id'='instalacao'
-      and coalesce(f.value->>'visibility','consultor')='consultor'
-  ) and not exists (
-    select 1 from jsonb_array_elements(coalesce(v_product.draft->'fields','[]'::jsonb)) as f(value)
-    where f.value->>'id'='superficie'
-      and f.value->>'when'='install' and f.value->>'required'='true'
-      and coalesce(f.value->>'visibility','consultor')='consultor'
-  ) then
-    raise exception 'Instalação exige campo de superfície obrigatório.' using errcode='22023';
-  end if;
-
-  if exists (
-    select 1 from jsonb_array_elements(coalesce(v_product.draft->'fields','[]'::jsonb)) as f(value)
-    where f.value->>'id'='acabamento'
-      and f.value->>'type'='select'
-      and coalesce(f.value->>'visibility','consultor')='consultor'
-      and exists (
-        select 1 from jsonb_array_elements_text(coalesce(f.value->'options','[]'::jsonb)) as option_text(value)
-        where lower(option_text.value) like '%pintura%'
-      )
-  ) and not exists (
-    select 1 from jsonb_array_elements(coalesce(v_product.draft->'fields','[]'::jsonb)) as f(value)
-    where f.value->>'id'='cor'
-      and f.value->>'when'='paint' and f.value->>'required'='true'
-      and coalesce(f.value->>'visibility','consultor')='consultor'
-  ) then
-    raise exception 'Acabamento com pintura exige campo de cor obrigatório.' using errcode='22023';
-  end if;
-
-  if exists (
-    select 1 from jsonb_array_elements(coalesce(v_product.draft->'complements','[]'::jsonb)) as c(value)
-    where jsonb_typeof(c.value)<>'object'
-      or coalesce(c.value->>'visibility','') not in ('commercial','internal')
-      or coalesce(c.value->>'mode','') not in ('separate','included','internal')
-      or (c.value->>'visibility'='commercial' and c.value->>'mode'='internal')
-      or (c.value->>'visibility'='internal' and c.value->>'mode'<>'internal')
-      or coalesce(c.value->>'when','') not in ('always','install','noart')
-      or length(btrim(coalesce(c.value->>'name','')))=0
-  ) then
-    raise exception 'Há complementos inválidos ou com visibilidade incompatível.' using errcode='22023';
-  end if;
-
-  select coalesce(jsonb_agg(jsonb_build_object(
-    'id',entry.value->>'id','title',entry.value->>'title',
-    'url',entry.value->>'url','caption',entry.value->>'caption',
-    'kind',entry.value->>'kind') order by entry.ordinality),'[]'::jsonb)
-  into v_gallery
-  from jsonb_array_elements(coalesce(v_product.draft->'gallery','[]'::jsonb))
-  with ordinality as entry(value,ordinality)
-  where entry.value->>'visibility'='consultor';
-
-  select coalesce(jsonb_agg(jsonb_build_object(
-    'id',entry.value->>'id','name',entry.value->>'name',
-    'mode',entry.value->>'mode','when',entry.value->>'when')
-    order by entry.ordinality),'[]'::jsonb)
-  into v_complements
-  from jsonb_array_elements(coalesce(v_product.draft->'complements','[]'::jsonb))
-  with ordinality as entry(value,ordinality)
-  where entry.value->>'visibility'='commercial';
-
-  -- Campos do formulário são sanitizados com uma lista positiva de propriedades.
-  select coalesce(jsonb_agg(jsonb_build_object(
-    'id',entry.value->>'id','label',entry.value->>'label',
-    'type',entry.value->>'type','required',entry.value->'required',
-    'when',entry.value->>'when','options',entry.value->'options',
-    'help',entry.value->>'help','unit',entry.value->>'unit')
-    order by entry.ordinality),'[]'::jsonb)
-  into v_fields
-  from jsonb_array_elements(coalesce(v_product.draft->'fields','[]'::jsonb))
-  with ordinality as entry(value,ordinality)
-  where coalesce(entry.value->>'visibility','consultor')='consultor';
-
-  v_content:=jsonb_build_object(
-    'name',v_product.draft->>'name',
-    'category',v_product.draft->>'category',
-    'description',v_product.draft->>'description',
-    'applications',coalesce(v_product.draft->>'applications',''),
-    'gallery',v_gallery,
-    'fields',v_fields,
-    'complements',v_complements,
-    'guidance',coalesce(v_product.draft->>'consultant_guidance','')
   );
 
   v_version:=v_product.published_version+1;
