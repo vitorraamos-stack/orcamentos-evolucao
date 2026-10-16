@@ -54,9 +54,12 @@ describe("EvoluSystem OS reads — request isolation", () => {
   it("invalidates outstanding requests after cleanup and rejects other order identifiers", () => {
     const reads = createOrderReadCoordinator();
     reads.activate("os-a");
+    expect(reads.isActive("os-a")).toBe(true);
+    expect(reads.isActive("os-b")).toBe(false);
     expect(reads.begin("os-b", "detail")).toBeNull();
     const ticket = reads.begin("os-a", "detail")!;
     reads.invalidate();
+    expect(reads.isActive("os-a")).toBe(false);
     expect(reads.isCurrent(ticket)).toBe(false);
     expect(reads.begin("os-a", "detail")).toBeNull();
     reads.activate("os-a");
