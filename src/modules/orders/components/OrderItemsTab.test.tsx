@@ -1,9 +1,14 @@
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { OrderItem } from "../types/orderDetail";
 // Isolate the item list from the editing dialog's Supabase repository dependency.
 vi.mock("./OrderItemDialog", () => ({ OrderItemDialog: () => null }));
 import { OrderItemsTab } from "./OrderItemsTab";
+
+const itemsSource = readFileSync(new URL("./OrderItemsTab.tsx", import.meta.url), "utf8");
+const editorSource = readFileSync(new URL("./OrderItemDialog.tsx", import.meta.url), "utf8");
+const pageSource = readFileSync(new URL("../pages/OrderDetailPage.tsx", import.meta.url), "utf8");
 
 const createItem = (changes: Partial<OrderItem> = {}): OrderItem => ({
   id: "item-1", order_id: "order-1", name: "Placa ACM", description: "Fachada externa",
@@ -97,4 +102,19 @@ describe("EvoluSystem OS item readability", () => {
     expect(withoutRetry).not.toContain("Tentar novamente");
     expect(withoutRetry).not.toContain("Nenhum item estruturado");
   });
+  it("passes the timestamp of the item opened for editing into the guarded save", () => {
+    expect(itemsSource).toContain("onUpdate(selected.id, value, selected.updated_at)");
+    expect(pageSource).toContain("updateOrderItemIfUnchanged(id, input, expectedUpdatedAt)");
+    expect(pageSource).toContain("const updated = await updateOrderItemIfUnchanged");
+  });
+
+  it("keeps typed fields in the editor when another collaborator saved first", () => {
+    const saveStart = editorSource.indexOf("await onSave(parsed.data as OrderItemInput)");
+    const catchStart = editorSource.indexOf("catch (saveError)", saveStart);
+    expect(saveStart).toBeGreaterThan(-1);
+    expect(catchStart).toBeGreaterThan(saveStart);
+    expect(editorSource.slice(catchStart)).toContain("setError(");
+    expect(editorSource.slice(catchStart)).not.toContain("setValue(empty");
+  });
+
 });
