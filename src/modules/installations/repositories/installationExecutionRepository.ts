@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { z } from "zod";
 import { invokeEdgeFunction } from "@/lib/supabase/invokeEdgeFunction";
 import { loadHubUsersByIds } from "@/shared/repositories/hubUsersRepository";
 import type {
@@ -77,12 +78,22 @@ export async function setChecklistItem(
   );
   fail(error);
 }
-export async function saveCompletionNotes(id: string, notes: string) {
-  const { error } = await supabase.rpc(
-    "hub_os_update_installation_completion_notes_secure",
-    { p_installation_id: id, p_notes: notes }
+export async function saveCompletionNotes(
+  id: string,
+  notes: string,
+  expectedUpdatedAt: string
+): Promise<Installation> {
+  const expected = z.iso.datetime({ offset: true }).parse(expectedUpdatedAt);
+  const { data, error } = await supabase.rpc(
+    "hub_os_update_installation_completion_notes_if_current",
+    {
+      p_installation_id: id,
+      p_expected_updated_at: expected,
+      p_notes: notes,
+    }
   );
   fail(error);
+  return data as Installation;
 }
 export async function forceCompleteInstallation(id: string, reason: string) {
   const { error } = await supabase.rpc(

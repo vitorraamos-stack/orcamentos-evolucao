@@ -23,6 +23,13 @@ import {
 } from "../repositories/installationExecutionRepository";
 import { installationAction } from "../repositories/installationsRepository";
 import {
+  editCompletionNotesDraft,
+  freshCompletionNotesDraft,
+  receiveCompletionNotes,
+  resetCompletionNotesToLatest,
+} from "../services/completionNotesDraft";
+import type { CompletionNotesDraft } from "../services/completionNotesDraft";
+import {
   buildMapsUrl,
   buildWazeUrl,
   formatAgendaDate,
@@ -50,21 +57,28 @@ export default function InstallationExecutionPage() {
   const [uploading, setUploading] = useState<InstallationEvidencePhase | null>(
     null
   );
-  const [notes, setNotes] = useState("");
+  const [notesDraft, setNotesDraft] = useState<CompletionNotesDraft>(() => freshCompletionNotesDraft(null));
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [notesSaveError, setNotesSaveError] = useState<string | null>(null);
+  const notesSavingRef = useRef(false);
+  const loadSequenceRef = useRef(0);
   const [override, setOverride] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const load = useCallback(async () => {
     if (!params?.id) return;
+    const sequence = ++loadSequenceRef.current;
     try {
       const data = await loadInstallationExecution(params.id);
+      if (sequence !== loadSequenceRef.current) return;
       setInstallation(data.installation);
       setItems(data.checklist);
       setEvidence(data.evidence);
-      setNotes(data.installation.completion_notes ?? "");
+      // Realtime and checklist refreshes must never overwrite unsaved notes.
+      setNotesDraft(previous => receiveCompletionNotes(previous, data.installation));
     } catch (e) {
-      toast.error((e as Error).message);
+      if (sequence === loadSequenceRef.current) toast.error((e as Error).message);
     } finally {
-      setLoading(false);
+      if (sequence === loadSequenceRef.current) setLoading(false);
     }
   }, [params?.id]);
   useEffect(() => {
@@ -129,6 +143,8 @@ export default function InstallationExecutionPage() {
     evidence
   );
   const readonly = ["COMPLETED", "CANCELLED"].includes(installation.status);
+  const notesDirty = notesDraft.text !== notesDraft.baseText;
+  const notesActiveInstallation = notesDraft.installationId === installation.id;
   const action = async (kind: "start" | "complete") => {
     setBusy(true);
     try {
@@ -366,25 +382,68 @@ export default function InstallationExecutionPage() {
               <Textarea
                 id="completion-notes"
                 maxLength={4000}
-                disabled={readonly}
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
+                disabled={readonly || savingNotes || !notesActiveInstallation}
+                value={notesActiveInstallation ? notesDraft.text : ""}
+                onChange={e => {
+                  setNotesSaveError(null);
+                  setNotesDraft(previous => editCompletionNotesDraft(previous, e.target.value));
+                }}
                 placeholder="Registre informações importantes sobre o serviço, condições encontradas ou orientações."
               />
+              {notesDraft.changedRemotely && (
+                <div role="alert" className="mt-2 space-y-2 rounded-lg border border-amber-300 p-3 text-sm">
+                  <p>
+                    As informações desta instalação mudaram enquanto você editava.
+                    Seu texto foi preservado e não será enviado sobre uma versão mais recente.
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={savingNotes}
+                    onClick={() => {
+                      setNotesDraft(previous => resetCompletionNotesToLatest(previous));
+                      setNotesSaveError(null);
+                    }}
+                  >
+                    Descartar meu texto e usar versão atual
+                  </Button>
+                </div>
+              )}
+              {notesSaveError && (
+                <p role="alert" className="mt-2 text-sm text-destructive">{notesSaveError}</p>
+              )}
               <Button
+                type="button"
                 variant="outline"
                 className="mt-2"
-                disabled={readonly}
+                disabled={readonly || savingNotes || !notesActiveInstallation || !notesDirty || notesDraft.changedRemotely}
                 onClick={async () => {
+                  if (notesSavingRef.current || notesDraft.changedRemotely || !notesDraft.expectedUpdatedAt) return;
+                  notesSavingRef.current = true;
+                  setSavingNotes(true);
+                  setNotesSaveError(null);
                   try {
-                    await saveCompletionNotes(installation.id, notes);
+                    const saved = await saveCompletionNotes(
+                      installation.id,
+                      notesDraft.text,
+                      notesDraft.expectedUpdatedAt
+                    );
+                    setNotesDraft(freshCompletionNotesDraft(saved));
                     toast.success("Observações salvas.");
+                    await load();
                   } catch (e) {
-                    toast.error((e as Error).message);
+                    const message = e instanceof Error ? e.message : "Não foi possível salvar as observações.";
+                    setNotesSaveError(message);
+                    // On a stale version, refresh the baseline without discarding typed text.
+                    await load();
+                  } finally {
+                    notesSavingRef.current = false;
+                    setSavingNotes(false);
                   }
                 }}
               >
-                Salvar observações
+                {savingNotes ? "Salvando…" : "Salvar observações"}
               </Button>
             </div>
             <InstallationCompletionReadiness {...readiness} />
