@@ -47,3 +47,21 @@ e negar chamadas anônimas e de outros criadores.
 
 **Resultado:** não liberar aplicação de 19V-C2. Esta revisão não
 moveu dados, não alterou grants e não criou pagamentos.
+
+## Falha de CI corrigida na revisão
+
+No commit inicial do PR #507, ambos os workflows de CI falharam no
+teste de equivalência textual da função 19V-A: o teste comparava até
+comentários, e a revisão havia corrigido um comentário antigo que
+afirmava incorretamente RLS na função definer. O teste agora aceita
+**somente essa substituição exata de três linhas de comentário**, além
+das três transformações de privilégio já aprovadas, e continua
+comparando todo o corpo da função byte a byte. Não houve alteração de
+instruções SQL executáveis. Verificar conclusão verde do novo commit
+antes de qualquer merge.
+
+Também existe uma migration de outra frente do EvoluSystem,
+`20261016134034_os_general_details_optimistic_lock`, posterior à C1.
+Ela não representa implantação da C2; a auditoria de 19V-C2 deve
+sempre usar o histórico atual e não afirmar que C1 é a última migration
+global do projeto.

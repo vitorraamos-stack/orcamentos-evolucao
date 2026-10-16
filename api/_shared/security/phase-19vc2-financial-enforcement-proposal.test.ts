@@ -34,16 +34,25 @@ describe("19V-C2: reviewed SQL candidate only — not an applied migration",()=>
   expect(candidate).toContain("'already_submitted',true");
   expect(candidate).toContain("'already_submitted',false");
  });
- it("copies 19V-A helper logic verbatim apart from intended privilege changes",()=>{
+ it("preserves every executable 19V-A helper statement and explicitly fixes the definer/RLS comment",()=>{
   const start="CREATE FUNCTION public.finalize_legacy_payment_submission(p_proof_id uuid)";
   const stop="$finalize$;";
   const originalBody=original.slice(original.indexOf(start),original.indexOf(stop,original.indexOf(start))+stop.length);
   const helperStart="CREATE FUNCTION evolusystem_finance_private.finalize_legacy_payment_submission(p_proof_id uuid)";
   const helper=candidate.slice(candidate.indexOf(helperStart),candidate.indexOf(stop,candidate.indexOf(helperStart))+stop.length);
+  const oldComment="  -- Discover under RLS, then lock OS first, proof second to serialize RPCs.";
+  const correctedComment=[
+    "  -- SECURITY DEFINER bypasses RLS: discovery below is NOT RLS-scoped.",
+    "  -- Explicit auth.uid(), module access and proof.created_by checks above",
+    "  -- are mandatory access controls; lock OS first, proof second."
+  ].join("\n");
+  expect(originalBody).toContain(oldComment);
+  expect(helper).toContain(correctedComment);
   const expected=originalBody
    .replace("CREATE FUNCTION public.","CREATE FUNCTION evolusystem_finance_private.")
    .replace("SECURITY INVOKER","SECURITY DEFINER")
-   .replace("IF current_user <> 'authenticated' OR v_actor IS NULL","IF v_actor IS NULL");
+   .replace("IF current_user <> 'authenticated' OR v_actor IS NULL","IF v_actor IS NULL")
+   .replace(oldComment,correctedComment);
   expect(helper).toBe(expected);
  });
  it("guards operational columns, finance event writes and cascade deletion",()=>{
