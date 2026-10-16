@@ -70,4 +70,31 @@ describe("EvoluSystem OS item readability", () => {
   it("preserves loading, errors and empty states", () => {
     expect(view([])).toContain("Nenhum item estruturado cadastrado");
   });
+
+  it("announces loading accessibly without displaying an empty list", () => {
+    const html = renderToStaticMarkup(
+      <OrderItemsTab
+        items={[]} loading error={null} canEdit={false}
+        onCreate={vi.fn()} onUpdate={vi.fn()} onRemove={vi.fn()} onMove={vi.fn()}
+      />
+    );
+    expect(html).toContain('role="status"');
+    expect(html).toContain('aria-live="polite"');
+    expect(html).toContain("Carregando itens");
+    expect(html).not.toContain("Nenhum item estruturado");
+  });
+
+  it("shows a retry on query failure only when the caller offers it", () => {
+    const base = {
+      items: [], loading: false, error: "Conexão indisponível", canEdit: false,
+      onCreate: vi.fn(), onUpdate: vi.fn(), onRemove: vi.fn(), onMove: vi.fn(),
+    };
+    const retry = renderToStaticMarkup(<OrderItemsTab {...base} onRetry={vi.fn()} />);
+    expect(retry).toContain('role="alert"');
+    expect(retry).toContain("Conexão indisponível");
+    expect(retry).toContain("Tentar novamente");
+    const withoutRetry = renderToStaticMarkup(<OrderItemsTab {...base} />);
+    expect(withoutRetry).not.toContain("Tentar novamente");
+    expect(withoutRetry).not.toContain("Nenhum item estruturado");
+  });
 });
