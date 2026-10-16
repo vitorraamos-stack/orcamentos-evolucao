@@ -209,6 +209,54 @@ export async function removeOrderDeadline(
   throwIfError(error);
 }
 
+/**
+ * Scoped optimistic updates used by the Resumo management cards.
+ * The additive database RPCs serialize creates and removals as well as edits,
+ * and insert their audit events within the same transaction.
+ * The existing unguarded functions remain for legacy consumers only.
+ */
+export async function changeOrderAssigneeIfUnchanged(
+  orderId: string,
+  scope: AssigneeScope,
+  userId: string | null,
+  expectedUpdatedAt: string | null
+): Promise<OrderAssignee | null> {
+  uuid.parse(orderId);
+  assigneeScopeSchema.parse(scope);
+  if (userId !== null) uuid.parse(userId);
+  const expected = expectedUpdatedAt === null ? null : z.iso.datetime({ offset: true }).parse(expectedUpdatedAt);
+  const { data, error } = await supabase.rpc("hub_os_set_assignee_if_current", {
+    p_os_id: orderId,
+    p_scope: scope,
+    p_user_id: userId,
+    p_expected_updated_at: expected,
+  });
+  throwIfError(error);
+  return (data ?? null) as OrderAssignee | null;
+}
+
+export async function changeOrderDeadlineIfUnchanged(
+  orderId: string,
+  scope: DeadlineScope,
+  action: "set" | "complete" | "reopen" | "remove",
+  expectedUpdatedAt: string | null,
+  dueDate?: string
+): Promise<OrderDeadline | null> {
+  uuid.parse(orderId);
+  deadlineScopeSchema.parse(scope);
+  const expected = expectedUpdatedAt === null ? null : z.iso.datetime({ offset: true }).parse(expectedUpdatedAt);
+  const date = action === "set" ? z.iso.date().parse(dueDate) : null;
+  const { data, error } = await supabase.rpc("hub_os_set_deadline_if_current", {
+    p_os_id: orderId,
+    p_scope: scope,
+    p_action: action,
+    p_due_date: date,
+    p_expected_updated_at: expected,
+  });
+  throwIfError(error);
+  return (data ?? null) as OrderDeadline | null;
+}
+
 export async function listOrderItems(orderId: string) {
   uuid.parse(orderId);
   const { data, error } = await supabase
