@@ -24,7 +24,7 @@ import { OrderProductionTab } from "../components/OrderProductionTab";
 import { OrderInstallationTab } from "../components/OrderInstallationTab";
 import { OrderEditDialog, type OrderEditInput } from "../components/OrderEditDialog";
 import {
-  completeOrderDeadline, createOrderComment, createOrderItem, getOrderDetail, listAssignableUsers, listOrderActivities, listOrderComments, listOrderFiles, listOrderItems, listItemOperations, createItemOperation, setItemOperationStatus, updateItemOperation, deleteItemOperation, recordOrderEvent, removeOrderAssignee, removeOrderComment, removeOrderDeadline, removeOrderItem, reopenOrderDeadline, reorderOrderItems, setOrderAssignee, updateOrderCommentIfUnchanged, updateOrderItemIfUnchanged, updateOrderOperationalFields, upsertOrderDeadline,
+  changeOrderAssigneeIfUnchanged, changeOrderDeadlineIfUnchanged, createOrderComment, createOrderItem, getOrderDetail, listAssignableUsers, listOrderActivities, listOrderComments, listOrderFiles, listOrderItems, listItemOperations, createItemOperation, setItemOperationStatus, updateItemOperation, deleteItemOperation, recordOrderEvent, removeOrderComment, removeOrderItem, reorderOrderItems, updateOrderCommentIfUnchanged, updateOrderItemIfUnchanged, updateOrderOperationalFields,
 } from "../repositories/orderDetailRepository";
 import type { AssigneeScope, DeadlineScope, OrderActivity, OrderComment, OrderDetail, OrderItem, UserOption, ItemOperation } from "../types/orderDetail";
 import { getValidOrderTransitions } from "../services/orderTransitions";
@@ -152,9 +152,43 @@ export default function OrderDetailPage() {
     </div>
   </div>;
   const event = async (type: string, payload: Record<string, unknown>) => { try { await recordOrderEvent({ orderId: detail.order.id, type, payload }); } catch (error) { console.error("Falha ao registrar auditoria", error); } };
-  const updateAssignee = async (scope: AssigneeScope, userId: string) => { const from = detail.assignees.find(a => a.scope === scope)?.user_id ?? null; try { if (userId === "__unassigned__") await removeOrderAssignee(detail.order.id, scope); else await setOrderAssignee(detail.order.id, scope, userId); await event("assignee_changed", { scope, from, to: userId === "__unassigned__" ? null : userId }); await loadDetail(); toast.success("Responsável atualizado."); } catch (error) { toast.error(message(error)); } };
-  const updateDeadline = async (scope: DeadlineScope, dueDate: string) => { const from = detail.deadlines.find(d => d.scope === scope)?.due_date ?? null; try { await upsertOrderDeadline(detail.order.id, scope, dueDate); await event("deadline_changed", { scope, from, to: dueDate, due_date: dueDate }); await loadDetail(); toast.success("Prazo atualizado."); } catch (error) { toast.error(message(error)); } };
-  const deadlineAction = async (scope: DeadlineScope, action: "complete" | "reopen" | "remove") => { const deadline = detail.deadlines.find(item => item.scope === scope); try { if (action === "complete") await completeOrderDeadline(detail.order.id, scope); else if (action === "reopen") await reopenOrderDeadline(detail.order.id, scope); else await removeOrderDeadline(detail.order.id, scope); await event(`deadline_${action === "complete" ? "completed" : action === "reopen" ? "reopened" : "removed"}`, { scope, due_date: deadline?.due_date }); await loadDetail(); toast.success("Prazo atualizado."); } catch (error) { toast.error(message(error)); } };
+  const updateAssignee = async (scope: AssigneeScope, userId: string, expectedUpdatedAt: string | null) => {
+    try {
+      await changeOrderAssigneeIfUnchanged(
+        detail.order.id, scope, userId === "__unassigned__" ? null : userId, expectedUpdatedAt
+      );
+      // The new RPC writes its audit event in the same transaction.
+      await loadDetail();
+      toast.success("Responsável atualizado.");
+    } catch (error) {
+      toast.error(message(error));
+      throw error;
+    }
+  };
+  const updateDeadline = async (scope: DeadlineScope, dueDate: string, expectedUpdatedAt: string | null) => {
+    try {
+      await changeOrderDeadlineIfUnchanged(detail.order.id, scope, "set", expectedUpdatedAt, dueDate);
+      await loadDetail();
+      toast.success("Prazo atualizado.");
+    } catch (error) {
+      toast.error(message(error));
+      throw error;
+    }
+  };
+  const deadlineAction = async (
+    scope: DeadlineScope,
+    action: "complete" | "reopen" | "remove",
+    expectedUpdatedAt: string
+  ) => {
+    try {
+      await changeOrderDeadlineIfUnchanged(detail.order.id, scope, action, expectedUpdatedAt);
+      await loadDetail();
+      toast.success("Prazo atualizado.");
+    } catch (error) {
+      toast.error(message(error));
+      throw error;
+    }
+  };
   const createItem = async (draft: ItemDraft) => { try { const created = await createOrderItem(detail.order.id, draft); await event("item_created", { item_id: created.id, name: created.name }); setItems(value => ({ ...value, data: [...value.data, created] })); toast.success("Item adicionado."); } catch (error) { toast.error(message(error)); throw error; } };
   const removeItem = async (id: string) => { try { const removed = items.data.find(item => item.id === id); await removeOrderItem(id); await event("item_removed", { item_id: id, name: removed?.name }); setItems(value => ({ ...value, data: value.data.filter(item => item.id !== id) })); } catch (error) { toast.error(message(error)); } };
   const updateItem = async (id: string, input: Partial<OrderItem>, expectedUpdatedAt: string) => { try { const previous = items.data.find(item => item.id === id); const updated = await updateOrderItemIfUnchanged(id, input, expectedUpdatedAt); const audited = ["name", "quantity", "status", "width_cm", "height_cm", "unit"] as const; const changes = Object.fromEntries(audited.filter(key => key in input && previous?.[key] !== updated[key]).map(key => [key, { from: previous?.[key] ?? null, to: updated[key] ?? null }])); await event("item_updated", { item_id: id, name: updated.name, changes }); setItems(value => ({ ...value, data: value.data.map(item => item.id === id ? updated : item) })); } catch (error) { toast.error(message(error)); throw error; } };
