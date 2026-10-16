@@ -110,7 +110,7 @@ describe("OS comments — safe action feedback", () => {
   it("keeps create and edit drafts until their saves have succeeded", () => {
     expect(source).toContain('await onCreate(message);');
     expect(source).toContain('setMessage("");');
-    expect(source).toContain('if (saved) setEditing(null);');
+    expect(source).toContain('if (saved) { setEditing(null); setEditVersion(null); }');
     expect(source).toContain('failure?.kind === "create"');
     expect(source).toContain('failure?.kind === "update"');
     expect(source).toContain("inFlight.current");
