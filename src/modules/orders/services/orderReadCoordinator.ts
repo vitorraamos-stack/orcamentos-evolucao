@@ -44,6 +44,7 @@ export function createOrderReadCoordinator() {
       return ticket;
     },
     isCurrent,
+    isActive(orderId: string) { return activeOrderId === orderId; },
     finish(ticket: OrderReadTicket) {
       if (isCurrent(ticket)) pending.delete(ticket.resource);
     },
