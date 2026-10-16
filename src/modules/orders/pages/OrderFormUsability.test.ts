@@ -31,7 +31,7 @@ describe("EvoluSystem OS form usability", () => {
     expect(creation).toContain('aria-invalid={Boolean(errors.deadline)}');
   });
 
-  it("groups editing fields and labels dropdowns without changing the save contract", () => {
+  it("groups editing fields, labels dropdowns and saves with the captured revision", () => {
     for (const id of ["edit-os-servico", "edit-os-prazo-logistica", "edit-os-prioridade"]) {
       expect(editing).toContain(`aria-labelledby="${id}"`);
       expect(editing).toContain(`id="${id}"`);
@@ -40,7 +40,8 @@ describe("EvoluSystem OS form usability", () => {
     expect(editing).toContain('id="order-logistics"');
     expect(editing).toContain('htmlFor="order-priority"');
     expect(editing).toContain('id="order-priority"');
-    expect(editing).toContain("await onSave(value)");
+    expect(editing).toContain("await onSave(value, openedUpdatedAt)");
+    expect(editing).toContain("setOpenedUpdatedAt(order.updated_at)");
     expect(editing).toContain("onOpenChange(false)");
   });
 
