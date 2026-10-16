@@ -132,7 +132,8 @@ export default function OrderDetailPage() {
     try {
       const data = await config.request();
       if (!readCoordinator.current.isCurrent(ticket) || data === null) return;
-      config.set({ data, loading: false, error: null, loaded: true } as never);
+      // reloadProductionData already sets both items and operations once.
+      if (tab !== "production") config.set({ data, loading: false, error: null, loaded: true } as never);
     } catch (error) {
       if (readCoordinator.current.isCurrent(ticket))
         config.set({ ...config.current, loading: false, loaded: true, error: message(error) } as never);
@@ -184,7 +185,8 @@ export default function OrderDetailPage() {
   const refreshProductionAfterWrite = async (successText: string) => {
     try { const refreshed = await reloadProductionData(); if (refreshed !== null) toast.success(successText); }
     catch {
-      // The write already succeeded: a failed refresh must not be reported as a failed mutation.
+      // The write already succeeded. Ignore a failure from an OS no longer open.
+      if (!orderId || !readCoordinator.current.isActive(orderId)) return;
       setOperations(value => ({ ...value, loading: false, loaded: true, error: "A alteração foi salva, mas não foi possível atualizar a lista. Use Tentar novamente para conferir o resultado." }));
       toast.warning("Alteração salva, mas a lista não foi atualizada. Tente novamente para conferir.");
     }
