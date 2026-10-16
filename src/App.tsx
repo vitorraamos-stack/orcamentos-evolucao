@@ -27,6 +27,7 @@ import InstallationsPage from "@/modules/installations/pages/InstallationsPage";
 import InstallationExecutionPage from "@/modules/installations/pages/InstallationExecutionPage";
 import DeliveriesPage from "@/modules/deliveries/pages/DeliveriesPage";
 import AwaitingSuppliesPage from "@/modules/supplies/pages/AwaitingSuppliesPage";
+import PrintingInventoryPage from "@/modules/printing/pages/PrintingInventoryPage";
 import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -192,6 +193,14 @@ function Router() {
         <Layout>
           <RequireModule moduleKey="hub_os">
             <OrdersCentralPage />
+          </RequireModule>
+        </Layout>
+      </Route>
+
+      <Route path="/impressao-estoque">
+        <Layout>
+          <RequireModule moduleKey="impressao_estoque">
+            <PrintingInventoryPage />
           </RequireModule>
         </Layout>
       </Route>

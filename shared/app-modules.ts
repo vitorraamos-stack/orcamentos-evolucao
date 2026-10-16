@@ -25,6 +25,11 @@ export const APP_MODULES = [
     routePrefixes: ['/os/kiosk'],
   },
   {
+    key: 'impressao_estoque',
+    label: 'Impressão & Estoque',
+    routePrefixes: ['/impressao-estoque'],
+  },
+  {
     key: 'galeria',
     label: 'Galeria',
     routePrefixes: ['/galeria'],
