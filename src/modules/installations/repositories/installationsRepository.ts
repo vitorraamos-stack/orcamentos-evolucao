@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { z } from "zod";
 import { loadHubUsersByRoles } from "@/shared/repositories/hubUsersRepository";
 import type {
   Installation,
@@ -107,12 +108,15 @@ export async function scheduleInstallation(i: InstallationScheduleInput) {
 }
 export async function rescheduleInstallation(
   id: string,
-  i: Omit<InstallationScheduleInput, "osId">
+  i: Omit<InstallationScheduleInput, "osId">,
+  expectedUpdatedAt: string
 ) {
+  const expected = z.iso.datetime({ offset: true }).parse(expectedUpdatedAt);
   const { data, error } = await supabase.rpc(
-    "hub_os_reschedule_installation_secure",
+    "hub_os_reschedule_installation_if_current",
     {
       p_installation_id: id,
+      p_expected_updated_at: expected,
       p_scheduled_start: i.scheduledStart,
       p_scheduled_end: i.scheduledEnd ?? null,
       p_team_id: i.teamId ?? null,

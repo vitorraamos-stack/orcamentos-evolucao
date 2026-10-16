@@ -1000,7 +1000,7 @@ export default function InstallationsPage() {
         open={dialog}
         onOpenChange={setDialog}
         onSave={async input => {
-          if (editing) await rescheduleInstallation(editing.id, input);
+          if (editing) await rescheduleInstallation(editing.id, input, editing.updated_at);
           else await scheduleInstallation(input);
           toast.success("Agendamento salvo.");
           await load();
