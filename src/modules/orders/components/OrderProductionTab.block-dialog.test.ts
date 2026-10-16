@@ -35,7 +35,7 @@ describe("EvoluSystem — safe production operation block dialog", () => {
     expect(block).toContain('disabled={busy}');
     expect(block).toContain('disabled={!canConfirmOperationBlock(blockedReason, busy)}');
     expect(block).toContain('blocking && canConfirmOperationBlock(blockedReason, busy) && void act(');
-    expect(block).toContain('await onStatus(blocking.id, "BLOCKED", blockedReason.trim())');
+    expect(block).toContain('await onStatus(blocking.id, "BLOCKED", blocking.updated_at, blockedReason.trim())');
     expect(block).toContain("setBlocking(null);");
     expect(block).toContain('{busy ? "Bloqueando…" : "Confirmar bloqueio"}');
   });
@@ -45,7 +45,7 @@ describe("EvoluSystem — safe production operation block dialog", () => {
     expect(source).toContain("canManage &&");
     expect(source).toContain('status: "BLOCKED"');
     expect(source).toContain('setBlockedReason(""), setBlocking(operation)');
-    expect(source).toContain("onDelete(deleting.id)");
+    expect(source).toContain("onDelete(deleting.id, deleting.updated_at)");
     expect(source).toContain("<AlertDialog open={Boolean(deleting)}");
     expect(source).toContain("Confirmar exclusão");
   });
