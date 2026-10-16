@@ -30,6 +30,11 @@ export const APP_MODULES = [
     routePrefixes: ['/impressao-estoque'],
   },
   {
+    key: 'biblioteca_produtos',
+    label: 'Biblioteca de Produtos',
+    routePrefixes: ['/biblioteca'],
+  },
+  {
     key: 'galeria',
     label: 'Galeria',
     routePrefixes: ['/galeria'],

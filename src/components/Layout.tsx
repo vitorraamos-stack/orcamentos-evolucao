@@ -18,6 +18,7 @@ import {
   SlidersHorizontal,
   BadgeDollarSign,
   Printer,
+  BookOpen,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import "./evolusystem-shell.css";
@@ -69,6 +70,8 @@ export default function Layout({ children }: LayoutProps) {
   const canViewPrinting = hasModuleAccess("impressao_estoque");
   const canViewGaleria = hasModuleAccess("galeria");
   const canViewCalculadora = hasModuleAccess("calculadora");
+  const canViewLibrary = hasModuleAccess("biblioteca_produtos") && hubPermissions.canCreateOs;
+  const canManageLibrary = canViewLibrary && isAdmin;
   const canViewOrcamentista =
     hubPermissions.canCreateOs && canViewCalculadora;
   const canViewMateriais = isAdmin && hasModuleAccess("materiais");
@@ -77,9 +80,9 @@ export default function Layout({ children }: LayoutProps) {
   const canViewFinanceiro = hasModuleAccess("hub_os_financeiro");
   // Os agrupamentos apenas organizam a navegação; os controles de acesso
   // continuam sendo os mesmos usados nas rotas de cada módulo.
-  const hasCommercialModules = canViewOrcamentista || canViewCalculadora;
+  const hasCommercialModules = canViewOrcamentista || canViewCalculadora || canViewLibrary;
   const hasResourceModules = canViewGaleria || canViewMateriais;
-  const hasManagementModules = canViewFinanceiro || canViewConfiguracoes;
+  const hasManagementModules = canViewFinanceiro || canViewConfiguracoes || canManageLibrary;
 
   const operationalLinks = [
     { href: "/hub-os", label: "Dashboard", Icon: LayoutDashboard, active: location === "/hub-os" },
@@ -170,6 +173,18 @@ export default function Layout({ children }: LayoutProps) {
         </Link>
       )}
 
+      {canViewLibrary && (
+        <Link href="/biblioteca">
+          <Button
+            variant={location === "/biblioteca" ? "secondary" : "ghost"}
+            className={cn("evolu-nav__item w-full justify-start",location === "/biblioteca" && "bg-sidebar-accent text-sidebar-accent-foreground")}
+          >
+            <BookOpen className="mr-2 h-4 w-4" />
+            Biblioteca de Produtos
+          </Button>
+        </Link>
+      )}
+
       {hasResourceModules && <SectionLabel>Recursos</SectionLabel>}
 
       {canViewGaleria && (
@@ -219,6 +234,18 @@ export default function Layout({ children }: LayoutProps) {
               >
                 <BadgeDollarSign className="mr-2 h-4 w-4" />
                 Financeiro
+              </Button>
+            </Link>
+          )}
+
+          {canManageLibrary && (
+            <Link href="/biblioteca/gestao">
+              <Button
+                variant={location.startsWith("/biblioteca/gestao") ? "secondary" : "ghost"}
+                className={cn("evolu-nav__item w-full justify-start",location.startsWith("/biblioteca/gestao") && "bg-sidebar-accent text-sidebar-accent-foreground")}
+              >
+                <BookOpen className="mr-2 h-4 w-4" />
+                Gestão da Biblioteca
               </Button>
             </Link>
           )}
