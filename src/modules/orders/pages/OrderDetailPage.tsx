@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import "./order-detail-premium.css";
@@ -17,6 +17,7 @@ import { OrderSummaryTab } from "../components/OrderSummaryTab";
 import { OrderItemsTab, type ItemDraft } from "../components/OrderItemsTab";
 import { OrderCommentsTab } from "../components/OrderCommentsTab";
 import { prependPublishedComment } from "../services/publishedComment";
+import { createOrderReadCoordinator } from "../services/orderReadCoordinator";
 import { OrderHistoryTab } from "../components/OrderHistoryTab";
 import { OrderFilesTab, openOrderFileWindow } from "../components/OrderFilesTab";
 import { OrderProductionTab } from "../components/OrderProductionTab";
@@ -48,23 +49,70 @@ export default function OrderDetailPage() {
   const canEditOrder = hubPermissions.isManager; const canManageAssignees = hubPermissions.isManager; const canManageDeadlines = hubPermissions.isManager; const canManageItems = hubPermissions.isManager; const canMoveArt = hubPermissions.canMoveArteBoard; const canMoveProduction = hubPermissions.canMoveProducaoBoard; const canComment = hubPermissions.canViewHubOS;
   const [detail, setDetail] = useState<OrderDetail | null>(null); const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(true); const [pageError, setPageError] = useState<string | null>(null); const [editOpen, setEditOpen] = useState(false);
+  const [viewOrderId, setViewOrderId] = useState<string | undefined>(undefined);
+  const readCoordinator = useRef(createOrderReadCoordinator());
   const [archiveOpen,setArchiveOpen]=useState(false); const [deleteOpen,setDeleteOpen]=useState(false);
   const [items, setItems] = useState(state<OrderItem[]>([])); const [comments, setComments] = useState(state<OrderComment[]>([]));
   const [activities, setActivities] = useState(state<OrderActivity[]>([])); const [files, setFiles] = useState(state<OsOrderLayoutAsset[]>([])); const [operations, setOperations] = useState(state<ItemOperation[]>([]));
 
   const loadDetail = useCallback(async () => {
-    if (!orderId) return; setLoading(true); setPageError(null);
-    try { const [next, nextUsers] = await Promise.all([getOrderDetail(orderId), (canManageAssignees || canMoveProduction) ? listAssignableUsers() : Promise.resolve([])]); setDetail(next); setUsers(nextUsers); }
-    catch (error) { setPageError(message(error)); } finally { setLoading(false); }
+    if (!orderId) return;
+    // The latest refresh wins; an older response must never replace newer OS data.
+    const ticket = readCoordinator.current.begin(orderId, "detail", true);
+    if (!ticket) return;
+    setLoading(true);
+    setPageError(null);
+    try {
+      const [next, nextUsers] = await Promise.all([
+        getOrderDetail(orderId),
+        (canManageAssignees || canMoveProduction) ? listAssignableUsers() : Promise.resolve([]),
+      ]);
+      if (!readCoordinator.current.isCurrent(ticket)) return;
+      setDetail(next);
+      setUsers(nextUsers);
+    } catch (error) {
+      if (readCoordinator.current.isCurrent(ticket)) setPageError(message(error));
+    } finally {
+      if (readCoordinator.current.isCurrent(ticket)) setLoading(false);
+      readCoordinator.current.finish(ticket);
+    }
   }, [canManageAssignees, canMoveProduction, orderId]);
-  useEffect(() => { void loadDetail(); }, [loadDetail]);
+
+  useEffect(() => {
+    // Never reuse tab data or request results when navigating to another OS.
+    const coordinator = readCoordinator.current;
+    coordinator.activate(orderId ?? null);
+    setViewOrderId(orderId);
+    setDetail(null);
+    setUsers([]);
+    setItems(state<OrderItem[]>([]));
+    setComments(state<OrderComment[]>([]));
+    setActivities(state<OrderActivity[]>([]));
+    setFiles(state<OsOrderLayoutAsset[]>([]));
+    setOperations(state<ItemOperation[]>([]));
+    setLoading(true);
+    setPageError(null);
+    void loadDetail();
+    return () => coordinator.invalidate();
+  }, [orderId, loadDetail]);
 
   const reloadProductionData = useCallback(async () => {
-    if (!orderId) return;
-    const [nextItems, nextOperations] = await Promise.all([listOrderItems(orderId), listItemOperations(orderId)]);
-    setItems({ data: nextItems, loading: false, error: null, loaded: true });
-    setOperations({ data: nextOperations, loading: false, error: null, loaded: true });
-    return nextOperations;
+    if (!orderId) return null;
+    // A mutation refresh supersedes a pending tab read, without writing to the DB.
+    const ticket = readCoordinator.current.begin(orderId, "production-data", true);
+    if (!ticket) return null;
+    try {
+      const [nextItems, nextOperations] = await Promise.all([
+        listOrderItems(orderId),
+        listItemOperations(orderId),
+      ]);
+      if (!readCoordinator.current.isCurrent(ticket)) return null;
+      setItems({ data: nextItems, loading: false, error: null, loaded: true });
+      setOperations({ data: nextOperations, loading: false, error: null, loaded: true });
+      return nextOperations;
+    } finally {
+      readCoordinator.current.finish(ticket);
+    }
   }, [orderId]);
 
   const loadTab = useCallback(async (tab: string) => {
@@ -76,14 +124,24 @@ export default function OrderDetailPage() {
       files: { current: files, set: setFiles, request: () => listOrderFiles(orderId) },
       production: { current: operations, set: setOperations, request: async () => { return await reloadProductionData(); } },
     } as const;
-    const config = configs[tab as keyof typeof configs] as { current: LoadState<unknown[]>; set: (value: LoadState<never[]>) => void; request: () => Promise<unknown[]> } | undefined;
+    const config = configs[tab as keyof typeof configs] as { current: LoadState<unknown[]>; set: (value: LoadState<never[]>) => void; request: () => Promise<unknown[] | null> } | undefined;
     if (!config || config.current.loading || (config.current.loaded && !config.current.error)) return;
+    const ticket = readCoordinator.current.begin(orderId, `tab:${tab}`);
+    if (!ticket) return; // Already loading, or the user navigated to another OS.
     config.set({ ...config.current, loading: true } as never);
-    try { const data = await config.request(); config.set({ data, loading: false, error: null, loaded: true } as never); }
-    catch (error) { config.set({ ...config.current, loading: false, loaded: true, error: message(error) } as never); }
+    try {
+      const data = await config.request();
+      if (!readCoordinator.current.isCurrent(ticket) || data === null) return;
+      config.set({ data, loading: false, error: null, loaded: true } as never);
+    } catch (error) {
+      if (readCoordinator.current.isCurrent(ticket))
+        config.set({ ...config.current, loading: false, loaded: true, error: message(error) } as never);
+    } finally {
+      readCoordinator.current.finish(ticket);
+    }
   }, [activities, comments, files, items, operations, orderId, reloadProductionData]);
 
-  if (loading) return <div className="space-y-4"><Skeleton className="h-56 w-full" /><Skeleton className="h-24 w-full" /></div>;
+  if (loading || viewOrderId !== orderId || (detail !== null && detail.order.id !== orderId)) return <div className="space-y-4"><Skeleton className="h-56 w-full" /><Skeleton className="h-24 w-full" /></div>;
   if (pageError || !detail) return <div role="alert" className="rounded-lg border border-destructive/40 p-6">
     <h1 className="font-semibold">Não foi possível abrir a OS</h1>
     <p className="mt-2 text-sm text-muted-foreground">{pageError ?? "OS não encontrada."}</p>
@@ -124,7 +182,7 @@ export default function OrderDetailPage() {
   const editComment = async (id: string, text: string) => { try { const updated = await updateOrderComment(id, text); await event("comment_updated", { comment_id: id, user_id: updated.user_id }); setComments(value => ({ ...value, data: value.data.map(comment => comment.id === id ? { ...comment, message: updated.message, updated_at: updated.updated_at } : comment) })); } catch (error) { toast.error(message(error)); throw error; } };
   const saveOrder = async (input: OrderEditInput) => { try { await updateOrderOperationalFields(detail.order.id, input); await loadDetail(); toast.success("OS atualizada."); } catch (error) { toast.error(message(error)); throw error; } };
   const refreshProductionAfterWrite = async (successText: string) => {
-    try { await reloadProductionData(); toast.success(successText); }
+    try { const refreshed = await reloadProductionData(); if (refreshed !== null) toast.success(successText); }
     catch {
       // The write already succeeded: a failed refresh must not be reported as a failed mutation.
       setOperations(value => ({ ...value, loading: false, loaded: true, error: "A alteração foi salva, mas não foi possível atualizar a lista. Use Tentar novamente para conferir o resultado." }));
@@ -171,7 +229,7 @@ export default function OrderDetailPage() {
     </nav>
     <OrderHeader order={detail.order} assignees={detail.assignees} canEdit={canEditOrder} canManage={hubPermissions.isManager} onArchive={()=>setArchiveOpen(true)} onDelete={()=>setDeleteOpen(true)} transitions={allowed} onTransition={moveStatus} onEdit={() => setEditOpen(true)} />
     <OrderFlowProgress order={detail.order} />
-    <Tabs className="evolu-detail__tabs" defaultValue="summary" onValueChange={loadTab}><div className="evolu-detail__tabs-scroll overflow-x-auto"><TabsList aria-label="Seções da ordem de serviço" className="evolu-detail__tabs-list w-max min-w-full justify-start"><TabsTrigger className="evolu-detail__tab" value="summary">Resumo</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="items">Itens</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="production">Produção</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="installation">Instalação / Entrega</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="files">Arquivos</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="comments">Comentários</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="history">Histórico</TabsTrigger></TabsList></div>
+    <Tabs key={orderId} className="evolu-detail__tabs" defaultValue="summary" onValueChange={loadTab}><div className="evolu-detail__tabs-scroll overflow-x-auto"><TabsList aria-label="Seções da ordem de serviço" className="evolu-detail__tabs-list w-max min-w-full justify-start"><TabsTrigger className="evolu-detail__tab" value="summary">Resumo</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="items">Itens</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="production">Produção</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="installation">Instalação / Entrega</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="files">Arquivos</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="comments">Comentários</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="history">Histórico</TabsTrigger></TabsList></div>
       <TabsContent className="evolu-detail__tab-content space-y-4" value="summary"><OrderSummaryTab order={detail.order} />
       <section aria-label="Responsáveis e prazos" className="evolu-detail__management-grid grid gap-4 xl:grid-cols-2"><OrderAssigneesCard assignees={detail.assignees} users={users} canEdit={canManageAssignees} onChange={updateAssignee} /><OrderDeadlinesCard order={detail.order} deadlines={detail.deadlines} canEdit={canManageDeadlines} onChange={updateDeadline} onComplete={scope => deadlineAction(scope, "complete")} onReopen={scope => deadlineAction(scope, "reopen")} onRemove={scope => deadlineAction(scope, "remove")} /></section></TabsContent><TabsContent className="evolu-detail__tab-content" value="items"><OrderItemsTab items={items.data} loading={items.loading} error={items.error} onRetry={() => void loadTab("items")} canEdit={canManageItems} onCreate={createItem} onUpdate={updateItem} onRemove={removeItem} onMove={moveItem} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="production"><OrderProductionTab items={items.data} operations={operations.data} users={users} loading={operations.loading} error={operations.error} onRetry={() => void loadTab("production")} canOperate={canMoveProduction} canManage={hubPermissions.isManager} onCreate={async input => { await createItemOperation(input); await refreshProductionAfterWrite("Operação adicionada."); }} onUpdate={async (id,input) => { await updateItemOperation(id,input); await refreshProductionAfterWrite("Operação editada."); }} onStatus={async (id,status,reason) => { await setItemOperationStatus(id,status,reason); await refreshProductionAfterWrite("Operação atualizada."); }} onDelete={async id => { await deleteItemOperation(id); await refreshProductionAfterWrite("Operação excluída."); }} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="installation"><OrderInstallationTab order={detail.order} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="files"><OrderFilesTab assets={files.data} loading={files.loading} error={files.error} onRetry={() => void loadTab("files")} onOpen={openAsset} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="comments"><OrderCommentsTab comments={comments.data} loading={comments.loading} error={comments.error} onRetry={() => void loadTab("comments")} currentUserId={user?.id} canComment={canComment} canRemoveAny={hubPermissions.isManager} onCreate={createComment} onUpdate={editComment} onRemove={removeComment} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="history"><OrderHistoryTab activities={activities.data} loading={activities.loading} error={activities.error} onRetry={() => void loadTab("history")} /></TabsContent></Tabs>
     <OrderEditDialog order={detail.order} open={editOpen} onOpenChange={setEditOpen} onSave={saveOrder} /><ArchiveOrderDialog open={archiveOpen} onOpenChange={setArchiveOpen} onConfirm={archive}/><DeleteOrderDialog open={deleteOpen} onOpenChange={setDeleteOpen} loadPreview={()=>getOrderDeletionPreview(detail.order.id)} onDelete={deleted} onArchive={()=>{setDeleteOpen(false);setArchiveOpen(true)}} onCleanup={cleanup} onGoToCentral={()=>navigate("/os")}/></main>;
