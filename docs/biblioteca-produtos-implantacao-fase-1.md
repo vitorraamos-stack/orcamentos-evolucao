@@ -47,3 +47,7 @@ Consulta **somente leitura** no projeto Supabase de produção `evolucao-orcamen
 - Reforços desta revisão: não permitir publicação sem mudanças, exigir controladores de campos condicionais, proteger cor da pintura e superfície de instalação e rejeitar visibilidades incompatíveis de complementos.
 - **Status:** sem execução de SQL mutável; a migration segue pendente de aprovação de aplicação.
 
+
+## Reforço pós-migration
+
+Aplicar também `20261016224600_library_trigger_execute_hardening.sql`. A função de trigger `library_products_touch_revision()` não precisa ser chamada por clientes via RPC: são revogados os privilégios de execução de `PUBLIC`, `anon` e `authenticated`. O banco continua executando o trigger automaticamente.
