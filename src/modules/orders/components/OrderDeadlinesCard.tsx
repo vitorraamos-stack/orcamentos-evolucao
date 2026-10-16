@@ -177,5 +177,5 @@ export function OrderDeadlinesCard({ order, deadlines, canEdit, onChange, onComp
           onClick={() => void confirmRemoval()}>Confirmar remoção</Button>
       </AlertDialogFooter></AlertDialogContent>
     </AlertDialog>
-  </Card></Card>;
+  </CardContent></Card>;
 }
