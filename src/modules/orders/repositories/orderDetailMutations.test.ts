@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ from: vi.fn() }));
 vi.mock("@/lib/supabase", () => ({ supabase: { from: mocks.from, auth: { getUser: vi.fn() }, rpc: vi.fn() } }));
-import { completeOrderDeadline, removeOrderAssignee, removeOrderDeadline, removeOrderItem, reopenOrderDeadline, setOrderAssignee, updateOrderItemIfUnchanged } from "./orderDetailRepository";
+import { completeOrderDeadline, removeOrderAssignee, removeOrderDeadline, removeOrderItem, reopenOrderDeadline, setOrderAssignee, updateOrderItemIfUnchanged, updateOrderCommentIfUnchanged } from "./orderDetailRepository";
 const orderId = "11111111-1111-4111-8111-111111111111"; const rowId = "22222222-2222-4222-8222-222222222222";
 describe("order detail mutations", () => {
   beforeEach(() => mocks.from.mockReset());
@@ -53,6 +53,61 @@ describe("order detail mutations", () => {
     await expect(updateOrderItemIfUnchanged(
       rowId, { name: "Novo texto" }, "2026-10-16T10:30:00.123456+00:00"
     )).rejects.toThrow("Permissão negada");
+  });
+
+  it("edits comments only when the version seen by the author still matches", async () => {
+    const openedAt = "2026-10-16T11:30:00.123456+00:00";
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: { id: rowId, message: "Novo texto", updated_at: "2026-10-16T11:35:00+00:00" },
+      error: null,
+    });
+    const select = vi.fn(() => ({ maybeSingle }));
+    const is = vi.fn(() => ({ select }));
+    const versionEq = vi.fn(() => ({ is }));
+    const idEq = vi.fn(() => ({ eq: versionEq }));
+    const update = vi.fn(() => ({ eq: idEq }));
+    mocks.from.mockReturnValueOnce({ update });
+    const result = await updateOrderCommentIfUnchanged(rowId, "  Novo texto  ", openedAt);
+    expect(result.message).toBe("Novo texto");
+    expect(mocks.from).toHaveBeenCalledWith("os_order_comments");
+    expect(update).toHaveBeenCalledWith({ message: "Novo texto" });
+    expect(idEq).toHaveBeenCalledWith("id", rowId);
+    expect(versionEq).toHaveBeenCalledWith("updated_at", openedAt);
+    expect(is).toHaveBeenCalledWith("deleted_at", null);
+    expect(select).toHaveBeenCalledOnce();
+  });
+
+  it("rejects stale or removed comments without overwriting the newer message", async () => {
+    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+    const update = vi.fn(() => ({
+      eq: () => ({ eq: () => ({ is: () => ({ select: () => ({ maybeSingle }) }) }) }),
+    }));
+    mocks.from.mockReturnValueOnce({ update });
+    await expect(updateOrderCommentIfUnchanged(
+      rowId, "Meu rascunho", "2026-10-16T11:30:00+00:00"
+    )).rejects.toThrow("alterado, removido ou está indisponível");
+    expect(maybeSingle).toHaveBeenCalledOnce();
+  });
+
+  it("propagates database permissions errors without claiming a version conflict", async () => {
+    mocks.from.mockReturnValueOnce({
+      update: () => ({
+        eq: () => ({ eq: () => ({
+          is: () => ({ select: () => ({
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: { message: "Acesso negado" } }),
+          }) }),
+        }) }),
+      }),
+    });
+    await expect(updateOrderCommentIfUnchanged(
+      rowId, "Comentário", "2026-10-16T11:30:00+00:00"
+    )).rejects.toThrow("Acesso negado");
+  });
+
+  it("rejects invalid revision timestamps before issuing a database update", async () => {
+    await expect(updateOrderCommentIfUnchanged(rowId, "Comentário", "versao-antiga"))
+      .rejects.toThrow();
+    expect(mocks.from).not.toHaveBeenCalled();
   });
 
   it("soft deletes items", async () => { const eq = vi.fn().mockResolvedValue({ error: null }); const update = vi.fn(() => ({ eq })); mocks.from.mockReturnValue({ update }); await removeOrderItem(rowId); expect(update.mock.calls[0][0].deleted_at).toEqual(expect.any(String)); expect(eq).toHaveBeenCalledWith("id", rowId); });
