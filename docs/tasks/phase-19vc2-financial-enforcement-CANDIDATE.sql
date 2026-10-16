@@ -88,6 +88,46 @@ BEGIN
       AND p.with_check='has_module_access(auth.uid(), ''hub_os''::text)'
   ) THEN RAISE EXCEPTION '19VC_POLICY_DRIFT' USING ERRCODE='55000'; END IF;
 
+  -- Both module access and manager decisions are SECURITY DEFINER
+  -- functions already in production. Pin their effective definition,
+  -- execution ACL and ownership before relying on either.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_proc p
+    WHERE p.oid='public.has_module_access(uuid,text)'::regprocedure
+      AND p.prosecdef
+      AND pg_catalog.pg_get_userbyid(p.proowner)='postgres'
+      AND p.proconfig=ARRAY['search_path=public']::text[]
+      AND pg_catalog.md5(p.prosrc)='5855f6a54a28a3f37f3c2702a5b0ac82'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_proc p
+    WHERE p.oid='public.is_manager(uuid)'::regprocedure
+      AND p.prosecdef
+      AND pg_catalog.pg_get_userbyid(p.proowner)='postgres'
+      AND p.proconfig=ARRAY['search_path=public']::text[]
+      AND pg_catalog.md5(p.prosrc)='6c4acc49a3edd1a6b8b775f05e1e1e4f'
+  ) OR NOT pg_catalog.has_function_privilege(
+     'authenticated','public.has_module_access(uuid,text)','EXECUTE')
+    OR NOT pg_catalog.has_function_privilege(
+     'authenticated','public.is_manager(uuid)','EXECUTE')
+    OR pg_catalog.has_function_privilege(
+     'anon','public.has_module_access(uuid,text)','EXECUTE')
+    OR pg_catalog.has_function_privilege(
+     'anon','public.is_manager(uuid)','EXECUTE')
+    OR NOT EXISTS (
+      SELECT 1 FROM pg_catalog.pg_class c
+      WHERE c.oid='public.user_module_access'::regclass
+        AND c.relrowsecurity
+    )
+    OR NOT EXISTS (
+      SELECT 1 FROM pg_catalog.pg_policies p
+      WHERE p.schemaname='public' AND p.tablename='user_module_access'
+        AND p.policyname='user_module_access_insert_manager'
+        AND p.cmd='INSERT' AND p.roles=ARRAY['authenticated']::name[]
+        AND p.with_check='is_manager(auth.uid())'
+    )
+  THEN RAISE EXCEPTION '19VC2_AUTHORIZATION_DEPENDENCY_DRIFT'
+    USING ERRCODE='55000'; END IF;
+
   IF pg_catalog.pg_has_role('authenticated','postgres','MEMBER')
      OR pg_catalog.pg_has_role('authenticated','service_role','MEMBER')
   THEN RAISE EXCEPTION '19VC_ROLE_INHERITANCE_DRIFT' USING ERRCODE='55000'; END IF;
