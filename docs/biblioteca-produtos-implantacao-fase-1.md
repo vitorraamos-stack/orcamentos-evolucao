@@ -33,3 +33,17 @@ Catálogo administrativo, novo produto, alteração e salvamento de rascunho com
 - proteção completa no banco para os contratos de campos e complementos além dos requisitos iniciais de publicação.
 
 A base inicial **não está pronta para uso produtivo sem migration e revisão técnica**. Nenhuma alteração no Supabase é realizada ao abrir esta PR. Evitar disparar múltiplos previews na Vercel; preferir commits consolidados.
+
+
+## Preflight de compatibilidade — 16/10/2026
+
+Consulta **somente leitura** no projeto Supabase de produção `evolucao-orcamentos`:
+- `public.app_modules`, `public.user_module_access` e funções `public.is_manager(uuid)` / `public.has_module_access(uuid,text)` existem.
+- As três tabelas `library_*` ainda não existem; a migration não foi aplicada.
+- `library_products` fica separada de `products` (engenharia de custos).
+- Nenhum módulo `biblioteca_produtos` registrado ainda; a migration o adicionará.
+- A configuração atual inclui gerentes e consultores de vendas: conceder apenas aos perfis previstos e testar RLS com credenciais reais antes de uso.
+- O Supabase Security Advisor reporta avisos **preexistentes** fora do novo módulo (incluindo funções SECURITY DEFINER e `pg_trgm` em `public`). Não foram introduzidos por esta migration.
+- Reforços desta revisão: não permitir publicação sem mudanças, exigir controladores de campos condicionais, proteger cor da pintura e superfície de instalação e rejeitar visibilidades incompatíveis de complementos.
+- **Status:** sem execução de SQL mutável; a migration segue pendente de aprovação de aplicação.
+

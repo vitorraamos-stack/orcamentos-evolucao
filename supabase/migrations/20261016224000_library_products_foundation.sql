@@ -130,6 +130,9 @@ begin
   if v_product.status='archived' then
     raise exception 'Produtos arquivados devem ser restaurados antes da publicação.' using errcode='22023';
   end if;
+  if v_product.status='published' and v_product.revision=v_product.published_revision then
+    raise exception 'Não existem alterações novas para publicar.' using errcode='22023';
+  end if;
   if p_expected_revision is null or v_product.revision<>p_expected_revision then
     raise exception 'A ficha foi alterada por outra pessoa. Atualize antes de publicar.' using errcode='40001';
   end if;
@@ -166,6 +169,75 @@ begin
       and (g.value->>'url' is null or g.value->>'url' !~* '^https://')
   ) then
     raise exception 'Imagens comerciais precisam de uma URL HTTPS.' using errcode='22023';
+  end if;
+
+
+  -- Falha fechada: nenhum campo dependente pode ser publicado sem seu controlador
+  -- comercial. A aplicação da condição é validada novamente no servidor.
+  if exists (
+    select 1 from jsonb_array_elements(coalesce(v_product.draft->'fields','[]'::jsonb)) as f(value)
+    where coalesce(f.value->>'visibility','consultor')='consultor'
+      and f.value->>'when' in ('paint','install','noart')
+      and not exists (
+        select 1 from jsonb_array_elements(coalesce(v_product.draft->'fields','[]'::jsonb)) as controller(value)
+        where controller.value->>'id'=case f.value->>'when'
+          when 'paint' then 'acabamento'
+          when 'install' then 'instalacao'
+          when 'noart' then 'arte_vetorial'
+        end
+        and coalesce(controller.value->>'visibility','consultor')='consultor'
+        and controller.value->>'type'=case f.value->>'when'
+          when 'paint' then 'select' else 'yesno'
+        end
+      )
+  ) then
+    raise exception 'Existe campo condicional sem controlador comercial válido.' using errcode='22023';
+  end if;
+
+  -- As exigências centrais da V28 nunca podem ser dispensadas apenas
+  -- por editar o formulário no navegador.
+  if exists (
+    select 1 from jsonb_array_elements(coalesce(v_product.draft->'fields','[]'::jsonb)) as f(value)
+    where f.value->>'id'='instalacao'
+      and coalesce(f.value->>'visibility','consultor')='consultor'
+  ) and not exists (
+    select 1 from jsonb_array_elements(coalesce(v_product.draft->'fields','[]'::jsonb)) as f(value)
+    where f.value->>'id'='superficie'
+      and f.value->>'when'='install' and f.value->>'required'='true'
+      and coalesce(f.value->>'visibility','consultor')='consultor'
+  ) then
+    raise exception 'Instalação exige campo de superfície obrigatório.' using errcode='22023';
+  end if;
+
+  if exists (
+    select 1 from jsonb_array_elements(coalesce(v_product.draft->'fields','[]'::jsonb)) as f(value)
+    where f.value->>'id'='acabamento'
+      and f.value->>'type'='select'
+      and coalesce(f.value->>'visibility','consultor')='consultor'
+      and exists (
+        select 1 from jsonb_array_elements_text(coalesce(f.value->'options','[]'::jsonb)) as option_text(value)
+        where lower(option_text.value) like '%pintura%'
+      )
+  ) and not exists (
+    select 1 from jsonb_array_elements(coalesce(v_product.draft->'fields','[]'::jsonb)) as f(value)
+    where f.value->>'id'='cor'
+      and f.value->>'when'='paint' and f.value->>'required'='true'
+      and coalesce(f.value->>'visibility','consultor')='consultor'
+  ) then
+    raise exception 'Acabamento com pintura exige campo de cor obrigatório.' using errcode='22023';
+  end if;
+
+  if exists (
+    select 1 from jsonb_array_elements(coalesce(v_product.draft->'complements','[]'::jsonb)) as c(value)
+    where jsonb_typeof(c.value)<>'object'
+      or coalesce(c.value->>'visibility','') not in ('commercial','internal')
+      or coalesce(c.value->>'mode','') not in ('separate','included','internal')
+      or (c.value->>'visibility'='commercial' and c.value->>'mode'='internal')
+      or (c.value->>'visibility'='internal' and c.value->>'mode'<>'internal')
+      or coalesce(c.value->>'when','') not in ('always','install','noart')
+      or length(btrim(coalesce(c.value->>'name','')))=0
+  ) then
+    raise exception 'Há complementos inválidos ou com visibilidade incompatível.' using errcode='22023';
   end if;
 
   select coalesce(jsonb_agg(jsonb_build_object(

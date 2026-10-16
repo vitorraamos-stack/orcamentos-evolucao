@@ -28,7 +28,14 @@ describe("Biblioteca: contratos de implantação fase 1",()=>{
     expect(migration).toContain("v_product.revision<>p_expected_revision");
     expect(migration).toContain("insert into public.library_product_history");
     expect(migration).toContain("published_revision=v_product.revision");
+    expect(migration).toContain("v_product.status='published' and v_product.revision=v_product.published_revision");
     expect(migration).toContain("delete from public.library_publications where product_id=p_product_id");
+  });
+  it("bloqueia campos sem controlador e exigências técnicas removidas pelo navegador",()=>{
+    expect(migration).toContain("Existe campo condicional sem controlador comercial válido.");
+    expect(migration).toContain("Instalação exige campo de superfície obrigatório.");
+    expect(migration).toContain("Acabamento com pintura exige campo de cor obrigatório.");
+    expect(migration).toContain("Há complementos inválidos ou com visibilidade incompatível.");
   });
   it("protege as rotas por módulo e papel",()=>{
     expect(app).toContain('path="/biblioteca/gestao"');
