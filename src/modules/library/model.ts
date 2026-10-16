@@ -31,9 +31,18 @@ export type LibraryComplement = {
   when: "always" | "install" | "noart";
 };
 
+export type LibraryConditionalRule = {
+  id: string;
+  field: string;
+  equals: string;
+  action: "note" | "require_photos" | "technical_review";
+  message: string;
+};
+
 export type LibraryRules = {
   photos_policy?: "recommend" | "required" | "waive";
   waiver_reason?: string;
+  conditions?: LibraryConditionalRule[];
 };
 
 export type LibraryTemplate = {
@@ -68,7 +77,7 @@ export type LibraryPublication = Pick<LibraryDraft, "name" | "category" | "descr
   gallery: Omit<LibraryPhoto, "visibility">[];
   complements: (Pick<LibraryComplement, "id" | "name" | "mode" | "when"> & {visibility?: LibraryComplement["visibility"]})[];
   guidance: string;
-  rules?: { photos_policy: "recommend" | "required" | "waive"; special_fixing_review: true };
+  rules?: { photos_policy: "recommend" | "required" | "waive"; special_fixing_review: true; conditions?: LibraryConditionalRule[] };
 };
 
 export type LibraryProductRecord = {
@@ -126,6 +135,14 @@ export function validateLibraryDraft(draft: LibraryDraft): string[] {
   }
   if ((draft.rules?.photos_policy || "recommend")==="waive" && (draft.rules?.waiver_reason||"").trim().length<10) {
     errors.push("Explique a dispensa das fotografias (mínimo 10 caracteres).");
+  }
+  for (const rule of draft.rules?.conditions||[]) {
+    const source=draft.fields.find(f=>f.id===rule.field && f.visibility!=="internal");
+    if (!source || !["select","yesno"].includes(source.type)) errors.push("Regra com campo controlador inexistente ou inválido.");
+    else if (!(source.type==="yesno"?["Sim","Não"].includes(rule.equals):(source.options||[]).includes(rule.equals))) {
+      errors.push("Regra com opção de comparação inválida.");
+    }
+    if (rule.action==="note" && !rule.message.trim()) errors.push("Informe a orientação da regra.");
   }
   if (draft.fields.some(f=>f.when!=="always" && !draft.fields.some(x=>x.id===({paint:"acabamento",install:"instalacao",noart:"arte_vetorial"} as Record<string,string>)[f.when]))) {
     errors.push("Existem campos condicionais sem o campo controlador.");

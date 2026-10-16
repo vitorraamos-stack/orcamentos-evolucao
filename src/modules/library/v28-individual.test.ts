@@ -30,6 +30,8 @@ describe("Biblioteca V28 individual",()=>{
   it("protege no servidor a exigência de fotos dispensadas",()=>{
     expect(migration).toContain("Justificativa obrigatória para dispensar fotografias.");
     expect(migration).toContain("'special_fixing_review',true");
+    expect(migration).toContain("'conditions',v_conditions");
+    expect(migration).toContain("Regra condicional possui campo, opção ou ação inválidos.");
     expect(migration).toContain("Acabamento com pintura exige campo de cor obrigatório.");
   });
   it("valida a dispensa de fotografias e o formulário individual",()=>{
@@ -37,6 +39,13 @@ describe("Biblioteca V28 individual",()=>{
     expect(validateLibraryDraft(draft)).toContain("Explique a dispensa das fotografias (mínimo 10 caracteres).");
     expect(libraryFieldVisible({id:"cor",label:"Cor",type:"text",required:true,when:"paint"},{acabamento:"PVC natural"})).toBe(false);
     expect(libraryMissingFields([{id:"medidas",label:"Medidas",type:"dimensions",required:true,when:"always"}],{medidas:{width:"120",height:"0"}})).toEqual(["Medidas"]);
+  });
+  it("impede regras condicionais sem opções e mensagens",()=>{
+    const base={...emptyLibraryDraft(),name:"Produto exemplo",description:"Descrição adequada"};
+    const choice={id:"acabamento",label:"Acabamento",type:"select" as const,when:"always" as const,required:true,options:["PVC natural","Pintura personalizada"]};
+    const bad={...base,fields:[choice],rules:{conditions:[{id:"r1",field:"acabamento",equals:"Acabamento inexistente",action:"note" as const,message:""}]}};
+    expect(validateLibraryDraft(bad)).toContain("Regra com opção de comparação inválida.");
+    expect(validateLibraryDraft(bad)).toContain("Informe a orientação da regra.");
   });
   it("valida imagens privadas e imagens HTTPS antigas",()=>{
     const base={...emptyLibraryDraft(),name:"Placa Exemplo",description:"Descrição adequada"};

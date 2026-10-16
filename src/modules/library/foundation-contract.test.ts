@@ -40,8 +40,8 @@ describe("Biblioteca: contratos de implantação fase 1",()=>{
   it("protege as rotas por módulo e papel",()=>{
     expect(app).toContain('path="/biblioteca/gestao"');
     expect(app).toContain('moduleKey="biblioteca_produtos"');
-    expect(app).toContain("hubPermissions.isManager ? <LibraryCatalogPage management />");
-    expect(app).toContain("hubPermissions.canCreateOs ? <LibraryCatalogPage />");
+    expect(app).toContain("hubPermissions.isManager ? <LibraryV28Page management />");
+    expect(app).toContain("hubPermissions.canCreateOs ? <LibraryV28Page />");
     expect(layout).toContain('hasModuleAccess("biblioteca_produtos") && hubPermissions.canCreateOs');
     expect(layout).toContain("const canManageLibrary = canViewLibrary && isAdmin");
     expect(adminUsers).toContain("'biblioteca_produtos'");

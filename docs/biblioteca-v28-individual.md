@@ -8,7 +8,7 @@ Esta etapa entrega a experiência de **produto individual**, preservando o catá
 - Modelos prontos por categoria e modelos reutilizáveis persistidos em `library_config_templates`; aplicar adiciona somente campos ausentes e preserva o que já foi personalizado no produto. Modelo aplicado é uma cópia datada com origem e versão registrada no rascunho
 - Campos customizados, tipos, opções, condições, ordenação e prévia
 - Complementos reutilizáveis em `library_complement_catalog`, individuais, com separação comercial ou interna
-- Regras: recomendação, exigência ou dispensa justificada de fotos; obrigatoriedade de superfície quando instalação, cor quando pintura; indicação de revisão técnica por fixação especial
+- Regras: recomendação, exigência ou dispensa justificada de fotos; condições SE → ENTÃO para avisos, fotografias ou avaliação técnica; obrigatoriedade de superfície quando instalação, cor quando pintura; indicação de revisão técnica por fixação especial
 - Configuração de **um produto por vez**, com rascunho provisório e cópia de descrição individual para inclusão manual no Conta Azul. **Sem preços automáticos**.
 
 ## Fora do escopo por decisão do gestor

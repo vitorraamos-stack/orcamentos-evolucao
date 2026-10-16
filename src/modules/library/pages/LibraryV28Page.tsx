@@ -76,7 +76,8 @@ function commercialLines(data:LibraryPublication,values:Record<string,unknown>,s
     else if(Array.isArray(v))parts.push(f.label+": "+v.join(", "));
     else if(f.type!=="attachment")parts.push(f.label+": "+String(v));
   }
-  const additions=(data.complements||[]).filter(x=>selected.includes(x.id));
+  const additions=(data.complements||[]).filter(x=>selected.includes(x.id) &&
+    (x.when==="always" || x.when==="install"&&values.instalacao==="Sim" || x.when==="noart"&&values.arte_vetorial==="Não"));
   for(const c of additions.filter(x=>x.mode==="included"))parts.push(c.name);
   return [parts.join(" — "),...additions.filter(x=>x.mode==="separate").map(c=>"Serviço adicional: "+c.name)];
 }
@@ -127,9 +128,11 @@ export default function LibraryV28Page({management=false}:{management?:boolean})
   const cards=summary.filter(x=>(category==="all"||x.category===category)&&(filter==="all"||(filter==="active"?x.status!=="Arquivado":x.status===filter))&&(x.name+" "+x.description+" "+x.category).toLowerCase().includes(search.toLowerCase()));
   const missing=display?libraryMissingFields(display.fields,answers):[];
   const installed=answers.instalacao==="Sim";
-  const mustHavePhotos=display?photoRule(display)==="required"&&installed&&!photosReceived:false;
-  const technicalPending=answers.fixacao_especial==="Sim";
-  const canCopyFinal=!admin&&!!release&&missing.length===0&&!mustHavePhotos&&!technicalPending;
+  const firedRules=(display?.rules?.conditions||[]).filter(r=>String(answers[r.field]||"")===r.equals);
+  const mustHavePhotos=(display?photoRule(display)==="required"&&installed:false)||firedRules.some(r=>r.action==="require_photos");
+  const photosPending=mustHavePhotos&&!photosReceived;
+  const technicalPending=answers.fixacao_especial==="Sim"||firedRules.some(r=>r.action==="technical_review");
+  const canCopyFinal=!admin&&!!release&&missing.length===0&&!photosPending&&!technicalPending;
   const selectedCommercial=(display?.complements||[]).filter(c=>c.mode!=="internal");
   const load=useCallback(async()=>{
     try {
@@ -172,7 +175,7 @@ export default function LibraryV28Page({management=false}:{management?:boolean})
     if(!display||(!admin&&!release))return;
     const lines=commercialLines(display as LibraryPublication,answers,chosenComplements);
     const prefix=final?"DESCRIÇÃO PARA CONFERÊNCIA E TRANSFERÊNCIA MANUAL AO CONTA AZUL":"RASCUNHO PROVISÓRIO — NÃO LIBERADO PARA TRANSFERÊNCIA FINAL";
-    const pendencies=[...missing,...(mustHavePhotos?["Fotografias do local"]:[]),...(technicalPending?["Fixação especial depende de parecer técnico"]:[])];
+    const pendencies=[...missing,...(photosPending?["Fotografias do local"]:[]),...(technicalPending?["Fixação especial depende de parecer técnico"]:[])];
     try{await navigator.clipboard.writeText([prefix,"",...lines,...(pendencies.length?["","Pendências: "+pendencies.join("; ")]:[]),"","Sem preços. A conferência comercial deve ocorrer no Conta Azul."].join("\n"));toast.success("Texto copiado.");}
     catch{toast.error("Não foi possível copiar o texto. Verifique as permissões do navegador.");}
   };
@@ -261,6 +264,34 @@ export default function LibraryV28Page({management=false}:{management?:boolean})
       <p className="text-sm text-muted-foreground">Configure as orientações sobre fotografias do local. As exigências essenciais de cor e superfície são protegidas pelo servidor.</p>
       <div className="rounded-lg bg-muted/60 p-3 space-y-2"><Label>Fotografias quando houver instalação</Label><select className={selectClass} value={edit.rules?.photos_policy||"recommend"} onChange={e=>update({rules:{...edit.rules,photos_policy:e.target.value as "recommend"|"required"|"waive"}})}><option value="recommend">Recomendar</option><option value="required">Tornar obrigatórias</option><option value="waive">Dispensar com justificativa</option></select></div>
       {edit.rules?.photos_policy==="waive"&&<div><Label>Justificativa da dispensa *</Label><Textarea rows={3} value={edit.rules.waiver_reason||""} onChange={e=>update({rules:{...edit.rules,waiver_reason:e.target.value}})}/></div>}
+      <div className="space-y-3 border-t pt-4">
+        <p className="text-sm font-semibold">Condições SE → ENTÃO</p>
+        <p className="text-xs text-muted-foreground">Crie avisos, solicite fotografias ou marque avaliação técnica conforme uma resposta do consultor.</p>
+        {(edit.rules?.conditions||[]).map(rule=>{
+          const controller=edit.fields.find(f=>f.id===rule.field);
+          const options=controller?.type==="yesno"?["Sim","Não"]:(controller?.options||[]);
+          return <div className="space-y-2 rounded-lg border p-3" key={rule.id}>
+            <Label>Se o campo...</Label>
+            <select className={selectClass} value={rule.field} onChange={e=>{
+              const f=edit.fields.find(x=>x.id===e.target.value);
+              const first=f?.type==="yesno"?"Sim":f?.options?.[0]||"";
+              update({rules:{...edit.rules,conditions:(edit.rules?.conditions||[]).map(x=>x.id===rule.id?{...x,field:e.target.value,equals:first}:x)}});
+            }}>{edit.fields.filter(f=>f.visibility!=="internal"&&["yesno","select"].includes(f.type)).map(f=><option key={f.id} value={f.id}>{f.label}</option>)}</select>
+            <Label>For igual a...</Label>
+            <select className={selectClass} value={rule.equals} onChange={e=>update({rules:{...edit.rules,conditions:(edit.rules?.conditions||[]).map(x=>x.id===rule.id?{...x,equals:e.target.value}:x)}})}>{options.map(opt=><option key={opt} value={opt}>{opt}</option>)}</select>
+            <Label>Então...</Label>
+            <select className={selectClass} value={rule.action} onChange={e=>update({rules:{...edit.rules,conditions:(edit.rules?.conditions||[]).map(x=>x.id===rule.id?{...x,action:e.target.value as typeof rule.action}:x)}})}><option value="note">Mostrar orientação</option><option value="require_photos">Exigir fotografias</option><option value="technical_review">Indicar avaliação técnica necessária</option></select>
+            {rule.action==="note"&&<Input placeholder="Escreva a orientação..." value={rule.message} onChange={e=>update({rules:{...edit.rules,conditions:(edit.rules?.conditions||[]).map(x=>x.id===rule.id?{...x,message:e.target.value}:x)}})}/>}
+            <Button variant="ghost" size="sm" onClick={()=>update({rules:{...edit.rules,conditions:(edit.rules?.conditions||[]).filter(x=>x.id!==rule.id)}})}><Trash2 className="mr-1 h-4 w-4"/> Remover regra</Button>
+          </div>;
+        })}
+        <Button variant="outline" size="sm" disabled={!edit.fields.some(f=>f.visibility!=="internal"&&["yesno","select"].includes(f.type))} onClick={()=>{
+          const f=edit.fields.find(x=>x.visibility!=="internal"&&["yesno","select"].includes(x.type));
+          if(!f)return;
+          const equals=f.type==="yesno"?"Sim":f.options?.[0]||"";
+          update({rules:{...edit.rules,conditions:[...(edit.rules?.conditions||[]),{id:randomId(),field:f.id,equals,action:"note",message:""}]}});
+        }}><Plus className="mr-1 h-4 w-4"/>Adicionar condição</Button>
+      </div>
       <div className="rounded-lg border p-3 space-y-2"><div className="flex gap-2"><LockKeyhole className="h-4 w-4 shrink-0 text-muted-foreground"/><p className="text-sm font-semibold">Regras técnicas protegidas</p></div>
       <p className="text-xs text-muted-foreground">Se houver instalação, a superfície é obrigatória. Se houver pintura, a cor é obrigatória. Fixação especial indica avaliação técnica necessária e impede a cópia como configuração liberada.</p></div>
       <p className="text-xs text-muted-foreground">Este fluxo não cria acompanhamentos de parecer técnico nem atribui tarefas automaticamente.</p>
@@ -309,8 +340,10 @@ export default function LibraryV28Page({management=false}:{management?:boolean})
             {admin&&<div className="flex gap-2"><Button size="sm" variant={revisionView==="draft"?"secondary":"ghost"} onClick={()=>{setRevisionView("draft");setAnswers({});}}>Em edição</Button><Button size="sm" variant={revisionView==="published"?"secondary":"ghost"} disabled={!release} onClick={()=>{setRevisionView("published");setAnswers({});}}>Publicado</Button></div>}
             <div className="rounded-lg bg-muted p-3 space-y-1"><p className="text-xs text-muted-foreground">{display?.category}</p><p className="font-semibold">{display?.name||"Novo produto"}</p><p className="text-xs text-muted-foreground">{display?.description||"Aguardando descrição."}</p></div>
             {(display?.fields||[]).map(f=><InputField key={f.id} field={f} values={answers} onChange={(id,val)=>setAnswers(old=>{const next={...old,[id]:val};if(id==="instalacao"&&val!=="Sim"){delete next.superficie;delete next.fixacao_especial;setPhotosReceived(false);}if(id==="acabamento"&&!String(val).toLowerCase().includes("pintura"))delete next.cor;return next;})}/>)}
-            {installed&&photoRule(display||emptyLibraryDraft())!=="waive"&&<div className="space-y-2 rounded-lg bg-muted/60 p-3"><p className="text-xs font-medium">{mustHavePhotos?"Fotografias do local obrigatórias":"Fotografias do local recomendadas"}</p><label className="flex items-start gap-2 text-xs"><Checkbox checked={photosReceived} onCheckedChange={x=>setPhotosReceived(x===true)}/>Confirmo que o cliente forneceu fotografias do local</label></div>}
+            {(installed&&photoRule(display||emptyLibraryDraft())!=="waive"||firedRules.some(r=>r.action==="require_photos"))&&<div className="space-y-2 rounded-lg bg-muted/60 p-3"><p className="text-xs font-medium">{mustHavePhotos?"Fotografias do local obrigatórias":"Fotografias do local recomendadas"}</p><label className="flex items-start gap-2 text-xs"><Checkbox checked={photosReceived} onCheckedChange={x=>setPhotosReceived(x===true)}/>Confirmo que o cliente forneceu fotografias do local</label></div>}
             {!!missing.length&&<p className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">Preencher: {missing.join(", ")}.</p>}
+            {firedRules.filter(r=>r.action==="note").map(r=><p key={r.id} className="rounded-lg bg-muted p-3 text-xs">{r.message}</p>)}
+            {photosPending&&<p className="text-xs text-muted-foreground">Fotografias pendentes para esta configuração.</p>}
             {technicalPending&&<div className="flex items-start gap-2 rounded-lg bg-muted p-3"><ShieldAlert className="h-4 w-4 shrink-0"/><p className="text-xs">Fixação especial: avaliação técnica necessária. Pode copiar como rascunho provisório, sem liberação final.</p></div>}
             {selectedCommercial.length>0&&<div className="space-y-2 border-t pt-3"><p className="text-sm font-semibold">Complementos</p>{selectedCommercial.filter(c=>c.when==="always"||c.when==="install"&&installed||c.when==="noart"&&answers.arte_vetorial==="Não").map(c=><label key={c.id} className="flex items-start gap-2 text-xs"><Checkbox checked={chosenComplements.includes(c.id)} onCheckedChange={x=>setChosenComplements(old=>x?[...old.filter(z=>z!==c.id),c.id]:old.filter(z=>z!==c.id))}/><span>{c.name}<span className="block text-muted-foreground">{c.mode==="included"?"Incluído na descrição":"Linha comercial separada"}</span></span></label>)}</div>}
             {!admin&&<div className="space-y-2 border-t pt-3"><Button variant="outline" className="w-full" onClick={()=>void copy(false)}><ClipboardCopy className="mr-2 h-4 w-4"/>Copiar rascunho provisório</Button><Button className="w-full" disabled={!canCopyFinal} onClick={()=>void copy(true)}><ClipboardCopy className="mr-2 h-4 w-4"/>Copiar descrição final</Button><p className="text-xs text-muted-foreground">O orçamento oficial continua no Conta Azul. Nenhum preço é calculado aqui.</p></div>}

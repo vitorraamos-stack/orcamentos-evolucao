@@ -93,6 +93,7 @@ declare
   v_gallery jsonb;
   v_complements jsonb;
   v_fields jsonb;
+  v_conditions jsonb;
   v_version integer;
   v_published_at timestamptz;
 begin
@@ -259,6 +260,39 @@ begin
     raise exception 'Justificativa obrigatória para dispensar fotografias.' using errcode='22023';
   end if;
 
+  if jsonb_typeof(coalesce(v_product.draft->'rules'->'conditions','[]'::jsonb))<>'array' then
+    raise exception 'Lista de regras inválida.' using errcode='22023';
+  end if;
+  if exists (
+    select 1
+    from jsonb_array_elements(coalesce(v_product.draft->'rules'->'conditions','[]'::jsonb)) as r(value)
+    where jsonb_typeof(r.value)<>'object'
+       or coalesce(r.value->>'action','') not in ('note','require_photos','technical_review')
+       or length(btrim(coalesce(r.value->>'field','')))=0
+       or length(btrim(coalesce(r.value->>'equals','')))=0
+       or (r.value->>'action'='note' and length(btrim(coalesce(r.value->>'message','')))=0)
+       or not exists (
+         select 1 from jsonb_array_elements(coalesce(v_product.draft->'fields','[]'::jsonb)) as f(value)
+         where f.value->>'id'=r.value->>'field'
+           and coalesce(f.value->>'visibility','consultor')='consultor'
+           and (
+             (f.value->>'type'='yesno' and r.value->>'equals' in ('Sim','Não'))
+             or (f.value->>'type'='select' and f.value->'options' ? (r.value->>'equals'))
+           )
+       )
+  ) then
+    raise exception 'Regra condicional possui campo, opção ou ação inválidos.' using errcode='22023';
+  end if;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id',r.value->>'id','field',r.value->>'field',
+    'equals',r.value->>'equals','action',r.value->>'action',
+    'message',r.value->>'message'
+  ) order by r.ordinality),'[]'::jsonb)
+  into v_conditions
+  from jsonb_array_elements(coalesce(v_product.draft->'rules'->'conditions','[]'::jsonb))
+    with ordinality as r(value,ordinality);
+
   v_content:=jsonb_build_object(
     'name',v_product.draft->>'name',
     'category',v_product.draft->>'category',
@@ -270,7 +304,8 @@ begin
     'guidance',coalesce(v_product.draft->>'consultant_guidance',''),
     'rules',jsonb_build_object(
       'photos_policy',coalesce(v_product.draft->'rules'->>'photos_policy','recommend'),
-      'special_fixing_review',true
+      'special_fixing_review',true,
+      'conditions',v_conditions
     )
   );
 
