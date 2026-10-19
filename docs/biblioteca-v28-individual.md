@@ -18,7 +18,7 @@ Esta etapa entrega a experiência de **produto individual**, preservando o catá
 - Módulo de acompanhamento de pareceres técnicos.
 
 ## Segurança e implantação
-- Apply migration `supabase/migrations/20261016232000_library_v28_individual.sql` antes do merge.
+- Migration `supabase/migrations/20261016213541_library_v28_individual.sql` já aplicada no Supabase de produção sob a versão `20261016213541`; não executar novamente. A correção do nome no repositório alinha o histórico de migrations.
 - Testar perfis gerente e consultor, publicação sanitizada, assinatura da foto somente após publicação e acesso negado para perfis não autorizados.
 - Testar idempotência da publicação, histórico e revisão concorrente.
 - CI deve passar `npm run verify:prod` antes do merge.
