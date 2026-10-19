@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 const read=(path:string)=>readFileSync(new URL(path,import.meta.url),"utf8");
-const migration=read("../../../supabase/migrations/20261016224000_library_products_foundation.sql");
+const migration=read("../../../supabase/migrations/20261016204531_library_products_foundation.sql");
 const app=read("../../App.tsx");
 const layout=read("../../components/Layout.tsx");
 const adminUsers=read("../../../api/admin-users.ts");

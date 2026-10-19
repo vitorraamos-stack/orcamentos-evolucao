@@ -1,5 +1,7 @@
 # Biblioteca de Produtos — implantação fase 1 (V18–V28)
 
+**Atualização de histórico — 19/10/2026:** As migrations `20261016204531_library_products_foundation.sql` e `20261016205015_library_trigger_execute_hardening.sql` **já foram aplicadas em produção** e conferidas com o SQL registrado no Supabase. Os passos e o preflight abaixo documentam a preparação original, não instruções para executar novamente. **Não reaplicar nem reparar o histórico de migrations para alinhar os nomes no repositório.**
+
 ## Integração
 
 Branch isolada `feat/biblioteca-produtos-foundation-v1`. Esta entrega inicia a implementação real sem criar dados demonstrativos na aplicação e **sem mudar o produto de Engenharia de Custos** (`public.products` / `product_versions`).
@@ -14,7 +16,7 @@ Branch isolada `feat/biblioteca-produtos-foundation-v1`. Esta entrega inicia a i
 
 ## Ordem de implantação
 
-1. Revisar migration `20261016224000_library_products_foundation.sql`, privilégios, tipos e políticas RLS.
+1. Revisar migration `20261016204531_library_products_foundation.sql`, privilégios, tipos e políticas RLS.
 2. Rodar `npm run check && npm run test && npm run build:app` em ambiente com dependências instaladas; corrigir antes do merge.
 3. Aplicar migration no Supabase **somente com autorização específica**, confirmar políticas e privilégios sob diferentes usuários.
 4. Liberar PR após revisão, verificações CI e validação da compatibilidade com o deploy.
@@ -50,4 +52,4 @@ Consulta **somente leitura** no projeto Supabase de produção `evolucao-orcamen
 
 ## Reforço pós-migration
 
-Aplicar também `20261016224600_library_trigger_execute_hardening.sql`. A função de trigger `library_products_touch_revision()` não precisa ser chamada por clientes via RPC: são revogados os privilégios de execução de `PUBLIC`, `anon` e `authenticated`. O banco continua executando o trigger automaticamente.
+Aplicar também `20261016205015_library_trigger_execute_hardening.sql`. A função de trigger `library_products_touch_revision()` não precisa ser chamada por clientes via RPC: são revogados os privilégios de execução de `PUBLIC`, `anon` e `authenticated`. O banco continua executando o trigger automaticamente.
