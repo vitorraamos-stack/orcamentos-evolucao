@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { emptyLibraryDraft, libraryCategories, libraryFieldVisible, libraryMissingFields, validateLibraryDraft, type LibraryDraft, type LibraryField, type LibraryPhoto, type LibraryComplement, type LibraryProductRecord, type LibraryPublishedRecord, type LibraryTemplate, type LibraryComplementTemplate, type LibraryPublication } from "../model";
 import { archiveLibraryProduct, createLibraryDraft, listLibraryDrafts, listLibraryPublications, publishLibraryDraft, restoreLibraryProduct, saveLibraryDraft } from "../repository";
 import { listLibraryTemplates, saveLibraryTemplate, listLibraryComplements, saveLibraryComplement, signedLibraryImageUrl, uploadLibraryPhoto } from "../assets";
+import { displayLibraryImageBytes, libraryImageSavings } from "../image-optimization";
 
 type Section="info"|"gallery"|"fields"|"addons"|"guides"|"rules";
 const sections=[{id:"info" as Section,name:"Informações",Icon:FileText},{id:"gallery" as Section,name:"Galeria",Icon:Images},{id:"fields" as Section,name:"Configuração",Icon:SlidersHorizontal},{id:"addons" as Section,name:"Complementos",Icon:Layers3},{id:"guides" as Section,name:"Orientações",Icon:BookOpen},{id:"rules" as Section,name:"Regras",Icon:ShieldCheck}];
@@ -103,6 +104,7 @@ export default function LibraryV28Page({management=false}:{management?:boolean})
   const [filter,setFilter]=useState("active");
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
+  const [photoUploading,setPhotoUploading]=useState(false);
   const [error,setError]=useState("");
   const [revisionView,setRevisionView]=useState<"draft"|"published">("draft");
   const [answers,setAnswers]=useState<Record<string,unknown>>({});
@@ -145,9 +147,9 @@ export default function LibraryV28Page({management=false}:{management?:boolean})
     finally{setLoading(false);}
   },[admin]);
   useEffect(()=>{setLoading(true);void load();},[load]);
-  const perform=async(task:()=>Promise<void>,message:string)=>{
+  const perform=async(task:()=>Promise<void>,message:string|(()=>string))=>{
     setBusy(true);
-    try{await task();toast.success(message);await load();}
+    try{await task();toast.success(typeof message==="function"?message():message);await load();}
     catch(e){toast.error(errorMessage(e));}
     finally{setBusy(false);}
   };
@@ -196,8 +198,30 @@ export default function LibraryV28Page({management=false}:{management?:boolean})
   const saveComplement=()=>{if(!user||!newComplement.trim())return;const c:LibraryComplement={id:randomId(),name:newComplement.trim(),mode:complementMode,visibility:complementMode==="internal"?"internal":"commercial",when:"always"};
     void perform(async()=>{await saveLibraryComplement(user.id,c);setNewComplement("");},"Complemento salvo na biblioteca compartilhada.");
   };
-  const uploadPhoto=(e:ChangeEvent<HTMLInputElement>)=>{const f=e.target.files?.[0];e.target.value="";if(!f||!selected)return;
-    void perform(async()=>{const photo=await uploadLibraryPhoto(selected.id,f);update({gallery:[...edit.gallery,{...photo,cover:edit.gallery.length===0}]});},"Imagem enviada ao armazenamento privado. Salve o rascunho para vinculá-la à ficha.");};
+  const uploadPhoto=(e:ChangeEvent<HTMLInputElement>)=>{
+    const f=e.target.files?.[0];e.target.value="";
+    if(!f||!selected||busy)return;
+    const productId=selected.id;
+    let summary="Imagem enviada ao armazenamento privado.";
+    setPhotoUploading(true);
+    void perform(async()=>{
+      try {
+        const {photo,optimization}=await uploadLibraryPhoto(productId,f);
+        setEdit(current=>({
+          ...current,
+          gallery:[...current.gallery,{...photo,cover:current.gallery.length===0}],
+        }));
+        setConfirmation(null);
+        const original=displayLibraryImageBytes(optimization.originalBytes);
+        const stored=displayLibraryImageBytes(optimization.storedBytes);
+        const saved=libraryImageSavings(optimization.originalBytes,optimization.storedBytes);
+        summary=saved>0?`Foto otimizada: ${original} → ${stored} (-${saved}%).`:
+          `Foto enviada em ${stored} (o original já estava otimizado).`;
+      } finally {
+        setPhotoUploading(false);
+      }
+    },()=>summary+" Salve o rascunho para vincular à ficha.");
+  };
   const updatePhoto=(id:string,patch:Partial<LibraryPhoto>)=>update({gallery:edit.gallery.map(f=>f.id===id?{...f,...patch}:f)});
   const loadHistory=()=>{if(!selected)return;void perform(async()=>{
     const {supabase}=await import("@/lib/supabase");
@@ -212,8 +236,12 @@ export default function LibraryV28Page({management=false}:{management?:boolean})
       <div className="space-y-1"><Label>Aplicações</Label><Textarea rows={3} value={edit.applications} onChange={e=>update({applications:e.target.value})}/></div>
     </div>;
     if(section==="gallery")return <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">Envie imagens da Evolução (JPG, PNG ou WebP até 8 MB). Elas ficam privadas; somente as marcadas para consultores aparecerão após a publicação.</p>
-      <label className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer hover:bg-muted"><Upload className="h-4 w-4"/> Enviar imagem<input type="file" className="sr-only" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} disabled={busy||selected?.status==="archived"}/></label>
+      <p className="text-sm text-muted-foreground">Envie fotografias JPG, PNG ou WebP de até 30 MB. O navegador reduz e comprime automaticamente antes do envio (até 1.800 pixels, buscando aproximadamente 500 KB). Somente a versão preparada ocupa espaço na nuvem. As imagens ficam privadas e apenas as publicadas para consultores aparecem no catálogo.</p>
+      <label className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer hover:bg-muted">
+        {photoUploading?<Loader2 className="h-4 w-4 animate-spin"/>:<Upload className="h-4 w-4"/>}
+        {photoUploading?"Otimizando e enviando...":"Enviar imagem"}
+        <input type="file" className="sr-only" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} disabled={busy||selected?.status==="archived"}/>
+      </label>
       {edit.gallery.map((photo,i)=><div key={photo.id} className="space-y-2 rounded-lg border p-3">
         <div className="flex items-start gap-3"><LibraryImage photo={photo} small/><div className="min-w-0 flex-1 space-y-1"><Input aria-label="Título da imagem" value={photo.title} onChange={e=>updatePhoto(photo.id,{title:e.target.value})}/><Input aria-label="Legenda da imagem" placeholder="Legenda / texto alternativo" value={photo.caption} onChange={e=>updatePhoto(photo.id,{caption:e.target.value})}/></div></div>
         <div className="flex items-center gap-2 flex-wrap"><select className={selectClass+" flex-1"} value={photo.visibility} onChange={e=>updatePhoto(photo.id,{visibility:e.target.value as LibraryPhoto["visibility"]})}><option value="consultor">Visível ao consultor</option><option value="internal">Somente uso interno</option></select>
