@@ -16,6 +16,8 @@ describe("PR 31A non-invasive link foundation", () => {
     expect(sql).toContain("enable row level security");
     expect(sql).toMatch(/revoke all on table public\.product_commercial_links from public, anon, authenticated/i);
     expect(sql).toMatch(/grant select, insert on table public\.product_commercial_links to service_role/i);
+    expect(sql).toMatch(/grant select \(id, status\) on table public\.library_products to service_role/i);
+    expect(sql).not.toMatch(/grant select \*? on table public\.library_products to service_role/i);
     expect(sql).not.toMatch(/create policy/i);
   });
   it("does not insert product links or modify existing catalog data", () => {

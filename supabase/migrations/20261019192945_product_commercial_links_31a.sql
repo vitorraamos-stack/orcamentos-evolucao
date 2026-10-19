@@ -21,4 +21,8 @@ alter table public.product_commercial_links enable row level security;
 revoke all on table public.product_commercial_links from public, anon, authenticated;
 grant select, insert on table public.product_commercial_links to service_role;
 
+-- O backend também precisa validar existência/status sem ler os rascunhos privados.
+-- Esta concessão é SOMENTE de colunas, não de SELECT sobre a tabela inteira.
+grant select (id, status) on table public.library_products to service_role;
+
 -- Propositalmente sem UPDATE/DELETE, RPC exposta, backfill ou alteração de produtos legados.
