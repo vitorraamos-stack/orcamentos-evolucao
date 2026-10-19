@@ -18,6 +18,7 @@ describe("Biblioteca V28 individual",()=>{
     expect(page).not.toContain("Instalação conjunta");
     expect(app).toContain('import LibraryV28Page from "@/modules/library/pages/LibraryV28Page";');
     expect(app).toContain("<LibraryV28Page management />");
+    expect(app).toContain("<LibraryCommercialPage />");
   });
   it("protege as fotografias por produto publicado e permissões",()=>{
     expect(migration).toContain("public=false");
