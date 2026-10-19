@@ -2,7 +2,7 @@ import { describe,expect,it } from "vitest";
 import { emptyLibraryDraft, libraryFieldVisible, libraryMissingFields, validateLibraryDraft } from "./model";
 import { readFileSync } from "node:fs";
 
-const migration=readFileSync(new URL("../../../supabase/migrations/20261016232000_library_v28_individual.sql",import.meta.url),"utf8");
+const migration=readFileSync(new URL("../../../supabase/migrations/20261016213541_library_v28_individual.sql",import.meta.url),"utf8");
 const app=readFileSync(new URL("../../App.tsx",import.meta.url),"utf8");
 const page=readFileSync(new URL("./pages/LibraryV28Page.tsx",import.meta.url),"utf8");
 
