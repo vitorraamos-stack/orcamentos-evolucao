@@ -24,7 +24,7 @@ describe("canonical finance privileges — review only", () => {
     for (const column of ["status", "notes", "reviewed_at", "reviewed_by"]) {
       expect(api).toContain(column);
     }
-    expect(api).toContain('.from("os_finance_installments")');
+    expect(api).toContain(".from('os_finance_installments')");
     expect(assets).toContain('"finance_upsert_from_asset"');
     expect(candidate).toContain("9bc1567dad2ab1640a82bf9893fc8ef3");
     expect(candidate).toContain("df7e652e9ec347cdd3583209e9b0d44f");
