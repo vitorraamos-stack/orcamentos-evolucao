@@ -40,7 +40,7 @@ export default function LibraryCommercialPage() {
   useEffect(()=>{void reload();},[reload]);
   const selected=products.find(item=>item.product_id===activeId);
   const published=selected?.content;
-  const categories=useMemo(()=>[...new Set(products.map(p=>p.content.category).filter(Boolean))].sort(),[products]);
+  const categories=useMemo(()=>Array.from(new Set(products.map(p=>p.content.category).filter(Boolean))).sort(),[products]);
   const filtered=useMemo(()=>products.filter(p=>
     (category==="all"||p.content.category===category)&&
     [p.content.name,p.content.category,p.content.description].join(" ").toLowerCase().includes(query.trim().toLowerCase())
