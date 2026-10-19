@@ -43,7 +43,11 @@ export async function publishLibraryDraft(product:LibraryProductRecord):Promise<
     p_product_id:product.id,p_expected_revision:product.revision
   });
   fail(error);
-  return Number(data);
+  const version = Number(data);
+  if (!Number.isSafeInteger(version) || version <= 0) {
+    throw new Error("Não foi possível confirmar a versão publicada.");
+  }
+  return version;
 }
 
 export async function archiveLibraryProduct(productId:string):Promise<void> {
