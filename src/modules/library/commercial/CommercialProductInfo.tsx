@@ -21,7 +21,7 @@ export function ProductImage({photo, alt, className}: {photo: Pick<LibraryPhoto,
 }
 
 function Feature({icon:Icon,title}:{icon:typeof Layers3;title:string}) {
-  return <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/25 px-3 py-3 text-xs font-medium">
+  return <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/25 px-3 py-3 text-sm font-medium">
     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="h-4 w-4"/></span>
     {title}
   </div>;
@@ -64,11 +64,11 @@ export default function CommercialProductInfo({product}:{product:LibraryPublicat
           <Badge variant="secondary" className="font-medium">{product.category}</Badge>
           <div className="space-y-3">
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">{product.name}</h2>
-            <p className="text-sm leading-6 text-muted-foreground">{product.description}</p>
+            <p className="text-[15px] leading-[1.65] text-muted-foreground">{product.description}</p>
           </div>
           {product.applications?.trim()&&<div className="space-y-2 border-t border-border/60 pt-4 xl:mt-7">
-            <h3 className="flex items-center gap-2 text-sm font-semibold"><Layers3 className="h-4 w-4 text-primary"/>Aplicações</h3>
-            <p className="text-sm leading-6 text-muted-foreground">{product.applications}</p>
+            <h3 className="flex items-center gap-2 text-base font-semibold"><Layers3 className="h-4 w-4 text-primary"/>Aplicações</h3>
+            <p className="text-[15px] leading-[1.65] text-muted-foreground">{product.applications}</p>
           </div>}
         </div>
         <div className="min-w-0">
@@ -76,7 +76,7 @@ export default function CommercialProductInfo({product}:{product:LibraryPublicat
             <ProductImage photo={current} alt={current.title||product.name} className="aspect-[4/3] w-full rounded-xl object-cover transition-transform duration-300 group-hover:scale-[1.03]"/>
             <span className="absolute bottom-3 right-3 rounded-full bg-background/85 p-2 shadow"><Maximize2 className="h-4 w-4"/></span>
           </button>:<div className="flex aspect-[4/3] items-center justify-center rounded-xl bg-muted/60 text-muted-foreground" role="img" aria-label="Produto sem fotografias publicadas">
-            <div className="space-y-2 text-center"><ImageIcon className="mx-auto h-10 w-10"/><p className="text-xs">Sem fotografias publicadas</p></div>
+            <div className="space-y-2 text-center"><ImageIcon className="mx-auto h-10 w-10"/><p className="text-sm">Sem fotografias publicadas</p></div>
           </div>}
         </div>
       </div>
@@ -89,25 +89,25 @@ export default function CommercialProductInfo({product}:{product:LibraryPublicat
       <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">{features.map(x=><Feature key={x.title} {...x}/>)}</div>
     </div>
     <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:p-6">
-      <h3 className="mb-3 flex items-center gap-2 text-base font-semibold"><Star className="h-5 w-5 text-primary"/>Destaques do produto</h3>
+      <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold"><Star className="h-5 w-5 text-primary"/>Destaques do produto</h3>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {highlightItems.map(({title,value,Icon})=><div key={title} className="rounded-xl border border-border/50 bg-muted/25 p-3">
-          <Icon className="mb-2 h-4 w-4 text-primary"/><p className="text-[11px] text-muted-foreground">{title}</p>
-          <p className="mt-1 text-xs font-medium">{value}</p>
+          <Icon className="mb-2 h-4 w-4 text-primary"/><p className="text-[13px] text-muted-foreground">{title}</p>
+          <p className="mt-1 text-sm font-medium leading-5">{value}</p>
         </div>)}
       </div>
     </div>
     <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:p-6">
-      <h3 className="mb-4 flex items-center gap-2 text-base font-semibold"><FileImage className="h-5 w-5 text-primary"/>Orientações comerciais</h3>
-      {guidance.length?<div className="space-y-3">{guidance.map((item,i)=><p key={i} className="flex items-start gap-3 text-sm leading-6 text-muted-foreground">
+      <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold"><FileImage className="h-5 w-5 text-primary"/>Orientações comerciais</h3>
+      {guidance.length?<div className="space-y-3">{guidance.map((item,i)=><p key={i} className="flex items-start gap-3 text-[15px] leading-[1.65] text-muted-foreground">
         <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-primary"/>{item}
-      </p>)}</div>:<p className="text-sm text-muted-foreground">Consulte os campos e orientações do produto antes de preparar a descrição.</p>}
+      </p>)}</div>:<p className="text-[15px] text-muted-foreground">Consulte os campos e orientações do produto antes de preparar a descrição.</p>}
     </div>
     <Dialog open={zoom} onOpenChange={setZoom}>
       <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader><DialogTitle>{current?.title||product.name}</DialogTitle></DialogHeader>
         {current&&<ProductImage photo={current} alt={current.title||product.name} className="max-h-[70vh] w-full rounded-lg object-contain"/>}
-        {current?.caption&&<p className="text-sm text-muted-foreground">{current.caption}</p>}
+        {current?.caption&&<p className="text-[15px] text-muted-foreground">{current.caption}</p>}
       </DialogContent>
     </Dialog>
   </section>;
