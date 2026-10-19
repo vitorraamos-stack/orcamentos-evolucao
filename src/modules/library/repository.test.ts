@@ -46,7 +46,8 @@ describe("Biblioteca V28 — ciclo de vida com Supabase simulado (sem escritas r
     supabaseMock.from.mockReturnValue({ select });
 
     expect(await listLibraryDrafts()).toEqual([product]);
-    expect(supabaseMock.from).toHaveBeenCalledExactlyOnceWith("library_products");
+    expect(supabaseMock.from).toHaveBeenCalledOnce();
+    expect(supabaseMock.from).toHaveBeenCalledWith("library_products");
     expect(select).toHaveBeenCalledWith(
       "id,draft,revision,status,published_version,published_revision,updated_at"
     );
@@ -65,7 +66,8 @@ describe("Biblioteca V28 — ciclo de vida com Supabase simulado (sem escritas r
     supabaseMock.from.mockReturnValue({ select });
 
     expect(await listLibraryPublications()).toEqual([publication]);
-    expect(supabaseMock.from).toHaveBeenCalledExactlyOnceWith("library_publications");
+    expect(supabaseMock.from).toHaveBeenCalledOnce();
+    expect(supabaseMock.from).toHaveBeenCalledWith("library_publications");
     expect(select).toHaveBeenCalledWith("product_id,version,content,published_at");
   });
 
@@ -133,7 +135,8 @@ describe("Biblioteca V28 — ciclo de vida com Supabase simulado (sem escritas r
   it("publica pela RPC usando ID do produto e revisão esperada", async () => {
     supabaseMock.rpc.mockResolvedValue({ data: 2, error: null });
     expect(await publishLibraryDraft(product)).toBe(2);
-    expect(supabaseMock.rpc).toHaveBeenCalledExactlyOnceWith(
+    expect(supabaseMock.rpc).toHaveBeenCalledOnce();
+    expect(supabaseMock.rpc).toHaveBeenCalledWith(
       "library_publish_product",
       { p_product_id: product.id, p_expected_revision: 3 }
     );
