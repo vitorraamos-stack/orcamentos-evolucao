@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { LibraryComplement, LibraryComplementTemplate, LibraryField, LibraryPhoto, LibraryTemplate } from "./model";
+import { optimizeLibraryImage, type OptimizedLibraryImage } from "./image-optimization";
 
 const bucket="library-product-images";
 
@@ -53,17 +54,34 @@ export async function signedLibraryImageUrl(uri:string):Promise<string> {
   return data.signedUrl;
 }
 
-const allowedMime=new Map([["image/jpeg","jpg"],["image/png","png"],["image/webp","webp"]]);
+export type LibraryUploadedPhoto = {
+  photo: Pick<LibraryPhoto, "id" | "url" | "title" | "kind" | "caption" | "visibility">;
+  optimization: OptimizedLibraryImage;
+};
 
-export async function uploadLibraryPhoto(productId:string,file:File):Promise<Pick<LibraryPhoto,"id"|"url"|"title"|"kind"|"caption"|"visibility">> {
-  const ext=allowedMime.get(file.type);
-  if(!ext)throw new Error("Use imagens JPG, PNG ou WebP.");
-  if(file.size>8*1024*1024)throw new Error("A imagem não pode ultrapassar 8 MB.");
-  if(file.size===0)throw new Error("A imagem está vazia.");
-  if(!/^[0-9a-f-]{36}$/i.test(productId))throw new Error("É necessário salvar o produto antes de enviar imagens.");
-  const id=crypto.randomUUID(),path=`${productId}/${id}.${ext}`;
-  const {error}=await supabase.storage.from(bucket).upload(path,file,{contentType:file.type,upsert:false,cacheControl:"3600"});
-  if(error)throw error;
-  return {id,url:libraryPhotoUri(path),title:file.name.replace(/\.[^.]+$/,"").slice(0,120),
-    caption:"",kind:"application",visibility:"consultor"};
+/**
+ * Original camera uploads are optimized locally, not persisted. Only the
+ * resulting JPEG/PNG/WebP Blob crosses the network and occupies bucket space.
+ */
+export async function uploadLibraryPhoto(productId: string, file: File): Promise<LibraryUploadedPhoto> {
+  if (!/^[0-9a-f-]{36}$/i.test(productId)) {
+    throw new Error("É necessário salvar o produto antes de enviar imagens.");
+  }
+  const optimized = await optimizeLibraryImage(file);
+  const id = crypto.randomUUID();
+  const path = `${productId}/${id}.${optimized.extension}`;
+  const { error } = await supabase.storage.from(bucket).upload(path, optimized.blob, {
+    contentType: optimized.mimeType,
+    upsert: false,
+    cacheControl: "3600",
+  });
+  if (error) throw error;
+  return {
+    optimization: optimized,
+    photo: {
+      id, url: libraryPhotoUri(path),
+      title: file.name.replace(/\.[^.]+$/, "").slice(0, 120),
+      caption: "", kind: "application", visibility: "consultor",
+    },
+  };
 }
