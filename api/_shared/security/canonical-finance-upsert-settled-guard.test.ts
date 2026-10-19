@@ -55,7 +55,7 @@ describe("Canonical finance: settled installment immutability candidate", () => 
     expect(executable).not.toMatch(/(?:^|\n)\s*(?:ALTER|CREATE|DROP|GRANT|REVOKE|UPDATE|INSERT|DELETE|CALL|DO|SET|BEGIN)\b/i);
     expect(doc).toContain("PR #523 permanece");
     expect(doc).toContain("Exclusão direta de OS");
-    expect(doc).toContain("não foi");
+    expect(doc).toContain("nenhuma das propriedades acima foi executada em");
     expect(doc).toContain("idempotência e concorrência");
   });
 });
