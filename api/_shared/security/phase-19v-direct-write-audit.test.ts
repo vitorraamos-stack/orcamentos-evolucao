@@ -13,18 +13,26 @@ const proposal = read("docs/tasks/phase-19v-atomic-finalization-PROPOSAL.sql");
 const audit = read("docs/tasks/phase-19v-direct-write-security-audit.md");
 
 describe("19V: documented security audit, static and non-mutating", () => {
-  it("captures the existing non-atomic status/event submission", () => {
+  it("requires the current atomic payment finalization instead of legacy separate writes", () => {
     const start = detail.indexOf("const handlePaymentSubmit = async () => {");
     const stop = detail.indexOf("\n  if (loading) {", start);
     const handler = detail.slice(start, stop);
     expect(start).toBeGreaterThan(-1);
     expect(stop).toBeGreaterThan(start);
-    expect(handler.indexOf("payment_status: nextStatus"))
-      .toBeLessThan(handler.indexOf('type: "PAYMENT_SUBMITTED"'));
-    expect(handler).toContain("createOsEvent({");
-    expect(handler).toContain("updateOs(order.id, {");
-    expect(api).toContain("export const updateOsPaymentStatus = async (");
-    expect(api).toContain('from("os_event")');
+    const rpcStart = handler.indexOf('stage = "finalization_started"');
+    const rpcCall = handler.indexOf("await finalizeLegacyPaymentSubmission(proof.id)");
+    const rpcComplete = handler.indexOf('stage = "complete"');
+    expect(rpcStart).toBeGreaterThan(-1);
+    expect(rpcCall).toBeGreaterThan(rpcStart);
+    expect(rpcComplete).toBeGreaterThan(rpcCall);
+    expect(handler).toContain("hasOwnSubmittedPaymentEvent(");
+    expect(handler).not.toContain("updateOs(order.id, {");
+    expect(handler).not.toContain("createOsEvent({");
+    expect(handler).not.toContain('type: "PAYMENT_SUBMITTED"');
+    expect(api).toContain("export const finalizeLegacyPaymentSubmission = async (");
+    expect(api).toContain('supabase.rpc("finalize_legacy_payment_submission", {');
+    expect(api).toContain("p_proof_id: proofId");
+    expect(api).not.toContain("export const updateOsPaymentStatus = async (");
   });
 
   it("separates finance writes from unrelated production/arte board changes", () => {
