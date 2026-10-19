@@ -2,7 +2,7 @@ import { describe,expect,it } from "vitest";
 import { emptyLibraryDraft, libraryFieldVisible, libraryMissingFields, validateLibraryDraft } from "./model";
 import { readFileSync } from "node:fs";
 
-const migration=readFileSync(new URL("../../../supabase/migrations/20261016232000_library_v28_individual.sql",import.meta.url),"utf8");
+const migration=readFileSync(new URL("../../../supabase/migrations/20261016213541_library_v28_individual.sql",import.meta.url),"utf8");
 const app=readFileSync(new URL("../../App.tsx",import.meta.url),"utf8");
 const page=readFileSync(new URL("./pages/LibraryV28Page.tsx",import.meta.url),"utf8");
 
@@ -18,6 +18,7 @@ describe("Biblioteca V28 individual",()=>{
     expect(page).not.toContain("Instalação conjunta");
     expect(app).toContain('import LibraryV28Page from "@/modules/library/pages/LibraryV28Page";');
     expect(app).toContain("<LibraryV28Page management />");
+    expect(app).toContain("<LibraryCommercialPage />");
   });
   it("protege as fotografias por produto publicado e permissões",()=>{
     expect(migration).toContain("public=false");
