@@ -95,9 +95,9 @@ export default function LibraryCommercialPage() {
   return <main className="mx-auto w-full max-w-[1600px] space-y-5 pb-12">
     <header className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <p className="text-xs text-muted-foreground">EvoluSystem / Comercial</p>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Biblioteca de Produtos</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Consulte e configure um produto por vez.</p>
+        <p className="text-[13px] text-muted-foreground">EvoluSystem / Comercial</p>
+        <h1 className="text-[26px] font-semibold tracking-tight sm:text-[32px]">Biblioteca de Produtos</h1>
+        <p className="mt-1 text-[15px] text-muted-foreground">Consulte e configure um produto por vez.</p>
       </div>
       <div className="flex flex-wrap gap-2">
         {isAdmin&&<Button variant="outline" onClick={()=>navigate("/biblioteca/gestao")}><Settings2 className="mr-2 h-4 w-4"/>Administrar</Button>}
@@ -105,36 +105,36 @@ export default function LibraryCommercialPage() {
       </div>
     </header>
 
-    {loadError&&<div role="alert" className="rounded-xl border border-destructive/35 bg-destructive/5 p-4 text-sm text-destructive">
+    {loadError&&<div role="alert" className="rounded-xl border border-destructive/35 bg-destructive/5 p-4 text-[15px] text-destructive">
       Não foi possível atualizar a Biblioteca: {loadError}
     </div>}
 
-    {loading?<div role="status" className="rounded-xl border p-10 text-center text-sm text-muted-foreground">Carregando produtos publicados...</div>
+    {loading?<div role="status" className="rounded-xl border p-10 text-center text-[15px] text-muted-foreground">Carregando produtos publicados...</div>
     :!selected?<section className="space-y-4">
-      {activeId&&<p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">O produto selecionado não está mais publicado. Escolha outro no catálogo.</p>}
+      {activeId&&<p className="rounded-lg bg-muted p-3 text-[15px] text-muted-foreground">O produto selecionado não está mais publicado. Escolha outro no catálogo.</p>}
       <div className="flex flex-wrap gap-2">
         <div className="relative min-w-[210px] flex-1">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground"/>
-          <Input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Buscar por produto, categoria ou descrição" className="pl-9" aria-label="Buscar na Biblioteca"/>
+          <Input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Buscar por produto, categoria ou descrição" className="pl-9 text-[15px] md:text-[15px]" aria-label="Buscar na Biblioteca"/>
         </div>
         <select aria-label="Filtrar categoria" value={category} onChange={event=>setCategory(event.target.value)}
-          className="h-10 min-w-[180px] rounded-lg border border-input bg-background px-3 text-sm">
+          className="h-10 min-w-[180px] rounded-lg border border-input bg-background px-3 text-[15px]">
           <option value="all">Todas as categorias</option>{categories.map(name=><option key={name} value={name}>{name}</option>)}
         </select>
       </div>
-      <p className="text-xs text-muted-foreground">{filtered.length} produto(s) publicados encontrados</p>
+      <p className="text-[13px] text-muted-foreground">{filtered.length} produto(s) publicados encontrados</p>
       {filtered.length===0?<div className="rounded-xl border border-dashed p-10 text-center">
         <BookOpen className="mx-auto h-8 w-8 text-muted-foreground"/>
-        <p className="mt-2 text-sm text-muted-foreground">Nenhum produto publicado corresponde à sua busca.</p>
+        <p className="mt-2 text-[15px] text-muted-foreground">Nenhum produto publicado corresponde à sua busca.</p>
       </div>:<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {filtered.map(item=><button key={item.product_id} type="button" onClick={()=>openProduct(item.product_id)}
           className="rounded-2xl border border-border/70 bg-card p-4 text-left shadow-sm transition-colors hover:border-primary/50 hover:bg-muted/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <div className="flex aspect-[16/7] items-center justify-center rounded-xl bg-muted/60"><Package className="h-9 w-9 text-muted-foreground"/></div>
-          <p className="mt-4 text-xs text-muted-foreground">{item.content.category}</p>
-          <h2 className="mt-1 text-base font-semibold">{item.content.name}</h2>
-          <p className="mt-2 line-clamp-2 min-h-[2.5rem] text-xs leading-5 text-muted-foreground">{item.content.description}</p>
+          <p className="mt-4 text-[13px] text-muted-foreground">{item.content.category}</p>
+          <h2 className="mt-1 text-lg font-semibold">{item.content.name}</h2>
+          <p className="mt-2 line-clamp-2 min-h-[3rem] text-[15px] leading-6 text-muted-foreground">{item.content.description}</p>
           <div className="mt-4 flex items-center justify-between"><Badge variant="secondary">Publicado</Badge>
-            <span className="text-xs text-muted-foreground">Versão {item.version}</span></div>
+            <span className="text-[13px] text-muted-foreground">Versão {item.version}</span></div>
         </button>)}
       </div>}
     </section>:<section className="space-y-4">
