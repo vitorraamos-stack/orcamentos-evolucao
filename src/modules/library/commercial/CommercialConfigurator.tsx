@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { LibraryField, LibraryPublication } from "../model";
 import { commercialGroups, type CommercialAssessment, type CommercialValues } from "./preparation";
+import { ProductImage } from "./CommercialProductInfo";
 
 const selectClass="h-10 w-full min-w-0 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
@@ -72,6 +73,8 @@ export default function CommercialConfigurator({
   photosConfirmed:boolean;onPhotosConfirmed:(value:boolean)=>void;assessment:CommercialAssessment;
   onCopy:(final:boolean)=>void;coping:boolean;
 }) {
+  const displayPhoto=(product.gallery||[]).filter(photo=>photo.url&&photo.kind!=="process").find(photo=>photo.cover)||
+    (product.gallery||[]).find(photo=>photo.url&&photo.kind!=="process");
   const groups=commercialGroups(product.fields||[]);
   const appliedGroups=groups.filter(group=>group.fields.some(f=>assessment.visibleFields.some(v=>v.id===f.id)));
   const renderGroup=(key:string)=>appliedGroups.find(group=>group.key===key);
@@ -104,7 +107,8 @@ export default function CommercialConfigurator({
     <header className="space-y-3">
       <h2 className="flex items-center gap-2 text-base font-semibold"><Layers3 className="h-5 w-5 text-primary"/>Configurar produto</h2>
       <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/30 p-3">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10"><Package className="h-6 w-6 text-primary"/></span>
+        {displayPhoto?<ProductImage photo={displayPhoto} alt={displayPhoto.title||product.name} className="h-12 w-14 shrink-0 rounded-lg object-cover"/>:
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10"><Package className="h-6 w-6 text-primary"/></span>}
         <div className="min-w-0"><p className="truncate text-sm font-semibold">{product.name}</p><p className="text-xs text-muted-foreground">{product.category}</p></div>
         <Badge variant="secondary" className="ml-auto shrink-0 text-[10px]">Individual</Badge>
       </div>

@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, FileImage, Image as ImageIcon, Layers3, Maximize2, Paintbrush, Wrench } from "lucide-react";
+import { CheckCircle2, FileImage, Image as ImageIcon, Layers3, Maximize2, Paintbrush, Wrench, Star, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { signedLibraryImageUrl } from "../assets";
 import type { LibraryPhoto, LibraryPublication } from "../model";
 
-function ProductImage({photo, alt, className}: {photo: Pick<LibraryPhoto,"url"|"title">;alt:string;className:string}) {
+export function ProductImage({photo, alt, className}: {photo: Pick<LibraryPhoto,"url"|"title">;alt:string;className:string}) {
   const [src,setSrc]=useState("");
   useEffect(()=>{
     let mounted=true;
@@ -44,6 +44,17 @@ export default function CommercialProductInfo({product}:{product:LibraryPublicat
     ...(fieldIds.has("instalacao")?[{title:"Instalação opcional",icon:Wrench}]:[]),
     ...(fieldIds.has("arte_vetorial")?[{title:"Arte vetorial",icon:FileImage}]:[]),
   ];
+  const thickness=product.fields.find(f=>f.id==="espessura" && f.visibility!=="internal");
+  const finish=product.fields.find(f=>f.id==="acabamento" && f.visibility!=="internal");
+  const installation=product.fields.find(f=>f.id==="instalacao" && f.visibility!=="internal");
+  const highlightItems=[
+    ...(thickness?.options?.length?[{title:"Espessuras",value:thickness.options.length>1?
+      thickness.options[0].replace(/\s*mm$/i,"")+" a "+thickness.options[thickness.options.length-1]:
+      thickness.options[0],Icon:Layers3}]:[]),
+    ...(finish?[{title:"Acabamento",value:"Opções configuráveis",Icon:Paintbrush}]:[]),
+    ...(installation?[{title:"Instalação",value:"Sob avaliação",Icon:Wrench}]:[]),
+    {title:"Orçamento",value:"Sem preço automático",Icon:FileText},
+  ];
   const text=product.guidance?.trim() || "";
   const guidance=text.split(/(?:\r?\n|(?<=[.!?])\s+(?=[A-ZÀ-Ú]))/).map(x=>x.trim()).filter(Boolean);
   return <section className="space-y-4">
@@ -76,6 +87,15 @@ export default function CommercialProductInfo({product}:{product:LibraryPublicat
         </button>)}
       </div>}
       <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">{features.map(x=><Feature key={x.title} {...x}/>)}</div>
+    </div>
+    <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:p-6">
+      <h3 className="mb-3 flex items-center gap-2 text-base font-semibold"><Star className="h-5 w-5 text-primary"/>Destaques do produto</h3>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {highlightItems.map(({title,value,Icon})=><div key={title} className="rounded-xl border border-border/50 bg-muted/25 p-3">
+          <Icon className="mb-2 h-4 w-4 text-primary"/><p className="text-[11px] text-muted-foreground">{title}</p>
+          <p className="mt-1 text-xs font-medium">{value}</p>
+        </div>)}
+      </div>
     </div>
     <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:p-6">
       <h3 className="mb-4 flex items-center gap-2 text-base font-semibold"><FileImage className="h-5 w-5 text-primary"/>Orientações comerciais</h3>
