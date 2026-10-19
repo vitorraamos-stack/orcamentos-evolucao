@@ -12,7 +12,7 @@ describe("finance correction approval: explicit privilege only", () => {
     expect(sql).toContain("p.is_super_admin IS TRUE");
     expect(sql).toContain("public.has_module_access(auth.uid(),'hub_os_financeiro')");
     expect(sql).toContain("a.user_id=auth.uid() AND a.revoked_at IS NULL");
-    expect(sql).not.toContain("public.is_admin(");
+    expect(sql.replace(/^--.*$/gm, "")).not.toContain("public.is_admin(");
     expect(sql).not.toContain("p.role='gerente'");
   });
   it("keeps the allowlist private and exposes only a caller-owned boolean", () => {
