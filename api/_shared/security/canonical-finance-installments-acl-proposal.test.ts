@@ -15,6 +15,8 @@ describe("canonical finance privileges — review only", () => {
     expect(candidate).toContain("REVOKE INSERT, UPDATE, DELETE, TRUNCATE, TRIGGER, REFERENCES, MAINTAIN");
     expect(candidate).toContain("GRANT UPDATE (status, notes, reviewed_at, reviewed_by)");
     expect(candidate).toContain("CANONICAL_FINANCE_ACL_POSTCHECK_FAILED");
+    expect(candidate).toContain("CANONICAL_FINANCE_ORDER_DIRECT_DELETE_BYPASS_UNRESOLVED");
+    expect(candidate).toContain("CANONICAL_FINANCE_UPSERT_RECONCILIATION_RESET_UNRESOLVED");
     expect(candidate).not.toMatch(/\b(?:CREATE TABLE|ALTER TABLE|DROP TABLE|UPDATE public\.|INSERT INTO public\.|DELETE FROM public\.)/i);
     expect(candidate).not.toMatch(/\b(?:REVOKE|GRANT)[^;]*\b(?:service_role|postgres)\s*;/i);
     expect(candidate).not.toContain("ALTER POLICY");
@@ -38,5 +40,12 @@ describe("canonical finance privileges — review only", () => {
     expect(review).toContain("integrações externas");
     expect(review).toContain("reviewed_by");
     expect(review).toContain("nova autorização explícita");
+    expect(review).toContain("Risco A");
+    expect(review).toContain("Risco B");
+    expect(review).toContain("não tem gatilho BEFORE DELETE");
+    const guards = read("docs/tasks/canonical-finance-integrity-blockers-READ-ONLY.sql");
+    const sqlOnly = guards.replace(/^--.*$/gm, "");
+    expect(sqlOnly.trimStart().startsWith("SELECT")).toBe(true);
+    expect(sqlOnly).not.toMatch(/(?:^|\n)\s*(?:ALTER|CREATE|DROP|GRANT|REVOKE|UPDATE|INSERT|DELETE|DO|SET ROLE)\b/i);
   });
 });

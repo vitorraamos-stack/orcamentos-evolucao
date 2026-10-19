@@ -8,6 +8,10 @@
 --   by the existing Financeiro/Pendentes UI, subject to existing RLS;
 -- * preserve service_role and postgres owner grants completely;
 -- * retain finance_upsert_from_asset SECURITY DEFINER workflow.
+-- DEPENDENCY BLOCK: do not apply until direct authenticated DELETE on
+-- os_orders is closed, and finance_upsert_from_asset no longer resets
+-- reconciled installments on repeated uploads. Follow-up DDL must be
+-- separately reviewed; current candidate intentionally fails preflight.
 -- IMPORTANT: This is not an end-to-end security certification.
 -- The four editable columns still require a future transition to
 -- a server-side reviewer-bound RPC for full attribution assurance.
@@ -16,6 +20,28 @@ DO $preflight$
 BEGIN
   IF current_user <> 'postgres' THEN
     RAISE EXCEPTION 'CANONICAL_FINANCE_WRONG_EXECUTOR' USING ERRCODE='42501';
+  END IF;
+
+  -- A direct DELETE on the parent bypasses the safe deletion RPC and
+  -- cascades to installments/assets. This must be fixed before rollout.
+  IF has_table_privilege('authenticated','public.os_orders','DELETE')
+    OR has_table_privilege('anon','public.os_orders','DELETE')
+  THEN
+    RAISE EXCEPTION 'CANONICAL_FINANCE_ORDER_DIRECT_DELETE_BYPASS_UNRESOLVED'
+      USING ERRCODE='55000';
+  END IF;
+
+  -- Existing privileged receipt RPC resets reconciled statuses and
+  -- rewrites proof links on conflict. This is a prerequisite block,
+  -- not a rewrite of financial history. After remediation, re-audit
+  -- and update the approved SQL hash and compatibility checks.
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p
+    WHERE p.oid='public.finance_upsert_from_asset(uuid,uuid,text,date)'::regprocedure
+      AND md5(p.prosrc)='9bc1567dad2ab1640a82bf9893fc8ef3'
+  ) THEN
+    RAISE EXCEPTION 'CANONICAL_FINANCE_UPSERT_RECONCILIATION_RESET_UNRESOLVED'
+      USING ERRCODE='55000';
   END IF;
 
   IF NOT EXISTS (
