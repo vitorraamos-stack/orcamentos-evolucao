@@ -29,6 +29,7 @@ import DeliveriesPage from "@/modules/deliveries/pages/DeliveriesPage";
 import AwaitingSuppliesPage from "@/modules/supplies/pages/AwaitingSuppliesPage";
 import PrintingInventoryPage from "@/modules/printing/pages/PrintingInventoryPage";
 import LibraryV28Page from "@/modules/library/pages/LibraryV28Page";
+import LibraryCommercialPage from "@/modules/library/commercial/LibraryCommercialPage";
 import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -155,7 +156,7 @@ function Router() {
       <Route path="/biblioteca">
         <Layout>
           <RequireModule moduleKey="biblioteca_produtos">
-            {hubPermissions.canCreateOs ? <LibraryV28Page /> : <Redirect to="/" />}
+            {hubPermissions.canCreateOs ? <LibraryCommercialPage /> : <Redirect to="/" />}
           </RequireModule>
         </Layout>
       </Route>
