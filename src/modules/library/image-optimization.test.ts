@@ -12,7 +12,7 @@ describe("Biblioteca de Produtos — otimização de fotografias",()=>{
     expect(fitLibraryImage(4000,2000,1800)).toEqual({width:1800,height:900});
     expect(fitLibraryImage(2000,4000,1800)).toEqual({width:900,height:1800});
     expect(fitLibraryImage(350,200,1800)).toEqual({width:350,height:200});
-    expect(fitLibraryImage(0,200,1800)).toThrow(/dimensões/);
+    expect(()=>fitLibraryImage(0,200,1800)).toThrow(/dimensões/);
   });
 
   it("rejeita arquivos vazios, formatos inválidos e originais grandes demais",()=>{
