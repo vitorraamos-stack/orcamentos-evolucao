@@ -267,7 +267,7 @@ describe("OfficialCostingCalculationService", () => {
     ).rejects.toMatchObject({ code: "SERVER_MANAGED_TECHNICAL_INPUT" });
   });
 
-  it("loads unique resources in deterministic type/id order", async () => {
+  it("does not load any resources for components excluded by a false condition", async () => {
     const specifications = [
       [
         "PROCESS",
@@ -319,13 +319,121 @@ describe("OfficialCostingCalculationService", () => {
       () => "2026-10-05T12:00:00Z"
     );
     await service.calculate(request);
-    expect(costing.loadResource.mock.calls).toEqual([
-      ["FIXED_COST", "10000000-0000-4000-8000-000000000022"],
-      ["MATERIAL", ids.resource],
-      ["OUTSOURCED_SERVICE", "10000000-0000-4000-8000-000000000021"],
-      ["PROCESS", "10000000-0000-4000-8000-000000000020"],
-    ]);
+    expect(costing.loadResource).not.toHaveBeenCalled();
   });
+  it.each(["2", "3", "5", "10", "15", "20", "30"])(
+    "loads only the matching CNC cut tariff for PVC %s mm", async thickness => {
+      const choices = ["2", "3", "5", "10", "15", "20", "30"];
+      const cutResourceId = (n: number) =>
+        `10000000-0000-4000-8000-${String(100 + n).padStart(12, "0")}`;
+      const parts = choices.map((candidate, i) => ({
+        id: `10000000-0000-4000-8000-${String(200 + i).padStart(12, "0")}`,
+        type: "OUTSOURCED_SERVICE",
+        outsourcedServiceId: cutResourceId(i),
+        label: `Corte CNC PVC ${candidate} mm`,
+        sortOrder: i,
+        quantityScope: "PER_UNIT",
+        quantityExpression: { type: "decimal_literal", value: "1", unit: "un" },
+        quantityUnit: "un",
+        condition: {
+          type: "binary", operator: "EQ",
+          left: { type: "reference", key: "thickness" },
+          right: { type: "string_literal", value: candidate },
+        },
+      }));
+      const paintResourceId = cutResourceId(7);
+      parts.push({
+        id: `10000000-0000-4000-8000-${String(207).padStart(12, "0")}`,
+        type: "MATERIAL",
+        materialId: paintResourceId,
+        label: "Tinta automotiva",
+        sortOrder: 7,
+        quantityScope: "PER_UNIT",
+        quantityExpression: { type: "decimal_literal", value: "1", unit: "un" },
+        quantityUnit: "un",
+        condition: {
+          type: "binary", operator: "GT",
+          left: { type: "reference", key: "number_of_colors" },
+          right: { type: "decimal_literal", value: "0" },
+        },
+      } as never);
+
+      const inputs = [
+        {
+          id: "10000000-0000-4000-8000-000000000041",
+          key: "thickness", label: "Espessura",
+          type: "SELECT", required: true, sortOrder: 0,
+          options: choices.map(n => ({ value: n, label: n + " mm" })),
+        },
+        {
+          id: "10000000-0000-4000-8000-000000000042",
+          key: "number_of_colors", label: "Número de cores",
+          type: "DECIMAL", unit: null, required: true, sortOrder: 1,
+          defaultValue: "0",
+        },
+      ];
+      const def = definition("PUBLISHED", parts as never, inputs);
+      const costing = {
+        loadProductParameters: vi.fn(async () => []),
+        loadResource: vi.fn(async (type: string, id: string) => ({
+          resource: {
+            id, type, code: "PVC", name: "Serviço de corte CNC",
+            description: "", status: "ACTIVE", costUnit: "un",
+          },
+          rates: [{
+            id: ids.rateA, type, outsourcedServiceId: id,
+            amount: "20", currency: "BRL", unit: "un",
+            effectiveFrom: "2026-01-01T00:00:00Z", effectiveTo: null,
+          }],
+        })),
+      };
+      const service = new OfficialCostingCalculationService(
+        { loadDefinition: vi.fn(async () => def) },
+        costing as never, () => "2026-10-05T12:00:00Z"
+      );
+      const result = await service.calculate(officialCostingRequestSchema.parse({
+        productVersionId: ids.version,
+        request: {
+          commercialQuantity: "2",
+          technicalInputs: { thickness: { kind: "string", value: thickness } },
+        },
+      }));
+      expect(costing.loadResource.mock.calls).toEqual([
+        ["OUTSOURCED_SERVICE", cutResourceId(choices.indexOf(thickness))],
+      ]);
+      expect(result.totalCost.amount).toBe("40");
+      expect(result.components).toHaveLength(8);
+      expect(result.components.filter(c => c.included)).toHaveLength(1);
+      expect(result.components.filter(c => !c.included)).toHaveLength(7);
+      expect(result.components.filter(c => !c.included)
+        .every(c => !c.rate && !c.resource)).toBe(true);
+    }
+  );
+
+  it("requires a vigente cost rate for a TRUE condition even when quantity is zero", async () => {
+    const zeroPart = component({
+      quantityExpression: { type: "decimal_literal", value: "0", unit: "un" },
+      condition: { type: "boolean_literal", value: true },
+    });
+    const { service, costing } = setup(definition("PUBLISHED", [zeroPart]), resource([]));
+    await expect(service.calculate(request)).rejects.toMatchObject({
+      code: "MISSING_COST_RATE",
+    });
+    expect(costing.loadResource).toHaveBeenCalledOnce();
+  });
+
+  it("rejects unknown technical inputs before fetching any cost resource", async () => {
+    const { service, costing } = setup();
+    await expect(service.calculate(officialCostingRequestSchema.parse({
+      productVersionId: ids.version,
+      request: {
+        commercialQuantity: "1",
+        technicalInputs: { unknown: { kind: "decimal", value: "1", unit: null } },
+      },
+    }))).rejects.toMatchObject({ code: "UNKNOWN_TECHNICAL_INPUT" });
+    expect(costing.loadResource).not.toHaveBeenCalled();
+  });
+
 });
 
 describe("officialCostingRequestSchema", () => {
