@@ -87,7 +87,7 @@ describe("PR 31E — coordinator de autosave com revisão otimista", () => {
     expect(await second.subject.flush(true)).toBe(false);
     expect(save).toHaveBeenCalledTimes(2);
     expect(database.draft.name).toBe("Admin 1");
-    expect(second.subject.getBaseline()?.draft.name).toBe("Original");
+    expect(second.subject.getBaseline()?.draft.name).toBe("Letreiro");
     second.subject.acceptServerRecord(database);
     expect(second.subject.getSnapshot()).toMatchObject({status:"saved",dirty:false,revision:4});
   });
@@ -105,6 +105,17 @@ describe("PR 31E — coordinator de autosave com revisão otimista", () => {
     expect(save).toHaveBeenCalledOnce();
     expect(await subject.flush(true)).toBe(true);
     expect(save.mock.calls[1][1].name).toBe("PVC offline novamente");
+  });
+
+  it("aceita o JSONB com propriedades em outra ordem sem perder confirmação", async () => {
+    const reordered = vi.fn(async (base: LibraryProductRecord, draft:LibraryProductRecord["draft"]) => ({
+      ...base, revision: base.revision + 1,
+      draft: Object.fromEntries(Object.entries(draft).reverse()) as LibraryProductRecord["draft"],
+    }));
+    const { subject } = setup(reordered);
+    subject.edit(modify(record(), "PVC com chaves reordenadas"));
+    expect(await subject.flush()).toBe(true);
+    expect(subject.getSnapshot()).toMatchObject({ status: "saved", dirty: false, revision: 4 });
   });
 
   it("não aplica o retorno de uma requisição antiga após troca de ficha", async () => {
