@@ -72,6 +72,24 @@ export function projectPublishedCommercialContent(raw: unknown) {
 export class PublishedCommercialAdapterService {
   constructor(private readonly db: any) {}
 
+  async loadByLibraryProductId(
+    libraryProductId: string
+  ): Promise<PublishedCommercialAdapterResult> {
+    const { data, error } = await this.db.from("product_commercial_links")
+      .select("product_id").eq("library_product_id", libraryProductId).maybeSingle();
+    if (error) unavailable();
+    if (!data) throw new PublishedCommercialAdapterError(
+      404, "PRODUCT_NOT_LINKED", "This product does not have a commercial link."
+    );
+    // Keep all publication, active-status and version checks in load().
+    const publication = await this.load(data.product_id);
+    if (publication.libraryProductId !== libraryProductId)
+      throw new PublishedCommercialAdapterError(
+        409, "LINK_CHANGED", "The linked product has changed."
+      );
+    return publication;
+  }
+
   async load(productId: string): Promise<PublishedCommercialAdapterResult> {
     // The canonical link, not a text match, selects the commercial publication.
     const link = await this.db.from("product_commercial_links")

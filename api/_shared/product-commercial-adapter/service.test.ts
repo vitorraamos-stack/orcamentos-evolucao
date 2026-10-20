@@ -108,6 +108,24 @@ describe("published commercial adapter 31B", () => {
     expect(calls).not.toContain("costing_configuration_audit_events");
   });
 
+  it("resolves published library ID to the same canonical technical product", async () => {
+    const { service, calls } = mockDb();
+    const result=await service.loadByLibraryProductId(LIBRARY);
+    expect(result.libraryProductId).toBe(LIBRARY);
+    expect(result.productId).toBe(PRODUCT);
+    expect(calls.slice(0,2)).toEqual([
+      "product_commercial_links","product_commercial_links",
+    ]);
+  });
+
+  it("does not attach an unlinked library product", async () => {
+    const { service, calls } = mockDb({ linked: false });
+    await expect(service.loadByLibraryProductId(LIBRARY)).rejects.toMatchObject({
+      status:404,code:"PRODUCT_NOT_LINKED",
+    });
+    expect(calls).toEqual(["product_commercial_links"]);
+  });
+
   it("returns a commercial preparation even without published engineering", async () => {
     const { service } = mockDb({ engineering: false });
     const result = await service.load(PRODUCT);

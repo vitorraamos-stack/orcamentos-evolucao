@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, BookOpen, Package, RefreshCw, Search, Settings2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -11,11 +11,13 @@ import { listLibraryPublications } from "../repository";
 import CommercialProductInfo from "./CommercialProductInfo";
 import CommercialConfigurator from "./CommercialConfigurator";
 import { assessCommercialConfiguration, copyCommercialText } from "./preparation";
+import { checkCommercialEstimator } from "./estimatorRepository";
+import { stageCommercialHandoff } from "../../estimator/commercialHandoff";
 
 const describeError=(error:unknown)=>error instanceof Error?error.message:"Erro ao carregar os produtos.";
 
 export default function LibraryCommercialPage() {
-  const {isAdmin}=useAuth();
+  const {isAdmin,user,hasModuleAccess}=useAuth();
   const [,navigate]=useLocation();
   const [products,setProducts]=useState<LibraryPublishedRecord[]>([]);
   const [loading,setLoading]=useState(true);
@@ -28,6 +30,10 @@ export default function LibraryCommercialPage() {
   const [selectedComplementIds,setSelectedComplementIds]=useState<string[]>([]);
   const [photosConfirmed,setPhotosConfirmed]=useState(false);
   const [copying,setCopying]=useState(false);
+  const [checkingEstimator,setCheckingEstimator]=useState(false);
+  const [estimatorMessage,setEstimatorMessage]=useState("");
+  const editSequence=useRef(0);
+  const canUseEstimator=hasModuleAccess("calculadora");
 
   const reload=useCallback(async()=>{
     try {
@@ -49,14 +55,18 @@ export default function LibraryCommercialPage() {
     assessCommercialConfiguration(published,values,selectedComplementIds,photosConfirmed):null,
   [published,values,selectedComplementIds,photosConfirmed]);
 
+  const invalidateEstimator=()=>{editSequence.current+=1;setEstimatorMessage("");};
   const openProduct=(productId:string)=>{
+    invalidateEstimator();
     setActiveId(productId);setValues({});setSelectedComplementIds([]);setPhotosConfirmed(false);
     window.scrollTo({top:0,behavior:"smooth"});
   };
   const back=()=>{
+    invalidateEstimator();
     setActiveId(null);setValues({});setSelectedComplementIds([]);setPhotosConfirmed(false);
   };
   const handleChange=(id:string,value:unknown)=>{
+    invalidateEstimator();
     setValues(old=>{
       const next={...old,[id]:value};
       if(id==="instalacao"&&value!=="Sim") {
@@ -87,8 +97,45 @@ export default function LibraryCommercialPage() {
     }catch(error){toast.error(describeError(error));}
     finally{setCopying(false);}
   };
+  const verifyAndOpenEstimator=async()=>{
+    if(!selected||!published||!user||!canUseEstimator||
+       !assessment||assessment.status!=="ready"||checkingEstimator)return;
+    const sequence=++editSequence.current;
+    const localValues=structuredClone(values);
+    const complements=[...selectedComplementIds];
+    const photos=photosConfirmed;
+    setEstimatorMessage("");setCheckingEstimator(true);
+    try{
+      const result=await checkCommercialEstimator(
+        selected.product_id,selected.version,localValues,complements,photos
+      );
+      // Input or selection changed during the two network requests.
+      if(editSequence.current!==sequence)return;
+      if(result.eligibility.status!=="CALCULABLE"||
+         !result.eligibility.canAttemptCalculation){
+        const pending=result.eligibility.missing.join(", ") ||
+          result.eligibility.technicalNotes.join("; ");
+        const messages:Record<string,string>={
+          INCOMPLETE:"Complete as informações comerciais antes do cálculo.",
+          INVALID_COMBINATION:"A configuração contém valores incompatíveis.",
+          TECHNICAL_PENDING:"Esta configuração precisa de avaliação técnica.",
+          PREPARATION_ONLY:"Este produto pode ser preparado, mas ainda não possui cálculo automático liberado.",
+        };
+        setEstimatorMessage([messages[result.eligibility.status]||
+          "Cálculo indisponível.",pending].filter(Boolean).join(" "));
+        return;
+      }
+      stageCommercialHandoff(user.id,result,localValues,complements);
+      navigate("/orcamentista");
+    }catch(error){
+      if(editSequence.current===sequence)
+        setEstimatorMessage(describeError(error));
+    }finally{
+      setCheckingEstimator(false);
+    }
+  };
   const refresh=()=>{
-    setRefreshing(true);
+    invalidateEstimator();setRefreshing(true);
     void reload();
   };
 
@@ -145,9 +192,12 @@ export default function LibraryCommercialPage() {
         <CommercialProductInfo product={selected.content}/>
         {assessment&&<CommercialConfigurator key={selected.product_id}
           product={selected.content} values={values} onChange={handleChange}
-          selectedComplements={selectedComplementIds} onSelectedComplements={setSelectedComplementIds}
-          photosConfirmed={photosConfirmed} onPhotosConfirmed={setPhotosConfirmed}
-          assessment={assessment} onCopy={copy} coping={copying}/>}
+          selectedComplements={selectedComplementIds} onSelectedComplements={next=>{invalidateEstimator();setSelectedComplementIds(next);}}
+          photosConfirmed={photosConfirmed} onPhotosConfirmed={next=>{invalidateEstimator();setPhotosConfirmed(next);}}
+          assessment={assessment} onCopy={copy} coping={copying}
+          canUseEstimator={canUseEstimator} checkingEstimator={checkingEstimator}
+          estimatorMessage={estimatorMessage} onOpenEstimator={()=>void verifyAndOpenEstimator()}/>}
+
       </div>
     </section>}
   </main>;
