@@ -32,7 +32,8 @@ const component = (overrides: Record<string, unknown> = {}) => ({
 const definition = (
   status = "PUBLISHED",
   components = [component()],
-  inputs: readonly unknown[] = []
+  inputs: readonly unknown[] = [],
+  variables: readonly unknown[] = []
 ) =>
   productVersionDefinitionSchema.parse({
     schemaVersion: "1.0",
@@ -50,7 +51,7 @@ const definition = (
       publishedBy: ["PUBLISHED", "RETIRED"].includes(status) ? ids.user : null,
     },
     inputs,
-    variables: [],
+    variables,
     components,
   });
 
@@ -353,7 +354,7 @@ describe("OfficialCostingCalculationService", () => {
         quantityUnit: "un",
         condition: {
           type: "binary", operator: "GT",
-          left: { type: "reference", key: "number_of_colors" },
+          left: { type: "reference", key: "color_count" },
           right: { type: "decimal_literal", value: "0" },
         },
       } as never);
@@ -372,7 +373,15 @@ describe("OfficialCostingCalculationService", () => {
           defaultValue: "0",
         },
       ];
-      const def = definition("PUBLISHED", parts as never, inputs);
+      const def = definition("PUBLISHED", parts as never, inputs, [{
+        id: "10000000-0000-4000-8000-000000000043",
+        key: "color_count", label: "Cores arredondadas", sortOrder: 0,
+        expectedValueType: "DECIMAL", expectedUnit: null,
+        expression: {
+          type: "call", function: "CEIL",
+          arguments: [{ type: "reference", key: "number_of_colors" }],
+        },
+      }]);
       const costing = {
         loadProductParameters: vi.fn(async () => []),
         loadResource: vi.fn(async (type: string, id: string) => ({
@@ -381,7 +390,8 @@ describe("OfficialCostingCalculationService", () => {
             description: "", status: "ACTIVE", costUnit: "un",
           },
           rates: [{
-            id: ids.rateA, type, outsourcedServiceId: id,
+            id: ids.rateA, type,
+            ...(type === "MATERIAL" ? { materialId: id } : { outsourcedServiceId: id }),
             amount: "20", currency: "BRL", unit: "un",
             effectiveFrom: "2026-01-01T00:00:00Z", effectiveTo: null,
           }],
@@ -407,6 +417,25 @@ describe("OfficialCostingCalculationService", () => {
       expect(result.components.filter(c => !c.included)).toHaveLength(7);
       expect(result.components.filter(c => !c.included)
         .every(c => !c.rate && !c.resource)).toBe(true);
+      // The real published PVC model derives "color_count" via CEIL.
+      // When colors become positive, the paint resource must be loaded too.
+      costing.loadResource.mockClear();
+      const painted = await service.calculate(officialCostingRequestSchema.parse({
+        productVersionId: ids.version,
+        request: {
+          commercialQuantity: "2",
+          technicalInputs: {
+            thickness: { kind: "string", value: thickness },
+            number_of_colors: { kind: "decimal", value: "1", unit: null },
+          },
+        },
+      }));
+      expect(costing.loadResource.mock.calls).toEqual([
+        ["MATERIAL", paintResourceId],
+        ["OUTSOURCED_SERVICE", cutResourceId(choices.indexOf(thickness))],
+      ]);
+      expect(painted.components.filter(c => c.included)).toHaveLength(2);
+      expect(painted.totalCost.amount).toBe("80");
     }
   );
 
