@@ -5,7 +5,7 @@ const uuid = z.string().uuid();
 export const commercialEligibilityRequestSchema = z.object({
   productId: uuid,
   commercialVersion: z.number().int().positive(),
-  values: z.record(z.unknown()).refine(v => Object.keys(v).length <= 50,
+  values: z.record(z.string(), z.unknown()).refine(v => Object.keys(v).length <= 50,
     "Too many commercial fields."),
   selectedComplementIds: z.array(z.string().min(1)).max(30),
   photosConfirmed: z.boolean(),

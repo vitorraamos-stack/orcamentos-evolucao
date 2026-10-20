@@ -10,7 +10,7 @@ type Input = {
   type: string;
   unit?: string | null;
   required?: boolean;
-  defaultValue?: string;
+  defaultValue?: unknown;
   min?: string;
   max?: string;
   options?: Array<{ value: string; label: string }>;
