@@ -9,13 +9,7 @@ import {
   multiplyDecimal,
   type DecimalString,
 } from "../calculation-engine/decimal/index.js";
-import {
-  collectReferences,
-  evaluateExpression,
-  evaluateVariables,
-  type Expression,
-  type ExpressionValue,
-} from "../calculation-engine/expressions/index.js";
+import { evaluateExpression } from "../calculation-engine/expressions/index.js";
 import { convertUnit } from "../calculation-engine/units/index.js";
 import {
   validateProductVersionForPublication,
@@ -30,7 +24,10 @@ import {
   type CostingResourceBundle,
 } from "./aggregationContracts.js";
 import { CostingDomainError } from "./errors.js";
-import { resolveTechnicalInputs } from "./inputResolution.js";
+import {
+  ensureAvailableReferences,
+  resolveCostingComponentConditions,
+} from "./componentResolution.js";
 import { resolveEffectiveCostRate } from "./resolution.js";
 import type { ResourceDefinition } from "./resources.js";
 import { costableUnitIdSchema, convertCostQuantity } from "./units.js";
@@ -52,21 +49,6 @@ export const getComponentCostResourceReference = (
           ? component.outsourcedServiceId
           : component.fixedCostDefinitionId,
 });
-
-function ensureAvailableReferences(
-  expression: Expression,
-  missing: ReadonlySet<string>
-): void {
-  const key = collectReferences(expression).find(reference =>
-    missing.has(reference)
-  );
-  if (key)
-    throw new CostingDomainError(
-      "MISSING_TECHNICAL_INPUT",
-      `Missing technical input: ${key}`,
-      { key }
-    );
-}
 
 function resourceFor(
   component: ProductComponent,
@@ -144,42 +126,17 @@ export function aggregateCosting(
       );
     bundleKeys.add(key);
   }
-  const resolved = resolveTechnicalInputs(
-    definition.inputs,
-    parsed.request.technicalInputs,
-    parsed.authoritativeTechnicalInputs
+  const selection = resolveCostingComponentConditions(
+    definition, parsed.request, parsed.authoritativeTechnicalInputs
   );
-  for (const variable of definition.variables)
-    ensureAvailableReferences(variable.expression, resolved.missingOptional);
-  const variables = evaluateVariables({
-    inputs: resolved.values,
-    variables: definition.variables,
-  });
-  const values: Readonly<Record<string, ExpressionValue>> = {
-    ...resolved.values,
-    ...variables,
-  };
   const components: ComponentCostResult[] = [];
   let unitVariable = ZERO,
     fixed = ZERO,
     contributionTotal = ZERO;
 
-  for (const component of [...definition.components].sort(
-    (a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)
-  )) {
+  for (const { component, included } of selection.components) {
     const reference = getComponentCostResourceReference(component);
-    let conditionResult = true;
-    if (component.condition != null) {
-      ensureAvailableReferences(component.condition, resolved.missingOptional);
-      const condition = evaluateExpression(component.condition, { values });
-      if (condition.kind !== "boolean")
-        throw new CostingDomainError(
-          "INVALID_COMPONENT_CONDITION_RESULT",
-          "Component condition must return BOOLEAN",
-          { componentId: component.id }
-        );
-      conditionResult = condition.value;
-    }
+    const conditionResult = included;
     if (!conditionResult) {
       components.push({
         componentId: component.id,
@@ -198,10 +155,10 @@ export function aggregateCosting(
     }
     ensureAvailableReferences(
       component.quantityExpression,
-      resolved.missingOptional
+      selection.missingOptional
     );
     const quantity = evaluateExpression(component.quantityExpression, {
-      values,
+      values: selection.values,
     });
     if (quantity.kind !== "decimal" || quantity.unit === null)
       throw new CostingDomainError(
@@ -309,7 +266,7 @@ export function aggregateCosting(
     productVersionRevision: definition.version.revision,
     effectiveCostAt: parsed.effectiveCostAt,
     commercialQuantity: parsed.request.commercialQuantity,
-    resolvedInputs: resolved.resolvedInputs,
+    resolvedInputs: selection.resolvedInputs,
     components,
     unitVariableCost: money(unitVariable),
     quoteItemFixedCost: money(fixed),

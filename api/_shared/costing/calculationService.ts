@@ -2,6 +2,7 @@ import {
   aggregateCosting,
   costingResourceBundleSchema,
   getComponentCostResourceReference,
+  resolveCostingComponentConditions,
   type CostingAggregateResult,
   type CostingResourceBundle,
   type OfficialCostingRequest,
@@ -74,8 +75,15 @@ export class OfficialCostingCalculationService {
         ])
     );
 
+    // Evaluate the same server-side conditions used by aggregateCosting.
+    // Excluded components do not require their tariff to be configured.
+    const selection = resolveCostingComponentConditions(
+      productDefinition, input.request, authoritativeTechnicalInputs
+    );
+
     const unique = new Map<string, { type: CostResourceType; id: string }>();
-    for (const component of productDefinition.components) {
+    for (const { component, included } of selection.components) {
+      if (!included) continue;
       const reference = getComponentCostResourceReference(component);
       unique.set(`${reference.type}:${reference.id}`, reference);
     }

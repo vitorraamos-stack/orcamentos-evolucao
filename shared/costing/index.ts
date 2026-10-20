@@ -4,6 +4,7 @@ export {
   getComponentCostResourceReference,
 } from "./aggregation.js";
 export * from "./officialCalculation.js";
+export { resolveCostingComponentConditions } from "./componentResolution.js";
 export * from "./aggregationContracts.js";
 export {
   COSTING_ERROR_CODES,

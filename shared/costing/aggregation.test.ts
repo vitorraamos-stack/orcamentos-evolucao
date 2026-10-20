@@ -13,6 +13,7 @@ import {
 } from "../product-engineering/index.js";
 import {
   aggregateCosting,
+  resolveCostingComponentConditions,
   costingAggregationInputSchema,
   costingResourceBundleSchema,
   CostingDomainError,
@@ -287,6 +288,59 @@ describe("aggregateCosting boundary", () => {
       }),
       "INVALID_COSTING_AGGREGATION_INPUT"
     );
+  });
+});
+
+describe("31D shared component selection", () => {
+  it("uses exactly the same condition decision for prefetch and final audit", () => {
+    const input = fixture({
+      components: [
+        component(),
+        component({
+          id: ids.secondComponent,
+          sortOrder: 1,
+          condition: { type: "boolean_literal", value: false },
+        }),
+      ],
+    });
+    const selection = resolveCostingComponentConditions(
+      input.productDefinition,
+      input.request,
+      input.authoritativeTechnicalInputs
+    );
+    const final = aggregateCosting(input);
+    expect(selection.components.map(row => row.included)).toEqual(
+      final.components.map(row => row.included)
+    );
+    expect(final.components[0].rate).toBeDefined();
+    expect(final.components[1]).toMatchObject({
+      included: false,
+      conditionResult: false,
+      baseCost: { amount: "0" },
+      totalCostContribution: { amount: "0" },
+    });
+    expect(final.components[1].rate).toBeUndefined();
+    expect(final.totalCost.amount).toBe("30");
+  });
+
+  it("keeps zero-quantity TRUE components eligible for rate lookup", () => {
+    const input = fixture({
+      components: [
+        component({
+          condition: { type: "boolean_literal", value: true },
+          quantityExpression: decimalLiteral("0", "un"),
+        }),
+      ],
+    });
+    const selection = resolveCostingComponentConditions(
+      input.productDefinition,
+      input.request,
+      input.authoritativeTechnicalInputs
+    );
+    expect(selection.components.map(row => row.included)).toEqual([true]);
+    const result = aggregateCosting(input);
+    expect(result.components[0].rate).toBeDefined();
+    expect(result.totalCost.amount).toBe("0");
   });
 });
 
