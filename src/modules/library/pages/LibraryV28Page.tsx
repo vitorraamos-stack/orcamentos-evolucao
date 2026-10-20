@@ -215,8 +215,11 @@ export default function LibraryV28Page({management=false}:{management?:boolean})
   const save=()=>{
     if(!selected||!dirty||savingDraft||saveSnapshot.status==="conflict")return;
     void saveCoordinator.flush(true).then(ok=>{
-      if(ok)toast.success("Rascunho salvo.");
-      else if(saveCoordinator.getError())toast.error(errorMessage(saveCoordinator.getError()));
+      if(ok){
+        const latest=saveCoordinator.getSnapshot();
+        if(latest.status==="saved"&&!latest.dirty)toast.success("Rascunho salvo.");
+        else toast.info("As alterações mais recentes ainda serão salvas.");
+      }else if(saveCoordinator.getError())toast.error(errorMessage(saveCoordinator.getError()));
     });
   };
   const publish=()=>{
