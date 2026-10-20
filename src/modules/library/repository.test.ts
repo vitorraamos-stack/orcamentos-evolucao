@@ -16,6 +16,7 @@ import {
   publishLibraryDraft,
   restoreLibraryProduct,
   saveLibraryDraft,
+  LibraryDraftConflictError,
 } from "./repository";
 
 const draft = {
@@ -100,21 +101,25 @@ describe("Biblioteca V28 — ciclo de vida com Supabase simulado (sem escritas r
   });
 
   it("salva uma edição apenas com revisão correspondente (lock otimista)", async () => {
-    const maybeSingle = vi.fn().mockResolvedValue({ data: { id: product.id }, error: null });
+    const modified={ ...draft, description: "Nova descrição" };
+    const saved={...product, draft:modified,revision:4};
+    const maybeSingle = vi.fn().mockResolvedValue({ data: saved, error: null });
     const select = vi.fn().mockReturnValue({ maybeSingle });
     const revisionEq = vi.fn().mockReturnValue({ select });
     const idEq = vi.fn().mockReturnValue({ eq: revisionEq });
     const update = vi.fn().mockReturnValue({ eq: idEq });
     supabaseMock.from.mockReturnValue({ update });
 
-    await expect(saveLibraryDraft(product, { ...draft, description: "Nova descrição" }))
-      .resolves.toBeUndefined();
+    await expect(saveLibraryDraft(product, modified))
+      .resolves.toEqual(saved);
     expect(update).toHaveBeenCalledWith({
-      draft: { ...draft, description: "Nova descrição" },
+      draft: modified,
     });
     expect(idEq).toHaveBeenCalledWith("id", product.id);
     expect(revisionEq).toHaveBeenCalledWith("revision", 3);
-    expect(select).toHaveBeenCalledWith("id");
+    expect(select).toHaveBeenCalledWith(
+      "id,draft,revision,status,published_version,published_revision,updated_at"
+    );
   });
 
   it("bloqueia conflito entre dois gestores sem sobrescrever o outro rascunho", async () => {
@@ -126,8 +131,8 @@ describe("Biblioteca V28 — ciclo de vida com Supabase simulado (sem escritas r
       update: vi.fn().mockReturnValue({ eq: idEq }),
     });
 
-    await expect(saveLibraryDraft(product, draft)).rejects.toThrow(
-      "Esta ficha foi atualizada por outra pessoa. Recarregue antes de salvar."
+    await expect(saveLibraryDraft(product, draft)).rejects.toBeInstanceOf(
+      LibraryDraftConflictError
     );
     expect(revisionEq).toHaveBeenCalledWith("revision", product.revision);
   });

@@ -14,6 +14,9 @@ import { emptyLibraryDraft, libraryCategories, libraryFieldVisible, libraryMissi
 import { archiveLibraryProduct, createLibraryDraft, listLibraryDrafts, listLibraryPublications, publishLibraryDraft, restoreLibraryProduct, saveLibraryDraft } from "../repository";
 import { listLibraryTemplates, saveLibraryTemplate, listLibraryComplements, saveLibraryComplement, signedLibraryImageUrl, uploadLibraryPhoto } from "../assets";
 import { displayLibraryImageBytes, libraryImageSavings } from "../image-optimization";
+import {
+  LibraryDraftSaveCoordinator, type LibraryAutoSaveSnapshot,
+} from "../draft-autosave";
 
 type Section="info"|"gallery"|"fields"|"addons"|"guides"|"rules";
 const sections=[{id:"info" as Section,name:"Informações",Icon:FileText},{id:"gallery" as Section,name:"Galeria",Icon:Images},{id:"fields" as Section,name:"Configuração",Icon:SlidersHorizontal},{id:"addons" as Section,name:"Complementos",Icon:Layers3},{id:"guides" as Section,name:"Orientações",Icon:BookOpen},{id:"rules" as Section,name:"Regras",Icon:ShieldCheck}];
@@ -117,9 +120,18 @@ export default function LibraryV28Page({management=false}:{management?:boolean})
   const [history,setHistory]=useState<{version:number;published_at:string}[]>([]);
   const [showHistory,setShowHistory]=useState(false);
   const [confirmation,setConfirmation]=useState<"publish"|"archive"|null>(null);
+  const [saveSnapshot,setSaveSnapshot]=useState<LibraryAutoSaveSnapshot>({
+    status:"idle",productId:null,dirty:false,revision:null,blocked:false,
+  });
+  const saveCoordinator=useMemo(()=>new LibraryDraftSaveCoordinator(
+    saveLibraryDraft,setSaveSnapshot,
+    (record)=>setDrafts(prev=>prev.map(item=>item.id===record.id?record:item))
+  ),[]);
   const selected=drafts.find(x=>x.id===selectedId);
   const release=published.find(x=>x.product_id===selectedId);
-  const dirty=!!selected&&JSON.stringify(edit)!==JSON.stringify(selected.draft);
+  const dirty=saveSnapshot.productId===selectedId&&saveSnapshot.dirty;
+  const savingDraft=saveSnapshot.status==="saving";
+  const saveBlocked=saveSnapshot.blocked;
   const publishedCount=drafts.filter(x=>x.status==="published"&&x.revision===x.published_revision).length;
   const revisionCount=drafts.filter(x=>x.status==="published"&&x.revision>x.published_revision).length;
   const allTemplates=useMemo(()=>[...builtIns,...templates],[templates]);
@@ -147,6 +159,22 @@ export default function LibraryV28Page({management=false}:{management?:boolean})
     finally{setLoading(false);}
   },[admin]);
   useEffect(()=>{setLoading(true);void load();},[load]);
+  // Debounce the editor only; publish/archive actions remain deliberate.
+  useEffect(()=>{
+    if(!admin||!selectedId||saveSnapshot.productId!==selectedId||
+       saveSnapshot.status!=="pending"||busy)return;
+    const timer=window.setTimeout(()=>{void saveCoordinator.flush();},1000);
+    return()=>window.clearTimeout(timer);
+  },[admin,selectedId,saveSnapshot,busy,saveCoordinator]);
+  useEffect(()=>{
+    const onExit=(event:BeforeUnloadEvent)=>{
+      if(saveSnapshot.dirty||saveSnapshot.status==="saving"||saveSnapshot.blocked){
+        event.preventDefault();event.returnValue="";
+      }
+    };
+    window.addEventListener("beforeunload",onExit);
+    return()=>window.removeEventListener("beforeunload",onExit);
+  },[saveSnapshot]);
   const perform=async(task:()=>Promise<void>,message:string|(()=>string))=>{
     setBusy(true);
     try{await task();toast.success(typeof message==="function"?message():message);await load();}
@@ -154,25 +182,69 @@ export default function LibraryV28Page({management=false}:{management?:boolean})
     finally{setBusy(false);}
   };
   const open=(id:string)=>{
-    if(admin){const item=drafts.find(x=>x.id===id);if(item)setEdit(structuredClone(item.draft));}
+    if(savingDraft){toast.info("Aguarde a conclusão do salvamento antes de trocar de produto.");return;}
+    if((dirty||saveBlocked)&&!window.confirm("Descartar as alterações locais deste produto?"))return;
+    if(admin){
+      const item=drafts.find(x=>x.id===id);
+      if(item){saveCoordinator.select(item);setEdit(structuredClone(item.draft));}
+    }
     setSelectedId(id);setSection("info");setAnswers({});setChosenComplements([]);
     setPhotosReceived(false);setConfirmation(null);setRevisionView("draft");setShowHistory(false);
     const t=allTemplates.find(x=>x.category===(drafts.find(x=>x.id===id)?.draft.category||published.find(x=>x.product_id===id)?.content.category));
     setTemplateId(t?.id||"");
   };
-  const update=(patch:Partial<LibraryDraft>)=>{setEdit(x=>({...x,...patch}));setConfirmation(null);};
-  const newProduct=()=>{if(!user)return;void perform(async()=>{
-    const draft=emptyLibraryDraft();const id=await createLibraryDraft(user.id,draft);
-    setSelectedId(id);setEdit(draft);setSection("info");setTemplateId("builtin-letters");setConfirmation(null);
-  },"Produto criado como rascunho.");};
-  const save=()=>{if(!selected||!dirty)return;void perform(async()=>{
-    await saveLibraryDraft(selected,edit);
-    const all=await listLibraryDrafts();setDrafts(all);
-    const fresh=all.find(x=>x.id===selected.id);if(fresh)setEdit(structuredClone(fresh.draft));
-  },"Rascunho salvo.");};
-  const publish=()=>{if(!selected||dirty||validateLibraryDraft(edit).length||!confirmation)return;void perform(async()=>{
-    await publishLibraryDraft(selected);setConfirmation(null);setRevisionView("published");
-  },"Nova versão publicada.");};
+  const update=(patch:Partial<LibraryDraft>)=>{
+    const next={...edit,...patch};
+    saveCoordinator.edit(next);
+    setEdit(next);setConfirmation(null);
+  };
+  const newProduct=()=>{
+    if(!user||savingDraft||busy)return;
+    if((dirty||saveBlocked)&&!window.confirm("Descartar alterações locais e criar outro produto?"))return;
+    void perform(async()=>{
+      const draft=emptyLibraryDraft();
+      const id=await createLibraryDraft(user.id,draft);
+      const all=await listLibraryDrafts();
+      const record=all.find(x=>x.id===id);
+      if(!record)throw new Error("O novo produto não foi encontrado após o cadastro.");
+      setDrafts(all);saveCoordinator.select(record);
+      setSelectedId(id);setEdit(structuredClone(record.draft));
+      setSection("info");setTemplateId("builtin-letters");setConfirmation(null);
+    },"Produto criado como rascunho.");
+  };
+  const save=()=>{
+    if(!selected||!dirty||savingDraft||saveSnapshot.status==="conflict")return;
+    void saveCoordinator.flush(true).then(ok=>{
+      if(ok)toast.success("Rascunho salvo.");
+      else if(saveCoordinator.getError())toast.error(errorMessage(saveCoordinator.getError()));
+    });
+  };
+  const publish=()=>{
+    const baseline=saveCoordinator.getBaseline();
+    if(!selected||!baseline||dirty||savingDraft||saveBlocked||
+       validateLibraryDraft(edit).length||!confirmation)return;
+    void perform(async()=>{
+      await publishLibraryDraft(baseline);
+      setConfirmation(null);setRevisionView("published");
+    },"Nova versão publicada.");
+  };
+  const recoverConflict=async()=>{
+    if(!selectedId||!window.confirm("Descartar seu rascunho local e carregar a versão atual?"))return;
+    try{
+      const records=await listLibraryDrafts();
+      const current=records.find(x=>x.id===selectedId);
+      if(!current)throw new Error("A ficha não está mais disponível.");
+      setDrafts(records);saveCoordinator.acceptServerRecord(current);
+      setEdit(structuredClone(current.draft));setConfirmation(null);
+      toast.success("Versão atual carregada.");
+    }catch(e){toast.error(errorMessage(e));}
+  };
+  const copyUnsavedDraft=async()=>{
+    try{
+      await navigator.clipboard.writeText(JSON.stringify(edit,null,2));
+      toast.success("Suas alterações locais foram copiadas.");
+    }catch{toast.error("Não foi possível copiar o rascunho.");}
+  };
   const copy=async(final:boolean)=>{
     if(!display||(!admin&&!release))return;
     const lines=commercialLines(display as LibraryPublication,answers,chosenComplements);
@@ -328,7 +400,7 @@ export default function LibraryV28Page({management=false}:{management?:boolean})
   if(loading)return <div role="status" className="flex min-h-44 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin"/> Carregando Biblioteca...</div>;
   return <div className="space-y-5 pb-10">
     <header className="flex flex-wrap justify-between gap-3"><div><p className="text-xs text-muted-foreground">EvoluSystem / {admin?"Administração":"Comercial"}</p><h1 className="text-2xl font-semibold tracking-tight">{admin?"Gestão da Biblioteca":"Biblioteca de Produtos"}</h1><p className="mt-1 text-sm text-muted-foreground">{admin?"Gerencie as fichas individualmente.":"Consulte e configure um produto por vez."}</p></div>
-      <div className="flex gap-2 flex-wrap">{!admin&&isAdmin&&<Button variant="outline" onClick={()=>navigate("/biblioteca/gestao")}>Administrar</Button>}<Button variant="outline" disabled={busy} onClick={()=>{setLoading(true);void load();}}><RefreshCw className="mr-2 h-4 w-4"/>Atualizar</Button>{admin&&<Button onClick={newProduct} disabled={busy}><Plus className="mr-2 h-4 w-4"/>Novo produto</Button>}</div></header>
+      <div className="flex gap-2 flex-wrap">{!admin&&isAdmin&&<Button variant="outline" onClick={()=>navigate("/biblioteca/gestao")}>Administrar</Button>}<Button variant="outline" disabled={busy} onClick={()=>{setLoading(true);void load();}}><RefreshCw className="mr-2 h-4 w-4"/>Atualizar</Button>{admin&&<Button onClick={newProduct} disabled={busy||savingDraft}><Plus className="mr-2 h-4 w-4"/>Novo produto</Button>}</div></header>
     {!!error&&<Card><CardContent className="p-4 text-sm text-destructive">Não foi possível carregar os dados: {error}</CardContent></Card>}
     {!selectedId?<div className="space-y-4">
       {admin&&<div className="grid grid-cols-3 gap-2">{[{label:"Publicados",value:publishedCount},{label:"Em revisão",value:revisionCount},{label:"Rascunhos",value:drafts.filter(x=>!x.published_version&&x.status!=="archived").length}].map(x=><div key={x.label} className="rounded-xl border p-3"><p className="text-xs text-muted-foreground">{x.label}</p><p className="mt-1 text-xl font-semibold">{x.value}</p></div>)}</div>}
@@ -341,7 +413,11 @@ export default function LibraryV28Page({management=false}:{management?:boolean})
       </button>)}</div>
       {!cards.length&&<div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">Nenhum produto encontrado para os filtros selecionados.</div>}
     </div>:<div className="space-y-3">
-      <Button variant="ghost" className="px-0" onClick={()=>{if(dirty&&!window.confirm("Descartar alterações não salvas?"))return;setSelectedId(null);setAnswers({});setConfirmation(null);}}><ArrowLeft className="mr-2 h-4 w-4"/>Voltar ao catálogo</Button>
+      <Button variant="ghost" className="px-0" onClick={()=>{
+        if(savingDraft){toast.info("Aguarde o salvamento terminar.");return;}
+        if((dirty||saveBlocked)&&!window.confirm("Descartar alterações locais?"))return;
+        saveCoordinator.select(null);setSelectedId(null);setAnswers({});setConfirmation(null);
+      }}><ArrowLeft className="mr-2 h-4 w-4"/>Voltar ao catálogo</Button>
       <div className="grid items-start gap-4 lg:grid-cols-[165px_minmax(0,1fr)_minmax(240px,0.8fr)]">
         <Card><CardContent className="p-2">{admin?<div className="space-y-1">{sections.map(s=><Button key={s.id} variant={section===s.id?"secondary":"ghost"} size="sm" className="w-full justify-start" onClick={()=>setSection(s.id)}><s.Icon className="mr-2 h-4 w-4"/>{s.name}</Button>)}</div>:<div className="p-2 space-y-2"><p className="text-xs text-muted-foreground">Ficha publicada v{release?.version}</p><p className="text-sm font-medium">{release?.content.category}</p></div>}</CardContent></Card>
         <div className="space-y-4"><Card><CardHeader className="pb-3"><CardTitle className="text-base">{admin?sections.find(s=>s.id===section)?.name:release?.content.name}</CardTitle></CardHeader>
@@ -352,15 +428,34 @@ export default function LibraryV28Page({management=false}:{management?:boolean})
             {!!release?.content.guidance&&<div className="rounded-lg bg-muted p-3 text-sm"><strong>Orientações:</strong> {release.content.guidance}</div>}
           </div>}</CardContent></Card>
           {admin&&selected&&<Card><CardContent className="space-y-3 p-4">
-            <div className="flex items-center gap-2 flex-wrap"><Badge variant="outline">{selected.status==="archived"?"Arquivado":selected.published_version===0?"Rascunho":selected.revision>selected.published_revision?"Em revisão":"Publicado"}</Badge>{dirty&&<Badge variant="secondary">Alterações não salvas</Badge>}</div>
+            <div className="flex items-center gap-2 flex-wrap"><Badge variant="outline">{selected.status==="archived"?"Arquivado":selected.published_version===0?"Rascunho":selected.revision>selected.published_revision?"Em revisão":"Publicado"}</Badge>{dirty&&<Badge variant="secondary">Alterações locais</Badge>}
+              <Badge variant="outline" role="status">
+                {saveSnapshot.status==="saving"?"Salvando…":
+                 saveSnapshot.status==="pending"?"Salvamento automático pendente":
+                 saveSnapshot.status==="conflict"?"Conflito de edição":
+                 saveSnapshot.status==="error"?"Erro no salvamento":
+                 saveSnapshot.status==="saved"?"Alterações salvas":"Aguardando"}
+              </Badge></div>
             {validateLibraryDraft(edit).map((e,i)=><p key={i} className="text-xs text-destructive">{e}</p>)}
-            <div className="flex flex-wrap gap-2"><Button disabled={!dirty||busy||selected.status==="archived"} onClick={save}>Salvar rascunho</Button><Button variant="outline" disabled={busy||dirty||selected.status==="archived"||validateLibraryDraft(edit).length>0||(selected.published_version>0&&selected.revision===selected.published_revision)} onClick={()=>setConfirmation("publish")}>Publicar versão</Button></div>
-            {confirmation==="publish"&&<div className="space-y-2 rounded-lg border p-3"><p className="text-sm">Confirmar publicação desta ficha? O histórico anterior será preservado.</p><Button disabled={busy} onClick={publish}>Confirmar publicação</Button><Button variant="ghost" onClick={()=>setConfirmation(null)}>Cancelar</Button></div>}
-            {selected.status==="archived"?<Button variant="outline" disabled={busy} onClick={()=>void perform(()=>restoreLibraryProduct(selected.id),"Produto restaurado como rascunho.")}><ArchiveRestore className="mr-2 h-4 w-4"/>Restaurar</Button>:<Button variant="ghost" disabled={dirty||busy} onClick={()=>setConfirmation("archive")}><Archive className="mr-2 h-4 w-4"/>Arquivar</Button>}
+            {saveBlocked&&<div className="space-y-2 rounded-lg border p-3 text-sm" role="alert">
+              <p className="font-medium">{saveSnapshot.status==="conflict"?"Outra pessoa atualizou esta ficha.":"O salvamento não foi concluído."}</p>
+              <p className="text-xs text-muted-foreground">Seu texto permanece nesta tela. O sistema não fará novas gravações automaticamente até você decidir.</p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={()=>void copyUnsavedDraft()}>Copiar minhas alterações</Button>
+                {saveSnapshot.status==="error"&&<Button size="sm" disabled={busy} onClick={save}>Tentar salvar novamente</Button>}
+                <Button variant="outline" size="sm" disabled={busy} onClick={()=>void recoverConflict()}>Descartar e carregar versão atual</Button>
+              </div>
+            </div>}
+            <div className="flex flex-wrap gap-2">
+              <Button disabled={!dirty||busy||savingDraft||saveSnapshot.status==="conflict"||selected.status==="archived"} onClick={save}>Salvar agora</Button>
+              <Button variant="outline" disabled={busy||dirty||savingDraft||saveBlocked||selected.status==="archived"||validateLibraryDraft(edit).length>0||(selected.published_version>0&&selected.revision===selected.published_revision)} onClick={()=>setConfirmation("publish")}>Publicar versão</Button>
+            </div>
+            {confirmation==="publish"&&<div className="space-y-2 rounded-lg border p-3"><p className="text-sm">Confirmar publicação desta ficha? O histórico anterior será preservado.</p><Button disabled={busy||dirty||savingDraft||saveBlocked} onClick={publish}>Confirmar publicação</Button><Button variant="ghost" onClick={()=>setConfirmation(null)}>Cancelar</Button></div>}
+            {selected.status==="archived"?<Button variant="outline" disabled={busy} onClick={()=>void perform(()=>restoreLibraryProduct(selected.id),"Produto restaurado como rascunho.")}><ArchiveRestore className="mr-2 h-4 w-4"/>Restaurar</Button>:<Button variant="ghost" disabled={dirty||busy||savingDraft||saveBlocked} onClick={()=>setConfirmation("archive")}><Archive className="mr-2 h-4 w-4"/>Arquivar</Button>}
             {confirmation==="archive"&&<div className="rounded-lg border p-3 space-y-2"><p className="text-sm">Arquivar e retirar do catálogo comercial?</p><Button variant="destructive" onClick={()=>void perform(async()=>{await archiveLibraryProduct(selected.id);setConfirmation(null);},"Produto arquivado.")}>Confirmar</Button><Button variant="ghost" onClick={()=>setConfirmation(null)}>Cancelar</Button></div>}
             <Button variant="link" className="px-0" onClick={loadHistory}>Histórico de publicações</Button>
             {showHistory&&<div className="space-y-1 border-t pt-2">{history.length?history.map(x=><p className="text-xs text-muted-foreground" key={x.version}>Versão {x.version} · {new Date(x.published_at).toLocaleDateString("pt-BR")}</p>):<p className="text-xs text-muted-foreground">Nenhuma publicação anterior.</p>}</div>}
-            <Button variant="ghost" size="sm" onClick={()=>{if(!user)return;const clone={...structuredClone(edit),name:"Cópia de "+edit.name,gallery:[]};void perform(async()=>{const id=await createLibraryDraft(user.id,clone);setSelectedId(id);setEdit(clone);},"Cópia criada como rascunho, sem copiar arquivos da galeria.");}}><Copy className="mr-2 h-4 w-4"/>Duplicar produto</Button>
+            <Button variant="ghost" size="sm" onClick={()=>{if(!user||savingDraft||busy)return;if((dirty||saveBlocked)&&!window.confirm("Duplicar e sair deste rascunho?"))return;const clone={...structuredClone(edit),name:"Cópia de "+edit.name,gallery:[]};void perform(async()=>{const id=await createLibraryDraft(user.id,clone);const all=await listLibraryDrafts();const row=all.find(x=>x.id===id);if(!row)throw new Error("Cópia não encontrada.");setDrafts(all);saveCoordinator.select(row);setSelectedId(id);setEdit(structuredClone(row.draft));},"Cópia criada como rascunho, sem copiar arquivos da galeria.");}}><Copy className="mr-2 h-4 w-4"/>Duplicar produto</Button>
           </CardContent></Card>}
         </div>
         <Card><CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Eye className="h-4 w-4"/> {admin?"Prévia do consultor":"Configurar produto"}</CardTitle></CardHeader>
