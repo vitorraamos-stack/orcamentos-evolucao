@@ -16,12 +16,17 @@ function setup(opts: {
   commercialStatus?: string;
   missingProduct?: boolean;
   insertError?: { code: string };
+  concurrentExactInsert?: boolean;
 } = {}) {
   const records = [...(opts.records ?? [])];
   const insert = vi.fn((value: any) => ({
     select: () => ({
       single: async () => {
-        if (opts.insertError) return { data: null, error: opts.insertError };
+        if (opts.insertError) {
+          if (opts.concurrentExactInsert)
+            records.push(row(value.product_id, value.library_product_id));
+          return { data: null, error: opts.insertError };
+        }
         const created = row(value.product_id, value.library_product_id);
         records.push(created);
         return { data: created, error: null };
@@ -105,6 +110,18 @@ describe("product commercial link service", () => {
       });
       expect(insert).not.toHaveBeenCalled();
     }
+  });
+
+  it("treats an identical concurrent insertion as idempotent", async () => {
+    const { service, insert, records } = setup({
+      insertError: { code: "23505" }, concurrentExactInsert: true,
+    });
+    const result = await service.create(PRODUCT, LIBRARY, ACTOR);
+    expect(result).toMatchObject({
+      created: false, link: { productId: PRODUCT, libraryProductId: LIBRARY },
+    });
+    expect(records).toHaveLength(1);
+    expect(insert).toHaveBeenCalledTimes(1);
   });
 
   it("never replaces an existing link on a unique violation", async () => {

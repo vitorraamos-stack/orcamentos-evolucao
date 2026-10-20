@@ -32,3 +32,19 @@ históricos nem a transferência ao Conta Azul.
 ## Testes
 Executar npm run check, npm run test, npm run build:app.
 Não foi aplicada migration em produção durante o desenvolvimento desta branch.
+
+## Homologação isolada — pendente de ambiente disponível
+Em 20/10/2026 foi verificado: somente a branch Supabase principal está ativa;
+o projeto existente "evolusystem-homologacao-19u" encontra-se INATIVO.
+Não houve restauração, criação de branch paga ou alteração do banco de produção.
+
+Após disponibilizar um banco isolado com o esquema necessário:
+1. Aplicar a migration APENAS nesse ambiente.
+2. Executar o SQL de auditoria somente leitura em
+   `docs/architecture/pr-31a-readonly-db-verification.sql`, exigindo todos
+   os indicadores terminados em `_pass` como `true`.
+3. Testar a API com gestor habilitado e verificar acesso negado para consultor
+   e usuário anônimo.
+4. Testar criação, repetição idempotente, conflito 1:1, concorrência e
+   impedimento de exclusão referencial em dados artificiais.
+5. Documentar o resultado ANTES de autorizar aplicação no banco real.
