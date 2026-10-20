@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { consumeCommercialHandoff } from "../commercialHandoff";
+import { buildContaAzulTransfer } from "../contaAzulTransfer";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -89,6 +90,7 @@ export default function EstimatorPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
+  const [transferReview, setTransferReview] = useState(false);
 
   const product = useMemo(
     () =>
@@ -219,6 +221,10 @@ export default function EstimatorPage() {
     currentFingerprint !== null &&
     currentFingerprint === calculatedFingerprint;
 
+  useEffect(() => {
+    setTransferReview(false);
+  }, [currentFingerprint, result]);
+
   const calculate = async () => {
     setWorking(true);
     try {
@@ -255,43 +261,27 @@ export default function EstimatorPage() {
     return raw.trim();
   };
 
-  const copySummary = async () => {
-    if (!result || !product || !freshResult) return;
+  const contaAzulTransfer = useMemo(() => {
+    if (!freshResult || !result || !product || working) return null;
+    try {
+      const technicalLines = product.inputs.flatMap(input => {
+        const value = formatInputValue(input);
+        return value === null ? [] : [input.label + ": " + value];
+      });
+      return buildContaAzulTransfer(result, product, technicalLines);
+    } catch {
+      return null;
+    }
+  }, [freshResult, result, product, fieldValues, fieldUnits, working]);
 
-    const technicalLines = product.inputs.flatMap(input => {
-      const value = formatInputValue(input);
-      return value === null ? [] : [input.label + ": " + value];
-    });
-
-    const lines = [
-      "ORÇAMENTISTA INTELIGENTE",
-      "Produto: " + product.name,
-      ...technicalLines,
-      "Quantidade: " + result.commercialQuantity,
-      "Pagamento: " + result.installments + "x",
-      "Valor do produto: " + formatBrl(result.productSellingPrice.amount),
-    ];
-
-    if (result.installation.requested)
-      lines.push(
-        "Instalação: " + formatBrl(result.installation.price.amount)
-      );
-
-    if (result.munck.requested)
-      lines.push(
-        "Munck: " +
-          result.munck.billedHours +
-          "h — " +
-          formatBrl(result.munck.price.amount)
-      );
-
-    lines.push(
-      "Subtotal: " + formatBrl(result.subtotalBeforeFinancialRate.amount),
-      "TOTAL: " + formatBrl(result.totalSellingPrice.amount)
-    );
-
-    await navigator.clipboard.writeText(lines.join("\n"));
-    toast.success("Resumo copiado para cadastrar no Conta Azul.");
+  const copyForContaAzul = async () => {
+    if (!contaAzulTransfer || !freshResult || !transferReview || working) return;
+    try {
+      await navigator.clipboard.writeText(contaAzulTransfer.copyText);
+      toast.success("Dados copiados. Confira e cadastre manualmente no Conta Azul.");
+    } catch {
+      toast.error("Não foi possível copiar. Verifique o acesso à área de transferência.");
+    }
   };
 
   if (loading)
@@ -705,19 +695,63 @@ export default function EstimatorPage() {
                     </p>
                   </div>
 
-                  <Button
-                    variant="outline"
-                    className="w-full gap-2"
-                    disabled={!freshResult}
-                    onClick={() => void copySummary()}
-                  >
-                    <ClipboardCopy className="h-4 w-4" />
-                    Copiar resumo
-                  </Button>
-
-                  <p className="text-center text-xs text-muted-foreground">
-                    Depois, cadastre o orçamento oficial no Conta Azul.
-                  </p>
+                  <div className="space-y-3 rounded-xl border p-4"
+                    aria-label="Conferência manual para Conta Azul">
+                    <div>
+                      <h3 className="text-sm font-semibold">Conferência para Conta Azul</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Valores totais de linha, não preços unitários. Confira
+                        a quantidade ao cadastrar cada item no Conta Azul.
+                      </p>
+                    </div>
+                    {!contaAzulTransfer ? (
+                      <p role="alert" className="text-sm text-destructive">
+                        Os valores não puderam ser conciliados. Refaça o cálculo antes de copiar.
+                      </p>
+                    ) : (
+                      <>
+                        <div className="space-y-2 text-sm">
+                          {contaAzulTransfer.lines.map(line => (
+                            <div key={line.id}
+                              className="flex justify-between gap-3 border-b border-border/50 pb-2">
+                              <div className="min-w-0">
+                                <p className="break-words font-medium">{line.description}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Quantidade: {line.quantity} · Total da linha
+                                </p>
+                              </div>
+                              <span className="shrink-0 tabular-nums">
+                                {formatBrl(line.lineTotal)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Pagamento: {contaAzulTransfer.installments}x.
+                          Total a conferir: {formatBrl(contaAzulTransfer.finalTotal)}.
+                        </p>
+                        <label className="flex cursor-pointer items-start gap-2 rounded-lg
+                          border border-border/70 p-3 text-sm">
+                          <Checkbox checked={transferReview} disabled={working}
+                            onCheckedChange={checked => setTransferReview(checked === true)}
+                            aria-label="Confirmo a conferência manual dos dados"
+                            className="mt-0.5 shrink-0"/>
+                          <span>Conferi descrições, quantidades, adicionais,
+                            condição de pagamento e total. Vou cadastrar e
+                            revisar manualmente no Conta Azul.</span>
+                        </label>
+                        <Button variant="outline" className="w-full gap-2"
+                          disabled={!transferReview || working}
+                          onClick={() => void copyForContaAzul()}>
+                          <ClipboardCopy className="h-4 w-4"/>
+                          Copiar para Conta Azul
+                        </Button>
+                      </>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      A cópia não cria orçamento nem envia proposta ao cliente.
+                    </p>
+                  </div>
                 </>
               )}
             </CardContent>
