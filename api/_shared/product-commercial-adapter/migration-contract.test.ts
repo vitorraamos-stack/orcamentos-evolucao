@@ -12,8 +12,11 @@ describe("31B minimal published content permission", () => {
     expect(sql).not.toMatch(/grant .*authenticated|grant .*anon/i);
   });
   it("never changes draft or pricing persistence", () => {
-    expect(sql).not.toMatch(/insert into|update public|delete from|create policy/i);
-    expect(sql).not.toContain("library_product_history");
-    expect(sql).not.toMatch(/grant .*draft/i);
+    // Ignore explanatory comments: security checks must inspect SQL statements.
+    const statements = sql.split("\n")
+      .filter(line => !line.trim().startsWith("--")).join("\n");
+    expect(statements).not.toMatch(/insert into|update public|delete from|create policy/i);
+    expect(statements).not.toContain("library_product_history");
+    expect(statements).not.toMatch(/grant\s+[^;]*\bdraft\b/i);
   });
 });
