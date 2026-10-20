@@ -20,13 +20,21 @@ no Orçamentista existente, nos preços ou nas regras de aprovação.
 
 ## Banco
 
-A migration 20261020123000_product_commercial_adapter_31b.sql concede ao
+A migration 20261020115833_product_commercial_adapter_31b.sql concede ao
 service_role apenas leitura de product_id, version, content e published_at da
 tabela library_publications. Não concede leitura ao público e não modifica
-publicações atuais. **Não aplicar sem autorização específica.**
+publicações atuais. **Aplicada em produção em 20/10/2026, versão 20261020115833; não reaplicar.**
 
 ## Rollout
 
 Esta API ficará inativa para o usuário final até integração explícita da etapa
-31C/31F. Não fazer merge, deploy nem aplicar migration automaticamente.
+31C/31F. Não fazer merge nem deploy automaticamente.
 O fluxo legado /orcamentista e a Biblioteca Comercial continuam intactos.
+
+## Validação da migration em produção
+Aplicada com autorização explícita do gestor em 20/10/2026. Conferidos SELECT de 
+`product_id`, `version`, `content`, `published_at` para `service_role`; sem INSERT,
+UPDATE ou DELETE na tabela de publicações; sem acesso de `service_role` ao draft.
+O vínculo do PVC, a publicação comercial V2 e a engenharia V3 permaneceram intactos.
+A política de SELECT pré-existente para `authenticated` não foi modificada por esta migration.
+O merge e a publicação da API continuam pendentes de autorização separada.

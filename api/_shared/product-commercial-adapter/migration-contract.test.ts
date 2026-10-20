@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 const sql = readFileSync(
-  "supabase/migrations/20261020123000_product_commercial_adapter_31b.sql",
+  "supabase/migrations/20261020115833_product_commercial_adapter_31b.sql",
   "utf8"
 );
 
