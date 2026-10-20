@@ -29,13 +29,27 @@ export async function createLibraryDraft(userId:string, draft:LibraryDraft):Prom
   return data.id;
 }
 
-export async function saveLibraryDraft(product:LibraryProductRecord, draft:LibraryDraft):Promise<void> {
-  // A condição de revisão evita sobrescrever uma alteração concorrente.
-  const {data,error} = await supabase.from("library_products")
-    .update({draft}).eq("id",product.id).eq("revision",product.revision)
-    .select("id").maybeSingle();
+export class LibraryDraftConflictError extends Error {
+  constructor() {
+    super("Esta ficha foi atualizada por outra pessoa. Suas alterações locais foram preservadas.");
+    this.name = "LibraryDraftConflictError";
+  }
+}
+
+export async function saveLibraryDraft(
+  product: LibraryProductRecord, draft: LibraryDraft
+): Promise<LibraryProductRecord> {
+  // Compare-and-swap: never accept a stale editor revision.
+  // Returning the row avoids a separate SELECT race after the UPDATE.
+  const { data, error } = await supabase.from("library_products")
+    .update({ draft })
+    .eq("id", product.id)
+    .eq("revision", product.revision)
+    .select("id,draft,revision,status,published_version,published_revision,updated_at")
+    .maybeSingle();
   fail(error);
-  if (!data) throw new Error("Esta ficha foi atualizada por outra pessoa. Recarregue antes de salvar.");
+  if (!data) throw new LibraryDraftConflictError();
+  return data as LibraryProductRecord;
 }
 
 export async function publishLibraryDraft(product:LibraryProductRecord):Promise<number> {
