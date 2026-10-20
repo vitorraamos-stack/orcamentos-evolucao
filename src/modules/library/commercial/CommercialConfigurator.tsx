@@ -67,11 +67,14 @@ function GroupHeading({index,title,icon:Icon}:{index:number;title:string;icon:ty
 
 export default function CommercialConfigurator({
   product,values,onChange,selectedComplements,onSelectedComplements,photosConfirmed,onPhotosConfirmed,assessment,onCopy,coping,
+  canUseEstimator,checkingEstimator,estimatorMessage,onOpenEstimator,
 }:{
   product:LibraryPublication;values:CommercialValues;onChange:(id:string,value:unknown)=>void;
   selectedComplements:string[];onSelectedComplements:(ids:string[])=>void;
   photosConfirmed:boolean;onPhotosConfirmed:(value:boolean)=>void;assessment:CommercialAssessment;
   onCopy:(final:boolean)=>void;coping:boolean;
+  canUseEstimator:boolean;checkingEstimator:boolean;estimatorMessage:string;
+  onOpenEstimator:()=>void;
 }) {
   const displayPhoto=(product.gallery||[]).filter(photo=>photo.url&&photo.kind!=="process").find(photo=>photo.cover)||
     (product.gallery||[]).find(photo=>photo.url&&photo.kind!=="process");
@@ -163,6 +166,19 @@ export default function CommercialConfigurator({
             {coping?<Loader2 className="mr-2 h-4 w-4 animate-spin"/>:<ClipboardCopy className="mr-2 h-4 w-4"/>}Copiar descrição final
           </Button>
         </div>
+        {canUseEstimator&&<div className="space-y-2 rounded-xl border border-border/70 p-3">
+          <p className="text-sm font-semibold">Orçamentista Inteligente</p>
+          <p className="text-[13px] leading-5 text-muted-foreground">
+            Verifique se esta configuração pode seguir para o cálculo oficial.
+            Valores e regras de preços são conferidos apenas no Orçamentista.
+          </p>
+          <Button type="button" variant="secondary" className="w-full min-h-11"
+            disabled={checkingEstimator||assessment.status!=="ready"} onClick={onOpenEstimator}>
+            {checkingEstimator?<Loader2 className="mr-2 h-4 w-4 animate-spin"/>:<FileText className="mr-2 h-4 w-4"/>}
+            {checkingEstimator?"Verificando...":"Verificar e abrir Orçamentista"}
+          </Button>
+          {!!estimatorMessage&&<p role="status" className="text-sm text-muted-foreground">{estimatorMessage}</p>}
+        </div>}
         <p className="text-[13px] leading-5 text-muted-foreground">O orçamento oficial continua no Conta Azul. Nenhum preço é calculado aqui.</p>
       </div>
     </div>

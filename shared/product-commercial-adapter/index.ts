@@ -2,9 +2,10 @@ import { z } from "zod";
 
 const uuid = z.string().uuid();
 
-export const publishedCommercialQuerySchema = z.object({
-  productId: uuid,
-}).strict();
+export const publishedCommercialQuerySchema = z.union([
+  z.object({ productId: uuid }).strict(),
+  z.object({ libraryProductId: uuid }).strict(),
+]);
 
 const fieldSchema = z.object({
   id: z.string().min(1),

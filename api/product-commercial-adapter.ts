@@ -49,8 +49,10 @@ export default async function handler(req: any, res: any) {
     if (!parsed.success)
       return fail(res, 400, "INVALID_QUERY", "Product ID must be a valid UUID.");
 
-    const result = await new PublishedCommercialAdapterService(db)
-      .load(parsed.data.productId);
+    const adapter = new PublishedCommercialAdapterService(db);
+    const result = "libraryProductId" in parsed.data
+      ? await adapter.loadByLibraryProductId(parsed.data.libraryProductId)
+      : await adapter.load(parsed.data.productId);
     return reply(res, 200, { ok: true, data: result });
   } catch (error) {
     if (error instanceof PublishedCommercialAdapterError)

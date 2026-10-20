@@ -3,11 +3,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
   client: null as any,
   load: vi.fn(),
+  loadByLibraryProductId: vi.fn(),
 }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => state.client }));
 vi.mock("./_shared/product-commercial-adapter/service.js", () => ({
   PublishedCommercialAdapterService: class {
     load(productId: string) { return state.load(productId); }
+    loadByLibraryProductId(libraryProductId: string) {
+      return state.loadByLibraryProductId(libraryProductId);
+    }
   },
   PublishedCommercialAdapterError: class extends Error {
     constructor(readonly status: number, readonly code: string, message: string) {
@@ -45,6 +49,7 @@ describe("published commercial adapter API", () => {
     process.env.SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "server-only";
     state.load.mockReset().mockResolvedValue({ name: "Published" });
+    state.loadByLibraryProductId.mockReset().mockResolvedValue({ name: "Published" });
     state.client = client("consultor_vendas");
   });
 
@@ -87,6 +92,15 @@ describe("published commercial adapter API", () => {
     }
   );
 
+  it("resolves a canonical association by library ID for authorized readers", async () => {
+    const libraryId="10000000-0000-4000-8000-000000000002";
+    const output=reply();
+    await handler(req("GET",{libraryProductId:libraryId}),output);
+    expect(output.statusCode).toBe(200);
+    expect(state.loadByLibraryProductId).toHaveBeenCalledWith(libraryId);
+    expect(state.load).not.toHaveBeenCalled();
+  });
+
   it("rejects invalid UUIDs and unexpected query parameters", async () => {
     const bad = reply();
     await handler(req("GET", { productId: "bad" }), bad);
@@ -94,6 +108,12 @@ describe("published commercial adapter API", () => {
     const extra = reply();
     await handler(req("GET", { productId: PRODUCT, draft: true }), extra);
     expect(extra.statusCode).toBe(400);
+    const both=reply();
+    await handler(req("GET",{
+      productId:PRODUCT,libraryProductId:"10000000-0000-4000-8000-000000000002",
+    }),both);
+    expect(both.statusCode).toBe(400);
     expect(state.load).not.toHaveBeenCalled();
+    expect(state.loadByLibraryProductId).not.toHaveBeenCalled();
   });
 });

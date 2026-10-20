@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { consumeCommercialHandoff } from "../commercialHandoff";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -70,6 +72,7 @@ const friendlyError = (error: unknown) => {
 };
 
 export default function EstimatorPage() {
+  const {user}=useAuth();
   const [definition, setDefinition] = useState<EstimatorFormDefinition | null>(null);
   const [productVersionId, setProductVersionId] = useState("");
   const [fieldValues, setFieldValues] = useState<EstimatorFieldValues>({});
@@ -135,6 +138,16 @@ export default function EstimatorPage() {
           loaded.products[0] ??
           null;
         if (first) selectProduct(first.productVersionId, loaded);
+        const transfer=consumeCommercialHandoff(user?.id,loaded);
+        if(transfer.prefill){
+          selectProduct(transfer.prefill.productVersionId,loaded);
+          setFieldValues(transfer.prefill.values);
+          setFieldUnits(transfer.prefill.units);
+          setQuantity(transfer.prefill.quantity);
+          toast.info("Dados da Biblioteca carregados. Revise e calcule pelo Orçamentista.");
+        }else if(transfer.attempted){
+          toast.error("A configuração ou versão técnica mudou. Preencha o Orçamentista manualmente.");
+        }
       })
       .catch(error => {
         if (cancelled) return;
@@ -149,7 +162,7 @@ export default function EstimatorPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user?.id]);
 
   const buildRequest = (): OfficialEstimateRequest => {
     if (!product) throw new Error("Selecione um produto.");
