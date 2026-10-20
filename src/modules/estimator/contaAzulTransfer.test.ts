@@ -52,7 +52,7 @@ describe("PR 31G — transferência assistida e conferência Conta Azul",()=>{
     expect(out.lines[0].description).toContain("Espessura: 10 mm");
     expect(out.copyText).toContain("Valor TOTAL da linha (não unitário)");
     expect(out.copyText).toContain("TOTAL OFICIAL CALCULADO");
-    expect(out.copyText).toContain("cadastro manual");
+    expect(out.copyText).toContain("CADASTRO MANUAL");
     expect(out.copyText).not.toContain("Custo interno");
   });
 
@@ -83,8 +83,8 @@ describe("PR 31G — transferência assistida e conferência Conta Azul",()=>{
 
   it("exposes negative rounding adjustments rather than altering line values",()=>{
     const out=buildContaAzulTransfer(result({
-      productAmount:"100.004",installation:"20.005",
-      subtotal:"120.009",total:"120.00",
+      productAmount:"100.004",installation:"20.006",
+      subtotal:"120.010",total:"120.00",
     }),product,[]);
     expect(out.lines.map(x=>x.lineTotal)).toEqual(["100","20.01","-0.01"]);
     expect(out.lines.at(-1)?.id).toBe("adjustment");

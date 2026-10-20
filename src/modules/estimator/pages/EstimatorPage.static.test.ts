@@ -7,14 +7,15 @@ const source = readFileSync(
 );
 
 describe("EstimatorPage re-scope 19A", () => {
-  it("keeps the official calculation flow and copy summary", () => {
+  it("keeps the official calculation flow and reviewed Conta Azul copy", () => {
     expect(source).toContain(".loadForm()");
     expect(source).toContain("estimatorRepository.calculate(request)");
     expect(source).toContain("buildTechnicalInputs(");
     expect(source).toContain("availableInstallments");
     expect(source).toContain("installationRequested");
     expect(source).toContain("munckRequested");
-    expect(source).toContain("Copiar resumo");
+    expect(source).toContain("Copiar para Conta Azul");
+    expect(source).toContain("buildContaAzulTransfer(result, product, technicalLines)");
     expect(source).toContain("Conta Azul");
   });
 
@@ -40,7 +41,9 @@ describe("EstimatorPage re-scope 19A", () => {
     expect(source).toContain("calculatedFingerprint");
     expect(source).toContain("freshResult");
     expect(source).toContain("Os dados foram alterados após o último cálculo");
-    expect(source).toContain("disabled={!freshResult}");
+    expect(source).toContain("if (!contaAzulTransfer || !freshResult || !transferReview || working) return;");
+    expect(source).toContain("disabled={!transferReview || working}");
+    expect(source).toContain("setTransferReview(false)");
   });
 
   it("does not render internal costing or pricing details", () => {
