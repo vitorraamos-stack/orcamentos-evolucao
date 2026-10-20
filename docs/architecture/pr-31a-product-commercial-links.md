@@ -4,7 +4,7 @@
 Adicionar exclusivamente o relacionamento 1:1 entre products (Engenharia) e
 library_products (Biblioteca), sem preço, sem migração de conteúdo e sem UI nova.
 
-- Migration aditiva: 20261019192945_product_commercial_links_31a.sql.
+- Migration aditiva: 20261020111643_product_commercial_links_31a.sql.
 - Serviço administrativo: api/product-commercial-links.ts
   - GET /api/product-commercial-links (opcional ?productId=UUID)
   - POST /api/product-commercial-links com ação LINK_PRODUCT, productId e libraryProductId.
@@ -16,7 +16,8 @@ library_products (Biblioteca), sem preço, sem migração de conteúdo e sem UI 
 - Sem UPDATE, DELETE, backfill ou associação automática pelo nome.
 
 ## Operação controlada
-NÃO aplicar a migration nem criar a associação inicial em produção sem autorização.
+Migration aplicada no Supabase de produção em 20/10/2026 mediante autorização explícita do gestor, registrada sob a versão 20261020111643. NÃO reaplicar.
+NÃO criar a associação inicial em produção sem autorização separada.
 Após a aprovação da migration, validar RLS/grants e testar em ambiente isolado
 antes de autorizar a vinculação do PVC.
 
@@ -48,3 +49,6 @@ Após disponibilizar um banco isolado com o esquema necessário:
 4. Testar criação, repetição idempotente, conflito 1:1, concorrência e
    impedimento de exclusão referencial em dados artificiais.
 5. Documentar o resultado ANTES de autorizar aplicação no banco real.
+
+## Validação de produção de 20/10/2026
+A migration `20261020111643` foi aplicada via Supabase e todas as 17 verificações do roteiro somente leitura passaram. A tabela está vazia, RLS e privilégios foram validados, e a associação do PVC não foi executada. GitHub merge e deploy manual permanecem pendentes de autorização específica.

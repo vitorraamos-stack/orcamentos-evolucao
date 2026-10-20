@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { productCommercialLinkCreateSchema } from "../../../shared/product-commercial-links/index";
 
 const sql = readFileSync(
-  "supabase/migrations/20261019192945_product_commercial_links_31a.sql", "utf8"
+  "supabase/migrations/20261020111643_product_commercial_links_31a.sql", "utf8"
 );
 
 describe("PR 31A non-invasive link foundation", () => {
