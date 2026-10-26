@@ -90,6 +90,7 @@ export default function OrdersCentralPage() {
   const [summaryTotal, setSummaryTotal] = useState<number | null>(null);
   const [summaryStatus, setSummaryStatus] = useState<"loading" | "ready" | "error">("loading");
   const summaryRequestId = useRef(0);
+  const listRequestId = useRef(0);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -168,6 +169,7 @@ export default function OrdersCentralPage() {
     setFiltersOpen(false);
   };
   const load = () => {
+    const requestId = ++listRequestId.current;
     setLoading(true);
     setError("");
     listOperationalOrders({
@@ -182,25 +184,29 @@ export default function OrdersCentralPage() {
       quickFilter: quick,
     })
       .then(result => {
+        if (requestId !== listRequestId.current) return;
         setOrders(result.orders);
         setTotal(result.total);
+        if (result.page !== page) setPage(result.page);
       })
-      .catch(reason =>
+      .catch(reason => {
+        if (requestId !== listRequestId.current) return;
+        setOrders([]);
+        setTotal(0);
         setError(
           reason instanceof Error ? reason.message : "Falha ao carregar as OS."
-        )
-      )
-      .finally(() => setLoading(false));
+        );
+      })
+      .finally(() => {
+        if (requestId === listRequestId.current) setLoading(false);
+      });
   };
-  useEffect(load, [
-    page,
-    query,
-    artStatus,
-    prodStatus,
-    priority,
-    logistics,
-    quick,
-  ]);
+  useEffect(() => {
+    load();
+    return () => {
+      listRequestId.current += 1;
+    };
+  }, [page, query, artStatus, prodStatus, priority, logistics, quick]);
   const refreshSummary = useCallback(() => {
     const requestId = ++summaryRequestId.current;
     setSummaryStatus("loading");
