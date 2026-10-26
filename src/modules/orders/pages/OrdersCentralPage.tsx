@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { Filter, Plus, RotateCcw, X } from "lucide-react";
 import "./orders-central.css";
@@ -56,11 +56,6 @@ function initialQuickFilter() {
 function OrdersLoading() {
   return (
     <div aria-label="Carregando ordens" className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        {Array.from({ length: 5 }, (_, index) => (
-          <Skeleton key={index} className="h-20 rounded-xl" />
-        ))}
-      </div>
       <Skeleton className="h-16 rounded-xl" />
       <div className="space-y-2 rounded-xl border p-4">
         {Array.from({ length: 6 }, (_, index) => (
@@ -76,7 +71,9 @@ export default function OrdersCentralPage() {
   const [, setLocation] = useLocation();
   const [orders, setOrders] = useState<OsOrder[]>([]);
   const [summaryOrders, setSummaryOrders] = useState<OsOrder[]>([]);
-  const [summaryTotal, setSummaryTotal] = useState(0);
+  const [summaryTotal, setSummaryTotal] = useState<number | null>(null);
+  const [summaryStatus, setSummaryStatus] = useState<"loading" | "ready" | "error">("loading");
+  const summaryRequestId = useRef(0);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -186,16 +183,31 @@ export default function OrdersCentralPage() {
     logistics,
     quick,
   ]);
-  useEffect(() => {
-    listOperationalOrderSummaryRows()
+  const refreshSummary = useCallback(() => {
+    const requestId = ++summaryRequestId.current;
+    setSummaryStatus("loading");
+    setSummaryTotal(null);
+    setSummaryOrders([]);
+    void listOperationalOrderSummaryRows()
       .then(result => {
+        if (requestId !== summaryRequestId.current) return;
         setSummaryOrders(result.orders);
         setSummaryTotal(result.total);
+        setSummaryStatus("ready");
       })
       .catch(() => {
-        // The central stays usable if this optional snapshot cannot be loaded.
+        if (requestId !== summaryRequestId.current) return;
+        setSummaryOrders([]);
+        setSummaryTotal(null);
+        setSummaryStatus("error");
       });
   }, []);
+  useEffect(() => {
+    refreshSummary();
+    return () => {
+      summaryRequestId.current += 1;
+    };
+  }, [refreshSummary]);
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setPage(1);
@@ -204,12 +216,8 @@ export default function OrdersCentralPage() {
     return () => window.clearTimeout(timer);
   }, [search]);
   const summary = useMemo(
-    () =>
-      summarizeOrders(
-        summaryOrders.length ? summaryOrders : orders,
-        summaryOrders.length ? summaryTotal : total
-      ),
-    [orders, summaryOrders, summaryTotal, total]
+    () => summaryTotal === null ? null : summarizeOrders(summaryOrders, summaryTotal),
+    [summaryOrders, summaryTotal]
   );
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -322,11 +330,21 @@ export default function OrdersCentralPage() {
           </Button>
         )}
       </div>
+      <OrdersSummaryCards
+        summary={summary}
+        loading={summaryStatus === "loading"}
+        error={summaryStatus === "error"}
+        onRetry={refreshSummary}
+        selectedUrgent={quick === "urgent"}
+        onSelectUrgent={() => {
+          setQuick("urgent");
+          setPage(1);
+        }}
+      />
       {loading && !orders.length ? (
         <OrdersLoading />
       ) : (
         <>
-          <OrdersSummaryCards summary={summary} />
           <section aria-label="Filtros rápidos" className="evolu-orders__quick-filters evolu-ui-panel">
             <div className="evolu-orders__quick-label">
               <span>Visualização rápida</span>

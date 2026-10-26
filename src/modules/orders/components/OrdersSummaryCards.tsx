@@ -1,26 +1,15 @@
 import type { LucideIcon } from "lucide-react";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  CircleDot,
-  ClipboardList,
-  Siren,
-} from "lucide-react";
+import { AlertTriangle, CircleDot, Siren } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { OrderSummary } from "../orderSummary";
 
 const cards: Array<{
-  key: keyof OrderSummary;
+  key: "active" | "overdue" | "urgent";
   label: string;
   icon: LucideIcon;
   tone: string;
 }> = [
-  {
-    key: "total",
-    label: "Total de OS",
-    icon: ClipboardList,
-    tone: "text-primary bg-primary/10",
-  },
   {
     key: "active",
     label: "Em andamento",
@@ -39,35 +28,63 @@ const cards: Array<{
     icon: Siren,
     tone: "text-amber-700 bg-amber-50",
   },
-  {
-    key: "finished",
-    label: "Finalizadas",
-    icon: CheckCircle2,
-    tone: "text-emerald-700 bg-emerald-50",
-  },
 ];
 
-export function OrdersSummaryCards({ summary }: { summary: OrderSummary }) {
+type Props = {
+  summary: OrderSummary | null;
+  loading: boolean;
+  error: boolean;
+  onRetry: () => void;
+  selectedUrgent: boolean;
+  onSelectUrgent: () => void;
+};
+
+export function OrdersSummaryCards({
+  summary,
+  loading,
+  error,
+  onRetry,
+  selectedUrgent,
+  onSelectUrgent,
+}: Props) {
   return (
-    <section
-      aria-label="Resumo das ordens"
-      className="grid grid-cols-2 gap-3 lg:grid-cols-5"
-    >
-      {cards.map(({ key, label, icon: Icon, tone }) => (
-        <Card key={key} className="gap-0 py-0 shadow-xs">
-          <CardContent className="flex items-center gap-3 p-4">
-            <span className={`rounded-lg p-2 ${tone}`}>
+    <section aria-label="Resumo das ordens" className="grid grid-cols-3 gap-2 sm:gap-3">
+      {cards.map(({ key, label, icon: Icon, tone }) => {
+        const value = loading || error || summary === null ? "—" : summary[key];
+        const body = (
+          <CardContent className="flex min-w-0 flex-col items-start gap-2 p-3 sm:flex-row sm:items-center sm:gap-3 sm:p-4">
+            <span className={"rounded-lg p-2 " + tone}>
               <Icon className="h-4 w-4" aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-muted-foreground">
-                {label}
-              </p>
-              <p className="text-2xl font-bold tabular-nums">{summary[key]}</p>
+              <p className="text-xs font-medium text-muted-foreground">{label}</p>
+              <p className="text-2xl font-bold tabular-nums">{value}</p>
             </div>
           </CardContent>
-        </Card>
-      ))}
+        );
+        return (
+          <Card key={key} className="gap-0 py-0 shadow-xs">
+            {key === "urgent" ? (
+              <button
+                type="button"
+                onClick={onSelectUrgent}
+                aria-pressed={selectedUrgent}
+                aria-label="Filtrar ordens urgentes"
+                className="w-full rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              >
+                {body}
+              </button>
+            ) : body}
+          </Card>
+        );
+      })}
+      {loading && <p role="status" className="sr-only">Atualizando indicadores globais.</p>}
+      {error && (
+        <div role="alert" className="col-span-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
+          <p className="text-sm">Não foi possível atualizar os indicadores globais.</p>
+          <Button variant="outline" size="sm" onClick={onRetry}>Tentar novamente</Button>
+        </div>
+      )}
     </section>
   );
 }
