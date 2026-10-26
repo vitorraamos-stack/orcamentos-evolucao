@@ -161,3 +161,19 @@
 .dark .evolu-orders [data-order-indicator][data-tone="danger"] {
   color: #fecaca; background: #450a0a; border-color: #b91c1c;
 }
+
+/* Four quick filters form a 2x2 grid on phones, without horizontal scrolling. */
+@media (max-width: 767px) {
+  .evolu-orders__quick-scroll {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+    gap: 8px;
+  }
+  .evolu-orders__quick-button {
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+    min-height: 42px;
+  }
+}

@@ -22,6 +22,14 @@ import { ART_COLUMNS, PROD_COLUMNS } from "@/features/hubos/constants";
 import type { LogisticType, OsOrder } from "@/features/hubos/types";
 import { createOrderPath } from "@/features/hubos/createOrderNavigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsMobile } from "@/hooks/useMobile";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   listOperationalOrders,
   listOperationalOrderSummaryRows,
@@ -38,14 +46,21 @@ const PAGE_SIZE = 25;
 const quickFilters: Array<[QuickOrderFilter, string]> = [
   ["all", "Todas"],
   ["active", "Em andamento"],
+  ["overdue", "Atrasadas"],
+  ["finished", "Finalizadas"],
+];
+
+// Preserve existing deep links and operational subsets without adding
+// more than the four approved quick-filter controls.
+const extraQuickFilters: Array<[QuickOrderFilter, string]> = [
   ["today", "Hoje"],
   ["tomorrow", "Amanhã"],
   ["week", "Esta semana"],
-  ["overdue", "Atrasadas"],
-  ["urgent", "Urgentes"],
   ["pending", "Pendentes"],
-  ["finished", "Finalizadas"],
+  ["urgent", "Urgentes"],
 ];
+const isExtraQuickFilter = (value: QuickOrderFilter) =>
+  extraQuickFilters.some(([key]) => key === value);
 
 function initialQuickFilter() {
   return typeof window === "undefined"
@@ -68,6 +83,7 @@ function OrdersLoading() {
 
 export default function OrdersCentralPage() {
   const { hubPermissions } = useAuth();
+  const isMobile = useIsMobile();
   const [, setLocation] = useLocation();
   const [orders, setOrders] = useState<OsOrder[]>([]);
   const [summaryOrders, setSummaryOrders] = useState<OsOrder[]>([]);
@@ -92,14 +108,16 @@ export default function OrdersCentralPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const advancedCount = [
-    quick,
-    artStatus,
-    prodStatus,
-    priority,
-    logistics,
-  ].filter(value => value !== "all").length;
+  const advancedCount = [artStatus, prodStatus, priority, logistics].filter(
+    value => value !== "all"
+  ).length + (isExtraQuickFilter(quick) ? 1 : 0);
   const hasFilters = Boolean(search || quick !== "all" || advancedCount);
+  const hasDraftChanges =
+    draftQuick !== quick ||
+    draftArtStatus !== artStatus ||
+    draftProdStatus !== prodStatus ||
+    draftPriority !== priority ||
+    draftLogistics !== logistics;
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -272,11 +290,79 @@ export default function OrdersCentralPage() {
       </Select>
     </div>
   );
+  const filterPanel = (
+    <div className="space-y-4">
+      <section className="space-y-2" aria-label="Situação">
+        <p className="text-xs font-semibold uppercase text-muted-foreground">
+          Situação
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {quickFilters.map(([value, label]) => (
+            <Button
+              key={value}
+              type="button"
+              size="sm"
+              className="rounded-full"
+              aria-pressed={draftQuick === value}
+              variant={draftQuick === value ? "default" : "outline"}
+              onClick={() => setDraftQuick(value)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+      </section>
+      <section className="space-y-2">
+        <p className="text-xs font-semibold uppercase text-muted-foreground">
+          Outros recortes operacionais
+        </p>
+        <Select
+          value={isExtraQuickFilter(draftQuick) ? draftQuick : "none"}
+          onValueChange={value =>
+            setDraftQuick(value === "none" ? "all" : (value as QuickOrderFilter))
+          }
+        >
+          <SelectTrigger aria-label="Outros recortes operacionais">
+            <SelectValue placeholder="Nenhum recorte adicional" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Nenhum recorte adicional</SelectItem>
+            {extraQuickFilters.map(([value, label]) => (
+              <SelectItem key={value} value={value}>{label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </section>
+      <section className="space-y-2">
+        <p className="text-xs font-semibold uppercase text-muted-foreground">
+          Etapas e classificação
+        </p>
+        {selectFilters}
+      </section>
+      {hasDraftChanges && (
+        <p role="status" className="text-xs text-muted-foreground">
+          Alterações não aplicadas
+        </p>
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+        <Button variant="ghost" onClick={clearDraftFilters}>
+          <RotateCcw className="h-4 w-4" />
+          Limpar
+        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setFiltersOpen(false)}>
+            Cancelar
+          </Button>
+          <Button onClick={applyDraftFilters}>Aplicar filtros</Button>
+        </div>
+      </div>
+    </div>
+  );
   const activeChips = [
-    quick !== "all"
+    isExtraQuickFilter(quick)
       ? {
           key: "quick",
-          label: quickFilters.find(([value]) => value === quick)?.[1],
+          label: extraQuickFilters.find(([value]) => value === quick)?.[1],
           clear: () => setQuick("all"),
         }
       : null,
@@ -373,61 +459,41 @@ export default function OrdersCentralPage() {
             <CardContent className="space-y-3 px-4">
               <div className="evolu-orders__toolbar flex gap-2">
                 <OrderSearch value={search} onChange={setSearch} />
-                <Popover
-                  open={filtersOpen}
-                  onOpenChange={handleFiltersOpenChange}
-                >
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="evolu-orders__advanced-button">
-                      <Filter className="h-4 w-4" />
-                      Filtros
-                      {advancedCount > 0 && (
-                        <Badge className="ml-1 h-5 min-w-5 px-1.5">
-                          {advancedCount}
-                        </Badge>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    align="end"
-                    className="w-[min(32rem,calc(100vw-2rem))] space-y-4"
-                  >
-                    <h2 className="font-semibold">Filtros</h2>
-                    <section className="space-y-2">
-                      <p className="text-xs font-semibold uppercase text-muted-foreground">
-                        Situação
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {quickFilters.map(([value, label]) => (
-                          <Button
-                            key={value}
-                            size="sm"
-                            className="rounded-full"
-                            variant={
-                              draftQuick === value ? "default" : "outline"
-                            }
-                            onClick={() => setDraftQuick(value)}
-                          >
-                            {label}
-                          </Button>
-                        ))}
-                      </div>
-                    </section>
-                    <p className="text-xs font-semibold uppercase text-muted-foreground">
-                      Etapas e classificação
-                    </p>
-                    {selectFilters}
-                    <div className="flex justify-between border-t pt-3">
-                      <Button variant="ghost" onClick={clearDraftFilters}>
-                        <RotateCcw className="h-4 w-4" />
-                        Limpar
+                {isMobile ? (
+                  <Sheet open={filtersOpen} onOpenChange={handleFiltersOpenChange}>
+                    <SheetTrigger asChild>
+                      <Button variant="outline" className="evolu-orders__advanced-button">
+                        <Filter className="h-4 w-4" />
+                        Filtros
+                        {advancedCount > 0 && (
+                          <Badge className="ml-1 h-5 min-w-5 px-1.5">{advancedCount}</Badge>
+                        )}
                       </Button>
-                      <Button onClick={applyDraftFilters}>
-                        Aplicar filtros
+                    </SheetTrigger>
+                    <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-2xl pb-6">
+                      <SheetHeader>
+                        <SheetTitle>Filtros da Central</SheetTitle>
+                      </SheetHeader>
+                      <div className="px-4">{filterPanel}</div>
+                    </SheetContent>
+                  </Sheet>
+                ) : (
+                  <Popover open={filtersOpen} onOpenChange={handleFiltersOpenChange}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="evolu-orders__advanced-button">
+                        <Filter className="h-4 w-4" />
+                        Filtros
+                        {advancedCount > 0 && (
+                          <Badge className="ml-1 h-5 min-w-5 px-1.5">{advancedCount}</Badge>
+                        )}
                       </Button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-[min(32rem,calc(100vw-2rem))] max-h-[80dvh] space-y-4 overflow-y-auto">
+                      <h2 className="font-semibold">Filtros</h2>
+                      {filterPanel}
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
               {activeChips.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2">
@@ -466,6 +532,21 @@ export default function OrdersCentralPage() {
             <div className="evolu-orders__table evolu-ui-panel">
               <div className="evolu-orders__table-heading">
                 <div>
+                  {quick === "urgent" && (
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary">Exibindo: Urgentes</Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setQuick("all");
+                          setPage(1);
+                        }}
+                      >
+                        Voltar a Todas
+                      </Button>
+                    </div>
+                  )}
                   <h2>Relação de ordens</h2>
                   <p>{total} registros encontrados nesta consulta</p>
                 </div>
