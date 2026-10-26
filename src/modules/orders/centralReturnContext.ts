@@ -25,6 +25,11 @@ const getStorage = (storage: Storage | null) => {
   try { return storage?.getItem(STORAGE_KEY) ?? null; } catch { return null; }
 };
 
+export function centralSessionStorage(): Storage | null {
+  try { return typeof window === "undefined" ? null : window.sessionStorage; }
+  catch { return null; }
+}
+
 export function clearCentralReturn(storage: Storage | null) {
   try { storage?.removeItem(STORAGE_KEY); } catch { /* storage unavailable */ }
 }
@@ -34,7 +39,7 @@ function isValid(value: unknown): value is CentralReturnContext {
   const entry = value as Partial<CentralReturnContext>;
   return typeof entry.userId === "string" && entry.userId.length > 0 &&
     typeof entry.orderId === "string" && entry.orderId.length > 0 &&
-    Number.isSafeInteger(entry.page) && (entry.page ?? 0) >= 1 &&
+    typeof entry.page === "number" && Number.isSafeInteger(entry.page) && entry.page >= 1 &&
     typeof entry.search === "string" && entry.search.length <= 1000 &&
     allowedQuick.includes(entry.quick as QuickOrderFilter) &&
     ["artStatus", "prodStatus", "priority", "logistics"].every(
@@ -112,9 +117,10 @@ export function readCentralReturn(
 
 export function consumeCentralReturn(
   storage: Storage | null,
-  value: CentralReturnContext
+  value: CentralReturnContext,
+  now = Date.now()
 ) {
-  const current = readStored(storage, Date.now());
+  const current = readStored(storage, now);
   if (current?.userId === value.userId &&
       current?.orderId === value.orderId &&
       current.openedAt === value.openedAt &&

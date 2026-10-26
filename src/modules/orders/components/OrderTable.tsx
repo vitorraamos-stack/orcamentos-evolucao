@@ -1,3 +1,4 @@
+import type { MouseEvent } from "react";
 import { Link } from "wouter";
 import {
   AlertTriangle,
@@ -11,6 +12,7 @@ import {
 } from "lucide-react";
 import type { OsOrder } from "@/features/hubos/types";
 import { calculateOrderRisk } from "../risk";
+import { isSameTabOrderActivation } from "../centralReturnContext";
 import {
   OrderPriorityBadge,
   OrderRiskBadge,
@@ -61,10 +63,17 @@ export function OrderLogisticsCell({
 export function OrderTable({
   orders,
   onClearFilters,
+  onOpenOrder,
+  highlightOrderId,
 }: {
   orders: OsOrder[];
   onClearFilters?: () => void;
+  onOpenOrder?: (orderId: string) => void;
+  highlightOrderId?: string | null;
 }) {
+  const handleOrderLink = (event: MouseEvent<HTMLAnchorElement>, orderId: string) => {
+    if (isSameTabOrderActivation(event.nativeEvent)) onOpenOrder?.(orderId);
+  };
   if (!orders.length)
     return (
       <div className="rounded-xl border bg-card py-4 shadow-xs">
@@ -89,10 +98,10 @@ export function OrderTable({
           const path = `/os/${order.id}`;
           const number = order.sale_number || order.os_number || "—";
           return (
-            <article key={order.id} className="evolu-orders__mobile-card">
+            <article key={order.id} className={cn("evolu-orders__mobile-card", highlightOrderId === order.id && "ring-2 ring-primary/50")}>
               <div className="flex min-w-0 items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <Link href={path} className="text-base font-extrabold text-primary hover:underline">
+                  <Link href={path} data-central-order-id={order.id} onClick={event => handleOrderLink(event, order.id)} className="text-base font-extrabold text-primary hover:underline">
                     #{number}
                   </Link>
                   <p className="mt-1 truncate text-sm font-semibold" title={order.client_name}>
@@ -119,6 +128,7 @@ export function OrderTable({
                 </span>
                 <Link
                   href={path}
+                  onClick={event => handleOrderLink(event, order.id)}
                   className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-primary hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   aria-label={`Visualizar OS ${number}`}
                 >
@@ -174,12 +184,15 @@ export function OrderTable({
                 className={cn(
                   "border-b transition-colors last:border-0 hover:bg-muted/30",
                   risk === "CRITICO" &&
-                    "border-l-2 border-l-destructive bg-destructive/[0.025]"
+                    "border-l-2 border-l-destructive bg-destructive/[0.025]",
+                  highlightOrderId === order.id && "bg-primary/10 ring-2 ring-inset ring-primary/40"
                 )}
               >
                 <td className="min-w-0 px-2 py-2.5 font-semibold tabular-nums">
                   <Link
                     href={path}
+                    data-central-order-id={order.id}
+                    onClick={event => handleOrderLink(event, order.id)}
                     className="whitespace-nowrap text-primary underline-offset-4 hover:underline"
                   >
                     #{order.sale_number || order.os_number || "—"}
@@ -254,6 +267,7 @@ export function OrderTable({
                         <Button asChild variant="ghost" size="icon">
                           <Link
                             href={path}
+                            onClick={event => handleOrderLink(event, order.id)}
                             aria-label={`Visualizar OS ${order.sale_number || order.os_number}`}
                           >
                             <Eye className="h-4 w-4" />
@@ -274,7 +288,7 @@ export function OrderTable({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem asChild>
-                          <Link href={path}>Abrir OS</Link>
+                          <Link href={path} onClick={event => handleOrderLink(event, order.id)}>Abrir OS</Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() =>

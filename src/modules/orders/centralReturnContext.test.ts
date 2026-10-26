@@ -30,7 +30,7 @@ describe("same-tab Central return context", () => {
     markCentralDetailEntered(storage, base.userId, base.orderId, now + 100);
     const result = readCentralReturn(storage, base.userId, "?quick=overdue", now + 200);
     expect(result).toMatchObject({ ...base, phase: "detail" });
-    consumeCentralReturn(storage, result!);
+    consumeCentralReturn(storage, result!, now + 200);
     expect(readCentralReturn(storage, base.userId, "", now + 300)).toBeNull();
   });
   it("does not restore across users, OSs, expired sessions or conflicting URL parameters", () => {

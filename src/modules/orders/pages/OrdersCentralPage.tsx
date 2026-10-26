@@ -42,6 +42,10 @@ import { OrdersListRecovery } from "../components/OrdersListRecovery";
 import { OrdersSummaryCards } from "../components/OrdersSummaryCards";
 import { summarizeOrders } from "../orderSummary";
 import { PageHeader } from "@/shared/components/OperationalUi";
+import {
+  centralSessionStorage, clearCentralReturn, consumeCentralReturn,
+  readCentralReturn, saveCentralReturn,
+} from "../centralReturnContext";
 
 const PAGE_SIZE = 25;
 const quickFilters: Array<[QuickOrderFilter, string]> = [
@@ -69,6 +73,9 @@ function initialQuickFilter() {
     : parseQuickFilterFromSearch(window.location.search);
 }
 
+// Provisional. Re-evaluate this limit with real-world performance evidence.
+const RETURN_LOOKUP_TIMEOUT_MS = 5000;
+
 function OrdersLoading() {
   return (
     <div aria-label="Carregando ordens" role="status" className="space-y-4">
@@ -86,7 +93,12 @@ function OrdersLoading() {
 }
 
 export default function OrdersCentralPage() {
-  const { hubPermissions } = useAuth();
+  const { user, hubPermissions } = useAuth();
+  const [returnContext] = useState(() =>
+    typeof window === "undefined" || !hubPermissions.canViewHubOS
+      ? null
+      : readCentralReturn(centralSessionStorage(), user?.id, window.location.search, Date.now())
+  );
   const isMobile = useIsMobile();
   const [, setLocation] = useLocation();
   const [orders, setOrders] = useState<OsOrder[]>([]);
@@ -95,6 +107,12 @@ export default function OrdersCentralPage() {
   const [summaryStatus, setSummaryStatus] = useState<"loading" | "ready" | "error">("loading");
   const summaryRequestId = useRef(0);
   const listRequestId = useRef(0);
+  const returnOrderIdRef = useRef(returnContext?.orderId ?? null);
+  const returnAbortRef = useRef<AbortController | null>(null);
+  const skipOnePageFetchRef = useRef<number | null>(null);
+  const pendingAnchorFocusRef = useRef<string | null>(null);
+  const [highlightOrderId, setHighlightOrderId] = useState<string | null>(null);
+  const [returnNotice, setReturnNotice] = useState("");
   const retryButtonRef = useRef<HTMLButtonElement>(null);
   const resultsHeadingRef = useRef<HTMLHeadingElement>(null);
   const focusResultsAfterRetry = useRef(false);
@@ -104,16 +122,16 @@ export default function OrdersCentralPage() {
   const [listRefreshKey, setListRefreshKey] = useState(0);
   const [searchEditVersion, setSearchEditVersion] = useState(0);
   const [searchCommittedVersion, setSearchCommittedVersion] = useState(0);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [query, setQuery] = useState("");
-  const [quick, setQuick] = useState<QuickOrderFilter>(initialQuickFilter);
-  const [artStatus, setArtStatus] = useState("all");
-  const [prodStatus, setProdStatus] = useState("all");
-  const [priority, setPriority] = useState("all");
-  const [logistics, setLogistics] = useState("all");
+  const [page, setPage] = useState(returnContext?.page ?? 1);
+  const [search, setSearch] = useState(returnContext?.search ?? "");
+  const [query, setQuery] = useState(returnContext?.search ?? "");
+  const [quick, setQuick] = useState<QuickOrderFilter>(returnContext?.quick ?? initialQuickFilter);
+  const [artStatus, setArtStatus] = useState(returnContext?.artStatus ?? "all");
+  const [prodStatus, setProdStatus] = useState(returnContext?.prodStatus ?? "all");
+  const [priority, setPriority] = useState(returnContext?.priority ?? "all");
+  const [logistics, setLogistics] = useState(returnContext?.logistics ?? "all");
   const [draftQuick, setDraftQuick] =
-    useState<QuickOrderFilter>(initialQuickFilter);
+    useState<QuickOrderFilter>(returnContext?.quick ?? initialQuickFilter);
   const [draftArtStatus, setDraftArtStatus] = useState("all");
   const [draftProdStatus, setDraftProdStatus] = useState("all");
   const [draftPriority, setDraftPriority] = useState("all");
@@ -133,6 +151,11 @@ export default function OrdersCentralPage() {
     draftLogistics !== logistics;
 
   useEffect(() => {
+    if (returnContext) consumeCentralReturn(centralSessionStorage(), returnContext);
+    else clearCentralReturn(centralSessionStorage());
+  }, [returnContext]);
+
+  useEffect(() => {
     const url = new URL(window.location.href);
     if (quick === "all") url.searchParams.delete("quick");
     else url.searchParams.set("quick", quick);
@@ -142,6 +165,12 @@ export default function OrdersCentralPage() {
   // Invalidate as soon as the user changes a committed criterion (or types),
   // before the 350 ms debounce can complete or a previous response can arrive.
   const invalidateList = () => {
+    returnOrderIdRef.current = null;
+    returnAbortRef.current?.abort();
+    returnAbortRef.current = null;
+    pendingAnchorFocusRef.current = null;
+    setHighlightOrderId(null);
+    setReturnNotice("");
     listRequestId.current += 1;
     focusResultsAfterRetry.current = false;
     setOrders([]);
@@ -208,7 +237,7 @@ export default function OrdersCentralPage() {
       setTotal(null);
       setListUpdatedAt(null);
     }
-    void listOperationalOrders({
+    const args = {
       page,
       pageSize: PAGE_SIZE,
       search: query,
@@ -218,15 +247,50 @@ export default function OrdersCentralPage() {
       logisticType:
         logistics === "all" ? undefined : (logistics as LogisticType),
       quickFilter: quick,
-    })
+    };
+    const returnTarget = returnOrderIdRef.current;
+    let timedOut = false;
+    const fetchPage = async () => {
+      if (!returnTarget) return listOperationalOrders(args);
+      const controller = new AbortController();
+      returnAbortRef.current = controller;
+      const timeout = window.setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, RETURN_LOOKUP_TIMEOUT_MS);
+      try {
+        return await listOperationalOrders({
+          ...args, locateOrderId: returnTarget, signal: controller.signal,
+        });
+      } catch (reason) {
+        if (!timedOut) throw reason;
+        // A timed-out location cannot move the UI later. Recover a valid
+        // ordinary page with the exact same filters and permissions.
+        return await listOperationalOrders(args);
+      } finally {
+        window.clearTimeout(timeout);
+        if (returnAbortRef.current === controller) returnAbortRef.current = null;
+      }
+    };
+    void fetchPage()
       .then(result => {
         if (requestId !== listRequestId.current) return;
+        returnOrderIdRef.current = null;
+        if (returnTarget) {
+          if (timedOut) {
+            setReturnNotice("Não foi possível recuperar a posição anterior. Os filtros foram preservados.");
+          } else if (result.locatedOrderId === returnTarget) {
+            pendingAnchorFocusRef.current = returnTarget;
+            setHighlightOrderId(returnTarget);
+            setReturnNotice("");
+          } else {
+            setReturnNotice("A ordem visualizada não aparece nos resultados desta consulta.");
+          }
+        }
         if (result.page !== page) {
-          // A page that disappeared is not an empty result. Keep loading
-          // until the server-validated page can be displayed.
-          invalidateList();
+          // Page and results commit together: no flash of the prior page.
+          skipOnePageFetchRef.current = result.page;
           setPage(result.page);
-          return;
         }
         if (retryInPlace && document.activeElement === retryButtonRef.current) {
           focusResultsAfterRetry.current = true;
@@ -238,6 +302,10 @@ export default function OrdersCentralPage() {
       })
       .catch(() => {
         if (requestId !== listRequestId.current) return;
+        returnOrderIdRef.current = null;
+        pendingAnchorFocusRef.current = null;
+        setHighlightOrderId(null);
+        setReturnNotice("");
         focusResultsAfterRetry.current = false;
         setOrders([]);
         setTotal(null);
@@ -249,6 +317,10 @@ export default function OrdersCentralPage() {
       });
   };
   useEffect(() => {
+    if (skipOnePageFetchRef.current === page) {
+      skipOnePageFetchRef.current = null;
+      return;
+    }
     // While search input is being edited, do not fetch the old query even
     // if another filter changes; the most recent search intent wins.
     if (searchEditVersion !== searchCommittedVersion) return;
@@ -260,6 +332,18 @@ export default function OrdersCentralPage() {
     page, query, artStatus, prodStatus, priority, logistics, quick,
     searchEditVersion, searchCommittedVersion, listRefreshKey,
   ]);
+  useEffect(() => {
+    if (loading || error || total === null || !pendingAnchorFocusRef.current) return;
+    const targetId = pendingAnchorFocusRef.current;
+    pendingAnchorFocusRef.current = null;
+    const matches = Array.from(document.querySelectorAll<HTMLElement>("[data-central-order-id]"));
+    const target = matches.find(el =>
+      el.dataset.centralOrderId === targetId && el.getClientRects().length > 0
+    );
+    target?.focus({ preventScroll: true });
+    target?.scrollIntoView({ block: "center", behavior: "auto" });
+  }, [loading, error, total, highlightOrderId, orders]);
+
   useEffect(() => {
     if (!loading && !error && total !== null && focusResultsAfterRetry.current) {
       focusResultsAfterRetry.current = false;
@@ -318,6 +402,14 @@ export default function OrdersCentralPage() {
   const retryList = () => {
     if (loading || !error) return;
     load(true);
+  };
+
+  const rememberOpenedOrder = (orderId: string) => {
+    if (!user?.id || !hubPermissions.canViewHubOS) return;
+    saveCentralReturn(centralSessionStorage(), {
+      userId: user.id, orderId, page, search: query, quick,
+      artStatus, prodStatus, priority, logistics,
+    }, Date.now());
   };
 
   const selectFilters = (
@@ -623,6 +715,11 @@ export default function OrdersCentralPage() {
               )}
             </CardContent>
           </Card>
+          {returnNotice && (
+            <div role="status" className="rounded-lg border p-3 text-sm text-muted-foreground">
+              {returnNotice}
+            </div>
+          )}
           <p role="status" className="sr-only">
             {!loading && !error && total !== null
               ? total === 0
@@ -670,6 +767,8 @@ export default function OrdersCentralPage() {
               <OrderTable
                 orders={orders}
                 onClearFilters={hasFilters ? clearFilters : undefined}
+                onOpenOrder={rememberOpenedOrder}
+                highlightOrderId={highlightOrderId}
               />
             </div>
           )}
