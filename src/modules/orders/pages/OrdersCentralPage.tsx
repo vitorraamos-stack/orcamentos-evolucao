@@ -42,6 +42,7 @@ import { OrdersListRecovery } from "../components/OrdersListRecovery";
 import { OrdersSummaryCards } from "../components/OrdersSummaryCards";
 import { summarizeOrders } from "../orderSummary";
 import { PageHeader } from "@/shared/components/OperationalUi";
+import { boundedCentralLookup } from "../centralReturnDeadline";
 import {
   centralSessionStorage, clearCentralReturn, consumeCentralReturn,
   readCentralReturn, saveCentralReturn,
@@ -254,21 +255,18 @@ export default function OrdersCentralPage() {
       if (!returnTarget) return listOperationalOrders(args);
       const controller = new AbortController();
       returnAbortRef.current = controller;
-      const timeout = window.setTimeout(() => {
-        timedOut = true;
-        controller.abort();
-      }, RETURN_LOOKUP_TIMEOUT_MS);
       try {
-        return await listOperationalOrders({
-          ...args, locateOrderId: returnTarget, signal: controller.signal,
-        });
-      } catch (reason) {
-        if (!timedOut) throw reason;
-        // A timed-out location cannot move the UI later. Recover a valid
-        // ordinary page with the exact same filters and permissions.
+        const outcome = await boundedCentralLookup(
+          signal => listOperationalOrders({ ...args, locateOrderId: returnTarget, signal }),
+          controller,
+          RETURN_LOOKUP_TIMEOUT_MS
+        );
+        if (outcome.status === "found") return outcome.value;
+        timedOut = true;
+        // Never await the expired location attempt. A late reply cannot move
+        // the UI; the fallback validates the same filters and permissions.
         return await listOperationalOrders(args);
       } finally {
-        window.clearTimeout(timeout);
         if (returnAbortRef.current === controller) returnAbortRef.current = null;
       }
     };
@@ -415,7 +413,7 @@ export default function OrdersCentralPage() {
   const selectFilters = (
     <div className="grid gap-2 sm:grid-cols-2">
       <Select value={draftArtStatus} onValueChange={setDraftArtStatus}>
-        <SelectTrigger>
+        <SelectTrigger aria-label="Filtrar etapa de arte">
           <SelectValue placeholder="Etapa de arte" />
         </SelectTrigger>
         <SelectContent>
@@ -428,7 +426,7 @@ export default function OrdersCentralPage() {
         </SelectContent>
       </Select>
       <Select value={draftProdStatus} onValueChange={setDraftProdStatus}>
-        <SelectTrigger>
+        <SelectTrigger aria-label="Filtrar etapa de produção">
           <SelectValue placeholder="Etapa de produção" />
         </SelectTrigger>
         <SelectContent>
@@ -441,7 +439,7 @@ export default function OrdersCentralPage() {
         </SelectContent>
       </Select>
       <Select value={draftPriority} onValueChange={setDraftPriority}>
-        <SelectTrigger>
+        <SelectTrigger aria-label="Filtrar prioridade">
           <SelectValue placeholder="Prioridade" />
         </SelectTrigger>
         <SelectContent>
@@ -451,7 +449,7 @@ export default function OrdersCentralPage() {
         </SelectContent>
       </Select>
       <Select value={draftLogistics} onValueChange={setDraftLogistics}>
-        <SelectTrigger>
+        <SelectTrigger aria-label="Filtrar logística">
           <SelectValue placeholder="Logística" />
         </SelectTrigger>
         <SelectContent>
@@ -721,6 +719,9 @@ export default function OrdersCentralPage() {
             </div>
           )}
           <p role="status" className="sr-only">
+            {!loading && !error && highlightOrderId ? "Ordem anteriormente aberta localizada nos resultados." : ""}
+          </p>
+          <p role="status" className="sr-only">
             {!loading && !error && total !== null
               ? total === 0
                 ? "Consulta concluída. Nenhuma OS encontrada."
@@ -778,13 +779,15 @@ export default function OrdersCentralPage() {
               Mostrando {orders.length} de {total} ordens
             </span>
             {pages > 1 && (
-              <div className="flex items-center gap-2">
-                <span className="hidden sm:inline">
+              <nav aria-label="Paginação das ordens" className="flex flex-wrap items-center gap-2">
+                <span className="sr-only sm:not-sr-only" aria-current="page">
                   Página {page} de {pages}
                 </span>
                 <Button
                   size="sm"
                   variant="outline"
+                  aria-label="Página anterior"
+                  className="min-h-11 sm:min-h-8"
                   disabled={page === 1 || loading}
                   onClick={() => {
                     invalidateList();
@@ -796,6 +799,8 @@ export default function OrdersCentralPage() {
                 <Button
                   size="sm"
                   variant="outline"
+                  aria-label="Próxima página"
+                  className="min-h-11 sm:min-h-8"
                   disabled={page >= pages || loading}
                   onClick={() => {
                     invalidateList();
@@ -804,7 +809,7 @@ export default function OrdersCentralPage() {
                 >
                   Próxima
                 </Button>
-              </div>
+              </nav>
             )}
           </footer>
           )}

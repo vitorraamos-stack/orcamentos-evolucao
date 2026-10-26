@@ -48,7 +48,7 @@ export function OrdersSummaryCards({
   onSelectUrgent,
 }: Props) {
   return (
-    <section aria-label="Resumo das ordens" className="grid grid-cols-3 gap-2 sm:gap-3">
+    <section aria-label="Resumo das ordens" className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-3 sm:gap-3">
       {cards.map(({ key, label, icon: Icon, tone }) => {
         const value = loading || error || summary === null ? "—" : summary[key];
         const body = (
@@ -70,7 +70,7 @@ export function OrdersSummaryCards({
                 onClick={onSelectUrgent}
                 aria-pressed={selectedUrgent}
                 aria-label="Filtrar ordens urgentes"
-                className="w-full rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                className="min-h-11 w-full rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               >
                 {body}
               </button>
@@ -80,9 +80,9 @@ export function OrdersSummaryCards({
       })}
       {loading && <p role="status" className="sr-only">Atualizando indicadores globais.</p>}
       {error && (
-        <div role="alert" className="col-span-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
+        <div role="alert" className="col-span-full flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
           <p className="text-sm">Não foi possível atualizar os indicadores globais.</p>
-          <Button variant="outline" size="sm" onClick={onRetry}>Tentar novamente</Button>
+          <Button variant="outline" size="sm" className="min-h-11 sm:min-h-8" onClick={onRetry}>Tentar novamente</Button>
         </div>
       )}
     </section>
