@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { Filter, Plus, RotateCcw, X } from "lucide-react";
+import { Filter, Plus, RefreshCw, RotateCcw, X } from "lucide-react";
 import "./orders-central.css";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,9 +38,10 @@ import type { QuickOrderFilter } from "../orderFilters";
 import { parseQuickFilterFromSearch } from "../quickFilterSearch";
 import { OrderSearch } from "../components/OrderSearch";
 import { OrderTable } from "../components/OrderTable";
+import { OrdersListRecovery } from "../components/OrdersListRecovery";
 import { OrdersSummaryCards } from "../components/OrdersSummaryCards";
 import { summarizeOrders } from "../orderSummary";
-import { ErrorState, PageHeader } from "@/shared/components/OperationalUi";
+import { PageHeader } from "@/shared/components/OperationalUi";
 
 const PAGE_SIZE = 25;
 const quickFilters: Array<[QuickOrderFilter, string]> = [
@@ -70,12 +71,15 @@ function initialQuickFilter() {
 
 function OrdersLoading() {
   return (
-    <div aria-label="Carregando ordens" className="space-y-4">
-      <Skeleton className="h-16 rounded-xl" />
-      <div className="space-y-2 rounded-xl border p-4">
-        {Array.from({ length: 6 }, (_, index) => (
-          <Skeleton key={index} className="h-10 w-full" />
-        ))}
+    <div aria-label="Carregando ordens" role="status" className="space-y-4">
+      <p className="sr-only">Carregando a consulta de ordens de serviço.</p>
+      <div aria-hidden="true">
+        <Skeleton className="mb-4 h-16 rounded-xl" />
+        <div className="space-y-2 rounded-xl border p-4">
+          {Array.from({ length: 6 }, (_, index) => (
+            <Skeleton key={index} className="h-10 w-full" />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -91,7 +95,15 @@ export default function OrdersCentralPage() {
   const [summaryStatus, setSummaryStatus] = useState<"loading" | "ready" | "error">("loading");
   const summaryRequestId = useRef(0);
   const listRequestId = useRef(0);
-  const [total, setTotal] = useState(0);
+  const retryButtonRef = useRef<HTMLButtonElement>(null);
+  const resultsHeadingRef = useRef<HTMLHeadingElement>(null);
+  const focusResultsAfterRetry = useRef(false);
+  const [total, setTotal] = useState<number | null>(null);
+  const [listUpdatedAt, setListUpdatedAt] = useState<Date | null>(null);
+  const [summaryUpdatedAt, setSummaryUpdatedAt] = useState<Date | null>(null);
+  const [listRefreshKey, setListRefreshKey] = useState(0);
+  const [searchEditVersion, setSearchEditVersion] = useState(0);
+  const [searchCommittedVersion, setSearchCommittedVersion] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
@@ -127,7 +139,25 @@ export default function OrdersCentralPage() {
     window.history.replaceState(window.history.state, "", url);
   }, [quick]);
 
+  // Invalidate as soon as the user changes a committed criterion (or types),
+  // before the 350 ms debounce can complete or a previous response can arrive.
+  const invalidateList = () => {
+    listRequestId.current += 1;
+    focusResultsAfterRetry.current = false;
+    setOrders([]);
+    setTotal(null);
+    setListUpdatedAt(null);
+    setError("");
+    setLoading(true);
+  };
+  const handleSearchChange = (value: string) => {
+    if (value === search) return;
+    invalidateList();
+    setSearch(value);
+    setSearchEditVersion(value => value + 1);
+  };
   const clearFilters = () => {
+    invalidateList();
     setSearch("");
     setQuery("");
     setQuick("all");
@@ -160,6 +190,7 @@ export default function OrdersCentralPage() {
     setDraftLogistics("all");
   };
   const applyDraftFilters = () => {
+    if (hasDraftChanges || page !== 1) invalidateList();
     setQuick(draftQuick);
     setArtStatus(draftArtStatus);
     setProdStatus(draftProdStatus);
@@ -168,11 +199,16 @@ export default function OrdersCentralPage() {
     setPage(1);
     setFiltersOpen(false);
   };
-  const load = () => {
+  const load = (retryInPlace = false) => {
     const requestId = ++listRequestId.current;
     setLoading(true);
-    setError("");
-    listOperationalOrders({
+    if (!retryInPlace) {
+      setError("");
+      setOrders([]);
+      setTotal(null);
+      setListUpdatedAt(null);
+    }
+    void listOperationalOrders({
       page,
       pageSize: PAGE_SIZE,
       search: query,
@@ -185,31 +221,55 @@ export default function OrdersCentralPage() {
     })
       .then(result => {
         if (requestId !== listRequestId.current) return;
+        if (result.page !== page) {
+          // A page that disappeared is not an empty result. Keep loading
+          // until the server-validated page can be displayed.
+          invalidateList();
+          setPage(result.page);
+          return;
+        }
+        if (retryInPlace && document.activeElement === retryButtonRef.current) {
+          focusResultsAfterRetry.current = true;
+        }
         setOrders(result.orders);
         setTotal(result.total);
-        if (result.page !== page) setPage(result.page);
+        setListUpdatedAt(new Date());
+        setError("");
       })
-      .catch(reason => {
+      .catch(() => {
         if (requestId !== listRequestId.current) return;
+        focusResultsAfterRetry.current = false;
         setOrders([]);
-        setTotal(0);
-        setError(
-          reason instanceof Error ? reason.message : "Falha ao carregar as OS."
-        );
+        setTotal(null);
+        setListUpdatedAt(null);
+        setError("Não foi possível carregar as Ordens de Serviço.");
       })
       .finally(() => {
         if (requestId === listRequestId.current) setLoading(false);
       });
   };
   useEffect(() => {
+    // While search input is being edited, do not fetch the old query even
+    // if another filter changes; the most recent search intent wins.
+    if (searchEditVersion !== searchCommittedVersion) return;
     load();
     return () => {
       listRequestId.current += 1;
     };
-  }, [page, query, artStatus, prodStatus, priority, logistics, quick]);
+  }, [
+    page, query, artStatus, prodStatus, priority, logistics, quick,
+    searchEditVersion, searchCommittedVersion, listRefreshKey,
+  ]);
+  useEffect(() => {
+    if (!loading && !error && total !== null && focusResultsAfterRetry.current) {
+      focusResultsAfterRetry.current = false;
+      resultsHeadingRef.current?.focus({ preventScroll: true });
+    }
+  }, [loading, error, total]);
   const refreshSummary = useCallback(() => {
     const requestId = ++summaryRequestId.current;
     setSummaryStatus("loading");
+    setSummaryUpdatedAt(null);
     setSummaryTotal(null);
     setSummaryOrders([]);
     void listOperationalOrderSummaryRows()
@@ -217,12 +277,14 @@ export default function OrdersCentralPage() {
         if (requestId !== summaryRequestId.current) return;
         setSummaryOrders(result.orders);
         setSummaryTotal(result.total);
+        setSummaryUpdatedAt(new Date());
         setSummaryStatus("ready");
       })
       .catch(() => {
         if (requestId !== summaryRequestId.current) return;
         setSummaryOrders([]);
         setSummaryTotal(null);
+        setSummaryUpdatedAt(null);
         setSummaryStatus("error");
       });
   }, []);
@@ -233,17 +295,30 @@ export default function OrdersCentralPage() {
     };
   }, [refreshSummary]);
   useEffect(() => {
+    if (searchEditVersion === searchCommittedVersion) return;
     const timer = window.setTimeout(() => {
       setPage(1);
       setQuery(search);
+      setSearchCommittedVersion(searchEditVersion);
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [search]);
+  }, [search, searchEditVersion, searchCommittedVersion]);
   const summary = useMemo(
     () => summaryTotal === null ? null : summarizeOrders(summaryOrders, summaryTotal),
     [summaryOrders, summaryTotal]
   );
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pages = Math.max(1, Math.ceil((total ?? 0) / PAGE_SIZE));
+  const refreshAll = () => {
+    if (loading || summaryStatus === "loading" ||
+        searchEditVersion !== searchCommittedVersion) return;
+    invalidateList();
+    refreshSummary();
+    setListRefreshKey(value => value + 1);
+  };
+  const retryList = () => {
+    if (loading || !error) return;
+    load(true);
+  };
 
   const selectFilters = (
     <div className="grid gap-2 sm:grid-cols-2">
@@ -413,14 +488,28 @@ export default function OrdersCentralPage() {
           <p className="evolu-orders__eyebrow">Gestão operacional <span aria-hidden="true" /></p>
         <PageHeader
           title="Ordens de Serviço"
-          description={`${total} ordens encontradas · Acompanhamento operacional centralizado`}
+          description={total === null
+            ? "Consulta de ordens ainda não confirmada"
+            : `${total} ordens encontradas · Acompanhamento operacional centralizado`}
         />
         </div>
-        {hubPermissions.canCreateOs && (
-          <Button className="evolu-orders__new-button evolu-ui-primary-action" onClick={() => setLocation(createOrderPath("/os"))}>
-            <Plus className="h-4 w-4" aria-hidden="true" /> Nova OS
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            aria-disabled={loading || summaryStatus === "loading"}
+            onClick={refreshAll}
+            className="gap-2"
+          >
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            Atualizar
           </Button>
-        )}
+          {hubPermissions.canCreateOs && (
+            <Button className="evolu-orders__new-button evolu-ui-primary-action" onClick={() => setLocation(createOrderPath("/os"))}>
+              <Plus className="h-4 w-4" aria-hidden="true" /> Nova OS
+            </Button>
+          )}
+        </div>
       </div>
       <OrdersSummaryCards
         summary={summary}
@@ -429,14 +518,19 @@ export default function OrdersCentralPage() {
         onRetry={refreshSummary}
         selectedUrgent={quick === "urgent"}
         onSelectUrgent={() => {
-          setQuick("urgent");
-          setPage(1);
+          if (quick !== "urgent" || page !== 1) {
+            invalidateList();
+            setQuick("urgent");
+            setPage(1);
+          }
         }}
       />
-      {loading && !orders.length ? (
-        <OrdersLoading />
-      ) : (
-        <>
+      {summaryUpdatedAt && summaryStatus === "ready" && (
+        <p className="text-xs text-muted-foreground">
+          Indicadores atualizados às {summaryUpdatedAt.toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}
+        </p>
+      )}
+      <>
           <section aria-label="Filtros rápidos" className="evolu-orders__quick-filters evolu-ui-panel">
             <div className="evolu-orders__quick-label">
               <span>Visualização rápida</span>
@@ -452,8 +546,11 @@ export default function OrdersCentralPage() {
                   variant={quick === value ? "default" : "outline"}
                   aria-pressed={quick === value}
                   onClick={() => {
-                    setQuick(value);
-                    setPage(1);
+                    if (value !== quick || page !== 1) {
+                      invalidateList();
+                      setQuick(value);
+                      setPage(1);
+                    }
                   }}
                 >
                   {label}
@@ -464,7 +561,7 @@ export default function OrdersCentralPage() {
           <Card className="evolu-orders__filter-card evolu-ui-panel gap-4 py-4 shadow-xs">
             <CardContent className="space-y-3 px-4">
               <div className="evolu-orders__toolbar flex gap-2">
-                <OrderSearch value={search} onChange={setSearch} />
+                <OrderSearch value={search} onChange={handleSearchChange} />
                 {isMobile ? (
                   <Sheet open={filtersOpen} onOpenChange={handleFiltersOpenChange}>
                     <SheetTrigger asChild>
@@ -510,6 +607,7 @@ export default function OrdersCentralPage() {
                       size="sm"
                       className="rounded-full"
                       onClick={() => {
+                        invalidateList();
                         chip.clear();
                         setPage(1);
                       }}
@@ -525,15 +623,21 @@ export default function OrdersCentralPage() {
               )}
             </CardContent>
           </Card>
+          <p role="status" className="sr-only">
+            {!loading && !error && total !== null
+              ? total === 0
+                ? "Consulta concluída. Nenhuma OS encontrada."
+                : `Consulta concluída. ${total} ordens encontradas.`
+              : ""}
+          </p>
           {error ? (
-            <Card className="evolu-orders__filter-card evolu-ui-panel">
-              <CardContent>
-                <ErrorState
-                  message="Não foi possível carregar as Ordens de Serviço."
-                  retry={load}
-                />
-              </CardContent>
-            </Card>
+            <OrdersListRecovery
+              retrying={loading}
+              onRetry={retryList}
+              retryRef={retryButtonRef}
+            />
+          ) : loading || total === null ? (
+            <OrdersLoading />
           ) : (
             <div className="evolu-orders__table evolu-ui-panel">
               <div className="evolu-orders__table-heading">
@@ -545,6 +649,7 @@ export default function OrdersCentralPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => {
+                          invalidateList();
                           setQuick("all");
                           setPage(1);
                         }}
@@ -553,10 +658,14 @@ export default function OrdersCentralPage() {
                       </Button>
                     </div>
                   )}
-                  <h2>Relação de ordens</h2>
+                  <h2 ref={resultsHeadingRef} tabIndex={-1}>Relação de ordens</h2>
                   <p>{total} registros encontrados nesta consulta</p>
                 </div>
-                <span className="evolu-orders__live-hint">{loading ? "Atualizando…" : "Lista atualizada"}</span>
+                <span className="evolu-orders__live-hint">
+                  {listUpdatedAt
+                    ? `Lista atualizada às ${listUpdatedAt.toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}`
+                    : "Lista atualizada"}
+                </span>
               </div>
               <OrderTable
                 orders={orders}
@@ -564,6 +673,7 @@ export default function OrdersCentralPage() {
               />
             </div>
           )}
+          {!loading && !error && total !== null && (
           <footer className="evolu-orders__footer flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
             <span>
               Mostrando {orders.length} de {total} ordens
@@ -576,24 +686,30 @@ export default function OrdersCentralPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={page === 1}
-                  onClick={() => setPage(value => value - 1)}
+                  disabled={page === 1 || loading}
+                  onClick={() => {
+                    invalidateList();
+                    setPage(value => value - 1);
+                  }}
                 >
                   Anterior
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={page >= pages}
-                  onClick={() => setPage(value => value + 1)}
+                  disabled={page >= pages || loading}
+                  onClick={() => {
+                    invalidateList();
+                    setPage(value => value + 1);
+                  }}
                 >
                   Próxima
                 </Button>
               </div>
             )}
           </footer>
+          )}
         </>
-      )}
     </main>
   );
 }

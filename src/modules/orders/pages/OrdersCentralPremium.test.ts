@@ -18,7 +18,8 @@ describe("Central de OS — EvoluSystem Premium", () => {
     expect(page).toContain("listOperationalOrderSummaryRows()");
     expect(page).toContain("summarizeOrders(");
     expect(page).toContain('setQuery(search)');
-    expect(page).toContain("}, 350)");
+    expect(page).toContain("setSearchCommittedVersion(searchEditVersion)");
+    expect(page).toContain("}, 350);");
     expect(page).toContain('onOpenChange={handleFiltersOpenChange}');
     expect(page).toContain('onClick={applyDraftFilters}');
     expect(page).toContain("hubPermissions.canCreateOs &&");

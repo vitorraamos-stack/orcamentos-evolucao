@@ -41,6 +41,7 @@ describe("OrdersCentralPage dedicated creation entry", () => {
     expect(source).toContain("clearFilters");
     expect(source).toContain("pages > 1");
     expect(source).toContain("Mostrando {orders.length} de {total} ordens");
+    expect(source).toContain("total !== null");
   });
 
   it("keeps popover edits in drafts until filters are applied", () => {
