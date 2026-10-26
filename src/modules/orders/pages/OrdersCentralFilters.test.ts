@@ -41,6 +41,13 @@ describe("Central de OS — simplified filters", () => {
     expect(page).toContain("clearDraftFilters");
   });
 
+  it("groups quick filters and search in one accessible surface", () => {
+    expect(page).toContain('aria-label="Pesquisa e filtros"');
+    expect(page).toContain('className="evolu-orders__filter-workspace evolu-ui-panel"');
+    expect(page).toContain('aria-label={`Remover filtro ${chip.label}`}');
+    expect(css).toContain(".evolu-orders__filter-workspace .evolu-orders__filter-card");
+  });
+
   it("uses the urgent summary as a distinct quick-result shortcut", () => {
     expect(page).toContain('quick === "urgent"');
     expect(page).toContain("Exibindo: Urgentes");

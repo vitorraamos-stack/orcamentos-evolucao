@@ -621,6 +621,7 @@ export default function OrdersCentralPage() {
         </p>
       )}
       <>
+          <section aria-label="Pesquisa e filtros" className="evolu-orders__filter-workspace evolu-ui-panel">
           <section aria-label="Filtros rápidos" className="evolu-orders__quick-filters evolu-ui-panel">
             <div className="evolu-orders__quick-label">
               <span>Visualização rápida</span>
@@ -696,6 +697,7 @@ export default function OrdersCentralPage() {
                       variant="secondary"
                       size="sm"
                       className="rounded-full"
+                      aria-label={`Remover filtro ${chip.label}`}
                       onClick={() => {
                         invalidateList();
                         chip.clear();
@@ -703,7 +705,7 @@ export default function OrdersCentralPage() {
                       }}
                     >
                       {chip.label}
-                      <X className="h-3 w-3" />
+                      <X className="h-3 w-3" aria-hidden="true" />
                     </Button>
                   ))}
                   <Button variant="ghost" size="sm" onClick={clearFilters}>
@@ -713,6 +715,7 @@ export default function OrdersCentralPage() {
               )}
             </CardContent>
           </Card>
+          </section>
           {returnNotice && (
             <div role="status" className="rounded-lg border p-3 text-sm text-muted-foreground">
               {returnNotice}

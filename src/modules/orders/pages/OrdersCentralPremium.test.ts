@@ -31,7 +31,7 @@ describe("Central de OS — EvoluSystem Premium", () => {
     expect(table).toContain('aria-label="Lista de ordens de serviço"');
     expect(table).toContain('className="evolu-orders__mobile-list lg:hidden"');
     expect(table).toContain('className="evolu-orders__desktop-table hidden overflow-x-auto');
-    expect(table).toContain("aria-label={" + "`" + "Visualizar OS " + "${number}" + "`" + "}");
+    expect(table).toContain("Visualizar OS sem número informado");
     expect(table).toContain("OrderRiskBadge risk={risk}");
     expect(table).toContain("OrderStatusBadge status={order.prod_status || order.art_status}");
     expect(table).toContain("OrderPriorityBadge urgent={isOrderUrgent(order)}");

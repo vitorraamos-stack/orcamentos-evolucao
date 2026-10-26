@@ -193,3 +193,38 @@
   outline-offset: 3px;
   border-radius: 3px;
 }
+
+/* UX stage 8: quick filters and advanced search share one operational surface. */
+.evolu-orders__filter-workspace {
+  min-width: 0;
+  overflow: visible;
+  border: 1px solid var(--orders-line);
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: 0 12px 30px -28px rgba(24, 54, 91, .5);
+}
+.evolu-orders__filter-workspace .evolu-orders__quick-filters {
+  border: 0;
+  border-radius: 16px 16px 0 0;
+  background: transparent;
+  box-shadow: none;
+}
+.evolu-orders__filter-workspace .evolu-orders__filter-card {
+  border: 0;
+  border-top: 1px solid var(--orders-line);
+  border-radius: 0 0 16px 16px;
+  background: transparent;
+  box-shadow: none;
+}
+.evolu-orders__filter-workspace .evolu-orders__quick-button { min-height: 40px; }
+.evolu-orders__desktop-table tbody td { line-height: 1.45; }
+.evolu-orders__desktop-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--muted) 18%, transparent);
+}
+.evolu-orders__desktop-table tbody tr:hover { background: var(--accent); }
+.evolu-orders__mobile-card { box-shadow: 0 5px 16px -15px rgba(24, 54, 91, .45); }
+.dark .evolu-orders__filter-workspace { border-color: var(--border); background: var(--card); }
+.dark .evolu-orders__filter-workspace .evolu-orders__filter-card { border-top-color: var(--border); }
+.dark .evolu-orders__desktop-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--muted) 25%, transparent);
+}

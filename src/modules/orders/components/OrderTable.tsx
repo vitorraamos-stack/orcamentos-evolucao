@@ -77,7 +77,9 @@ export function OrderTable({
       <div className="rounded-xl border bg-card py-4 shadow-xs">
         <EmptyState
           title="Nenhuma ordem encontrada."
-          description="Revise os filtros ou tente outra busca."
+          description={onClearFilters
+            ? "Nenhuma OS corresponde à pesquisa ou aos filtros aplicados. Remova um critério ou tente outra busca."
+            : "Não há ordens de serviço disponíveis nesta consulta."}
         />
         {onClearFilters && (
           <div className="flex justify-center">
@@ -94,22 +96,23 @@ export function OrderTable({
         {orders.map(order => {
           const risk = calculateOrderRisk(order);
           const path = `/os/${order.id}`;
-          const number = order.sale_number || order.os_number || "—";
+          const number = order.sale_number || order.os_number;
+          const numberLabel = number ? `#${number}` : "Número não informado";
           return (
             <article key={order.id} className={cn("evolu-orders__mobile-card", highlightOrderId === order.id && "ring-2 ring-primary/50")}>
               <div className="flex min-w-0 items-start justify-between gap-3">
                 <div className="min-w-0">
                   <Link href={path} data-central-order-id={order.id} onClick={event => handleOrderLink(event, order.id)} className="text-base font-extrabold text-primary hover:underline">
-                    #{number}
+                    {numberLabel}
                   </Link>
                   <p className="mt-1 truncate text-sm font-semibold" title={order.client_name}>
-                    {order.client_name}
+                    {order.client_name || "Cliente não informado"}
                   </p>
                 </div>
                 <OrderRiskBadge risk={risk} />
               </div>
-              <p className="mt-3 line-clamp-2 text-sm text-foreground" title={order.title || order.description || "Sem título"}>
-                {order.title || order.description || "Sem título"}
+              <p className="mt-3 line-clamp-2 text-sm text-foreground" title={order.title || order.description || "Serviço não informado"}>
+                {order.title || order.description || "Serviço não informado"}
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <OrderStatusBadge status={order.prod_status || order.art_status} />
@@ -128,7 +131,7 @@ export function OrderTable({
                   href={path}
                   onClick={event => handleOrderLink(event, order.id)}
                   className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-primary hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                  aria-label={`Visualizar OS ${number}`}
+                  aria-label={number ? `Visualizar OS ${number}` : "Visualizar OS sem número informado"}
                 >
                   <Eye className="h-4 w-4" aria-hidden="true" /> Visualizar OS
                 </Link>
@@ -160,7 +163,8 @@ export function OrderTable({
             {orders.map(order => {
               const risk = calculateOrderRisk(order);
               const path = `/os/${order.id}`;
-              const number = order.sale_number || order.os_number || "—";
+              const number = order.sale_number || order.os_number;
+              const numberLabel = number ? `#${number}` : "Número não informado";
               return (
                 <tr
                   key={order.id}
@@ -177,7 +181,7 @@ export function OrderTable({
                       onClick={event => handleOrderLink(event, order.id)}
                       className="inline-flex rounded-sm font-bold text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     >
-                      #{number}
+                      {numberLabel}
                     </Link>
                     <p className="mt-1 truncate text-xs text-muted-foreground" title={order.client_name}>
                       {order.client_name || "Cliente não informado"}
@@ -221,7 +225,7 @@ export function OrderTable({
                             <Link
                               href={path}
                               onClick={event => handleOrderLink(event, order.id)}
-                              aria-label={`Visualizar OS ${number}`}
+                              aria-label={number ? `Visualizar OS ${number}` : "Visualizar OS sem número informado"}
                             >
                               <Eye className="h-4 w-4" aria-hidden="true" />
                             </Link>
@@ -234,7 +238,7 @@ export function OrderTable({
                           <Button
                             variant="ghost"
                             size="icon"
-                            aria-label={`Ações da OS ${number}`}
+                            aria-label={number ? `Ações da OS ${number}` : "Ações da OS sem número informado"}
                           >
                             <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                           </Button>
@@ -243,15 +247,13 @@ export function OrderTable({
                           <DropdownMenuItem asChild>
                             <Link href={path} onClick={event => handleOrderLink(event, order.id)}>Abrir OS</Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              navigator.clipboard?.writeText(
-                                order.sale_number || String(order.os_number || "")
-                              )
-                            }
-                          >
-                            Copiar número da OS
-                          </DropdownMenuItem>
+                          {number && (
+                            <DropdownMenuItem
+                              onClick={() => navigator.clipboard?.writeText(String(number))}
+                            >
+                              Copiar número da OS
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

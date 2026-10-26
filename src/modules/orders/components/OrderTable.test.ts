@@ -16,6 +16,15 @@ describe("OrderTable responsive sizing", () => {
     expect(source).toContain("xl:min-w-0");
   });
 
+  it("renders explicit placeholders without fabricating an OS number", () => {
+    expect(source).toContain('"Número não informado"');
+    expect(source).toContain('const numberLabel = number ? `#${number}` : "Número não informado";');
+    expect(source).toContain('order.client_name || "Cliente não informado"');
+    expect(source).toContain('"Serviço não informado"');
+    expect(source).toContain("onClearFilters");
+    expect(source).toContain("Nenhuma OS corresponde à pesquisa ou aos filtros aplicados.");
+  });
+
   it("preserves an eight-percent actions column with five primary headings", () => {
     expect(source).toContain('"OS / Cliente", "Serviço", "Etapa", "Prazo", "Ações"');
     expect(source).not.toContain("Sem responsável");
