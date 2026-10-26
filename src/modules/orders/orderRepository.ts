@@ -15,6 +15,8 @@ export type OrderListQuery = {
   logisticType?: OsOrder["logistic_type"];
   quickFilter?: QuickOrderFilter;
   now?: Date;
+  locateOrderId?: string;
+  signal?: AbortSignal;
 };
 
 export type DashboardPeriod = {
@@ -132,11 +134,13 @@ function filteredOrderPriorityQuery({
   logisticType,
   quickFilter = "all",
   now,
+  signal,
 }: Omit<OrderListQuery, "page" | "pageSize">) {
   let query = supabase
     .from("os_orders")
     .select(PRIORITY_PROJECTION, { count: "exact" })
     .order("id", { ascending: true });
+  if (signal) query = query.abortSignal(signal);
   if (search?.trim()) {
     const term = search.trim().replace(/[,%()]/g, "");
     query = query.or(
@@ -193,18 +197,29 @@ async function readOperationalOrderPage(input: OrderListQuery, now: Date) {
     throw new OrderSnapshotChanged();
   }
   const pageCount = Math.max(1, Math.ceil(total / safeSize));
-  const validPage = Math.min(safePage, pageCount);
-  if (total === 0) {
-    return { orders: [] as OsOrder[], total, page: 1, pageSize: safeSize };
-  }
   const ordered = sortOperationalOrderPriority(matches, now);
+  // Locate only within the filtered, RLS-authorized result set. Never override
+  // filters to reveal an OS that no longer belongs to this consultation.
+  const locatedIndex = input.locateOrderId
+    ? ordered.findIndex(row => row.id === input.locateOrderId)
+    : -1;
+  const locatedOrderId = locatedIndex >= 0 ? input.locateOrderId ?? null : null;
+  const validPage = locatedIndex >= 0
+    ? Math.floor(locatedIndex / safeSize) + 1
+    : Math.min(safePage, pageCount);
+  if (total === 0) {
+    return { orders: [] as OsOrder[], total, page: 1, pageSize: safeSize,
+      locatedOrderId: null };
+  }
   const ids = ordered
     .slice((validPage - 1) * safeSize, validPage * safeSize)
     .map(row => row.id);
-  const { data, error } = await supabase
+  let detailsQuery = supabase
     .from("os_orders")
     .select("*")
     .in("id", ids);
+  if (input.signal) detailsQuery = detailsQuery.abortSignal(input.signal);
+  const { data, error } = await detailsQuery;
   if (error) throw new Error(error.message);
   const byId = new Map(((data ?? []) as OsOrder[]).map(row => [row.id, row]));
   if (byId.size !== ids.length ||
@@ -216,6 +231,7 @@ async function readOperationalOrderPage(input: OrderListQuery, now: Date) {
     total,
     page: validPage,
     pageSize: safeSize,
+    locatedOrderId,
   };
 }
 
