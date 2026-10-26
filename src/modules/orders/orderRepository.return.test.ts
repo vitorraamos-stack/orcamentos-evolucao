@@ -30,9 +30,17 @@ describe("return location within permitted filtered rows", () => {
     Object.values(query).forEach(fn => fn.mockReturnValue(query));
     mocks.from.mockReturnValue(query);
     mocks.range.mockResolvedValue({ data: rows, count: rows.length, error: null });
-    mocks.in.mockImplementation(async (_column: string, ids: string[]) => ({
-      data: rows.filter(row => ids.includes(row.id)), error: null,
-    }));
+    mocks.in.mockImplementation((_column: string, ids: string[]) => {
+      const response = { data: rows.filter(row => ids.includes(row.id)), error: null };
+      // PostgREST builders are thenable and expose abortSignal before awaiting.
+      // Preserve both behaviors in the test double.
+      return Object.assign(Promise.resolve(response), {
+        abortSignal: (signal: AbortSignal) => {
+          mocks.abortSignal(signal);
+          return Promise.resolve(response);
+        },
+      });
+    });
   };
 
   it("locates an OS on its newly ordered page, before paging", async () => {
