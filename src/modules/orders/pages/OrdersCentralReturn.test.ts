@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 const page = readFileSync(new URL("./OrdersCentralPage.tsx", import.meta.url), "utf8");
 const detail = readFileSync(new URL("./OrderDetailPage.tsx", import.meta.url), "utf8");
 const table = readFileSync(new URL("../components/OrderTable.tsx", import.meta.url), "utf8");
+const deadline = readFileSync(new URL("../centralReturnDeadline.ts", import.meta.url), "utf8");
 
 describe("Central de OS — one-shot intelligent return", () => {
   it("captures origin only from direct same-tab OS links", () => {
@@ -22,7 +23,8 @@ describe("Central de OS — one-shot intelligent return", () => {
   });
   it("bounds one location attempt and prevents delayed navigation", () => {
     expect(page).toContain("RETURN_LOOKUP_TIMEOUT_MS = 5000");
-    expect(page).toContain("controller.abort()");
+    expect(deadline).toContain("controller.abort()");
+    expect(deadline).toContain("Promise.race([lookup, timeout])");
     expect(page).toContain("locateOrderId: returnTarget, signal: controller.signal");
     expect(page).toContain("if (requestId !== listRequestId.current) return;");
     expect(page).toContain("return await listOperationalOrders(args)");
