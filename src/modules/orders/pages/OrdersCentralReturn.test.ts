@@ -25,7 +25,7 @@ describe("Central de OS — one-shot intelligent return", () => {
     expect(page).toContain("RETURN_LOOKUP_TIMEOUT_MS = 5000");
     expect(deadline).toContain("controller.abort()");
     expect(deadline).toContain("Promise.race([lookup, timeout])");
-    expect(page).toContain("locateOrderId: returnTarget, signal: controller.signal");
+    expect(page).toContain("signal => listOperationalOrders({ ...args, locateOrderId: returnTarget, signal })");
     expect(page).toContain("if (requestId !== listRequestId.current) return;");
     expect(page).toContain("return await listOperationalOrders(args)");
     expect(page).toContain("returnOrderIdRef.current = null");
