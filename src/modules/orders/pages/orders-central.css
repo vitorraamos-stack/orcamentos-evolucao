@@ -74,7 +74,15 @@
 }
 .evolu-orders__table .evolu-orders__desktop-table td { padding-block: 14px; }
 .evolu-orders__table .evolu-orders__desktop-table tbody tr:hover { background: #f5fafe; }
-.evolu-orders__mobile-list { display: grid; gap: 10px; padding: 12px; }
+.evolu-orders__mobile-list { gap: 10px; padding: 12px; }
+/* Mobile cards and desktop table are mutually exclusive. Without an explicit
+   breakpoint, this stylesheet's display:grid can override Tailwind lg:hidden. */
+@media (max-width: 1023px) {
+  .evolu-orders__mobile-list { display: grid; }
+}
+@media (min-width: 1024px) {
+  .evolu-orders__mobile-list { display: none; }
+}
 .evolu-orders__mobile-card {
   min-width: 0; border: 1px solid #e4ebf4; border-radius: 14px; background: #fbfcfe;
   padding: 15px; overflow: hidden;
