@@ -24,7 +24,7 @@ describe("Central de OS — EvoluSystem Premium", () => {
     expect(page).toContain('onClick={applyDraftFilters}');
     expect(page).toContain("hubPermissions.canCreateOs &&");
     expect(page).toContain('setLocation(createOrderPath("/os"))');
-    expect(page).toContain('Mostrando {orders.length} de {total} ordens');
+    expect(page).toContain('Mostrando {orders.length} de {total} {total === 1 ? "ordem" : "ordens"}');
   });
 
   it("renders a mobile-specific OS card and retains the desktop table", () => {
@@ -35,6 +35,8 @@ describe("Central de OS — EvoluSystem Premium", () => {
     expect(table).toContain("OrderRiskBadge risk={risk}");
     expect(table).toContain("OrderStatusBadge status={order.prod_status || order.art_status}");
     expect(table).toContain("OrderPriorityBadge urgent={isOrderUrgent(order)}");
-    expect(table).toContain("min-w-[1040px]");
+    expect(table).toContain("min-w-[760px]");
+    expect(table).toContain('"OS / Cliente", "Serviço", "Etapa", "Prazo", "Ações"');
+    expect(table).not.toContain("Sem responsável");
   });
 });

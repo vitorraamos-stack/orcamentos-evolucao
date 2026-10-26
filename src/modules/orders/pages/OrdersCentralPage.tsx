@@ -580,7 +580,7 @@ export default function OrdersCentralPage() {
           title="Ordens de Serviço"
           description={total === null
             ? "Consulta de ordens ainda não confirmada"
-            : `${total} ordens encontradas · Acompanhamento operacional centralizado`}
+            : `${total} ${total === 1 ? "ordem encontrada" : "ordens encontradas"} · Acompanhamento operacional centralizado`}
         />
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -725,7 +725,7 @@ export default function OrdersCentralPage() {
             {!loading && !error && total !== null
               ? total === 0
                 ? "Consulta concluída. Nenhuma OS encontrada."
-                : `Consulta concluída. ${total} ordens encontradas.`
+                : `Consulta concluída. ${total} ${total === 1 ? "ordem encontrada" : "ordens encontradas"}.`
               : ""}
           </p>
           {error ? (
@@ -757,7 +757,7 @@ export default function OrdersCentralPage() {
                     </div>
                   )}
                   <h2 ref={resultsHeadingRef} tabIndex={-1}>Relação de ordens</h2>
-                  <p>{total} registros encontrados nesta consulta</p>
+                  <p>{total} {total === 1 ? "registro encontrado" : "registros encontrados"} nesta consulta</p>
                 </div>
                 <span className="evolu-orders__live-hint">
                   {listUpdatedAt
@@ -776,7 +776,7 @@ export default function OrdersCentralPage() {
           {!loading && !error && total !== null && (
           <footer className="evolu-orders__footer flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
             <span>
-              Mostrando {orders.length} de {total} ordens
+              Mostrando {orders.length} de {total} {total === 1 ? "ordem" : "ordens"}
             </span>
             {pages > 1 && (
               <nav aria-label="Paginação das ordens" className="flex flex-wrap items-center gap-2">
