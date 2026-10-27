@@ -19,6 +19,7 @@ import { OrderCommentsTab } from "../components/OrderCommentsTab";
 import { prependPublishedComment } from "../services/publishedComment";
 import { createOrderReadCoordinator } from "../services/orderReadCoordinator";
 import { OrderHistoryTab } from "../components/OrderHistoryTab";
+import { centralSessionStorage, markCentralDetailEntered } from "../centralReturnContext";
 import { OrderFilesTab, openOrderFileWindow } from "../components/OrderFilesTab";
 import { OrderProductionTab } from "../components/OrderProductionTab";
 import { OrderInstallationTab } from "../components/OrderInstallationTab";
@@ -77,6 +78,12 @@ export default function OrderDetailPage() {
       readCoordinator.current.finish(ticket);
     }
   }, [canManageAssignees, canMoveProduction, orderId]);
+
+  useEffect(() => {
+    if (user?.id && orderId) {
+      markCentralDetailEntered(centralSessionStorage(), user.id, orderId, Date.now());
+    }
+  }, [user?.id, orderId]);
 
   useEffect(() => {
     // Never reuse tab data or request results when navigating to another OS.

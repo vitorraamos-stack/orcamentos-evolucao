@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { Filter, Plus, RotateCcw, X } from "lucide-react";
+import { Filter, Plus, RefreshCw, RotateCcw, X } from "lucide-react";
 import "./orders-central.css";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,14 @@ import { ART_COLUMNS, PROD_COLUMNS } from "@/features/hubos/constants";
 import type { LogisticType, OsOrder } from "@/features/hubos/types";
 import { createOrderPath } from "@/features/hubos/createOrderNavigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsMobile } from "@/hooks/useMobile";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   listOperationalOrders,
   listOperationalOrderSummaryRows,
@@ -30,22 +38,35 @@ import type { QuickOrderFilter } from "../orderFilters";
 import { parseQuickFilterFromSearch } from "../quickFilterSearch";
 import { OrderSearch } from "../components/OrderSearch";
 import { OrderTable } from "../components/OrderTable";
+import { OrdersListRecovery } from "../components/OrdersListRecovery";
 import { OrdersSummaryCards } from "../components/OrdersSummaryCards";
 import { summarizeOrders } from "../orderSummary";
-import { ErrorState, PageHeader } from "@/shared/components/OperationalUi";
+import { PageHeader } from "@/shared/components/OperationalUi";
+import { boundedCentralLookup } from "../centralReturnDeadline";
+import {
+  centralSessionStorage, clearCentralReturn, consumeCentralReturn,
+  readCentralReturn, saveCentralReturn,
+} from "../centralReturnContext";
 
 const PAGE_SIZE = 25;
 const quickFilters: Array<[QuickOrderFilter, string]> = [
   ["all", "Todas"],
   ["active", "Em andamento"],
+  ["overdue", "Atrasadas"],
+  ["finished", "Finalizadas"],
+];
+
+// Preserve existing deep links and operational subsets without adding
+// more than the four approved quick-filter controls.
+const extraQuickFilters: Array<[QuickOrderFilter, string]> = [
   ["today", "Hoje"],
   ["tomorrow", "Amanhã"],
   ["week", "Esta semana"],
-  ["overdue", "Atrasadas"],
-  ["urgent", "Urgentes"],
   ["pending", "Pendentes"],
-  ["finished", "Finalizadas"],
+  ["urgent", "Urgentes"],
 ];
+const isExtraQuickFilter = (value: QuickOrderFilter) =>
+  extraQuickFilters.some(([key]) => key === value);
 
 function initialQuickFilter() {
   return typeof window === "undefined"
@@ -53,41 +74,65 @@ function initialQuickFilter() {
     : parseQuickFilterFromSearch(window.location.search);
 }
 
+// Provisional. Re-evaluate this limit with real-world performance evidence.
+const RETURN_LOOKUP_TIMEOUT_MS = 5000;
+
 function OrdersLoading() {
   return (
-    <div aria-label="Carregando ordens" className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        {Array.from({ length: 5 }, (_, index) => (
-          <Skeleton key={index} className="h-20 rounded-xl" />
-        ))}
-      </div>
-      <Skeleton className="h-16 rounded-xl" />
-      <div className="space-y-2 rounded-xl border p-4">
-        {Array.from({ length: 6 }, (_, index) => (
-          <Skeleton key={index} className="h-10 w-full" />
-        ))}
+    <div aria-label="Carregando ordens" role="status" className="space-y-4">
+      <p className="sr-only">Carregando a consulta de ordens de serviço.</p>
+      <div aria-hidden="true">
+        <Skeleton className="mb-4 h-16 rounded-xl" />
+        <div className="space-y-2 rounded-xl border p-4">
+          {Array.from({ length: 6 }, (_, index) => (
+            <Skeleton key={index} className="h-10 w-full" />
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
 export default function OrdersCentralPage() {
-  const { hubPermissions } = useAuth();
+  const { user, hubPermissions } = useAuth();
+  const [returnContext] = useState(() =>
+    typeof window === "undefined" || !hubPermissions.canViewHubOS
+      ? null
+      : readCentralReturn(centralSessionStorage(), user?.id, window.location.search, Date.now())
+  );
+  const isMobile = useIsMobile();
   const [, setLocation] = useLocation();
   const [orders, setOrders] = useState<OsOrder[]>([]);
   const [summaryOrders, setSummaryOrders] = useState<OsOrder[]>([]);
-  const [summaryTotal, setSummaryTotal] = useState(0);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [query, setQuery] = useState("");
-  const [quick, setQuick] = useState<QuickOrderFilter>(initialQuickFilter);
-  const [artStatus, setArtStatus] = useState("all");
-  const [prodStatus, setProdStatus] = useState("all");
-  const [priority, setPriority] = useState("all");
-  const [logistics, setLogistics] = useState("all");
+  const [summaryTotal, setSummaryTotal] = useState<number | null>(null);
+  const [summaryStatus, setSummaryStatus] = useState<"loading" | "ready" | "error">("loading");
+  const summaryRequestId = useRef(0);
+  const listRequestId = useRef(0);
+  const returnOrderIdRef = useRef(returnContext?.orderId ?? null);
+  const returnAbortRef = useRef<AbortController | null>(null);
+  const skipOnePageFetchRef = useRef<number | null>(null);
+  const pendingAnchorFocusRef = useRef<string | null>(null);
+  const [highlightOrderId, setHighlightOrderId] = useState<string | null>(null);
+  const [returnNotice, setReturnNotice] = useState("");
+  const retryButtonRef = useRef<HTMLButtonElement>(null);
+  const resultsHeadingRef = useRef<HTMLHeadingElement>(null);
+  const focusResultsAfterRetry = useRef(false);
+  const [total, setTotal] = useState<number | null>(null);
+  const [listUpdatedAt, setListUpdatedAt] = useState<Date | null>(null);
+  const [summaryUpdatedAt, setSummaryUpdatedAt] = useState<Date | null>(null);
+  const [listRefreshKey, setListRefreshKey] = useState(0);
+  const [searchEditVersion, setSearchEditVersion] = useState(0);
+  const [searchCommittedVersion, setSearchCommittedVersion] = useState(0);
+  const [page, setPage] = useState(returnContext?.page ?? 1);
+  const [search, setSearch] = useState(returnContext?.search ?? "");
+  const [query, setQuery] = useState(returnContext?.search ?? "");
+  const [quick, setQuick] = useState<QuickOrderFilter>(returnContext?.quick ?? initialQuickFilter);
+  const [artStatus, setArtStatus] = useState(returnContext?.artStatus ?? "all");
+  const [prodStatus, setProdStatus] = useState(returnContext?.prodStatus ?? "all");
+  const [priority, setPriority] = useState(returnContext?.priority ?? "all");
+  const [logistics, setLogistics] = useState(returnContext?.logistics ?? "all");
   const [draftQuick, setDraftQuick] =
-    useState<QuickOrderFilter>(initialQuickFilter);
+    useState<QuickOrderFilter>(returnContext?.quick ?? initialQuickFilter);
   const [draftArtStatus, setDraftArtStatus] = useState("all");
   const [draftProdStatus, setDraftProdStatus] = useState("all");
   const [draftPriority, setDraftPriority] = useState("all");
@@ -95,14 +140,21 @@ export default function OrdersCentralPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const advancedCount = [
-    quick,
-    artStatus,
-    prodStatus,
-    priority,
-    logistics,
-  ].filter(value => value !== "all").length;
+  const advancedCount = [artStatus, prodStatus, priority, logistics].filter(
+    value => value !== "all"
+  ).length + (isExtraQuickFilter(quick) ? 1 : 0);
   const hasFilters = Boolean(search || quick !== "all" || advancedCount);
+  const hasDraftChanges =
+    draftQuick !== quick ||
+    draftArtStatus !== artStatus ||
+    draftProdStatus !== prodStatus ||
+    draftPriority !== priority ||
+    draftLogistics !== logistics;
+
+  useEffect(() => {
+    if (returnContext) consumeCentralReturn(centralSessionStorage(), returnContext);
+    else clearCentralReturn(centralSessionStorage());
+  }, [returnContext]);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -111,7 +163,31 @@ export default function OrdersCentralPage() {
     window.history.replaceState(window.history.state, "", url);
   }, [quick]);
 
+  // Invalidate as soon as the user changes a committed criterion (or types),
+  // before the 350 ms debounce can complete or a previous response can arrive.
+  const invalidateList = () => {
+    returnOrderIdRef.current = null;
+    returnAbortRef.current?.abort();
+    returnAbortRef.current = null;
+    pendingAnchorFocusRef.current = null;
+    setHighlightOrderId(null);
+    setReturnNotice("");
+    listRequestId.current += 1;
+    focusResultsAfterRetry.current = false;
+    setOrders([]);
+    setTotal(null);
+    setListUpdatedAt(null);
+    setError("");
+    setLoading(true);
+  };
+  const handleSearchChange = (value: string) => {
+    if (value === search) return;
+    invalidateList();
+    setSearch(value);
+    setSearchEditVersion(value => value + 1);
+  };
   const clearFilters = () => {
+    invalidateList();
     setSearch("");
     setQuery("");
     setQuick("all");
@@ -144,6 +220,7 @@ export default function OrdersCentralPage() {
     setDraftLogistics("all");
   };
   const applyDraftFilters = () => {
+    if (hasDraftChanges || page !== 1) invalidateList();
     setQuick(draftQuick);
     setArtStatus(draftArtStatus);
     setProdStatus(draftProdStatus);
@@ -152,10 +229,16 @@ export default function OrdersCentralPage() {
     setPage(1);
     setFiltersOpen(false);
   };
-  const load = () => {
+  const load = (retryInPlace = false) => {
+    const requestId = ++listRequestId.current;
     setLoading(true);
-    setError("");
-    listOperationalOrders({
+    if (!retryInPlace) {
+      setError("");
+      setOrders([]);
+      setTotal(null);
+      setListUpdatedAt(null);
+    }
+    const args = {
       page,
       pageSize: PAGE_SIZE,
       search: query,
@@ -165,58 +248,172 @@ export default function OrdersCentralPage() {
       logisticType:
         logistics === "all" ? undefined : (logistics as LogisticType),
       quickFilter: quick,
-    })
+    };
+    const returnTarget = returnOrderIdRef.current;
+    let timedOut = false;
+    const fetchPage = async () => {
+      if (!returnTarget) return listOperationalOrders(args);
+      const controller = new AbortController();
+      returnAbortRef.current = controller;
+      try {
+        const outcome = await boundedCentralLookup(
+          signal => listOperationalOrders({ ...args, locateOrderId: returnTarget, signal }),
+          controller,
+          RETURN_LOOKUP_TIMEOUT_MS
+        );
+        if (outcome.status === "found") return outcome.value;
+        timedOut = true;
+        // Never await the expired location attempt. A late reply cannot move
+        // the UI; the fallback validates the same filters and permissions.
+        return await listOperationalOrders(args);
+      } finally {
+        if (returnAbortRef.current === controller) returnAbortRef.current = null;
+      }
+    };
+    void fetchPage()
       .then(result => {
+        if (requestId !== listRequestId.current) return;
+        returnOrderIdRef.current = null;
+        if (returnTarget) {
+          if (timedOut) {
+            setReturnNotice("Não foi possível recuperar a posição anterior. Os filtros foram preservados.");
+          } else if (result.locatedOrderId === returnTarget) {
+            pendingAnchorFocusRef.current = returnTarget;
+            setHighlightOrderId(returnTarget);
+            setReturnNotice("");
+          } else {
+            setReturnNotice("A ordem visualizada não aparece nos resultados desta consulta.");
+          }
+        }
+        if (result.page !== page) {
+          // Page and results commit together: no flash of the prior page.
+          skipOnePageFetchRef.current = result.page;
+          setPage(result.page);
+        }
+        if (retryInPlace && document.activeElement === retryButtonRef.current) {
+          focusResultsAfterRetry.current = true;
+        }
         setOrders(result.orders);
         setTotal(result.total);
-      })
-      .catch(reason =>
-        setError(
-          reason instanceof Error ? reason.message : "Falha ao carregar as OS."
-        )
-      )
-      .finally(() => setLoading(false));
-  };
-  useEffect(load, [
-    page,
-    query,
-    artStatus,
-    prodStatus,
-    priority,
-    logistics,
-    quick,
-  ]);
-  useEffect(() => {
-    listOperationalOrderSummaryRows()
-      .then(result => {
-        setSummaryOrders(result.orders);
-        setSummaryTotal(result.total);
+        setListUpdatedAt(new Date());
+        setError("");
       })
       .catch(() => {
-        // The central stays usable if this optional snapshot cannot be loaded.
+        if (requestId !== listRequestId.current) return;
+        returnOrderIdRef.current = null;
+        pendingAnchorFocusRef.current = null;
+        setHighlightOrderId(null);
+        setReturnNotice("");
+        focusResultsAfterRetry.current = false;
+        setOrders([]);
+        setTotal(null);
+        setListUpdatedAt(null);
+        setError("Não foi possível carregar as Ordens de Serviço.");
+      })
+      .finally(() => {
+        if (requestId === listRequestId.current) setLoading(false);
+      });
+  };
+  useEffect(() => {
+    if (skipOnePageFetchRef.current === page) {
+      skipOnePageFetchRef.current = null;
+      return;
+    }
+    // While search input is being edited, do not fetch the old query even
+    // if another filter changes; the most recent search intent wins.
+    if (searchEditVersion !== searchCommittedVersion) return;
+    load();
+    return () => {
+      listRequestId.current += 1;
+    };
+  }, [
+    page, query, artStatus, prodStatus, priority, logistics, quick,
+    searchEditVersion, searchCommittedVersion, listRefreshKey,
+  ]);
+  useEffect(() => {
+    if (loading || error || total === null || !pendingAnchorFocusRef.current) return;
+    const targetId = pendingAnchorFocusRef.current;
+    pendingAnchorFocusRef.current = null;
+    const matches = Array.from(document.querySelectorAll<HTMLElement>("[data-central-order-id]"));
+    const target = matches.find(el =>
+      el.dataset.centralOrderId === targetId && el.getClientRects().length > 0
+    );
+    target?.focus({ preventScroll: true });
+    target?.scrollIntoView({ block: "center", behavior: "auto" });
+  }, [loading, error, total, highlightOrderId, orders]);
+
+  useEffect(() => {
+    if (!loading && !error && total !== null && focusResultsAfterRetry.current) {
+      focusResultsAfterRetry.current = false;
+      resultsHeadingRef.current?.focus({ preventScroll: true });
+    }
+  }, [loading, error, total]);
+  const refreshSummary = useCallback(() => {
+    const requestId = ++summaryRequestId.current;
+    setSummaryStatus("loading");
+    setSummaryUpdatedAt(null);
+    setSummaryTotal(null);
+    setSummaryOrders([]);
+    void listOperationalOrderSummaryRows()
+      .then(result => {
+        if (requestId !== summaryRequestId.current) return;
+        setSummaryOrders(result.orders);
+        setSummaryTotal(result.total);
+        setSummaryUpdatedAt(new Date());
+        setSummaryStatus("ready");
+      })
+      .catch(() => {
+        if (requestId !== summaryRequestId.current) return;
+        setSummaryOrders([]);
+        setSummaryTotal(null);
+        setSummaryUpdatedAt(null);
+        setSummaryStatus("error");
       });
   }, []);
   useEffect(() => {
+    refreshSummary();
+    return () => {
+      summaryRequestId.current += 1;
+    };
+  }, [refreshSummary]);
+  useEffect(() => {
+    if (searchEditVersion === searchCommittedVersion) return;
     const timer = window.setTimeout(() => {
       setPage(1);
       setQuery(search);
+      setSearchCommittedVersion(searchEditVersion);
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [search]);
+  }, [search, searchEditVersion, searchCommittedVersion]);
   const summary = useMemo(
-    () =>
-      summarizeOrders(
-        summaryOrders.length ? summaryOrders : orders,
-        summaryOrders.length ? summaryTotal : total
-      ),
-    [orders, summaryOrders, summaryTotal, total]
+    () => summaryTotal === null ? null : summarizeOrders(summaryOrders, summaryTotal),
+    [summaryOrders, summaryTotal]
   );
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pages = Math.max(1, Math.ceil((total ?? 0) / PAGE_SIZE));
+  const refreshAll = () => {
+    if (loading || summaryStatus === "loading" ||
+        searchEditVersion !== searchCommittedVersion) return;
+    invalidateList();
+    refreshSummary();
+    setListRefreshKey(value => value + 1);
+  };
+  const retryList = () => {
+    if (loading || !error) return;
+    load(true);
+  };
+
+  const rememberOpenedOrder = (orderId: string) => {
+    if (!user?.id || !hubPermissions.canViewHubOS) return;
+    saveCentralReturn(centralSessionStorage(), {
+      userId: user.id, orderId, page, search: query, quick,
+      artStatus, prodStatus, priority, logistics,
+    }, Date.now());
+  };
 
   const selectFilters = (
     <div className="grid gap-2 sm:grid-cols-2">
       <Select value={draftArtStatus} onValueChange={setDraftArtStatus}>
-        <SelectTrigger>
+        <SelectTrigger aria-label="Filtrar etapa de arte">
           <SelectValue placeholder="Etapa de arte" />
         </SelectTrigger>
         <SelectContent>
@@ -229,7 +426,7 @@ export default function OrdersCentralPage() {
         </SelectContent>
       </Select>
       <Select value={draftProdStatus} onValueChange={setDraftProdStatus}>
-        <SelectTrigger>
+        <SelectTrigger aria-label="Filtrar etapa de produção">
           <SelectValue placeholder="Etapa de produção" />
         </SelectTrigger>
         <SelectContent>
@@ -242,7 +439,7 @@ export default function OrdersCentralPage() {
         </SelectContent>
       </Select>
       <Select value={draftPriority} onValueChange={setDraftPriority}>
-        <SelectTrigger>
+        <SelectTrigger aria-label="Filtrar prioridade">
           <SelectValue placeholder="Prioridade" />
         </SelectTrigger>
         <SelectContent>
@@ -252,7 +449,7 @@ export default function OrdersCentralPage() {
         </SelectContent>
       </Select>
       <Select value={draftLogistics} onValueChange={setDraftLogistics}>
-        <SelectTrigger>
+        <SelectTrigger aria-label="Filtrar logística">
           <SelectValue placeholder="Logística" />
         </SelectTrigger>
         <SelectContent>
@@ -264,11 +461,79 @@ export default function OrdersCentralPage() {
       </Select>
     </div>
   );
+  const filterPanel = (
+    <div className="space-y-4">
+      <section className="space-y-2" aria-label="Situação">
+        <p className="text-xs font-semibold uppercase text-muted-foreground">
+          Situação
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {quickFilters.map(([value, label]) => (
+            <Button
+              key={value}
+              type="button"
+              size="sm"
+              className="rounded-full"
+              aria-pressed={draftQuick === value}
+              variant={draftQuick === value ? "default" : "outline"}
+              onClick={() => setDraftQuick(value)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+      </section>
+      <section className="space-y-2">
+        <p className="text-xs font-semibold uppercase text-muted-foreground">
+          Outros recortes operacionais
+        </p>
+        <Select
+          value={isExtraQuickFilter(draftQuick) ? draftQuick : "none"}
+          onValueChange={value =>
+            setDraftQuick(value === "none" ? "all" : (value as QuickOrderFilter))
+          }
+        >
+          <SelectTrigger aria-label="Outros recortes operacionais">
+            <SelectValue placeholder="Nenhum recorte adicional" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Nenhum recorte adicional</SelectItem>
+            {extraQuickFilters.map(([value, label]) => (
+              <SelectItem key={value} value={value}>{label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </section>
+      <section className="space-y-2">
+        <p className="text-xs font-semibold uppercase text-muted-foreground">
+          Etapas e classificação
+        </p>
+        {selectFilters}
+      </section>
+      {hasDraftChanges && (
+        <p role="status" className="text-xs text-muted-foreground">
+          Alterações não aplicadas
+        </p>
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+        <Button variant="ghost" onClick={clearDraftFilters}>
+          <RotateCcw className="h-4 w-4" />
+          Limpar
+        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setFiltersOpen(false)}>
+            Cancelar
+          </Button>
+          <Button onClick={applyDraftFilters}>Aplicar filtros</Button>
+        </div>
+      </div>
+    </div>
+  );
   const activeChips = [
-    quick !== "all"
+    isExtraQuickFilter(quick)
       ? {
           key: "quick",
-          label: quickFilters.find(([value]) => value === quick)?.[1],
+          label: extraQuickFilters.find(([value]) => value === quick)?.[1],
           clear: () => setQuick("all"),
         }
       : null,
@@ -313,20 +578,50 @@ export default function OrdersCentralPage() {
           <p className="evolu-orders__eyebrow">Gestão operacional <span aria-hidden="true" /></p>
         <PageHeader
           title="Ordens de Serviço"
-          description={`${total} ordens encontradas · Acompanhamento operacional centralizado`}
+          description={total === null
+            ? "Consulta de ordens ainda não confirmada"
+            : `${total} ${total === 1 ? "ordem encontrada" : "ordens encontradas"} · Acompanhamento operacional centralizado`}
         />
         </div>
-        {hubPermissions.canCreateOs && (
-          <Button className="evolu-orders__new-button evolu-ui-primary-action" onClick={() => setLocation(createOrderPath("/os"))}>
-            <Plus className="h-4 w-4" aria-hidden="true" /> Nova OS
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            aria-disabled={loading || summaryStatus === "loading"}
+            onClick={refreshAll}
+            className="gap-2"
+          >
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            Atualizar
           </Button>
-        )}
+          {hubPermissions.canCreateOs && (
+            <Button className="evolu-orders__new-button evolu-ui-primary-action" onClick={() => setLocation(createOrderPath("/os"))}>
+              <Plus className="h-4 w-4" aria-hidden="true" /> Nova OS
+            </Button>
+          )}
+        </div>
       </div>
-      {loading && !orders.length ? (
-        <OrdersLoading />
-      ) : (
-        <>
-          <OrdersSummaryCards summary={summary} />
+      <OrdersSummaryCards
+        summary={summary}
+        loading={summaryStatus === "loading"}
+        error={summaryStatus === "error"}
+        onRetry={refreshSummary}
+        selectedUrgent={quick === "urgent"}
+        onSelectUrgent={() => {
+          if (quick !== "urgent" || page !== 1) {
+            invalidateList();
+            setQuick("urgent");
+            setPage(1);
+          }
+        }}
+      />
+      {summaryUpdatedAt && summaryStatus === "ready" && (
+        <p className="text-xs text-muted-foreground">
+          Indicadores atualizados às {summaryUpdatedAt.toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}
+        </p>
+      )}
+      <>
+          <section aria-label="Pesquisa e filtros" className="evolu-orders__filter-workspace evolu-ui-panel">
           <section aria-label="Filtros rápidos" className="evolu-orders__quick-filters evolu-ui-panel">
             <div className="evolu-orders__quick-label">
               <span>Visualização rápida</span>
@@ -342,8 +637,11 @@ export default function OrdersCentralPage() {
                   variant={quick === value ? "default" : "outline"}
                   aria-pressed={quick === value}
                   onClick={() => {
-                    setQuick(value);
-                    setPage(1);
+                    if (value !== quick || page !== 1) {
+                      invalidateList();
+                      setQuick(value);
+                      setPage(1);
+                    }
                   }}
                 >
                   {label}
@@ -354,62 +652,42 @@ export default function OrdersCentralPage() {
           <Card className="evolu-orders__filter-card evolu-ui-panel gap-4 py-4 shadow-xs">
             <CardContent className="space-y-3 px-4">
               <div className="evolu-orders__toolbar flex gap-2">
-                <OrderSearch value={search} onChange={setSearch} />
-                <Popover
-                  open={filtersOpen}
-                  onOpenChange={handleFiltersOpenChange}
-                >
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="evolu-orders__advanced-button">
-                      <Filter className="h-4 w-4" />
-                      Filtros
-                      {advancedCount > 0 && (
-                        <Badge className="ml-1 h-5 min-w-5 px-1.5">
-                          {advancedCount}
-                        </Badge>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    align="end"
-                    className="w-[min(32rem,calc(100vw-2rem))] space-y-4"
-                  >
-                    <h2 className="font-semibold">Filtros</h2>
-                    <section className="space-y-2">
-                      <p className="text-xs font-semibold uppercase text-muted-foreground">
-                        Situação
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {quickFilters.map(([value, label]) => (
-                          <Button
-                            key={value}
-                            size="sm"
-                            className="rounded-full"
-                            variant={
-                              draftQuick === value ? "default" : "outline"
-                            }
-                            onClick={() => setDraftQuick(value)}
-                          >
-                            {label}
-                          </Button>
-                        ))}
-                      </div>
-                    </section>
-                    <p className="text-xs font-semibold uppercase text-muted-foreground">
-                      Etapas e classificação
-                    </p>
-                    {selectFilters}
-                    <div className="flex justify-between border-t pt-3">
-                      <Button variant="ghost" onClick={clearDraftFilters}>
-                        <RotateCcw className="h-4 w-4" />
-                        Limpar
+                <OrderSearch value={search} onChange={handleSearchChange} />
+                {isMobile ? (
+                  <Sheet open={filtersOpen} onOpenChange={handleFiltersOpenChange}>
+                    <SheetTrigger asChild>
+                      <Button variant="outline" className="evolu-orders__advanced-button">
+                        <Filter className="h-4 w-4" />
+                        Filtros
+                        {advancedCount > 0 && (
+                          <Badge className="ml-1 h-5 min-w-5 px-1.5">{advancedCount}</Badge>
+                        )}
                       </Button>
-                      <Button onClick={applyDraftFilters}>
-                        Aplicar filtros
+                    </SheetTrigger>
+                    <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-2xl pb-6">
+                      <SheetHeader>
+                        <SheetTitle>Filtros da Central</SheetTitle>
+                      </SheetHeader>
+                      <div className="px-4">{filterPanel}</div>
+                    </SheetContent>
+                  </Sheet>
+                ) : (
+                  <Popover open={filtersOpen} onOpenChange={handleFiltersOpenChange}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="evolu-orders__advanced-button">
+                        <Filter className="h-4 w-4" />
+                        Filtros
+                        {advancedCount > 0 && (
+                          <Badge className="ml-1 h-5 min-w-5 px-1.5">{advancedCount}</Badge>
+                        )}
                       </Button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-[min(32rem,calc(100vw-2rem))] max-h-[80dvh] space-y-4 overflow-y-auto">
+                      <h2 className="font-semibold">Filtros</h2>
+                      {filterPanel}
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
               {activeChips.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2">
@@ -419,13 +697,15 @@ export default function OrdersCentralPage() {
                       variant="secondary"
                       size="sm"
                       className="rounded-full"
+                      aria-label={`Remover filtro ${chip.label}`}
                       onClick={() => {
+                        invalidateList();
                         chip.clear();
                         setPage(1);
                       }}
                     >
                       {chip.label}
-                      <X className="h-3 w-3" />
+                      <X className="h-3 w-3" aria-hidden="true" />
                     </Button>
                   ))}
                   <Button variant="ghost" size="sm" onClick={clearFilters}>
@@ -435,60 +715,108 @@ export default function OrdersCentralPage() {
               )}
             </CardContent>
           </Card>
+          </section>
+          {returnNotice && (
+            <div role="status" className="rounded-lg border p-3 text-sm text-muted-foreground">
+              {returnNotice}
+            </div>
+          )}
+          <p role="status" className="sr-only">
+            {!loading && !error && highlightOrderId ? "Ordem anteriormente aberta localizada nos resultados." : ""}
+          </p>
+          <p role="status" className="sr-only">
+            {!loading && !error && total !== null
+              ? total === 0
+                ? "Consulta concluída. Nenhuma OS encontrada."
+                : `Consulta concluída. ${total} ${total === 1 ? "ordem encontrada" : "ordens encontradas"}.`
+              : ""}
+          </p>
           {error ? (
-            <Card className="evolu-orders__filter-card evolu-ui-panel">
-              <CardContent>
-                <ErrorState
-                  message="Não foi possível carregar as Ordens de Serviço."
-                  retry={load}
-                />
-              </CardContent>
-            </Card>
+            <OrdersListRecovery
+              retrying={loading}
+              onRetry={retryList}
+              retryRef={retryButtonRef}
+            />
+          ) : loading || total === null ? (
+            <OrdersLoading />
           ) : (
             <div className="evolu-orders__table evolu-ui-panel">
               <div className="evolu-orders__table-heading">
                 <div>
-                  <h2>Relação de ordens</h2>
-                  <p>{total} registros encontrados nesta consulta</p>
+                  {quick === "urgent" && (
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary">Exibindo: Urgentes</Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          invalidateList();
+                          setQuick("all");
+                          setPage(1);
+                        }}
+                      >
+                        Voltar a Todas
+                      </Button>
+                    </div>
+                  )}
+                  <h2 ref={resultsHeadingRef} tabIndex={-1}>Relação de ordens</h2>
+                  <p>{total} {total === 1 ? "registro encontrado" : "registros encontrados"} nesta consulta</p>
                 </div>
-                <span className="evolu-orders__live-hint">{loading ? "Atualizando…" : "Lista atualizada"}</span>
+                <span className="evolu-orders__live-hint">
+                  {listUpdatedAt
+                    ? `Lista atualizada às ${listUpdatedAt.toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}`
+                    : "Lista atualizada"}
+                </span>
               </div>
               <OrderTable
                 orders={orders}
                 onClearFilters={hasFilters ? clearFilters : undefined}
+                onOpenOrder={rememberOpenedOrder}
+                highlightOrderId={highlightOrderId}
               />
             </div>
           )}
+          {!loading && !error && total !== null && (
           <footer className="evolu-orders__footer flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
             <span>
-              Mostrando {orders.length} de {total} ordens
+              Mostrando {orders.length} de {total} {total === 1 ? "ordem" : "ordens"}
             </span>
             {pages > 1 && (
-              <div className="flex items-center gap-2">
-                <span className="hidden sm:inline">
+              <nav aria-label="Paginação das ordens" className="flex flex-wrap items-center gap-2">
+                <span className="sr-only sm:not-sr-only" aria-current="page">
                   Página {page} de {pages}
                 </span>
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={page === 1}
-                  onClick={() => setPage(value => value - 1)}
+                  aria-label="Página anterior"
+                  className="min-h-11 sm:min-h-8"
+                  disabled={page === 1 || loading}
+                  onClick={() => {
+                    invalidateList();
+                    setPage(value => value - 1);
+                  }}
                 >
                   Anterior
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={page >= pages}
-                  onClick={() => setPage(value => value + 1)}
+                  aria-label="Próxima página"
+                  className="min-h-11 sm:min-h-8"
+                  disabled={page >= pages || loading}
+                  onClick={() => {
+                    invalidateList();
+                    setPage(value => value + 1);
+                  }}
                 >
                   Próxima
                 </Button>
-              </div>
+              </nav>
             )}
           </footer>
+          )}
         </>
-      )}
     </main>
   );
 }

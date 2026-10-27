@@ -54,7 +54,7 @@
 }
 /* Filter cards share the same surface composition as the other operational panels. */
 .evolu-orders__toolbar input { min-height: 42px; }
-.evolu-orders__advanced-button { min-height: 42px; border-radius: 10px; }
+.evolu-orders__advanced-button { min-height: 44px; border-radius: 10px; }
 .evolu-orders__table { overflow: hidden; }
 .evolu-orders__table-heading {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
@@ -74,7 +74,15 @@
 }
 .evolu-orders__table .evolu-orders__desktop-table td { padding-block: 14px; }
 .evolu-orders__table .evolu-orders__desktop-table tbody tr:hover { background: #f5fafe; }
-.evolu-orders__mobile-list { display: grid; gap: 10px; padding: 12px; }
+.evolu-orders__mobile-list { gap: 10px; padding: 12px; }
+/* Mobile cards and desktop table are mutually exclusive. Without an explicit
+   breakpoint, this stylesheet's display:grid can override Tailwind lg:hidden. */
+@media (max-width: 1023px) {
+  .evolu-orders__mobile-list { display: grid; }
+}
+@media (min-width: 1024px) {
+  .evolu-orders__mobile-list { display: none; }
+}
 .evolu-orders__mobile-card {
   min-width: 0; border: 1px solid #e4ebf4; border-radius: 14px; background: #fbfcfe;
   padding: 15px; overflow: hidden;
@@ -160,4 +168,71 @@
 }
 .dark .evolu-orders [data-order-indicator][data-tone="danger"] {
   color: #fecaca; background: #450a0a; border-color: #b91c1c;
+}
+
+/* Four quick filters form a 2x2 grid on phones, without horizontal scrolling. */
+@media (max-width: 767px) {
+  .evolu-orders__quick-scroll {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+    gap: 8px;
+  }
+  .evolu-orders__quick-button {
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+    min-height: 44px;
+  }
+}
+
+/* A 320px viewport and 200% zoom must not force the three metrics into
+   undersized columns. On wider phones they remain compact and scannable. */
+@media (max-width: 419px) {
+  .evolu-orders [aria-label="Resumo das ordens"] [data-slot="card-content"] {
+    min-height: 64px;
+    flex-direction: row;
+    align-items: center;
+  }
+}
+/* Keep visual focus and the restored OS highlight perceivable together. */
+.evolu-orders a[data-central-order-id]:focus-visible {
+  outline: 3px solid var(--orders-blue);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+/* UX stage 8: quick filters and advanced search share one operational surface. */
+.evolu-orders__filter-workspace {
+  min-width: 0;
+  overflow: visible;
+  border: 1px solid var(--orders-line);
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: 0 12px 30px -28px rgba(24, 54, 91, .5);
+}
+.evolu-orders__filter-workspace .evolu-orders__quick-filters {
+  border: 0;
+  border-radius: 16px 16px 0 0;
+  background: transparent;
+  box-shadow: none;
+}
+.evolu-orders__filter-workspace .evolu-orders__filter-card {
+  border: 0;
+  border-top: 1px solid var(--orders-line);
+  border-radius: 0 0 16px 16px;
+  background: transparent;
+  box-shadow: none;
+}
+.evolu-orders__filter-workspace .evolu-orders__quick-button { min-height: 40px; }
+.evolu-orders__desktop-table tbody td { line-height: 1.45; }
+.evolu-orders__desktop-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--muted) 18%, transparent);
+}
+.evolu-orders__desktop-table tbody tr:hover { background: var(--accent); }
+.evolu-orders__mobile-card { box-shadow: 0 5px 16px -15px rgba(24, 54, 91, .45); }
+.dark .evolu-orders__filter-workspace { border-color: var(--border); background: var(--card); }
+.dark .evolu-orders__filter-workspace .evolu-orders__filter-card { border-top-color: var(--border); }
+.dark .evolu-orders__desktop-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--muted) 25%, transparent);
 }

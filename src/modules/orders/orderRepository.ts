@@ -3,6 +3,7 @@ import type { OsOrder } from "@/features/hubos/types";
 import { addLocalDays, formatLocalDate } from "@/shared/lib/date";
 import type { QuickOrderFilter } from "./orderFilters";
 import { getConsultantFinancePendingSummary } from "@/features/hubos/financePending";
+import { sortOperationalOrderPriority, type OrderPriorityRow } from "./orderPriority";
 
 export type OrderListQuery = {
   page: number;
@@ -14,6 +15,8 @@ export type OrderListQuery = {
   logisticType?: OsOrder["logistic_type"];
   quickFilter?: QuickOrderFilter;
   now?: Date;
+  locateOrderId?: string;
+  signal?: AbortSignal;
 };
 
 export type DashboardPeriod = {
@@ -108,23 +111,36 @@ export function quickFilterOperations(
   }
 }
 
-export async function listOperationalOrders({
-  page,
-  pageSize,
+const PRIORITY_PROJECTION =
+  "id,delivery_date,updated_at,prod_status,logistic_type,archived,is_urgent,art_direction_tag";
+const PRIORITY_BATCH_SIZE = 500;
+
+class OrderSnapshotChanged extends Error {
+  constructor() {
+    super("A consulta de ordens mudou durante a paginação. Tente novamente.");
+  }
+}
+
+/**
+ * Server filters and RLS remain unchanged. Read ONLY the columns needed to
+ * rank all permitted matching orders, then load full data for the 25 selected
+ * ids. Never sort one server page and misrepresent it as global ordering.
+ */
+function filteredOrderPriorityQuery({
   search,
   artStatus,
   prodStatus,
   urgent,
   logisticType,
   quickFilter = "all",
-  now = new Date(),
-}: OrderListQuery) {
-  const safePage = Math.max(1, page);
-  const safeSize = Math.min(50, Math.max(10, pageSize));
+  now,
+  signal,
+}: Omit<OrderListQuery, "page" | "pageSize">) {
   let query = supabase
     .from("os_orders")
-    .select("*", { count: "exact" })
-    .order("updated_at", { ascending: false });
+    .select(PRIORITY_PROJECTION, { count: "exact" })
+    .order("id", { ascending: true });
+  if (signal) query = query.abortSignal(signal);
   if (search?.trim()) {
     const term = search.trim().replace(/[,%()]/g, "");
     query = query.or(
@@ -150,15 +166,86 @@ export async function listOperationalOrders({
       query = query.gte(operation.column, operation.value);
     else query = query.lte(operation.column, operation.value);
   }
-  const from = (safePage - 1) * safeSize;
-  const { data, count, error } = await query.range(from, from + safeSize - 1);
+  return query;
+}
+
+async function readOperationalOrderPage(input: OrderListQuery, now: Date) {
+  const safePage = Math.max(1, Math.floor(input.page || 1));
+  const safeSize = Math.min(50, Math.max(10, Math.floor(input.pageSize || 25)));
+  const matches: OrderPriorityRow[] = [];
+  let expectedTotal: number | null = null;
+  for (let offset = 0; ; offset += PRIORITY_BATCH_SIZE) {
+    const { data, count, error } = await filteredOrderPriorityQuery({
+      ...input,
+      now,
+    }).range(offset, offset + PRIORITY_BATCH_SIZE - 1);
+    if (error) throw new Error(error.message);
+    if (count === null || !Number.isSafeInteger(count) || count < 0) {
+      throw new Error("Não foi possível confirmar a contagem da consulta.");
+    }
+    if (expectedTotal === null) expectedTotal = count;
+    if (count !== expectedTotal) throw new OrderSnapshotChanged();
+    const batch = (data ?? []) as unknown as OrderPriorityRow[];
+    matches.push(...batch);
+    // A short intermediate batch is not a valid completed query if total
+    // declares more records. It can indicate concurrent edits during paging.
+    if (matches.length >= expectedTotal) break;
+    if (batch.length !== PRIORITY_BATCH_SIZE) throw new OrderSnapshotChanged();
+  }
+  const total = expectedTotal ?? 0;
+  if (matches.length !== total || new Set(matches.map(row => row.id)).size !== total) {
+    throw new OrderSnapshotChanged();
+  }
+  const pageCount = Math.max(1, Math.ceil(total / safeSize));
+  const ordered = sortOperationalOrderPriority(matches, now);
+  // Locate only within the filtered, RLS-authorized result set. Never override
+  // filters to reveal an OS that no longer belongs to this consultation.
+  const locatedIndex = input.locateOrderId
+    ? ordered.findIndex(row => row.id === input.locateOrderId)
+    : -1;
+  const locatedOrderId = locatedIndex >= 0 ? input.locateOrderId ?? null : null;
+  const validPage = locatedIndex >= 0
+    ? Math.floor(locatedIndex / safeSize) + 1
+    : Math.min(safePage, pageCount);
+  if (total === 0) {
+    return { orders: [] as OsOrder[], total, page: 1, pageSize: safeSize,
+      locatedOrderId: null };
+  }
+  const ids = ordered
+    .slice((validPage - 1) * safeSize, validPage * safeSize)
+    .map(row => row.id);
+  let detailsQuery = supabase
+    .from("os_orders")
+    .select("*")
+    .in("id", ids);
+  if (input.signal) detailsQuery = detailsQuery.abortSignal(input.signal);
+  const { data, error } = await detailsQuery;
   if (error) throw new Error(error.message);
+  const byId = new Map(((data ?? []) as OsOrder[]).map(row => [row.id, row]));
+  if (byId.size !== ids.length ||
+      ids.some(id => byId.get(id)?.updated_at !== matches.find(row => row.id === id)?.updated_at)) {
+    throw new OrderSnapshotChanged();
+  }
   return {
-    orders: (data ?? []) as OsOrder[],
-    total: count ?? 0,
-    page: safePage,
+    orders: ids.map(id => byId.get(id)!),
+    total,
+    page: validPage,
     pageSize: safeSize,
+    locatedOrderId,
   };
+}
+
+export async function listOperationalOrders(input: OrderListQuery) {
+  const now = input.now ?? new Date();
+  // One automatic retry only for a confirmed concurrent-snapshot change.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await readOperationalOrderPage(input, now);
+    } catch (error) {
+      if (!(error instanceof OrderSnapshotChanged) || attempt === 1) throw error;
+    }
+  }
+  throw new OrderSnapshotChanged();
 }
 
 /** Lightweight, unfiltered dataset used only by the summary cards. */
