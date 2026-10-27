@@ -96,7 +96,7 @@ export function OrderTable({
         {orders.map(order => {
           const risk = calculateOrderRisk(order);
           const path = `/os/${order.id}`;
-          const number = order.sale_number || order.os_number;
+          const number = order.sale_number;
           const numberLabel = number ? `#${number}` : "Número não informado";
           return (
             <article key={order.id} className={cn("evolu-orders__mobile-card", highlightOrderId === order.id && "ring-2 ring-primary/50")}>
@@ -163,7 +163,7 @@ export function OrderTable({
             {orders.map(order => {
               const risk = calculateOrderRisk(order);
               const path = `/os/${order.id}`;
-              const number = order.sale_number || order.os_number;
+              const number = order.sale_number;
               const numberLabel = number ? `#${number}` : "Número não informado";
               return (
                 <tr

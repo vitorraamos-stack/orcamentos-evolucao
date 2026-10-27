@@ -19,6 +19,8 @@ describe("OrderTable responsive sizing", () => {
   it("renders explicit placeholders without fabricating an OS number", () => {
     expect(source).toContain('"Número não informado"');
     expect(source).toContain('const numberLabel = number ? `#${number}` : "Número não informado";');
+    expect(source).toContain("const number = order.sale_number;");
+    expect(source).not.toContain("order.sale_number || order.os_number");
     expect(source).toContain('order.client_name || "Cliente não informado"');
     expect(source).toContain('"Serviço não informado"');
     expect(source).toContain("onClearFilters");
