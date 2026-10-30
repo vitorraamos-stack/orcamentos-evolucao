@@ -28,7 +28,7 @@ export default function PrintingInventoryPage() {
   const { user } = useAuth();
   const [tab, setTab] = useState<"prints" | "stock">("prints");
   const [stockTab, setStockTab] = useState<"rolls" | "inks">("rolls");
-  const [rollFilter, setRollFilter] = useState<"all" | "available" | "low" | "empty">("all");
+  const [rollFilter, setRollFilter] = useState<"all" | "available" | "low" | "empty" | "archived">("all");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [rolls, setRolls] = useState<PrintRoll[]>([]);
   const [inks, setInks] = useState<InkBalance[]>([]);
