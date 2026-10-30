@@ -374,7 +374,9 @@ export default function Layout({ children }: LayoutProps) {
                 isProductionCentralPage ||
                 location === "/hub-os"
                 ? "max-w-none"
-                : "max-w-6xl",
+                : location === "/impressao-estoque"
+                  ? "max-w-[1520px]"
+                  : "max-w-6xl",
               isCreateOrderPage ? "h-auto" : "h-full"
             )}
           >
