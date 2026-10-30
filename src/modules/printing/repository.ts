@@ -58,3 +58,58 @@ export async function movePrintInk(input:{
   });
   fail(error);
 }
+
+
+/** Read-only assisted lookup; visibility is limited by the existing os_orders RLS. */
+export type PrintOrderSuggestion = { id: string; sale_number: string; client_name: string | null; title: string | null };
+
+export async function searchPrintOrders(term: string): Promise<PrintOrderSuggestion[]> {
+  const normalized = term.trim().replace(/[%_\\]/g, "").slice(0, 40);
+  if (normalized.length < 2) return [];
+  const { data, error } = await supabase
+    .from("os_orders")
+    .select("id,sale_number,client_name,title")
+    .ilike("sale_number", normalized + "%")
+    .order("sale_number", { ascending: false })
+    .limit(6);
+  fail(error);
+  return (data ?? []).filter(row => Boolean(row.sale_number)) as PrintOrderSuggestion[];
+}
+
+export type PrintHistoryFilter = {
+  page: number;
+  pageSize: number;
+  type: "all" | "prints" | "stock";
+  since?: string;
+  search?: string;
+  rolls: PrintRoll[];
+};
+
+export async function loadPrintHistory(filters: PrintHistoryFilter): Promise<{ rows: (StockEvent & { created_by: string })[]; count: number }> {
+  const { page, pageSize, type, since, rolls } = filters;
+  const safe = (filters.search ?? "").trim().replace(/[^\\p{L}\\p{N}\\s-]/gu, "").slice(0, 50);
+  let query = supabase
+    .from("print_inventory_events")
+    .select("id,kind,roll_id,color,delta_m,delta_ml,os_ref,reason,created_at,created_by", { count: "exact" });
+  if (type === "prints") query = query.in("kind", ["PRINT", "REPRINT"]);
+  if (type === "stock") query = query.in("kind", ["ROLL_IN", "ROLL_ADJUST", "INK_IN", "INK_USE"]);
+  if (since) query = query.gte("created_at", since);
+  if (safe) {
+    const matchingRolls = rolls.filter(roll => (roll.code + " " + roll.material).toLocaleLowerCase("pt-BR").includes(safe.toLocaleLowerCase("pt-BR"))).map(roll => roll.id);
+    const matchingColors: string[] = [];
+    for (const [name, code] of [["ciano", "C"], ["magenta", "M"], ["amarelo", "Y"], ["preto", "K"]]) {
+      if (name.includes(safe.toLocaleLowerCase("pt-BR"))) matchingColors.push(code);
+    }
+    const clauses = ["os_ref.ilike.%" + safe.replace(/\\s+/g, "%") + "%"];
+    if (matchingRolls.length) clauses.push("roll_id.in.(" + matchingRolls.join(",") + ")");
+    if (matchingColors.length) clauses.push("color.in.(" + matchingColors.join(",") + ")");
+    query = query.or(clauses.join(","));
+  }
+  const from = Math.max(0, page) * pageSize;
+  const { data, error, count } = await query
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(from, from + pageSize - 1);
+  fail(error);
+  return { rows: (data ?? []) as (StockEvent & { created_by: string })[], count: count ?? 0 };
+}
