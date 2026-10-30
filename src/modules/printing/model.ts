@@ -6,11 +6,13 @@ export interface PrintRoll {
   initial_length_m: number;
   remaining_length_m: number;
   created_at: string;
+  archived_at?: string | null;
+  archived_reason?: string | null;
 }
 export interface InkBalance { color: "C" | "M" | "Y" | "K"; balance_ml: number; }
 export interface StockEvent {
   id: string;
-  kind: "ROLL_IN" | "PRINT" | "REPRINT" | "ROLL_ADJUST" | "INK_IN" | "INK_USE";
+  kind: "ROLL_IN" | "PRINT" | "REPRINT" | "ROLL_ADJUST" | "ROLL_ARCHIVE" | "INK_IN" | "INK_USE";
   roll_id: string | null;
   color: string | null;
   delta_m: number | null;
