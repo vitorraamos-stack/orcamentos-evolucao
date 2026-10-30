@@ -15,7 +15,7 @@ const pageSize=10;
 const fmt = (value:number, digits=2) => value.toLocaleString("pt-BR",{minimumFractionDigits:digits,maximumFractionDigits:digits});
 const labels: Record<StockEvent["kind"],string> = {
   ROLL_IN:"Entrada de bobina",PRINT:"Impressão",REPRINT:"Reimpressão",
-  ROLL_ADJUST:"Ajuste de bobina",INK_IN:"Entrada de tinta",INK_USE:"Abastecimento de tinta",
+  ROLL_ADJUST:"Ajuste de bobina",ROLL_ARCHIVE:"Exclusão de bobina",INK_IN:"Entrada de tinta",INK_USE:"Abastecimento de tinta",
 };
 const inkNames:Record<string,string>={C:"Ciano",M:"Magenta",Y:"Amarelo",K:"Preto"};
 const eventAmount=(event:StockEvent) => event.delta_m !== null ?
