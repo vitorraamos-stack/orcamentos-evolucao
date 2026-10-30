@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { OsOrderLayoutAsset } from "@/features/hubos/types";
 import { fetchOsAssetDownloadUrl } from "@/modules/hub-os/api";
 import { OrderHeader } from "../components/OrderHeader";
+import { formatOfficialOsLabel } from "../orderOfficialNumber";
 import { OrderFlowProgress } from "../components/OrderFlowProgress";
 import { OrderAssigneesCard } from "../components/OrderAssigneesCard";
 import { OrderDeadlinesCard } from "../components/OrderDeadlinesCard";
@@ -149,7 +150,7 @@ export default function OrderDetailPage() {
     }
   }, [activities, comments, files, items, operations, orderId, reloadProductionData]);
 
-  if (loading || viewOrderId !== orderId || (detail !== null && detail.order.id !== orderId)) return <div className="space-y-4"><Skeleton className="h-56 w-full" /><Skeleton className="h-24 w-full" /></div>;
+  if ((loading && !detail) || viewOrderId !== orderId || (detail !== null && detail.order.id !== orderId)) return <div className="space-y-4"><Skeleton className="h-56 w-full" /><Skeleton className="h-24 w-full" /></div>;
   if (pageError || !detail) return <div role="alert" className="rounded-lg border border-destructive/40 p-6">
     <h1 className="font-semibold">Não foi possível abrir a OS</h1>
     <p className="mt-2 text-sm text-muted-foreground">{pageError ?? "OS não encontrada."}</p>
@@ -268,7 +269,7 @@ export default function OrderDetailPage() {
         <ArrowLeft className="size-4" aria-hidden="true" /> Voltar à Central de OS
       </Link>
       <ChevronRight className="size-4" aria-hidden="true" />
-      <span aria-current="page">OS #{detail.order.os_number ?? detail.order.sale_number}</span>
+      <span aria-current="page">{formatOfficialOsLabel(detail.order.sale_number)}</span>
     </nav>
     <OrderHeader order={detail.order} assignees={detail.assignees} canEdit={canEditOrder} canManage={hubPermissions.isManager} onArchive={()=>setArchiveOpen(true)} onDelete={()=>setDeleteOpen(true)} transitions={allowed} onTransition={moveStatus} onEdit={() => setEditOpen(true)} />
     <OrderFlowProgress order={detail.order} />

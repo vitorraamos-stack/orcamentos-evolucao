@@ -76,6 +76,15 @@ describe("EvoluSystem — OS detail premium visual contract", () => {
     expect(header).toContain("isOrderUrgent(order)");
   });
 
+  it("shows the Conta Azul official number and truthful placeholders", () => {
+    expect(detail).toContain("formatOfficialOsLabel(detail.order.sale_number)");
+    expect(header).toContain("formatOfficialOsLabel(order.sale_number)");
+    expect(detail).not.toContain("detail.order.os_number");
+    expect(header).not.toContain("order.os_number");
+    expect(header).toContain("Cliente não informado");
+    expect(header).toContain("Serviço não informado");
+  });
+
   it("uses canonical operational stages and marks the current one accessibly", () => {
     expect(flow).toContain("getOrderOperationalStage(order)");
     expect(flow).toContain('aria-label="Progresso operacional"');
