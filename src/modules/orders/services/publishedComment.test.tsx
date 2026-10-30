@@ -16,7 +16,7 @@ const makeComment = (id: string, userId = author.id): OrderComment => ({
 });
 
 describe("EvoluSystem — newly published comments", () => {
-  it("shows a confirmed comment first with its author and preserves earlier entries", () => {
+  it("shows a confirmed comment at the end of the chronological conversation with its author", () => {
     const previous = [makeComment("older"), makeComment("oldest")];
     const published = makeComment("published");
     const result = prependPublishedComment(previous, published, author);
@@ -34,7 +34,7 @@ describe("EvoluSystem — newly published comments", () => {
     expect(html).toContain("Mensagem published");
     expect(html).toContain("Equipe de Arte");
     expect(html).toContain("Editar comentário de Equipe de Arte");
-    expect(html.indexOf("Mensagem published")).toBeLessThan(html.indexOf("Mensagem older"));
+    expect(html.indexOf("Mensagem published")).toBeGreaterThan(html.indexOf("Mensagem older"));
   });
 
   it("does not duplicate an existing row when the same server id is received", () => {

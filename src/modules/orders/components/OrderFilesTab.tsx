@@ -112,13 +112,13 @@ export function OrderFilesTab({
   if (!assets.length) {
     return (
       <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-        Nenhum arquivo disponível.
+        Nenhum arquivo disponível nesta OS. As artes são transferidas para o servidor local.
       </p>
     );
   }
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2" aria-label="Arquivos da OS">
+    <section className="space-y-4"><p className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">As artes de produção seguem o fluxo de envio pela nuvem e armazenamento no servidor local. Esta lista contém apenas anexos efetivamente acessíveis pelo sistema, quando existentes.</p><div className="grid gap-3" aria-label="Arquivos da OS">
       {assets.map(asset => {
         const name = orderFileName(asset);
         const AssetIcon = ASSET_ICON[asset.asset_type] ?? FileText;
@@ -155,6 +155,6 @@ export function OrderFilesTab({
           </div>
         );
       })}
-    </div>
+    </div></section>
   );
 }

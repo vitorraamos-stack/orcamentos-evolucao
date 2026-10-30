@@ -517,14 +517,15 @@ export async function removeOrderComment(id: string) {
   throwIfError(error);
 }
 
-export async function listOrderActivities(orderId: string) {
+export async function listOrderActivities(orderId: string, offset = 0) {
   uuid.parse(orderId);
   const { data, error } = await supabase
     .from("os_orders_event")
     .select("id,os_id,type,payload,created_by,created_at")
     .eq("os_id", orderId)
     .order("created_at", { ascending: false })
-    .limit(100);
+    .order("id", { ascending: false })
+    .range(offset, offset + 99);
   throwIfError(error);
   const activities = (data ?? []) as OrderActivity[];
   const userIds = Array.from(

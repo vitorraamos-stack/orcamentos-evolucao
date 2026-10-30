@@ -109,11 +109,12 @@ describe("EvoluSystem OS activity timeline", () => {
       type: "CUSTOM_EVENT",
       payload: { name: `Entrada ${index}` },
     }));
-    const html = view(events);
-    expect(html).toContain("Exibindo os 100 eventos mais recentes da OS.");
+    const html = renderToStaticMarkup(<OrderHistoryTab activities={events} loading={false} error={null} hasMore={true} onLoadMore={vi.fn()} />);
+    expect(html).toContain("Há registros anteriores disponíveis para carregar.");
+    expect(html).toContain("Carregar registros anteriores");
     expect((html.match(/<li /g) ?? []).length).toBe(100);
     expect(html.indexOf("Entrada 0")).toBeLessThan(html.indexOf("Entrada 99"));
-    expect(view(events.slice(0, 99))).not.toContain("Exibindo os 100 eventos");
+    expect(view(events.slice(0, 99))).not.toContain("Carregar registros anteriores");
   });
 
 });
