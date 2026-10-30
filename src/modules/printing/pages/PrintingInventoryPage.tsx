@@ -28,7 +28,7 @@ export default function PrintingInventoryPage() {
   const { user } = useAuth();
   const [tab, setTab] = useState<"prints" | "stock">("prints");
   const [stockTab, setStockTab] = useState<"rolls" | "inks">("rolls");
-  const [rollFilter, setRollFilter] = useState<"all" | "available" | "low" | "empty">("all");
+  const [rollFilter, setRollFilter] = useState<"all" | "available" | "low" | "empty" | "archived">("all");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [rolls, setRolls] = useState<PrintRoll[]>([]);
   const [inks, setInks] = useState<InkBalance[]>([]);
@@ -121,9 +121,9 @@ export default function PrintingInventoryPage() {
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [os, selectedOrder, manualOrder, completed]);
 
-  const materials = useMemo(() => Array.from(new Set(rolls.map(roll => roll.material))).sort((a,b) => a.localeCompare(b,"pt-BR")), [rolls]);
+  const materials = useMemo(() => Array.from(new Set(rolls.filter(roll => !roll.archived_at).map(roll => roll.material))).sort((a,b) => a.localeCompare(b,"pt-BR")), [rolls]);
   const chosenMaterial = materials.includes(material) ? material : (materials[0] ?? "");
-  const candidates = rolls.filter(roll => roll.material === chosenMaterial);
+  const candidates = rolls.filter(roll => !roll.archived_at && roll.material === chosenMaterial);
   const selectedRoll = candidates.find(roll => roll.id === rollId);
   const validDimensions = [decimal(width), decimal(length), decimal(copies)].every(Number.isFinite) &&
     decimal(width) > 0 && decimal(length) > 0 && Number.isInteger(decimal(copies)) &&
@@ -147,8 +147,8 @@ export default function PrintingInventoryPage() {
   const orderReady = Boolean((selectedOrder?.sale_number === os || manualOrder) && os.trim());
   const reasonReady = !reprint || Boolean(reason.trim());
   const canConfirm = !busy && !completed && orderReady && estimate !== null && reasonReady && !searching;
-  const availableCount = rolls.filter(roll => Number(roll.remaining_length_m) > 0).length;
-  const lowCount = rolls.filter(roll => Number(roll.remaining_length_m) > 0 && Number(roll.remaining_length_m) <= 10).length;
+  const availableCount = rolls.filter(roll => !roll.archived_at && Number(roll.remaining_length_m) > 0).length;
+  const lowCount = rolls.filter(roll => !roll.archived_at && Number(roll.remaining_length_m) > 0 && Number(roll.remaining_length_m) <= 10).length;
   const inkLiters = inks.reduce((sum, ink) => sum + Number(ink.balance_ml), 0) / 1000;
 
   const startNext = (sameOrder: boolean) => {
@@ -234,7 +234,7 @@ export default function PrintingInventoryPage() {
               <Card>
                 <CardHeader><CardTitle className="text-base">Registrar impressão</CardTitle></CardHeader>
                 <CardContent className="space-y-6">
-                  {!rolls.length && <div className="rounded-lg border border-dashed p-4 text-sm">Nenhuma bobina cadastrada. <Button variant="link" className="px-1" onClick={() => openStock("rolls")}>Ir para o estoque</Button></div>}
+                  {!rolls.some(roll => !roll.archived_at) && <div className="rounded-lg border border-dashed p-4 text-sm">Nenhuma bobina cadastrada. <Button variant="link" className="px-1" onClick={() => openStock("rolls")}>Ir para o estoque</Button></div>}
                   <section className="space-y-3" aria-labelledby="print-step-os">
                     <Step id="print-step-os" number="1" icon={<Search className="h-4 w-4"/>} title="Identificação da impressão"/>
                     <Field id="print-os" label="Número da OS" hint="Use o número oficial da Ordem de Serviço.">
@@ -373,7 +373,7 @@ function SummaryLine({label,value,emphasized=false}:{label:string;value:string;e
   return <div className={"flex items-center justify-between gap-3 text-sm " + (emphasized?"border-t pt-3 font-semibold":"")}><span className="text-muted-foreground">{label}</span><span className="text-right tabular-nums">{value}</span></div>;
 }
 function EventRow({event,rolls}:{event:StockEvent;rolls:PrintRoll[]}) {
-  const labels:Record<StockEvent["kind"],string> = { ROLL_IN:"Entrada de bobina",PRINT:"Impressão",REPRINT:"Reimpressão",ROLL_ADJUST:"Ajuste de bobina",INK_IN:"Entrada de tinta",INK_USE:"Abastecimento de tinta" };
+  const labels:Record<StockEvent["kind"],string> = { ROLL_IN:"Entrada de bobina",PRINT:"Impressão",REPRINT:"Reimpressão",ROLL_ADJUST:"Ajuste de bobina",ROLL_ARCHIVE:"Exclusão administrativa de bobina",INK_IN:"Entrada de tinta",INK_USE:"Abastecimento de tinta" };
   return <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3 last:border-0 last:pb-0">
     <div className="min-w-0"><p className="text-sm font-medium">{labels[event.kind]}</p><p className="text-xs text-muted-foreground">{event.os_ref?"OS "+event.os_ref+" · ":""}{rolls.find(roll=>roll.id===event.roll_id)?.code || event.color || ""} · {new Date(event.created_at).toLocaleString("pt-BR")}</p></div>
     <span className="text-sm font-semibold tabular-nums">{event.delta_m!==null?(Number(event.delta_m)>0?"+":"")+fmt(Number(event.delta_m))+" m":(Number(event.delta_ml)>0?"+":"")+fmt(Number(event.delta_ml),0)+" mL"}</span>
