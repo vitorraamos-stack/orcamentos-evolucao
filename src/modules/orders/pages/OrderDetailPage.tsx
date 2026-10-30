@@ -52,6 +52,8 @@ export default function OrderDetailPage() {
   const [detail, setDetail] = useState<OrderDetail | null>(null); const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(true); const [pageError, setPageError] = useState<string | null>(null); const [editOpen, setEditOpen] = useState(false);
   const [viewOrderId, setViewOrderId] = useState<string | undefined>(undefined);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [loadingMoreHistory, setLoadingMoreHistory] = useState(false);
   const readCoordinator = useRef(createOrderReadCoordinator());
   const [archiveOpen,setArchiveOpen]=useState(false); const [deleteOpen,setDeleteOpen]=useState(false);
   const [items, setItems] = useState(state<OrderItem[]>([])); const [comments, setComments] = useState(state<OrderComment[]>([]));
@@ -91,6 +93,8 @@ export default function OrderDetailPage() {
     const coordinator = readCoordinator.current;
     coordinator.activate(orderId ?? null);
     setViewOrderId(orderId);
+    setHasMoreHistory(false);
+    setLoadingMoreHistory(false);
     setDetail(null);
     setUsers([]);
     setItems(state<OrderItem[]>([]));
@@ -142,6 +146,7 @@ export default function OrderDetailPage() {
       if (!readCoordinator.current.isCurrent(ticket) || data === null) return;
       // reloadProductionData already sets both items and operations once.
       if (tab !== "production") config.set({ data, loading: false, error: null, loaded: true } as never);
+      if (tab === "history") setHasMoreHistory(Array.isArray(data) && data.length === 100);
     } catch (error) {
       if (readCoordinator.current.isCurrent(ticket))
         config.set({ ...config.current, loading: false, loaded: true, error: message(error) } as never);
@@ -240,6 +245,25 @@ export default function OrderDetailPage() {
 
   const board: "art" | "production" = detail.order.prod_status ? "production" : "art"; const from = (detail.order.prod_status ?? detail.order.art_status) as ArtStatus | ProdStatus; const allowed = (board === "art" ? canMoveArt : canMoveProduction) ? getValidOrderTransitions({ board, from, role: hubRole, isManager: hubPermissions.isManager }).map(value => ({ board, value })) : [];
   const moveStatus = async (targetBoard: "art" | "production", to: ArtStatus | ProdStatus) => { try { const updated = await transitionOrderStatus({ orderId: detail.order.id, board: targetBoard, from, to, context: { role: hubRole, isManager: hubPermissions.isManager } }); setDetail(value => value ? { ...value, order: updated } : value); toast.success("Etapa atualizada."); } catch (error) { toast.error(message(error)); } };
+  const loadMoreHistory = async () => {
+    if (!orderId || loadingMoreHistory || !hasMoreHistory) return;
+    const ticket = readCoordinator.current.begin(orderId, "history-more");
+    if (!ticket) return;
+    setLoadingMoreHistory(true);
+    try {
+      const more = await listOrderActivities(orderId, activities.data.length);
+      if (!readCoordinator.current.isCurrent(ticket)) return;
+      setActivities(previous => readCoordinator.current.isCurrent(ticket)
+        ? { ...previous, data: [...previous.data, ...more.filter(value => !previous.data.some(old => old.id === value.id))] }
+        : previous);
+      if (readCoordinator.current.isCurrent(ticket)) setHasMoreHistory(more.length === 100);
+    } catch (error) {
+      if (readCoordinator.current.isCurrent(ticket)) toast.error(message(error));
+    } finally {
+      if (readCoordinator.current.isCurrent(ticket)) setLoadingMoreHistory(false);
+      readCoordinator.current.finish(ticket);
+    }
+  };
   const actorName=user?.user_metadata?.full_name??user?.email??user?.id??null;
   const archive=async(reason:string)=>{try{await archiveOrderSecure({id:detail.order.id,reason,actorName});toast.success("OS arquivada.");navigate("/os");}catch(error){toast.error(message(error));throw error;}};
   const deleted=async(reason:string,confirmation:string)=>deleteOrderPermanently({id:detail.order.id,reason,confirmation,actorName});
@@ -275,6 +299,6 @@ export default function OrderDetailPage() {
     <OrderFlowProgress order={detail.order} />
     <Tabs className="evolu-detail__tabs" key={orderId} defaultValue="summary" onValueChange={loadTab}><div className="evolu-detail__tabs-scroll overflow-x-auto"><TabsList aria-label="Seções da ordem de serviço" className="evolu-detail__tabs-list w-max min-w-full justify-start"><TabsTrigger className="evolu-detail__tab" value="summary">Resumo</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="items">Itens</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="production">Produção</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="installation">Instalação / Entrega</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="files">Arquivos</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="comments">Comentários</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="history">Histórico</TabsTrigger></TabsList></div>
       <TabsContent className="evolu-detail__tab-content space-y-4" value="summary"><OrderSummaryTab order={detail.order} />
-      <section aria-label="Responsáveis e prazos" className="evolu-detail__management-grid grid gap-4 xl:grid-cols-2"><OrderAssigneesCard assignees={detail.assignees} users={users} canEdit={canManageAssignees} onChange={updateAssignee} /><OrderDeadlinesCard order={detail.order} deadlines={detail.deadlines} canEdit={canManageDeadlines} onChange={updateDeadline} onComplete={(scope, version) => deadlineAction(scope, "complete", version)} onReopen={(scope, version) => deadlineAction(scope, "reopen", version)} onRemove={(scope, version) => deadlineAction(scope, "remove", version)} /></section></TabsContent><TabsContent className="evolu-detail__tab-content" value="items"><OrderItemsTab items={items.data} loading={items.loading} error={items.error} onRetry={() => void loadTab("items")} canEdit={canManageItems} onCreate={createItem} onUpdate={updateItem} onRemove={removeItem} onMove={moveItem} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="production"><OrderProductionTab items={items.data} operations={operations.data} users={users} loading={operations.loading} error={operations.error} onRetry={() => void loadTab("production")} canOperate={canMoveProduction} canManage={hubPermissions.isManager} onCreate={async input => { await createItemOperation(input); await refreshProductionAfterWrite("Operação adicionada."); }} onUpdate={async (id,input,revision) => { await updateItemOperation(id,input,revision); await refreshProductionAfterWrite("Operação editada."); }} onStatus={async (id,status,revision,reason) => { await setItemOperationStatus(id,status,revision,reason); await refreshProductionAfterWrite("Operação atualizada."); }} onDelete={async (id,revision) => { await deleteItemOperation(id,revision); await refreshProductionAfterWrite("Operação excluída."); }} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="installation"><OrderInstallationTab order={detail.order} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="files"><OrderFilesTab assets={files.data} loading={files.loading} error={files.error} onRetry={() => void loadTab("files")} onOpen={openAsset} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="comments"><OrderCommentsTab comments={comments.data} loading={comments.loading} error={comments.error} onRetry={() => void loadTab("comments")} currentUserId={user?.id} canComment={canComment} canRemoveAny={hubPermissions.isManager} onCreate={createComment} onUpdate={editComment} onRemove={removeComment} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="history"><OrderHistoryTab activities={activities.data} loading={activities.loading} error={activities.error} onRetry={() => void loadTab("history")} /></TabsContent></Tabs>
+      <section aria-label="Responsáveis e prazos" className="evolu-detail__management-grid grid gap-4 xl:grid-cols-2"><OrderAssigneesCard assignees={detail.assignees} users={users} canEdit={canManageAssignees} onChange={updateAssignee} /><OrderDeadlinesCard order={detail.order} deadlines={detail.deadlines} canEdit={canManageDeadlines} onChange={updateDeadline} onComplete={(scope, version) => deadlineAction(scope, "complete", version)} onReopen={(scope, version) => deadlineAction(scope, "reopen", version)} onRemove={(scope, version) => deadlineAction(scope, "remove", version)} /></section></TabsContent><TabsContent className="evolu-detail__tab-content" value="items"><OrderItemsTab items={items.data} loading={items.loading} error={items.error} onRetry={() => void loadTab("items")} canEdit={canManageItems} onCreate={createItem} onUpdate={updateItem} onRemove={removeItem} onMove={moveItem} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="production"><OrderProductionTab items={items.data} operations={operations.data} users={users} loading={operations.loading} error={operations.error} onRetry={() => void loadTab("production")} canOperate={canMoveProduction} canManage={hubPermissions.isManager} onCreate={async input => { await createItemOperation(input); await refreshProductionAfterWrite("Operação adicionada."); }} onUpdate={async (id,input,revision) => { await updateItemOperation(id,input,revision); await refreshProductionAfterWrite("Operação editada."); }} onStatus={async (id,status,revision,reason) => { await setItemOperationStatus(id,status,revision,reason); await refreshProductionAfterWrite("Operação atualizada."); }} onDelete={async (id,revision) => { await deleteItemOperation(id,revision); await refreshProductionAfterWrite("Operação excluída."); }} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="installation"><OrderInstallationTab order={detail.order} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="files"><OrderFilesTab assets={files.data} loading={files.loading} error={files.error} onRetry={() => void loadTab("files")} onOpen={openAsset} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="comments"><OrderCommentsTab comments={comments.data} loading={comments.loading} error={comments.error} onRetry={() => void loadTab("comments")} currentUserId={user?.id} canComment={canComment} canRemoveAny={hubPermissions.isManager} onCreate={createComment} onUpdate={editComment} onRemove={removeComment} /></TabsContent><TabsContent className="evolu-detail__tab-content" value="history"><OrderHistoryTab activities={activities.data} loading={activities.loading} error={activities.error} onRetry={() => void loadTab("history")} hasMore={hasMoreHistory} loadingMore={loadingMoreHistory} onLoadMore={() => void loadMoreHistory()} /></TabsContent></Tabs>
     <OrderEditDialog order={detail.order} open={editOpen} onOpenChange={setEditOpen} onSave={saveOrder} /><ArchiveOrderDialog open={archiveOpen} onOpenChange={setArchiveOpen} onConfirm={archive}/><DeleteOrderDialog open={deleteOpen} onOpenChange={setDeleteOpen} loadPreview={()=>getOrderDeletionPreview(detail.order.id)} onDelete={deleted} onArchive={()=>{setDeleteOpen(false);setArchiveOpen(true)}} onCleanup={cleanup} onGoToCentral={()=>navigate("/os")}/></main>;
 }

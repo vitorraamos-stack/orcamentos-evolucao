@@ -12,6 +12,16 @@ describe("EvoluSystem OS tabs — reliable loading and error recovery", () => {
     expect(detail).toContain("readCoordinator.current.isCurrent(ticket)");
   });
 
+  it("isolates paginated history from stale reads and switches between orders", () => {
+    expect(detail).toContain('readCoordinator.current.begin(orderId, "history-more")');
+    expect(detail).toContain("if (!readCoordinator.current.isCurrent(ticket)) return;");
+    expect(detail).toContain("setActivities(previous => readCoordinator.current.isCurrent(ticket)");
+    expect(detail).toContain("setHasMoreHistory(more.length === 100)");
+    expect(detail).toContain("setHasMoreHistory(false)");
+    expect(detail).toContain("setLoadingMoreHistory(false)");
+    expect(detail).toContain('hasMore={hasMoreHistory}');
+  });
+
   it("only skips previously successful tabs; retries failed tabs on reentry", () => {
     expect(detail).toContain("config.current.loading || (config.current.loaded && !config.current.error)");
     for (const call of ["listOrderItems(orderId)", "listOrderComments(orderId)", "listOrderActivities(orderId)", "listOrderFiles(orderId)"]) expect(detail).toContain(call);

@@ -97,9 +97,9 @@ export function OrderCommentsTab({
   </div>;
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-5">
       {canComment && (
-        <section aria-label="Novo comentário" className="space-y-3">
+        <section aria-label="Novo comentário" className="order-2 space-y-3">
           <div className="space-y-2">
             <Label htmlFor={composeId}>Comentário interno</Label>
             <Textarea
@@ -136,8 +136,8 @@ export function OrderCommentsTab({
           Nenhum comentário interno.
         </p>
       ) : (
-        <div className="space-y-3" aria-label="Comentários da OS">
-          {comments.map(comment => {
+        <div className="order-1 space-y-3" aria-label="Comentários da OS">
+          {[...comments].reverse().map(comment => {
             const own = comment.user_id === currentUserId;
             const canEdit = own;
             const canRemove = own || canRemoveAny;
