@@ -1,17 +1,18 @@
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Droplets, Loader2, PackagePlus, Pencil, Search, Tag } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Droplets, Loader2, PackagePlus, Pencil, Search, Tag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { addPrintRoll, adjustPrintRoll, movePrintInk } from "../repository";
+import { addPrintRoll, adjustPrintRoll, archivePrintRoll, movePrintInk } from "../repository";
+import { useAuth } from "@/contexts/AuthContext";
 import { decimal, type InkBalance, type PrintRoll } from "../model";
 import type { RunInventoryOperation } from "../pages/PrintingInventoryPage";
 
-type RollFilter = "all" | "available" | "low" | "empty";
+type RollFilter = "all" | "available" | "low" | "empty" | "archived";
 type Props = {
   rolls: PrintRoll[];
   inks: InkBalance[];
@@ -34,26 +35,34 @@ function rollStatus(roll: PrintRoll) {
   return value <= 0 ? "empty" : value <= 10 ? "low" : "available";
 }
 export function PrintingStockPanel({rolls,inks,busy,execute,stockTab,setStockTab,rollFilter,setRollFilter}:Props) {
+  const { isAdmin } = useAuth();
   const [query,setQuery] = useState("");
   const [sort,setSort] = useState<"code"|"material"|"balance">("code");
-  const [panel,setPanel] = useState<"new"|"adjust"|"label"|null>(null);
+  const [panel,setPanel] = useState<"new"|"adjust"|"label"|"delete"|null>(null);
   const [targetId,setTargetId] = useState("");
   const [newMaterial,setNewMaterial] = useState("");
   const [newWidth,setNewWidth] = useState("137");
   const [newLength,setNewLength] = useState("50");
   const [adjustBalance,setAdjustBalance] = useState("");
   const [adjustReason,setAdjustReason] = useState("");
+  const [deleteReason,setDeleteReason] = useState("");
+  const [deleteConfirmation,setDeleteConfirmation] = useState("");
   const [inkColor,setInkColor] = useState<InkBalance["color"]>("C");
   const [inkAmount,setInkAmount] = useState("250");
   const [inkEntry,setInkEntry] = useState(false);
 
+  const activeCount = rolls.filter(roll => !roll.archived_at).length;
   const filtered = useMemo(() => rolls.filter(roll => {
+    if (rollFilter === "archived") {
+      if (!isAdmin || !roll.archived_at) return false;
+    } else if (roll.archived_at) return false;
     const status = rollStatus(roll);
-    const matchesStatus = rollFilter === "all" || (rollFilter === "available" ? status !== "empty" : status === rollFilter);
+    const matchesStatus = rollFilter === "all" || rollFilter === "archived" ||
+      (rollFilter === "available" ? status !== "empty" : status === rollFilter);
     const matchesSearch = (roll.code+" "+roll.material+" "+roll.width_cm).toLocaleLowerCase("pt-BR").includes(query.toLocaleLowerCase("pt-BR").trim());
     return matchesStatus && matchesSearch;
   }).sort((a,b) => sort==="balance" ? Number(a.remaining_length_m)-Number(b.remaining_length_m) :
-    sort==="material" ? a.material.localeCompare(b.material,"pt-BR") : a.code.localeCompare(b.code,"pt-BR")), [rolls,rollFilter,query,sort]);
+    sort==="material" ? a.material.localeCompare(b.material,"pt-BR") : a.code.localeCompare(b.code,"pt-BR")), [rolls,rollFilter,query,sort,isAdmin]);
 
   const target = rolls.find(roll=>roll.id===targetId);
   const validNew = newMaterial.trim().length>=2 && newMaterial.trim().length<=120 &&
@@ -67,11 +76,12 @@ export function PrintingStockPanel({rolls,inks,busy,execute,stockTab,setStockTab
   const amount = decimal(inkAmount);
   const validInk = inkAmount.trim()!=="" && Number.isFinite(amount) && amount>0 && amount<=100000 &&
     (inkEntry || amount<=inkBalance);
-  const close = () => { if (!busy) { setPanel(null); setTargetId(""); } };
-  const showPanel = (action:"new"|"adjust"|"label",roll?:PrintRoll) => {
+  const close = () => { if (!busy) { setPanel(null); setTargetId(""); setDeleteReason(""); setDeleteConfirmation(""); } };
+  const showPanel = (action:"new"|"adjust"|"label"|"delete",roll?:PrintRoll) => {
     if (busy) return;
     setPanel(action); setTargetId(roll?.id ?? "");
     if (action==="adjust" && roll) { setAdjustBalance(String(roll.remaining_length_m).replace(".",",")); setAdjustReason(""); }
+    if (action==="delete") { setDeleteReason(""); setDeleteConfirmation(""); }
   };
   const copyLabel = async () => {
     if (!target) return;
@@ -101,13 +111,13 @@ export function PrintingStockPanel({rolls,inks,busy,execute,stockTab,setStockTab
             </select></div>
           </div>
           <div role="group" aria-label="Filtrar bobinas" className="flex flex-wrap gap-2">
-            {([{key:"all",label:"Todas"},{key:"available",label:"Com saldo"},{key:"low",label:"Estoque baixo"},{key:"empty",label:"Esgotadas"}] as {key:RollFilter;label:string}[]).map(filter =>
+            {([...[{key:"all",label:"Todas"},{key:"available",label:"Com saldo"},{key:"low",label:"Estoque baixo"},{key:"empty",label:"Esgotadas"}],...(isAdmin?[{key:"archived",label:"Excluídas"}]:[])] as {key:RollFilter;label:string}[]).map(filter =>
               <Button key={filter.key} size="sm" variant={rollFilter===filter.key?"secondary":"outline"} aria-pressed={rollFilter===filter.key} onClick={()=>setRollFilter(filter.key)}>{filter.label}</Button>)}
           </div>
           {filtered.length===0 ? <div className="rounded-lg border border-dashed p-8 text-center">
-            <p className="text-sm text-muted-foreground">{rolls.length?"Nenhuma bobina corresponde à busca ou aos filtros.":"Nenhuma bobina cadastrada."}</p>
-            {!rolls.length && <Button className="mt-3" variant="outline" onClick={()=>showPanel("new")}>Cadastrar primeira bobina</Button>}
-            {rolls.length>0 && <Button className="mt-3" variant="outline" onClick={()=>{setQuery("");setRollFilter("all");}}>Limpar filtros</Button>}
+            <p className="text-sm text-muted-foreground">{activeCount?"Nenhuma bobina corresponde à busca ou aos filtros.":"Nenhuma bobina cadastrada."}</p>
+            {!activeCount && rollFilter!=="archived" && <Button className="mt-3" variant="outline" onClick={()=>showPanel("new")}>Cadastrar primeira bobina</Button>}
+            {activeCount>0 && <Button className="mt-3" variant="outline" onClick={()=>{setQuery("");setRollFilter("all");}}>Limpar filtros</Button>}
           </div> : <>
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-left text-sm">
@@ -117,7 +127,7 @@ export function PrintingStockPanel({rolls,inks,busy,execute,stockTab,setStockTab
                 <tbody>{filtered.map(roll=><tr key={roll.id} className="border-b last:border-0 hover:bg-muted/30">
                   <td className="p-3 font-semibold">{roll.code}</td><td className="max-w-60 p-3 break-words">{roll.material}</td><td className="p-3 tabular-nums">{fmt(Number(roll.width_cm),0)} cm</td>
                   <td className="min-w-36 p-3"><RollBalance roll={roll}/></td><td className="p-3"><RollStatus roll={roll}/></td>
-                  <td className="p-3"><div className="flex justify-end gap-1"><Button variant="ghost" size="sm" onClick={()=>showPanel("label",roll)}><Tag className="mr-1 h-4 w-4"/>Etiqueta</Button><Button variant="outline" size="sm" onClick={()=>showPanel("adjust",roll)}><Pencil className="mr-1 h-4 w-4"/>Ajustar</Button></div></td>
+                  <td className="p-3"><div className="flex justify-end gap-1"><Button variant="ghost" size="sm" onClick={()=>showPanel("label",roll)}><Tag className="mr-1 h-4 w-4"/>Etiqueta</Button><Button variant="outline" size="sm" disabled={Boolean(roll.archived_at)} onClick={()=>showPanel("adjust",roll)}><Pencil className="mr-1 h-4 w-4"/>Ajustar</Button>{isAdmin && !roll.archived_at && <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={()=>showPanel("delete",roll)}><Trash2 className="mr-1 h-4 w-4"/>Excluir</Button>}</div></td>
                 </tr>)}</tbody>
               </table>
             </div>
@@ -125,11 +135,11 @@ export function PrintingStockPanel({rolls,inks,busy,execute,stockTab,setStockTab
               {filtered.map(roll=><div key={roll.id} className="space-y-3 rounded-lg border p-4">
                 <div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{roll.code}</p><p className="text-sm">{roll.material}</p><p className="text-xs text-muted-foreground">{fmt(Number(roll.width_cm),0)} cm de largura</p></div><RollStatus roll={roll}/></div>
                 <RollBalance roll={roll}/>
-                <div className="flex gap-2"><Button className="flex-1" variant="outline" size="sm" onClick={()=>showPanel("label",roll)}><Tag className="mr-1 h-4 w-4"/>Etiqueta</Button><Button className="flex-1" variant="outline" size="sm" onClick={()=>showPanel("adjust",roll)}><Pencil className="mr-1 h-4 w-4"/>Ajustar</Button></div>
+                <div className="flex gap-2"><Button className="flex-1" variant="outline" size="sm" onClick={()=>showPanel("label",roll)}><Tag className="mr-1 h-4 w-4"/>Etiqueta</Button><Button className="flex-1" variant="outline" size="sm" disabled={Boolean(roll.archived_at)} onClick={()=>showPanel("adjust",roll)}><Pencil className="mr-1 h-4 w-4"/>Ajustar</Button>{isAdmin && !roll.archived_at && <Button variant="outline" size="sm" className="text-destructive" onClick={()=>showPanel("delete",roll)}><Trash2 className="h-4 w-4"/><span className="sr-only">Excluir {roll.code}</span></Button>}</div>
               </div>)}
             </div>
           </>}
-          <p className="text-xs text-muted-foreground">{filtered.length} de {rolls.length} bobinas exibidas. Estoque baixo: até 10 metros.</p>
+          <p className="text-xs text-muted-foreground">{filtered.length} bobinas exibidas · {activeCount} no estoque ativo. Estoque baixo: até 10 metros.</p>
         </CardContent>
       </Card>
     </section> : <section className="space-y-4" aria-labelledby="inks-heading">
@@ -173,8 +183,8 @@ export function PrintingStockPanel({rolls,inks,busy,execute,stockTab,setStockTab
     <Sheet open={panel!==null} onOpenChange={open=>{if(!open)close();}}>
       <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle>{panel==="new"?"Cadastrar nova bobina":panel==="adjust"?"Ajustar saldo de "+(target?.code??"bobina"):"Identificação de "+(target?.code??"bobina")}</SheetTitle>
-          <SheetDescription>{panel==="new"?"Cadastre a metragem física de uma nova bobina.":panel==="adjust"?"Conferência física com justificativa obrigatória.":"Informações para etiqueta da bobina."}</SheetDescription>
+          <SheetTitle>{panel==="new"?"Cadastrar nova bobina":panel==="adjust"?"Ajustar saldo de "+(target?.code??"bobina"):panel==="delete"?"Excluir "+(target?.code??"bobina"):"Identificação de "+(target?.code??"bobina")}</SheetTitle>
+          <SheetDescription>{panel==="new"?"Cadastre a metragem física de uma nova bobina.":panel==="adjust"?"Conferência física com justificativa obrigatória.":panel==="delete"?"Disponível exclusivamente para administradores. O histórico será preservado.":"Informações para etiqueta da bobina."}</SheetDescription>
         </SheetHeader>
         <div className="space-y-4 px-4 pb-6">
           {panel==="new" && <>
@@ -199,6 +209,32 @@ export function PrintingStockPanel({rolls,inks,busy,execute,stockTab,setStockTab
               void execute("roll-adjust-"+target.id,payload,id=>adjustPrintRoll({requestId:id,...payload}),()=>{setPanel(null);toast.success("Saldo ajustado e registrado no histórico.");});
             }}>{busy?<Loader2 className="mr-2 h-4 w-4 animate-spin"/>:<CheckCircle2 className="mr-2 h-4 w-4"/>}Salvar ajuste</Button></div>
           </>}
+          {panel==="delete" && target && isAdmin && !target.archived_at && <>
+            <div role="alert" className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+              <p className="flex items-center gap-2 font-semibold text-destructive"><AlertTriangle className="h-4 w-4"/>Excluir bobina do estoque ativo</p>
+              <p className="text-sm"><strong>{target.code}</strong> · {target.material}</p>
+              <p className="text-sm">Saldo atual: <strong>{fmt(Number(target.remaining_length_m))} m</strong></p>
+              <p className="text-xs text-muted-foreground">A bobina deixará de aparecer na seleção de impressão e não poderá receber novas baixas ou ajustes. Os registros anteriores continuarão disponíveis no histórico. Esta ação não ajusta o estoque de tinta.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="roll-delete-reason">Motivo da exclusão (obrigatório)</Label>
+              <textarea id="roll-delete-reason" rows={3} maxLength={500} value={deleteReason} onChange={event=>setDeleteReason(event.target.value)} disabled={busy} placeholder="Ex.: bobina cadastrada incorretamente" className="w-full rounded-md border border-input bg-background p-3 text-sm"/>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="roll-delete-confirmation">Digite {target.code} para confirmar</Label>
+              <Input id="roll-delete-confirmation" value={deleteConfirmation} onChange={event=>setDeleteConfirmation(event.target.value)} disabled={busy} autoComplete="off" placeholder={target.code}/>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={close} disabled={busy}>Cancelar</Button>
+              <Button variant="destructive" disabled={busy || deleteConfirmation.trim()!==target.code || deleteReason.trim().length<3} onClick={()=>{
+                const payload={rollId:target.id,reason:deleteReason.trim()};
+                void execute("roll-archive-"+target.id,payload,id=>archivePrintRoll({requestId:id,...payload}),()=>{
+                  setPanel(null);setDeleteReason("");setDeleteConfirmation("");setRollFilter("all");
+                  toast.success("Bobina excluída do estoque ativo. Histórico preservado.");
+                });
+              }}>{busy?<Loader2 className="mr-2 h-4 w-4 animate-spin"/>:<Trash2 className="mr-2 h-4 w-4"/>}Confirmar exclusão</Button>
+            </div>
+          </>}
           {panel==="label" && target && <>
             <div className="space-y-2 rounded-lg border border-dashed p-5 text-center">
               <p className="text-xs font-semibold">EVOLUÇÃO · IMPRESSÃO</p>
@@ -215,6 +251,7 @@ export function PrintingStockPanel({rolls,inks,busy,execute,stockTab,setStockTab
 }
 function RollStatus({roll}:{roll:PrintRoll}) {
   const status=rollStatus(roll);
+  if (roll.archived_at) return <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">Excluída</span>;
   return <span className={"inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium " + (status==="low"?"bg-amber-500/10 text-amber-700 dark:text-amber-400":status==="empty"?"bg-muted text-muted-foreground":"bg-emerald-500/10 text-emerald-700 dark:text-emerald-400")}>
     {status==="low" && <AlertTriangle className="h-3 w-3"/>}{status==="empty"?"Esgotada":status==="low"?"Estoque baixo":"Disponível"}
   </span>;
