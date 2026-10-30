@@ -7,7 +7,7 @@ const fail = (error: { message: string } | null) => {
 export async function loadPrintStock() {
   const [r,i,e] = await Promise.all([
     supabase.from("print_inventory_rolls")
-      .select("id,code,material,width_cm,initial_length_m,remaining_length_m,created_at")
+      .select("id,code,material,width_cm,initial_length_m,remaining_length_m,created_at,archived_at,archived_reason")
       .order("created_at",{ascending:false}),
     supabase.from("print_inventory_inks").select("color,balance_ml").order("color"),
     supabase.from("print_inventory_events")
@@ -112,4 +112,16 @@ export async function loadPrintHistory(filters: PrintHistoryFilter): Promise<{ r
     .range(from, from + pageSize - 1);
   fail(error);
   return { rows: (data ?? []) as (StockEvent & { created_by: string })[], count: count ?? 0 };
+}
+
+/** Remove a roll from active inventory without deleting historical movements.
+ * Authorization is enforced by the admin-only RPC on the server.
+ */
+export async function archivePrintRoll(input: { requestId: string; rollId: string; reason: string }) {
+  const { error } = await supabase.rpc("print_inventory_archive_roll", {
+    p_request_id: input.requestId,
+    p_roll_id: input.rollId,
+    p_reason: input.reason,
+  });
+  fail(error);
 }
