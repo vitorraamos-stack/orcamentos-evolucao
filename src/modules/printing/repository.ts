@@ -87,7 +87,7 @@ export type PrintHistoryFilter = {
 
 export async function loadPrintHistory(filters: PrintHistoryFilter): Promise<{ rows: (StockEvent & { created_by: string })[]; count: number }> {
   const { page, pageSize, type, since, rolls } = filters;
-  const safe = (filters.search ?? "").trim().replace(/[^\\p{L}\\p{N}\\s-]/gu, "").slice(0, 50);
+  const safe = (filters.search ?? "").trim().replace(/[^0-9A-Za-zÀ-ÿ -]/g, "").slice(0, 50);
   let query = supabase
     .from("print_inventory_events")
     .select("id,kind,roll_id,color,delta_m,delta_ml,os_ref,reason,created_at,created_by", { count: "exact" });
@@ -100,7 +100,7 @@ export async function loadPrintHistory(filters: PrintHistoryFilter): Promise<{ r
     for (const [name, code] of [["ciano", "C"], ["magenta", "M"], ["amarelo", "Y"], ["preto", "K"]]) {
       if (name.includes(safe.toLocaleLowerCase("pt-BR"))) matchingColors.push(code);
     }
-    const clauses = ["os_ref.ilike.%" + safe.replace(/\\s+/g, "%") + "%"];
+    const clauses = ["os_ref.ilike.%" + safe.replace(/ +/g, "%") + "%"];
     if (matchingRolls.length) clauses.push("roll_id.in.(" + matchingRolls.join(",") + ")");
     if (matchingColors.length) clauses.push("color.in.(" + matchingColors.join(",") + ")");
     query = query.or(clauses.join(","));
