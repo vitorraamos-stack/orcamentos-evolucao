@@ -62,7 +62,7 @@ describe("EvoluSystem OS tabs — reliable loading and error recovery", () => {
       "<OrderDeliverySummary delivery={delivery} />",
       "<OrderPickupSummary pickup={pickup} />",
     ]) expect(logistics).toContain(fragment);
-    expect(detail).toContain("onValueChange={loadTab}");
+    expect(detail).toContain("onValueChange={selectTab}");
     expect(detail).toContain("hubPermissions.isManager");
     expect((detail.match(/<TabsTrigger className="evolu-detail__tab"/g) ?? []).length).toBe(7);
   });
@@ -85,7 +85,7 @@ describe("EvoluSystem OS tabs — reliable loading and error recovery", () => {
   });
 
   it("does not duplicate responsibility or deadline cards outside Resumo", () => {
-    const summary = detail.indexOf('value="summary"><OrderSummaryTab');
+    const summary = detail.indexOf('value="summary">');
     const management = detail.indexOf('aria-label="Responsáveis e prazos"');
     const items = detail.indexOf('value="items"><OrderItemsTab');
     expect(summary).toBeGreaterThan(-1);
@@ -103,7 +103,7 @@ describe("EvoluSystem OS tabs — reliable loading and error recovery", () => {
     expect(detail).toContain("coordinator.activate(orderId ?? null)");
     expect(detail).toContain("setItems(state<OrderItem[]>([]))");
     expect(detail).toContain("setComments(state<OrderComment[]>([]))");
-    expect(detail).toContain('key={orderId} defaultValue="summary"');
+    expect(detail).toContain('key={orderId} value={activeTab}');
     expect(detail).toContain("detail.order.id !== orderId");
   });
 

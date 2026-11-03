@@ -419,3 +419,19 @@
 .dark .evolu-detail__tab[data-state="active"] {
   box-shadow: inset 0 -2px 0 var(--primary);
 }
+
+/* Positions preceding the current stage are not proof of completion. */
+.evolu-detail__stage-bubble--earlier {
+  border-color: var(--detail-border);
+  background: var(--muted);
+  color: var(--detail-muted);
+}
+.dark .evolu-detail__stage-bubble--earlier {
+  border-color: var(--border);
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+.evolu-detail__summary-columns > * { min-width: 0; }
+.evolu-detail__summary-columns .evolu-detail__management-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
