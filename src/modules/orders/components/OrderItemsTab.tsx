@@ -29,10 +29,11 @@ type Props = {
   onUpdate: (id: string, input: Partial<OrderItem>, expectedUpdatedAt: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onMove: (index: number, direction: -1 | 1) => Promise<void>;
+  onUnsavedChange?: (dirty: boolean) => void;
 };
 
 export function OrderItemsTab({
-  items, loading, error, onRetry, canEdit, onCreate, onUpdate, onRemove, onMove,
+  items, loading, error, onRetry, canEdit, onCreate, onUpdate, onRemove, onMove, onUnsavedChange,
 }: Props) {
   const [dialog, setDialog] = useState<"create" | "edit" | null>(null);
   const [selected, setSelected] = useState<OrderItem | null>(null);
@@ -147,6 +148,7 @@ export function OrderItemsTab({
         item={selected}
         sortOrder={items.length}
         onSave={value => selected ? onUpdate(selected.id, value, selected.updated_at) : onCreate(value)}
+        onDirtyChange={onUnsavedChange}
       />
       <AlertDialog open={Boolean(removing)} onOpenChange={open => !open && setRemoving(null)}>
         <AlertDialogContent>

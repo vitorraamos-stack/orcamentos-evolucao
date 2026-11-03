@@ -33,7 +33,7 @@ describe("EvoluSystem — OS detail premium visual contract", () => {
     expect(summaryIndex).toBeGreaterThan(tabsListEnd);
     expect(tabsClose).toBeGreaterThan(summaryIndex);
     const summaryEnd = detail.indexOf("</TabsContent>", summaryIndex);
-    const itemsStart = detail.indexOf('<TabsContent className="evolu-detail__tab-content" value="items">');
+    const itemsStart = detail.indexOf('<TabsContent forceMount className="evolu-detail__tab-content" value="items">');
 
     expect(managementIndex).toBeGreaterThan(summaryIndex);
     expect(managementIndex).toBeLessThan(summaryEnd);

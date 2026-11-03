@@ -6,7 +6,7 @@ const page = readFileSync(new URL("../pages/OrderDetailPage.tsx", import.meta.ur
 
 describe("OS item save error regression contracts", () => {
   it("keeps the draft and dialog open when saving rejects", () => {
-    expect(dialog).toContain('await onSave(parsed.data as OrderItemInput); onOpenChange(false);');
+    expect(dialog).toContain('await onSave(parsed.data as OrderItemInput); onDirtyChange?.(false); onOpenChange(false);');
     expect(dialog).toContain('catch (saveError)');
     expect(dialog).toContain('setError(saveError instanceof Error ? saveError.message');
     expect(dialog).toContain('finally { setSaving(false); }');

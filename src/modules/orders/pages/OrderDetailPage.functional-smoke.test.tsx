@@ -102,7 +102,7 @@ describe("EvoluSystem — OS seven-tab fixture-based functional smoke", () => {
       expect(page).toContain('<TabsContent className="evolu-detail__tab-content');
     }
     expect((page.match(/<TabsTrigger className="evolu-detail__tab"/g) ?? [])).toHaveLength(7);
-    expect((page.match(/<TabsContent className="evolu-detail__tab-content/g) ?? [])).toHaveLength(7);
+    expect((page.match(/<TabsContent(?: forceMount)? className="evolu-detail__tab-content/g) ?? [])).toHaveLength(7);
     expect(page).toContain("onValueChange={loadTab}");
     expect(page).toContain("config.current.loaded && !config.current.error");
   });
