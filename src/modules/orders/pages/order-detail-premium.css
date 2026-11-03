@@ -187,7 +187,7 @@
 }
 .evolu-detail__section-heading p {
   margin-top: 4px;
-  color: #8596a9;
+  color: #4b6178;
   font-size: 12px;
 }
 .evolu-detail__current-stage {
@@ -195,7 +195,7 @@
   border-radius: 99px;
   background: #f0f8fe;
   padding: 7px 11px;
-  color: #087db8;
+  color: #07577f;
   font-size: 11px;
   font-weight: 750;
 }
@@ -434,4 +434,14 @@
 .evolu-detail__summary-columns > * { min-width: 0; }
 .evolu-detail__summary-columns .evolu-detail__management-grid {
   grid-template-columns: minmax(0, 1fr);
+}
+
+
+/* WCAG AA: primary actions within OS details must contrast with white text. */
+.evolu-detail .bg-primary.text-primary-foreground {
+  background-color: #075e8b;
+  color: #fff;
+}
+.evolu-detail .bg-primary.text-primary-foreground:hover {
+  background-color: #054769;
 }
