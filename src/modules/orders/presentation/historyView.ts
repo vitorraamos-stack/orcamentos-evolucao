@@ -12,6 +12,12 @@ export const dayKey = (utc: string): string | null => {
   const part = (type: string) => parts.find(value => value.type === type)?.value ?? "";
   return `${part("year")}-${part("month")}-${part("day")}`;
 };
+export const formatHistoryDay = (utc: string): string | null => {
+  const key = dayKey(utc);
+  if (!key) return null;
+  const [year, month, day] = key.split("-");
+  return `${day}/${month}/${year}`;
+};
 export function filterHistory<T extends TimeStampedActivity>(entries: readonly T[], query: string, filter: HistoryFilter, description: (entry: T) => string): T[] {
   const normalized = query.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").trim();
   return entries.filter(entry => {

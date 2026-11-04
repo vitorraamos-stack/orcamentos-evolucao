@@ -58,7 +58,8 @@
   ],
   "git": {
     "deploymentEnabled": {
-      "feat/os-detail-uxui-integrated-20261030": false
+      "feat/os-detail-uxui-integrated-20261030": false,
+      "fix/os-history-ptbr-20261104": false
     }
   }
 }

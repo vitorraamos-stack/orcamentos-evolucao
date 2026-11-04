@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { OrderActivity } from "../types/orderDetail";
-import { dayKey, filterHistory, type HistoryFilter } from "../presentation/historyView";
+import { dayKey, formatHistoryDay, filterHistory, type HistoryFilter } from "../presentation/historyView";
 import { Button } from "@/components/ui/button";
 import {
   WORK_CENTER_LABELS,
@@ -151,7 +151,7 @@ export function OrderHistoryTab({
     <ol aria-label="Linha do tempo da OS" className="relative ml-2 space-y-3 border-l border-border pl-6">
       {filtered.map((activity, index) => (
         <li key={activity.id} className="relative min-w-0 rounded-xl border bg-card p-4">
-          {(index === 0 || dayKey(filtered[index - 1].created_at) !== dayKey(activity.created_at)) && <h3 className="mb-3 border-b pb-2 text-xs font-semibold text-muted-foreground">{dayKey(activity.created_at) ?? "Data não identificada"}</h3>}
+          {(index === 0 || dayKey(filtered[index - 1].created_at) !== dayKey(activity.created_at)) && <h3 className="mb-3 border-b pb-2 text-xs font-semibold text-muted-foreground">{formatHistoryDay(activity.created_at) ?? "Data não identificada"}</h3>}
           <span
             aria-hidden="true"
             className="absolute -left-[31px] top-5 size-3 rounded-full border-2 border-background bg-primary"
