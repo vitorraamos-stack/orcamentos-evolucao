@@ -4,6 +4,13 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* A slightly larger readable scale without enlarging rem-based layout gaps. */
+  --text-xs: 0.8125rem; /* 13px instead of 12px */
+  --text-xs--line-height: 1.45;
+  --text-sm: 0.9375rem; /* 15px instead of 14px */
+  --text-sm--line-height: 1.5;
+  --text-base: 1.0625rem; /* 17px instead of 16px */
+  --text-base--line-height: 1.5;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -125,6 +132,7 @@
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    font-size: 17px;
   }
   /* Typography overrides */
   h1,

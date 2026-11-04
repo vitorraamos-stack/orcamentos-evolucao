@@ -99,7 +99,7 @@ export default function Layout({ children }: LayoutProps) {
   ];
 
   const SectionLabel = ({ children }: { children: React.ReactNode }) => (
-    <h2 className="evolu-nav__section px-3 pb-2 pt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/55">
+    <h2 className="evolu-nav__section px-3 pb-2 pt-3 font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/55">
       {children}
     </h2>
   );

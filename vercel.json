@@ -58,7 +58,8 @@
   ],
   "git": {
     "deploymentEnabled": {
-      "feat/os-detail-uxui-integrated-20261030": false
+      "feat/os-detail-uxui-integrated-20261030": false,
+      "feat/system-typography-readability-20261104": false
     }
   }
 }
