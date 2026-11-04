@@ -30,6 +30,19 @@ describe("EvoluSystem OS activity timeline", () => {
     expect(source).not.toContain("activities.reverse");
   });
 
+  it("formats timeline day headers in pt-BR while grouping by São Paulo calendar day", () => {
+    const html = view([
+      activity({ id: "one", created_at: "2026-10-15T01:20:00Z" }),
+      activity({ id: "two", created_at: "2026-10-14T15:35:00Z" }),
+      activity({ id: "three", created_at: "2026-10-13T22:00:00Z" }),
+    ]);
+    expect(html).toMatch(/<h3[^>]*>14\/10\/2026<\/h3>/);
+    expect(html).toMatch(/<h3[^>]*>13\/10\/2026<\/h3>/);
+    expect((html.match(/<h3 /g) ?? []).length).toBe(2);
+    expect(html.indexOf("14/10/2026")).toBeLessThan(html.indexOf("13/10/2026"));
+    expect(source).toContain("dayKey(filtered[index - 1].created_at)");
+  });
+
   it("displays timestamp, author and event text without truncation", () => {
     const html = view([activity({
       type: "status_change",
