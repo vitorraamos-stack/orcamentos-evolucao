@@ -10,22 +10,22 @@ const primitives = read("./evolusystem-primitives.css");
 
 describe("EvoluSystem readable typography scale", () => {
   it("increases small and base text without increasing the HTML root and layout spacing", () => {
-    expect(globalStyles).toContain("--text-xs: 0.8125rem");
-    expect(globalStyles).toContain("--text-sm: 0.9375rem");
-    expect(globalStyles).toContain("--text-base: 1.0625rem");
+    expect(globalStyles).toContain("--text-xs: 0.875rem");
+    expect(globalStyles).toContain("--text-sm: 1rem");
+    expect(globalStyles).toContain("--text-base: 1.125rem");
     expect(globalStyles).toContain("--text-xs--line-height: 1.45");
     expect(globalStyles).toContain("--text-sm--line-height: 1.5");
-    expect(globalStyles).toContain("font-size: 17px");
+    expect(globalStyles).toContain("font-size: 18px");
     expect(globalStyles).not.toMatch(/html\s*\{[^}]*font-size:/);
   });
 
   it("makes the navigation and dashboard labels easier to read without touching module permissions", () => {
-    expect(shell).toMatch(/\.evolu-shell__navigation \.evolu-nav__section\s*\{[^}]*font-size:12px/);
-    expect(shell).toMatch(/\.evolu-shell__navigation \.evolu-nav__item\s*\{[^}]*font-size:14px/s);
-    expect(dashboard).toContain("font-size:12px; font-weight:750");
-    expect(dashboard).toContain(".evolu-dashboard__filter { font-size:14px");
-    expect(dashboard).toContain(".evolu-dashboard__panel h2 { color:#1a2f4a; font-size:16px");
-    expect(primitives).toMatch(/\.evolu-ui-filter-control\s*\{[^}]*font-size: 14px/s);
+    expect(shell).toMatch(/\.evolu-shell__navigation \.evolu-nav__section\s*\{[^}]*font-size:13px/);
+    expect(shell).toMatch(/\.evolu-shell__navigation \.evolu-nav__item\s*\{[^}]*font-size:15px/s);
+    expect(dashboard).toContain("font-size:13px; font-weight:750");
+    expect(dashboard).toContain(".evolu-dashboard__filter { font-size:15px");
+    expect(dashboard).toContain(".evolu-dashboard__panel h2 { color:#1a2f4a; font-size:17px");
+    expect(primitives).toMatch(/\.evolu-ui-filter-control\s*\{[^}]*font-size: 15px/s);
     expect(layout).toContain("getOperationalNavState(location)");
     expect(layout).toContain('hasModuleAccess("hub_os")');
   });

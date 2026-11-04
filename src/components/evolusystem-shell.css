@@ -6,10 +6,10 @@
 .evolu-shell__brand-name { margin-top:0; color:white; font-size:26px; font-weight:800; letter-spacing:-.055em; line-height:1.1; }
 .evolu-shell__brand-name span { color:#31b6f5; }
 .evolu-shell__navigation { scrollbar-color:#395979 transparent; scrollbar-width:thin; }
-.evolu-shell__navigation .evolu-nav__section { color:#8aa9c9; font-size:12px; letter-spacing:.14em; }
+.evolu-shell__navigation .evolu-nav__section { color:#8aa9c9; font-size:13px; letter-spacing:.14em; }
 .evolu-shell__navigation .evolu-nav__item {
   min-height:42px; height:auto; padding:9px 12px; border-radius:10px; background:transparent;
-  color:#c7d6e5; font-size:14px; line-height:1.4; font-weight:520; transition: color .16s ease, background-color .16s ease;
+  color:#c7d6e5; font-size:15px; line-height:1.4; font-weight:520; transition: color .16s ease, background-color .16s ease;
 }
 .evolu-shell__navigation .evolu-nav__item:hover,
 .evolu-shell__navigation .evolu-nav__item:focus-visible { background:rgba(91,150,207,.16); color:white; }
