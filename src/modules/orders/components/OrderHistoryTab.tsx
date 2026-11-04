@@ -1,4 +1,6 @@
+import { useState } from "react";
 import type { OrderActivity } from "../types/orderDetail";
+import { dayKey, filterHistory, type HistoryFilter } from "../presentation/historyView";
 import { Button } from "@/components/ui/button";
 import {
   WORK_CENTER_LABELS,
@@ -105,13 +107,17 @@ export function OrderHistoryTab({
   activities,
   loading,
   error,
-  onRetry,
+  onRetry, hasMore = false, onLoadMore, loadingMore = false,
 }: {
   activities: OrderActivity[];
   loading: boolean;
   error: string | null;
   onRetry?: () => void;
+  hasMore?: boolean; onLoadMore?: () => void; loadingMore?: boolean;
 }) {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<HistoryFilter>("all");
+  const filtered = filterHistory(activities, search, filter, formatOrderActivity);
   if (loading) {
     return (
       <p role="status" className="text-sm text-muted-foreground">
@@ -135,14 +141,17 @@ export function OrderHistoryTab({
 
   return (
     <div className="space-y-3">
-    {activities.length >= 100 && (
+    {hasMore && (
       <p role="note" className="text-xs text-muted-foreground">
-        Exibindo os 100 eventos mais recentes da OS.
+        Há registros anteriores disponíveis para carregar.
       </p>
     )}
+    <div className="flex flex-wrap gap-2"><input type="search" aria-label="Pesquisar histórico" className="min-h-11 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm" placeholder="Pesquisar acontecimentos" value={search} onChange={event => setSearch(event.target.value)} /><select aria-label="Filtrar histórico" className="min-h-11 rounded-md border bg-background px-3 text-sm" value={filter} onChange={event => setFilter(event.target.value as HistoryFilter)}><option value="all">Todos</option><option value="stages">Etapas</option><option value="updates">Alterações</option></select></div>
+    {!filtered.length && <p role="status" className="text-sm text-muted-foreground">Nenhum evento corresponde aos filtros.</p>}
     <ol aria-label="Linha do tempo da OS" className="relative ml-2 space-y-3 border-l border-border pl-6">
-      {activities.map(activity => (
+      {filtered.map((activity, index) => (
         <li key={activity.id} className="relative min-w-0 rounded-xl border bg-card p-4">
+          {(index === 0 || dayKey(filtered[index - 1].created_at) !== dayKey(activity.created_at)) && <h3 className="mb-3 border-b pb-2 text-xs font-semibold text-muted-foreground">{dayKey(activity.created_at) ?? "Data não identificada"}</h3>}
           <span
             aria-hidden="true"
             className="absolute -left-[31px] top-5 size-3 rounded-full border-2 border-background bg-primary"
@@ -163,6 +172,7 @@ export function OrderHistoryTab({
         </li>
       ))}
     </ol>
+    {hasMore && onLoadMore && <Button type="button" variant="outline" className="min-h-11 w-full" disabled={loadingMore} onClick={onLoadMore}>{loadingMore ? "Carregando…" : "Carregar registros anteriores"}</Button>}
     </div>
   );
 }

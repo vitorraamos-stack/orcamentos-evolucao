@@ -67,7 +67,7 @@ describe("EvoluSystem OS files", () => {
     expect(view([], { loading: true })).toContain("Carregando arquivos");
     expect(view([], { error: "Não foi possível carregar." })).toContain('role="alert"');
     expect(view([], { error: "Falha na rede", retry: true })).toContain("Tentar novamente");
-    expect(view([])).toContain("Nenhum arquivo disponível.");
+    expect(view([])).toContain("Nenhum arquivo disponível nesta OS.");
     expect(view([asset])).not.toContain("Excluir");
     expect(view([asset])).not.toContain("Enviar arquivo");
   });

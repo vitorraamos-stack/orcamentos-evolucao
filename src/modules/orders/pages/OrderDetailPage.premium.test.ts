@@ -10,7 +10,7 @@ describe("EvoluSystem — OS detail premium visual contract", () => {
     expect(detail).toContain('href="/os"');
     expect(detail).toContain("Voltar à Central de OS");
     expect(detail).toContain('aria-label="Caminho"');
-    expect(detail).toContain('onValueChange={loadTab}');
+    expect(detail).toContain('onValueChange={selectTab}');
     expect((detail.match(/<TabsTrigger className="evolu-detail__tab"/g) ?? []).length).toBe(7);
     for (const section of ["summary", "items", "production", "installation", "files", "comments", "history"]) {
       expect(detail).toContain('value="' + section + '"');
@@ -33,7 +33,7 @@ describe("EvoluSystem — OS detail premium visual contract", () => {
     expect(summaryIndex).toBeGreaterThan(tabsListEnd);
     expect(tabsClose).toBeGreaterThan(summaryIndex);
     const summaryEnd = detail.indexOf("</TabsContent>", summaryIndex);
-    const itemsStart = detail.indexOf('<TabsContent className="evolu-detail__tab-content" value="items">');
+    const itemsStart = detail.indexOf('<TabsContent forceMount className="evolu-detail__tab-content" value="items">');
 
     expect(managementIndex).toBeGreaterThan(summaryIndex);
     expect(managementIndex).toBeLessThan(summaryEnd);
@@ -74,6 +74,15 @@ describe("EvoluSystem — OS detail premium visual contract", () => {
     expect(header).toContain("canManage && onArchive && onDelete &&");
     expect(header).toContain("calculateOrderRisk(order)");
     expect(header).toContain("isOrderUrgent(order)");
+  });
+
+  it("shows the Conta Azul official number and truthful placeholders", () => {
+    expect(detail).toContain("formatOfficialOsLabel(detail.order.sale_number)");
+    expect(header).toContain("formatOfficialOsLabel(order.sale_number)");
+    expect(detail).not.toContain("detail.order.os_number");
+    expect(header).not.toContain("order.os_number");
+    expect(header).toContain("Cliente não informado");
+    expect(header).toContain("Serviço não informado");
   });
 
   it("uses canonical operational stages and marks the current one accessibly", () => {

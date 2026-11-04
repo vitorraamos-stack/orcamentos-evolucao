@@ -8,6 +8,7 @@ import { OrderItemsTab } from "./OrderItemsTab";
 
 const itemsSource = readFileSync(new URL("./OrderItemsTab.tsx", import.meta.url), "utf8");
 const editorSource = readFileSync(new URL("./OrderItemDialog.tsx", import.meta.url), "utf8");
+const inlineEditorSource = readFileSync(new URL("./OrderItemInlineEditor.tsx", import.meta.url), "utf8");
 const pageSource = readFileSync(new URL("../pages/OrderDetailPage.tsx", import.meta.url), "utf8");
 
 const createItem = (changes: Partial<OrderItem> = {}): OrderItem => ({
@@ -103,7 +104,8 @@ describe("EvoluSystem OS item readability", () => {
     expect(withoutRetry).not.toContain("Nenhum item estruturado");
   });
   it("passes the timestamp of the item opened for editing into the guarded save", () => {
-    expect(itemsSource).toContain("onUpdate(selected.id, value, selected.updated_at)");
+    expect(itemsSource).toContain("onSave={onUpdate}");
+    expect(inlineEditorSource).toContain("await onSave(item.id, parsed.data, revision.current)");
     expect(pageSource).toContain("updateOrderItemIfUnchanged(id, input, expectedUpdatedAt)");
     expect(pageSource).toContain("const updated = await updateOrderItemIfUnchanged");
   });

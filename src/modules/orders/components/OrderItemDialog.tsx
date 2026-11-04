@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -14,16 +14,34 @@ export type OrderItemInput = {
 };
 const empty = (sort_order: number): OrderItemInput => ({ name: "", description: null, quantity: 1, width_cm: null, height_cm: null, unit: "un", notes: null, status: "PENDING", sort_order });
 
-export function OrderItemDialog({ open, onOpenChange, item, sortOrder, onSave }: { open: boolean; onOpenChange: (value: boolean) => void; item?: OrderItem | null; sortOrder: number; onSave: (value: OrderItemInput) => Promise<void> }) {
+export function OrderItemDialog({ open, onOpenChange, item, sortOrder, onSave, onDirtyChange }: { open: boolean; onOpenChange: (value: boolean) => void; item?: OrderItem | null; sortOrder: number; onSave: (value: OrderItemInput) => Promise<void>; onDirtyChange?: (dirty: boolean) => void }) {
   const [value, setValue] = useState<OrderItemInput>(empty(sortOrder));
+  const baseline = useRef<OrderItemInput>(empty(sortOrder));
   const [error, setError] = useState<string | null>(null); const [saving, setSaving] = useState(false);
-  useEffect(() => { setValue(item ? { name: item.name, description: item.description, quantity: item.quantity, width_cm: item.width_cm, height_cm: item.height_cm, unit: item.unit, notes: item.notes, status: item.status, sort_order: item.sort_order } : empty(sortOrder)); setError(null); }, [item, open, sortOrder]);
+  const dirty = open && JSON.stringify(value) !== JSON.stringify(baseline.current);
+  useEffect(() => {
+    if (!open) { onDirtyChange?.(false); return; }
+    const next = item ? { name: item.name, description: item.description, quantity: item.quantity, width_cm: item.width_cm, height_cm: item.height_cm, unit: item.unit, notes: item.notes, status: item.status, sort_order: item.sort_order } : empty(sortOrder);
+    baseline.current = next;
+    setValue(next);
+    setError(null);
+  // Switching the item or opening a new dialog resets the baseline, but incoming
+  // updates to the same item must not erase unsaved form fields.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item?.id, open]);
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
+  const requestClose = (nextOpen: boolean) => {
+    if (nextOpen) { onOpenChange(true); return; }
+    if (saving || (dirty && !window.confirm("Descartar as alterações não salvas deste item?"))) return;
+    onDirtyChange?.(false);
+    onOpenChange(false);
+  };
   const number = (field: "quantity" | "width_cm" | "height_cm", raw: string) => setValue(current => ({ ...current, [field]: raw === "" ? null : Number(raw) } as OrderItemInput));
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>{item ? "Editar item" : "Adicionar item"}</DialogTitle></DialogHeader><div className="grid gap-4">
+  return <Dialog open={open} onOpenChange={requestClose}><DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>{item ? "Editar item" : "Adicionar item"}</DialogTitle></DialogHeader><div className="grid gap-4">
     <div><Label htmlFor="item-name">Nome</Label><Input id="item-name" value={value.name} maxLength={160} onChange={e => setValue(v => ({ ...v, name: e.target.value }))} /></div>
     <div><Label htmlFor="item-description">Descrição</Label><Textarea id="item-description" value={value.description ?? ""} maxLength={4000} onChange={e => setValue(v => ({ ...v, description: e.target.value || null }))} /></div>
     <div className="grid gap-4 sm:grid-cols-3"><div><Label>Quantidade</Label><Input type="number" min="0.001" step="0.001" value={value.quantity ?? ""} onChange={e => number("quantity", e.target.value)} /></div><div><Label>Largura (cm)</Label><Input type="number" min="0.001" step="0.001" value={value.width_cm ?? ""} onChange={e => number("width_cm", e.target.value)} /></div><div><Label>Altura (cm)</Label><Input type="number" min="0.001" step="0.001" value={value.height_cm ?? ""} onChange={e => number("height_cm", e.target.value)} /></div></div>
     <div className="grid gap-4 sm:grid-cols-2"><div><Label>Unidade</Label><Input value={value.unit} maxLength={30} onChange={e => setValue(v => ({ ...v, unit: e.target.value }))} /></div><div><Label>Status</Label><Select value={value.status} onValueChange={status => setValue(v => ({ ...v, status: status as OrderItemStatus }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="PENDING">Pendente</SelectItem><SelectItem value="IN_PROGRESS">Em andamento</SelectItem><SelectItem value="READY">Pronto</SelectItem><SelectItem value="CANCELLED">Cancelado</SelectItem></SelectContent></Select></div></div>
     <div><Label htmlFor="item-notes">Observações</Label><Textarea id="item-notes" value={value.notes ?? ""} maxLength={4000} onChange={e => setValue(v => ({ ...v, notes: e.target.value || null }))} /></div>{error && <p className="text-sm text-destructive">{error}</p>}
-  </div><DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button disabled={saving} onClick={async () => { const parsed = itemInputSchema.safeParse(value); if (!parsed.success) { setError(parsed.error.issues[0]?.message ?? "Revise os campos."); return; } setSaving(true); try { setError(null); await onSave(parsed.data as OrderItemInput); onOpenChange(false); } catch (saveError) { setError(saveError instanceof Error ? saveError.message : "Não foi possível salvar o item. Tente novamente."); } finally { setSaving(false); } }}>{saving ? "Salvando…" : "Salvar"}</Button></DialogFooter></DialogContent></Dialog>;
+  </div><DialogFooter><Button variant="outline" disabled={saving} onClick={() => requestClose(false)}>Cancelar</Button><Button disabled={saving} onClick={async () => { const parsed = itemInputSchema.safeParse(value); if (!parsed.success) { setError(parsed.error.issues[0]?.message ?? "Revise os campos."); return; } setSaving(true); try { setError(null); await onSave(parsed.data as OrderItemInput); onDirtyChange?.(false); onOpenChange(false); } catch (saveError) { setError(saveError instanceof Error ? saveError.message : "Não foi possível salvar o item. Tente novamente."); } finally { setSaving(false); } }}>{saving ? "Salvando…" : "Salvar"}</Button></DialogFooter></DialogContent></Dialog>;
 }

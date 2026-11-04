@@ -11,6 +11,7 @@ import {
 import { CalendarDays, ChevronDown, MapPinned, Pencil, UserRound } from "lucide-react";
 import { isOrderUrgent } from "@/features/hubos/orderUrgency";
 import { OrderActionsMenu } from "./OrderActionsMenu";
+import { formatOfficialOsLabel } from "../orderOfficialNumber";
 
 const date = (value: string | null) =>
   value
@@ -52,13 +53,13 @@ export function OrderHeader({
             Ordem de serviço
           </p>
           <p className="evolu-detail__number">
-            OS #{order.os_number ?? order.sale_number}
+            {formatOfficialOsLabel(order.sale_number)}
           </p>
           <h1 className="evolu-detail__client break-words">
-            {order.client_name}
+            {order.client_name || "Cliente não informado"}
           </h1>
           <p className="evolu-detail__service break-words">
-            {order.title || order.description || "Sem título"}
+            {order.title || order.description || "Serviço não informado"}
           </p>
           <div className="evolu-detail__badges flex flex-wrap items-center gap-2">
             <Badge>{getOperationalStatusLabel(order.prod_status || order.art_status)}</Badge>
