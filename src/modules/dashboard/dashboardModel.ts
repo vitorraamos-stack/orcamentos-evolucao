@@ -68,7 +68,7 @@ export function buildDashboardOverview(rows: readonly DashboardOrder[], now: Dat
   for (const order of rows) {
     if (!isOrderFinished(order)) unique.set(order.id, order);
   }
-  const active = [...unique.values()];
+  const active = Array.from(unique.values());
   const ranked: DashboardPriority[] = active.map(order => ({
     order,
     ...dashboardPriorityReason(order, now),
