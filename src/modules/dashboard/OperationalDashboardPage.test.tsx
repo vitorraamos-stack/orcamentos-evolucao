@@ -3,99 +3,73 @@ import { describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
 
 vi.mock("@/lib/supabase", () => ({ supabase: {} }));
+vi.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({
+    hubPermissions: {
+      canViewArteBoard: true, canViewProducaoBoard: false,
+      canViewInstallations: false, canViewDeliveries: false,
+    },
+  }),
+}));
 
+import { buildDashboardOverview, type DashboardOrder } from "./dashboardModel";
 import { OperationalDashboardSections } from "./OperationalDashboardPage";
 
-describe("OperationalDashboardSections", () => {
-  it("renders the 12 cards with their canonical metric values", () => {
+const sample: DashboardOrder = {
+  id: "11111111-1111-4111-8111-111111111111",
+  sale_number: "123", client_name: "Cliente Exemplo", title: "Letreiro",
+  delivery_date: "2026-11-05", updated_at: "2026-11-05T12:00:00Z",
+  prod_status: "Produção", art_status: "Produzir", production_tag: "EM_PRODUCAO",
+  archived: false, is_urgent: false, art_direction_tag: null, logistic_type: "instalacao",
+};
+
+describe("Dashboard Etapa 1 — interface", () => {
+  const overview = buildDashboardOverview([sample], new Date("2026-11-05T15:00:00Z"));
+
+  it("renders the approved four indicators and one prioritized OS", () => {
     const html = renderToStaticMarkup(
-      <Router ssrPath="/">
-        <OperationalDashboardSections
-          metrics={{
-            active: 101,
-            art: 102,
-            approval: 103,
-            production: 104,
-            finish: 105,
-            ready: 106,
-            installations: 999,
-            overdue: 110,
-            today: 111,
-            tomorrow: 112,
-            letterBox: 0,
-            externalProduction: 108,
-            installationLoad: 0,
-          }}
-          attentionMetrics={{ awaitingSupplies: 107, financePending: 109 }}
-          financeHref="/financeiro"
-        />
+      <Router ssrPath="/hub-os">
+        <OperationalDashboardSections overview={overview} assignments={[]} />
       </Router>
     );
-
-    const cards = [
-      ["OS ativas", 101],
-      ["Em Arte", 102],
-      ["Aguardando aprovação", 103],
-      ["Em Produção", 104],
-      ["Em Acabamento", 105],
-      ["Material pronto", 106],
-      ["Aguardando insumos", 107],
-      ["Produção externa", 108],
-      ["Pendências financeiras", 109],
-      ["Atrasadas", 110],
-      ["Prazo hoje", 111],
-      ["Prazo amanhã", 112],
-    ] as const;
-    for (const [label, value] of cards) {
+    for (const label of ["OS ativas", "Exigem atenção", "Atrasadas", "Vencem hoje"]) {
       expect(html).toContain(label);
-      expect(html).toContain(`>${value}</p>`);
     }
-    expect(html).not.toContain("Instalações no período");
-    expect(html.match(/border-l-4/g)).toHaveLength(12);
-    const destinations = [
-      "/os?quick=active",
-      "/os/arte",
-      "/os/arte/aprovacoes",
-      "/os/producao/em-producao",
-      "/os/producao/acabamento",
-      "/os/producao/pronto",
-      "/os/insumos",
-      "/os/producao/externa",
-      "/hub-os/pendentes",
-      "/os?quick=overdue",
-      "/os?quick=today",
-      "/os?quick=tomorrow",
-    ];
-    destinations.forEach(href =>
-      expect(html).toContain(`href="${href.replaceAll("&", "&amp;")}"`)
-    );
-    expect(html).not.toContain('href="/financeiro"');
+    expect(html.match(/evolu-dashboard__indicator--/g)).toHaveLength(4);
+    expect(html).not.toContain("Pendências financeiras");
+    expect(html).toContain('href="/os?quick=active"');
+    expect(html).toContain('href="/os?quick=overdue"');
+    expect(html).toContain("OS 123");
+    expect(html).toContain('href="/os/' + sample.id + '"');
+    expect(html).toContain("Responsável:");
+    expect(html).toContain("Não informado");
+    expect(html).toContain("Fluxo por setores");
+    expect(html).toContain('href="/os/arte"');
+    expect(html).not.toContain('href="/os/producao"');
   });
 
-  it("supports the permission-safe finance fallback", () => {
+  it("does not misreport unavailable values as zero", () => {
     const html = renderToStaticMarkup(
-      <Router ssrPath="/">
-        <OperationalDashboardSections
-          metrics={{
-            active: 0,
-            art: 0,
-            approval: 0,
-            production: 0,
-            finish: 0,
-            ready: 0,
-            installations: 0,
-            overdue: 0,
-            today: 0,
-            tomorrow: 0,
-            letterBox: 0,
-            externalProduction: 0,
-            installationLoad: 0,
-          }}
-          attentionMetrics={{ awaitingSupplies: 0, financePending: 0 }}
-          financeHref="/hub-os/pendentes"
-        />
+      <Router ssrPath="/hub-os">
+        <OperationalDashboardSections overview={null} />
       </Router>
     );
-    expect(html).toContain('href="/hub-os/pendentes"');
+    expect(html).toContain("Carregando prioridades");
+    expect(html).toContain("—");
+    expect(html).not.toContain("Nenhuma OS ativa para priorizar");
+  });
+
+  it("identifies missing sale numbers and keeps direct links", () => {
+    const missing = buildDashboardOverview([
+      { ...sample, sale_number: "", client_name: "", delivery_date: null },
+    ], new Date("2026-11-05T15:00:00Z"));
+    const html = renderToStaticMarkup(
+      <Router ssrPath="/hub-os">
+        <OperationalDashboardSections overview={missing} assignments={[]} />
+      </Router>
+    );
+    expect(html).toContain("Número não informado");
+    expect(html).toContain("Cliente não informado");
+    expect(html).toContain("Prazo:");
   });
 });

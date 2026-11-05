@@ -1,0 +1,26 @@
+name: Dashboard Etapa 1 — validação sem deploy
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/modules/dashboard/**"
+      - "docs/tasks/dashboard-operacional-etapa1.md"
+      - ".github/workflows/dashboard-etapa1-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  dashboard-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run test
+      - run: npm run build:app
