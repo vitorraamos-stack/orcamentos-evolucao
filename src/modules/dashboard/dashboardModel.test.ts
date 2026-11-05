@@ -41,8 +41,8 @@ describe("Dashboard operacional — indicadores e prioridades", () => {
   it("counts real parallel sector signals separately without duplicating active OS", () => {
     const value = buildDashboardOverview([
       row("parallel", { art_status: "Em Criação", prod_status: "Produção" }),
-      row("logistic", { prod_status: "Instalação Agendada" }),
-      row("finish", { prod_status: "Em Acabamento" }),
+      row("logistic", { prod_status: "Instalação Agendada", production_tag: null }),
+      row("finish", { prod_status: "Em Acabamento", production_tag: null }),
     ], now);
     expect(value.active).toBe(3);
     expect(value.sectors).toEqual({ artwork: 1, production: 1, finishing: 1, logistics: 1 });
