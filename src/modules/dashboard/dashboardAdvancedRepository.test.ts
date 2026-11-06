@@ -52,6 +52,7 @@ describe("Dashboard Etapa 4 — consulta RLS e degradação segura", () => {
       os_order_deadlines: query([]),
       os_item_operation_dependencies: query([], 0, { code: "PGRST205", message: "missing relation" }),
       dashboard_operational_rules: query([], 0, { code: "PGRST205", message: "missing relation" }),
+      dashboard_stage_intervals: query([]),
     });
     const result = await listDashboardAdvancedSources(["os1"]);
     expect(result.rules.state).toBe("unavailable");
@@ -79,9 +80,12 @@ describe("Dashboard Etapa 4 — consulta RLS e degradação segura", () => {
       os_order_deadlines: deadlines,
       dashboard_operational_rules: rules,
       os_item_operation_dependencies: deps,
+      dashboard_stage_intervals: query([]),
     });
     const value = await listDashboardAdvancedSources(["os1"]);
     expect(value.assignees).toHaveLength(501);
+    expect(value.timingEvidenceAvailable).toBe(true);
+    expect(value.stageIntervals).toEqual([]);
     expect(assignees.in).toHaveBeenCalledWith("order_id", ["os1"]);
     expect(assignees.range).toHaveBeenCalledWith(0,499);
     expect(assignees.range).toHaveBeenCalledWith(500,999);
