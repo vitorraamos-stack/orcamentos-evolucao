@@ -84,7 +84,7 @@ BEGIN
    count(*) FILTER (WHERE require_owner AND NOT EXISTS (
      SELECT 1 FROM public.os_order_assignees a
      WHERE a.order_id=scoped.id AND a.user_id IS NOT NULL
-       AND a.scope IN (scoped_rule_scope(p_scope), 'GENERAL')
+       AND a.scope IN (public.scoped_rule_scope(p_scope), 'GENERAL')
    ))::int,
    count(*) FILTER (WHERE require_deadline AND NOT EXISTS (
      SELECT 1 FROM public.os_order_deadlines d
