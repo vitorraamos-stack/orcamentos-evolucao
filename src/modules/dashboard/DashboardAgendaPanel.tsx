@@ -30,9 +30,10 @@ function EventRow({ event, preparations, leadHours, now }: {
   const Icon = event.kind === "installation" ? Wrench :
     event.kind === "delivery" ? Truck : CalendarDays;
   return (
-    <Link href={"/os/" + encodeURIComponent(event.order.id)}
-      className="evolu-dashboard__agenda-event"
-      aria-label={"Abrir OS " + (event.order.sale_number?.trim() || "sem número") + ": " + event.label}>
+    <div className="evolu-dashboard__agenda-event">
+      <Link href={"/os/" + encodeURIComponent(event.order.id)}
+        className="evolu-dashboard__agenda-open"
+        aria-label={"Abrir OS " + (event.order.sale_number?.trim() || "sem número") + ": " + event.label}>
       <span className="evolu-dashboard__agenda-event-top">
         <span className="evolu-dashboard__agenda-kind"><Icon aria-hidden="true" className="h-4 w-4" />{event.label}</span>
         <span className="evolu-dashboard__agenda-time">{agendaEventTime(event)}</span>
@@ -42,13 +43,14 @@ function EventRow({ event, preparations, leadHours, now }: {
         <span aria-hidden="true"> · </span>{event.order.client_name?.trim() || "Cliente não informado"}
       </span>
       <span className="evolu-dashboard__agenda-status">{event.status} <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" /></span>
+      </Link>
       <PreparationBadge preparation={preparations?.[event.order.id]} event={event} leadHours={leadHours} now={now} />
       {event.warnings.map(warning => (
         <span key={warning} className="evolu-dashboard__agenda-warning">
           <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />{warning}
         </span>
       ))}
-    </Link>
+    </div>
   );
 }
 
