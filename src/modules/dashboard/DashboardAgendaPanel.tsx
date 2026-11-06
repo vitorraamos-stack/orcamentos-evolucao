@@ -45,7 +45,7 @@ function EventRow({ event, preparations, leadHours, now }: {
       <span className="evolu-dashboard__agenda-status">{event.status} <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" /></span>
       </Link>
       <PreparationBadge preparation={preparations?.[event.order.id]} event={event} leadHours={leadHours} now={now} />
-      {event.warnings.map(warning => (
+      {(preparations?.[event.order.id] ? [] : event.warnings).map(warning => (
         <span key={warning} className="evolu-dashboard__agenda-warning">
           <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />{warning}
         </span>
