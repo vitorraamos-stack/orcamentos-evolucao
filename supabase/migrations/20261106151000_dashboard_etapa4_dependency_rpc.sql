@@ -92,55 +92,79 @@ END $$;
 -- Limpeza de vínculos de atividades movidas/canceladas/excluídas (inclusive
 -- operações de itens, e exclusão de OS). Preserva auditoria independente.
 -- A limpeza ocorre na MESMA transação da alteração operacional existente.
-CREATE FUNCTION public.dashboard_cleanup_dependencies_on_source() RETURNS trigger
- LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE v_should_cleanup boolean:=false; v_order uuid;
+CREATE OR REPLACE FUNCTION public.dashboard_cleanup_dependencies_on_source() RETURNS trigger
+ LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $
+DECLARE v_order uuid;
 BEGIN
+ -- Cada ramo usa somente campos existentes no tipo de linha OLD daquela tabela.
+ -- Isso evita resolução de campos inexistentes em triggers de tabelas distintas.
  IF TG_TABLE_NAME='os_orders' THEN
-   IF TG_OP='DELETE' THEN v_should_cleanup:=true; v_order:=OLD.id; END IF;
+   IF TG_OP='DELETE' THEN
+     v_order:=OLD.id;
+     WITH removed AS (
+       DELETE FROM public.os_item_operation_dependencies d
+        WHERE d.order_id=OLD.id
+       RETURNING d.*
+     )
+     INSERT INTO public.dashboard_operation_dependency_audit
+       (dependency_id,order_id,predecessor_operation_id,successor_operation_id,
+        action,changed_by,reason)
+     SELECT id,order_id,predecessor_operation_id,successor_operation_id,
+       'REMOVED',auth.uid(),'Vínculo invalidado pela exclusão da OS'
+     FROM removed;
+   END IF;
+
  ELSIF TG_TABLE_NAME='os_order_items' THEN
    v_order:=OLD.order_id;
-   IF TG_OP='DELETE' THEN v_should_cleanup:=true;
-   ELSIF TG_OP='UPDATE' AND
-     ((OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL) OR
-      (OLD.status<>'CANCELLED' AND NEW.status='CANCELLED') OR
-      OLD.order_id IS DISTINCT FROM NEW.order_id) THEN v_should_cleanup:=true;
+   IF TG_OP='DELETE' OR
+      (TG_OP='UPDATE' AND
+       ((OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL) OR
+        (OLD.status<>'CANCELLED' AND NEW.status='CANCELLED') OR
+        OLD.order_id IS DISTINCT FROM NEW.order_id)) THEN
+     PERFORM 1 FROM public.os_orders o WHERE o.id=v_order FOR UPDATE;
+     WITH removed AS (
+       DELETE FROM public.os_item_operation_dependencies d
+        WHERE EXISTS (
+          SELECT 1 FROM public.os_order_item_operations op
+           WHERE op.item_id=OLD.id
+             AND (op.id=d.predecessor_operation_id OR op.id=d.successor_operation_id)
+        )
+       RETURNING d.*
+     )
+     INSERT INTO public.dashboard_operation_dependency_audit
+       (dependency_id,order_id,predecessor_operation_id,successor_operation_id,
+        action,changed_by,reason)
+     SELECT id,order_id,predecessor_operation_id,successor_operation_id,
+       'REMOVED',auth.uid(),'Vínculo invalidado por cancelamento, movimentação ou exclusão do item'
+     FROM removed;
    END IF;
+
  ELSIF TG_TABLE_NAME='os_order_item_operations' THEN
-   SELECT item.order_id INTO v_order FROM public.os_order_items item WHERE item.id=OLD.item_id;
-   IF TG_OP='DELETE' THEN v_should_cleanup:=true;
-   ELSIF TG_OP='UPDATE' AND
-     ((OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL) OR
-      OLD.item_id IS DISTINCT FROM NEW.item_id) THEN v_should_cleanup:=true;
+   SELECT item.order_id INTO v_order
+     FROM public.os_order_items item WHERE item.id=OLD.item_id;
+   IF TG_OP='DELETE' OR
+      (TG_OP='UPDATE' AND
+       ((OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL) OR
+        OLD.item_id IS DISTINCT FROM NEW.item_id)) THEN
+     PERFORM 1 FROM public.os_orders o WHERE o.id=v_order FOR UPDATE;
+     WITH removed AS (
+       DELETE FROM public.os_item_operation_dependencies d
+        WHERE d.predecessor_operation_id=OLD.id
+           OR d.successor_operation_id=OLD.id
+       RETURNING d.*
+     )
+     INSERT INTO public.dashboard_operation_dependency_audit
+       (dependency_id,order_id,predecessor_operation_id,successor_operation_id,
+        action,changed_by,reason)
+     SELECT id,order_id,predecessor_operation_id,successor_operation_id,
+       'REMOVED',auth.uid(),'Vínculo invalidado por alteração ou exclusão da operação'
+     FROM removed;
    END IF;
  END IF;
 
- IF v_should_cleanup THEN
-   -- Compartilha o bloqueio da OS com a criação de vínculo; não conclui
-   -- uma alteração enquanto outra sessão cria relacionamento na mesma OS.
-   PERFORM 1 FROM public.os_orders o WHERE o.id=v_order FOR UPDATE;
-   WITH removed AS (
-     DELETE FROM public.os_item_operation_dependencies d
-       WHERE (TG_TABLE_NAME='os_orders' AND d.order_id=OLD.id)
-          OR (TG_TABLE_NAME='os_order_items' AND EXISTS (
-               SELECT 1 FROM public.os_order_item_operations op
-                WHERE op.item_id=OLD.id AND
-                 (op.id=d.predecessor_operation_id OR op.id=d.successor_operation_id)
-             ))
-          OR (TG_TABLE_NAME='os_order_item_operations' AND
-              (d.predecessor_operation_id=OLD.id OR d.successor_operation_id=OLD.id))
-     RETURNING d.*
-   )
-   INSERT INTO public.dashboard_operation_dependency_audit
-     (dependency_id,order_id,predecessor_operation_id,successor_operation_id,
-      action,changed_by,reason)
-   SELECT id,order_id,predecessor_operation_id,successor_operation_id,
-     'REMOVED',auth.uid(),'Vínculo invalidado por alteração ou exclusão da atividade/OS'
-   FROM removed;
- END IF;
  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
  RETURN NEW;
-END $$;
+END $;
 
 CREATE TRIGGER dashboard_dependency_cleanup_operation
  BEFORE UPDATE OF deleted_at,item_id OR DELETE ON public.os_order_item_operations
