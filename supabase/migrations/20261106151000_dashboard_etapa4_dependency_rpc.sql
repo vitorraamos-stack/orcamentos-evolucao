@@ -93,7 +93,7 @@ END $$;
 -- operações de itens, e exclusão de OS). Preserva auditoria independente.
 -- A limpeza ocorre na MESMA transação da alteração operacional existente.
 CREATE OR REPLACE FUNCTION public.dashboard_cleanup_dependencies_on_source() RETURNS trigger
- LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $
+ LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $dashboard_cleanup$
 DECLARE v_order uuid;
 BEGIN
  -- Cada ramo usa somente campos existentes no tipo de linha OLD daquela tabela.
@@ -164,7 +164,7 @@ BEGIN
 
  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
  RETURN NEW;
-END $;
+END $dashboard_cleanup$;
 
 CREATE TRIGGER dashboard_dependency_cleanup_operation
  BEFORE UPDATE OF deleted_at,item_id OR DELETE ON public.os_order_item_operations
