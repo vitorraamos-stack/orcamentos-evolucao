@@ -42,6 +42,7 @@ describe("Dashboard Etapa 4 — consulta RLS e degradação segura", () => {
     expect(isMissingSchema({ code: "42P01" })).toBe(true);
     expect(isMissingSchema({ code: "PGRST205" })).toBe(true);
     expect(isMissingSchema({ code: "42501" })).toBe(false);
+    expect(isMissingSchema({ code: "PGRST200" })).toBe(false);
     expect(isMissingSchema(new Error("network timeout"))).toBe(false);
   });
 
