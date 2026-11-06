@@ -62,6 +62,21 @@ describe("Dashboard Etapa 4 — requisitos por etapa e provas", () => {
       { id: "user1", order_id: "os1", scope: "GENERAL", user_id: "user" },
     ], [{ id: "date1", order_id: "os1", scope: "PRODUCTION", due_date: "2026-11-08", completed_at: null }])).toEqual([]);
   });
+  it("supports retirada without treating unsupported sectors as evidence of missing obligations", () => {
+    const retirada: RuleSource = { state: "configured", rules: [{
+      scope: "PRODUCTION", owner: "conditional", deadline: "optional",
+      conditionLogisticType: "retirada", stalledLimitMinutes: null, calendarVerified: false,
+    }] };
+    expect(assessStageRequirements(order("os1", { logistic_type: "retirada" }), retirada, [], [])).toHaveLength(1);
+    expect(assessStageRequirements(order("os1", { logistic_type: "entrega" }), retirada, [], [])).toHaveLength(0);
+    const unsupported: RuleSource = { state: "configured", rules: [{
+      scope: "LOGISTICS", owner: "required", deadline: "required",
+      conditionLogisticType: null, stalledLimitMinutes: null, calendarVerified: false,
+    }] };
+    expect(assessStageRequirements(order("os1", {
+      prod_status: "Logística (Entrega/Transportadora)",
+    }), unsupported, [], [])).toEqual([]);
+  });
   it("never maps delivery to installation automatically", () => {
     expect(orderOperationalScope(order("os2", { prod_status: "Logística (Entrega/Transportadora)" }))).toBe("LOGISTICS");
     expect(orderOperationalScope(order("os2", { prod_status: "Instalação Agendada" }))).toBe("INSTALLATION");
