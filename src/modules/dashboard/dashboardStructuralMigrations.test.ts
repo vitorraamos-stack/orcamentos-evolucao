@@ -27,7 +27,7 @@ describe("Dashboard Etapa 4 — migration authoring safety checks", () => {
       "dashboard_operation_dependency_audit", "dashboard_stage_intervals",
       "dashboard_stage_pauses",
     ]) expect(foundation).toContain("ALTER TABLE public." + table + " ENABLE ROW LEVEL SECURITY");
-    expect(foundation).toContain("FROM PUBLIC, anon, authenticated");
+    expect(foundation).toContain("FROM PUBLIC, anon, authenticated, service_role");
     expect(foundation).not.toMatch(/GRANT\s+(?:INSERT|UPDATE|DELETE|ALL)\s+ON\s+TABLE[\s\S]*?\bTO\s+authenticated/i);
   });
   it("publishes audited rules only with manager check and revision lock", () => {
@@ -37,7 +37,7 @@ describe("Dashboard Etapa 4 — migration authoring safety checks", () => {
     expect(rules).toContain("p_expected_revision");
     expect(rules).toContain("pg_advisory_xact_lock");
     expect(rules).toContain("INSERT INTO public.dashboard_operational_rule_revisions");
-    expect(rules).toContain("FROM PUBLIC,anon,authenticated");
+    expect(rules).toContain("FROM PUBLIC,anon,authenticated,service_role");
   });
   it("supports retirada and rejects unsupported approval/logistics requirements", () => {
     expect(rules).toContain("'retirada','entrega','instalacao'");
