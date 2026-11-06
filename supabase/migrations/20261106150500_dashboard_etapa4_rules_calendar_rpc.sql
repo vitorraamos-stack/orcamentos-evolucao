@@ -10,7 +10,7 @@ BEGIN
  END IF;
  RETURN v_user;
 END $$;
-REVOKE ALL ON FUNCTION public.dashboard_assert_manager() FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.dashboard_assert_manager() FROM PUBLIC,anon,authenticated,service_role;
 
 -- A mesma validação alimenta prévia e gravação; não aceitar regras cujas
 -- fontes ainda não existem nas tabelas de responsáveis e prazos.
@@ -52,7 +52,7 @@ BEGIN
  END IF;
 END $$;
 REVOKE ALL ON FUNCTION public.dashboard_validate_rule(text,text,text,text,integer,uuid)
- FROM PUBLIC,anon,authenticated;
+ FROM PUBLIC,anon,authenticated,service_role;
 
 -- Prévia consultiva, restrita a gestores. Não supõe jornada nem infração
 -- para logística/aprovação sem fonte; contagens calculadas a partir das OS.
@@ -234,11 +234,11 @@ END $$;
 
 -- Hardening: funções internas inacessíveis por chamada pública.
 REVOKE ALL ON FUNCTION public.dashboard_preview_rule_impact(text,text,text,text,integer,uuid)
-  FROM PUBLIC,anon,authenticated;
+  FROM PUBLIC,anon,authenticated,service_role;
 REVOKE ALL ON FUNCTION public.dashboard_publish_rule(text,text,text,text,integer,uuid,integer,text)
-  FROM PUBLIC,anon,authenticated;
+  FROM PUBLIC,anon,authenticated,service_role;
 REVOKE ALL ON FUNCTION public.dashboard_publish_calendar(text,date,date,jsonb,jsonb,integer,text)
-  FROM PUBLIC,anon,authenticated;
+  FROM PUBLIC,anon,authenticated,service_role;
 GRANT EXECUTE ON FUNCTION public.dashboard_preview_rule_impact(text,text,text,text,integer,uuid)
  TO authenticated;
 GRANT EXECUTE ON FUNCTION public.dashboard_publish_rule(text,text,text,text,integer,uuid,integer,text)
