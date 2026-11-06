@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { AlertTriangle, ArrowRight, GitBranch, RefreshCw, ShieldAlert, TimerOff, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, Clock3, GitBranch, RefreshCw, ShieldAlert, TimerOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,13 @@ import { listDashboardAdvancedSources } from "./dashboardAdvancedRepository";
 import { OPERATION_STATUS_LABELS, WORK_CENTER_LABELS, type WorkCenter } from "@/modules/production/operations";
 import { toast } from "sonner";
 import { createDashboardDependency, removeDashboardDependency } from "./dashboardDependencyRepository";
+
+function formatWorkingMinutes(value: number | null) {
+  if (value === null) return "Não calculado";
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  return hours > 0 ? hours + "h " + minutes + "min" : minutes + "min";
+}
 
 const workCenterLabel = (center: string) =>
   Object.prototype.hasOwnProperty.call(WORK_CENTER_LABELS, center)
@@ -258,10 +265,29 @@ function AdvancedOrderRow({ assessment, source, isManager, onChanged }: {
             <strong>Dependências registradas</strong>
             <OperationDependencies row={assessment} source={source} isManager={isManager} onChanged={onChanged} />
           </div>
-          <p className="evolu-dashboard__advanced-muted">
-            <TimerOff aria-hidden="true" className="mr-1 inline h-3.5 w-3.5" />
-            {assessment.timingReason} Bloqueio registrado não equivale a gargalo confirmado.
-          </p>
+          <div className="flex items-start gap-2">
+            {assessment.timing === "available"
+              ? <Clock3 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              : <TimerOff aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />}
+            <div className="min-w-0 space-y-1">
+              {assessment.timing === "available" ? <>
+                <p className="text-xs">
+                  Permanência útil nesta etapa: <strong>{formatWorkingMinutes(assessment.elapsedWorkingMinutes)}</strong>
+                </p>
+                {assessment.limitMinutes === null
+                  ? <p className="evolu-dashboard__advanced-muted">{assessment.timingReason}</p>
+                  : assessment.overLimit
+                    ? <p className="evolu-dashboard__advanced-warning">
+                        {assessment.timingReason} Limite: {formatWorkingMinutes(assessment.limitMinutes)}.
+                      </p>
+                    : <p className="evolu-dashboard__advanced-muted">
+                        {assessment.timingReason} Limite: {formatWorkingMinutes(assessment.limitMinutes)}.
+                      </p>}
+              </> : <p className="evolu-dashboard__advanced-muted">
+                {assessment.timingReason} Bloqueio registrado não equivale a gargalo confirmado.
+              </p>}
+            </div>
+          </div>
         </div>
       </details>
     </div>

@@ -2,7 +2,8 @@ import { supabase } from "@/lib/supabase";
 import { listDashboardPreparationSources } from "./dashboardPreparationRepository";
 import type {
   AdvancedSources, OperationDependency, RelationSource, RuleSource, RuleSpec,
-  StageAssignee, StageDeadline,
+  StageAssignee, StageDeadline, StageInterval, StagePause, TimingRule,
+  WorkCalendarVersion, WorkCalendarPeriod, WorkCalendarException,
 } from "./dashboardAdvanced";
 
 const PAGE_SIZE = 500;
@@ -11,11 +12,15 @@ const BATCH = 80;
 type IdRecord = { id: string };
 
 /** Exact-count RLS pages. Never treat an incomplete/denied query as empty. */
-async function readByOrderIds<T extends IdRecord>(
-  table: "os_order_assignees" | "os_order_deadlines" | "os_item_operation_dependencies",
-  fields: string, orderIds: readonly string[], signal?: AbortSignal
+async function readByIds<T extends IdRecord>(
+  table: "os_order_assignees" | "os_order_deadlines" | "os_item_operation_dependencies" |
+    "dashboard_stage_intervals" | "dashboard_stage_pauses" |
+    "dashboard_work_calendar_versions" | "dashboard_work_calendar_periods" |
+    "dashboard_work_calendar_exceptions",
+  fields: string, field: "order_id" | "stage_interval_id" | "calendar_version_id" | "id",
+  ids: readonly string[], signal?: AbortSignal
 ): Promise<T[]> {
-  const unique = Array.from(new Set(orderIds.filter(Boolean)));
+  const unique = Array.from(new Set(ids.filter(Boolean)));
   const result: T[] = [];
   for (let index = 0; index < unique.length; index += BATCH) {
     const ids = unique.slice(index, index + BATCH);
@@ -25,7 +30,7 @@ async function readByOrderIds<T extends IdRecord>(
       try {
         for (let offset = 0; ; offset += PAGE_SIZE) {
           let query = supabase.from(table)
-            .select(fields, { count: "exact" }).in("order_id", ids)
+            .select(fields, { count: "exact" }).in(field, ids)
             .order("id", { ascending: true }).range(offset, offset + PAGE_SIZE - 1);
           if (signal) query = query.abortSignal(signal);
           const { data, count, error } = await query;
@@ -109,10 +114,10 @@ export async function listDashboardDependencies(
 ): Promise<RelationSource> {
   if (!orderIds.length) return { state: "available", links: [] };
   try {
-    const links = await readByOrderIds<OperationDependency>(
+    const links = await readByIds<OperationDependency>(
       "os_item_operation_dependencies",
       "id,order_id,predecessor_operation_id,successor_operation_id",
-      orderIds, signal,
+      "order_id", orderIds, signal,
     );
     return { state: "available", links };
   } catch (error) {
@@ -121,23 +126,104 @@ export async function listDashboardDependencies(
   }
 }
 
+type TimingSourceBundle = {
+  timingRules: TimingRule[];
+  timingEvidenceAvailable: boolean;
+  stageIntervals: StageInterval[];
+  stagePauses: StagePause[];
+  calendars: WorkCalendarVersion[];
+  calendarPeriods: WorkCalendarPeriod[];
+  calendarExceptions: WorkCalendarException[];
+};
+
+/** Temporal evidence is read-only and must be complete; missing schema is not an empty calendar. */
+async function listDashboardTimingSources(
+  orderIds: string[], signal?: AbortSignal
+): Promise<TimingSourceBundle> {
+  const empty: TimingSourceBundle = {
+    timingRules: [], timingEvidenceAvailable: false, stageIntervals: [],
+    stagePauses: [], calendars: [], calendarPeriods: [], calendarExceptions: [],
+  };
+  if (!orderIds.length) return { ...empty, timingEvidenceAvailable: true };
+
+  try {
+    let timingRuleQuery = supabase.from("dashboard_operational_rules")
+      .select("id,scope,stalled_limit_minutes,calendar_version_id,calendar_verified,revision,updated_at");
+    if (signal) timingRuleQuery = timingRuleQuery.abortSignal(signal);
+    const [stageIntervals, rulesResult] = await Promise.all([
+      readByIds<StageInterval>(
+        "dashboard_stage_intervals",
+        "id,order_id,scope,entered_at,left_at,calendar_version_id,rule_revision_id,evidence_state",
+        "order_id", orderIds, signal,
+      ),
+      timingRuleQuery,
+    ]);
+    if (rulesResult.error) throw rulesResult.error;
+    const timingRules = (rulesResult.data ?? []) as TimingRule[];
+    const intervalIds = stageIntervals.map(row => row.id);
+    const calendarIds = Array.from(new Set(stageIntervals
+      .map(row => row.calendar_version_id).filter((id): id is string => Boolean(id))));
+
+    const stagePauses = intervalIds.length
+      ? await readByIds<StagePause>(
+          "dashboard_stage_pauses",
+          "id,stage_interval_id,operation_id,started_at,ended_at,reason,evidence_state",
+          "stage_interval_id", intervalIds, signal,
+        )
+      : [];
+
+    let calendars: WorkCalendarVersion[] = [];
+    let calendarPeriods: WorkCalendarPeriod[] = [];
+    let calendarExceptions: WorkCalendarException[] = [];
+    if (calendarIds.length) {
+      [calendars, calendarPeriods, calendarExceptions] = await Promise.all([
+        readByIds<WorkCalendarVersion>(
+          "dashboard_work_calendar_versions",
+          "id,version,time_zone,effective_from,effective_until",
+          "id", calendarIds, signal,
+        ),
+        readByIds<WorkCalendarPeriod>(
+          "dashboard_work_calendar_periods",
+          "id,calendar_version_id,weekday,starts_local,ends_local",
+          "calendar_version_id", calendarIds, signal,
+        ),
+        readByIds<WorkCalendarException>(
+          "dashboard_work_calendar_exceptions",
+          "id,calendar_version_id,exception_date,working,starts_local,ends_local",
+          "calendar_version_id", calendarIds, signal,
+        ),
+      ]);
+    }
+
+    return {
+      timingRules, timingEvidenceAvailable: true, stageIntervals, stagePauses,
+      calendars, calendarPeriods, calendarExceptions,
+    };
+  } catch (error) {
+    if (isMissingSchema(error)) return empty;
+    throw error;
+  }
+}
+
 /** Read-only; runs only when the user requests advanced analysis. */
 export async function listDashboardAdvancedSources(
   orderIds: string[], signal?: AbortSignal
 ): Promise<AdvancedSources> {
-  const [preparation, assignees, deadlines, rules, dependencies] = await Promise.all([
+  const [preparation, assignees, deadlines, rules, dependencies, timing] = await Promise.all([
     listDashboardPreparationSources(orderIds, signal),
-    readByOrderIds<StageAssignee>(
-      "os_order_assignees", "id,order_id,user_id,scope", orderIds, signal,
+    readByIds<StageAssignee>(
+      "os_order_assignees", "id,order_id,user_id,scope", "order_id", orderIds, signal,
     ),
-    readByOrderIds<StageDeadline>(
-      "os_order_deadlines", "id,order_id,scope,due_date,completed_at", orderIds, signal,
+    readByIds<StageDeadline>(
+      "os_order_deadlines", "id,order_id,scope,due_date,completed_at", "order_id", orderIds, signal,
     ),
     listDashboardOperationalRules(signal),
     listDashboardDependencies(orderIds, signal),
+    listDashboardTimingSources(orderIds, signal),
   ]);
   return {
     items: preparation.items, operations: preparation.operations,
     assignees, deadlines, rules, dependencies, events: [],
+    ...timing,
   };
 }

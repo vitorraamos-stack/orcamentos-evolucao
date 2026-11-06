@@ -57,6 +57,7 @@ describe("Dashboard Etapa 3 — fontes paginadas e RLS", () => {
     expect(operations.in).toHaveBeenCalledWith("item_id", ["item1"]);
     expect(items.is).toHaveBeenCalledWith("deleted_at", null);
     expect(operations.is).toHaveBeenCalledWith("deleted_at", null);
+    expect(operations.select.mock.calls[0][0]).toContain("created_at");
     expect(mocks.from).not.toHaveBeenCalledWith("materials");
   });
 

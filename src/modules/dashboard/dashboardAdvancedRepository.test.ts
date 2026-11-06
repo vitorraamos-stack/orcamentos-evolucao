@@ -88,6 +88,56 @@ describe("Dashboard Etapa 4 — consulta RLS e degradação segura", () => {
     expect(mocks.preparation).toHaveBeenCalledWith(["os1"], undefined);
   });
 
+  it("loads complete stage, pause and calendar evidence with exact-count pages", async () => {
+    const interval = {
+      id: "interval-1", order_id: "os1", scope: "PRODUCTION",
+      entered_at: "2026-11-02T11:00:00Z", left_at: null,
+      calendar_version_id: "calendar-1", rule_revision_id: "revision-1",
+      evidence_state: "verified",
+    };
+    const pause = {
+      id: "pause-1", stage_interval_id: "interval-1", operation_id: "op1",
+      started_at: "2026-11-02T12:00:00Z", ended_at: "2026-11-02T13:00:00Z",
+      reason: "Aguardando material", evidence_state: "verified",
+    };
+    const rule = {
+      id: "rule-1", scope: "PRODUCTION", owner: "optional", deadline: "optional",
+      condition_logistic_type: null, stalled_limit_minutes: 180,
+      calendar_version_id: "calendar-1", calendar_verified: true,
+      revision: 1, updated_at: "2026-11-02T10:00:00Z",
+    };
+    const calendar = {
+      id: "calendar-1", version: 1, time_zone: "America/Sao_Paulo",
+      effective_from: "2026-11-01", effective_until: null,
+    };
+    byTable({
+      os_order_assignees: query([]),
+      os_order_deadlines: query([]),
+      os_item_operation_dependencies: query([]),
+      dashboard_operational_rules: query([rule]),
+      dashboard_stage_intervals: query([interval]),
+      dashboard_stage_pauses: query([pause]),
+      dashboard_work_calendar_versions: query([calendar]),
+      dashboard_work_calendar_periods: query([{
+        id: "period-1", calendar_version_id: "calendar-1", weekday: 1,
+        starts_local: "08:00:00", ends_local: "12:00:00",
+      }]),
+      dashboard_work_calendar_exceptions: query([{
+        id: "exception-1", calendar_version_id: "calendar-1",
+        exception_date: "2026-11-02", working: false,
+        starts_local: null, ends_local: null,
+      }]),
+    });
+    const value = await listDashboardAdvancedSources(["os1"]);
+    expect(value.timingEvidenceAvailable).toBe(true);
+    expect(value.stageIntervals).toEqual([interval]);
+    expect(value.stagePauses).toEqual([pause]);
+    expect(value.timingRules[0].calendar_version_id).toBe("calendar-1");
+    expect(value.calendars).toEqual([calendar]);
+    expect(value.calendarPeriods).toHaveLength(1);
+    expect(value.calendarExceptions).toHaveLength(1);
+  });
+
   it("does not transform unknown count into a confirmed empty result", async () => {
     byTable({ os_item_operation_dependencies: query([],null) });
     await expect(listDashboardDependencies(["os1"])).rejects.toThrow("Contagem");

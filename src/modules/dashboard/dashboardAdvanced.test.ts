@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { DashboardOrder } from "./dashboardModel";
 import {
   advancedSummary, analyzeDependencies, assessStageRequirements, buildAdvancedAssessments,
-  orderOperationalScope, type AdvancedSources, type OperationDependency, type RuleSource,
+  calculateWorkingMinutes, orderOperationalScope, type AdvancedSources, type OperationDependency, type RuleSource,
 } from "./dashboardAdvanced";
 import type { PreparationItem, PreparationOperation } from "./dashboardPreparation";
 
@@ -21,7 +21,7 @@ const operation = (id: string, itemId = "i1",
   extra: Partial<PreparationOperation> = {}): PreparationOperation => ({
   id, item_id: itemId, work_center: "PRINTING", status: "PENDING",
   is_required: true, blocked_reason: null, assigned_to: "user",
-  updated_at: "2026-11-06T12:00:00Z", ...extra,
+  updated_at: "2026-11-06T12:00:00Z", created_at: "2026-11-06T12:00:00Z", ...extra,
 });
 const link = (id: string, before: string, after: string, orderId="os1"): OperationDependency => ({
   id, order_id: orderId, predecessor_operation_id: before, successor_operation_id: after,
@@ -43,6 +43,8 @@ const basic: AdvancedSources = {
   ],
   deadlines: [], assignees: [],
   rules: { state: "unavailable" }, dependencies: { state: "unavailable" }, events: [],
+  timingRules: [], timingEvidenceAvailable: true, stageIntervals: [], stagePauses: [],
+  calendars: [], calendarPeriods: [], calendarExceptions: [],
 };
 
 describe("Dashboard Etapa 4 — requisitos por etapa e provas", () => {
@@ -143,5 +145,146 @@ describe("Dashboard Etapa 4 — dependências somente registradas", () => {
     expect(summary.orders).toBe(2);
     expect(summary.withConfirmedBlocks).toBe(1);
     expect(summary.waitingSuccessors).toBe(1);
+  });
+});
+
+
+describe("Dashboard Etapa 4 — permanência útil com evidência verificável", () => {
+  const now = new Date("2026-11-02T15:00:00.000Z"); // segunda-feira, 12:00 em São Paulo
+  const interval = {
+    id: "interval-1", order_id: "os1", scope: "PRODUCTION" as const,
+    entered_at: "2026-11-02T11:00:00.000Z", left_at: null,
+    calendar_version_id: "calendar-1", rule_revision_id: "revision-1",
+    evidence_state: "verified" as const,
+  };
+  const timingSources = (overrides: Partial<AdvancedSources> = {}): AdvancedSources => ({
+    ...basic,
+    items: [item("i1")],
+    operations: [],
+    timingRules: [{
+      id: "rule-1", scope: "PRODUCTION", stalled_limit_minutes: 180,
+      calendar_version_id: "calendar-1", calendar_verified: true,
+      revision: 1, updated_at: "2026-11-02T10:00:00.000Z",
+    }],
+    timingEvidenceAvailable: true,
+    stageIntervals: [interval],
+    stagePauses: [],
+    calendars: [{
+      id: "calendar-1", version: 1, time_zone: "America/Sao_Paulo",
+      effective_from: "2026-11-01", effective_until: null,
+    }],
+    calendarPeriods: [{
+      id: "period-1", calendar_version_id: "calendar-1", weekday: 1,
+      starts_local: "08:00:00", ends_local: "12:00:00",
+    }],
+    calendarExceptions: [],
+    ...overrides,
+  });
+
+  it("converts the published local work window to elapsed minutes", () => {
+    const sources = timingSources();
+    expect(calculateWorkingMinutes(
+      interval.entered_at, now.toISOString(), sources.calendars[0],
+      sources.calendarPeriods, sources.calendarExceptions,
+    )).toBe(240);
+    const result = buildAdvancedAssessments([order()], sources, now)[0];
+    expect(result.timing).toBe("available");
+    expect(result.elapsedWorkingMinutes).toBe(240);
+    expect(result.limitMinutes).toBe(180);
+    expect(result.overLimit).toBe(true);
+    expect(result.timingReason).toContain("não comprova sozinho a causa");
+  });
+
+  it("does not calculate when temporal evidence tables are unavailable", () => {
+    const sources = timingSources({ timingEvidenceAvailable: false });
+    const result = buildAdvancedAssessments([order()], sources, now)[0];
+    expect(result.timing).toBe("unavailable");
+    expect(result.elapsedWorkingMinutes).toBeNull();
+  });
+
+  it("subtracts the union of verified pauses without double counting overlaps", () => {
+    const sources = timingSources({
+      stagePauses: [
+        { id: "pause-1", stage_interval_id: "interval-1", operation_id: "op-1",
+          started_at: "2026-11-02T12:00:00.000Z", ended_at: "2026-11-02T13:00:00.000Z",
+          reason: "Aguardando liberação", evidence_state: "verified" },
+        { id: "pause-2", stage_interval_id: "interval-1", operation_id: "op-2",
+          started_at: "2026-11-02T12:30:00.000Z", ended_at: "2026-11-02T13:30:00.000Z",
+          reason: "Aguardando material", evidence_state: "verified" },
+      ],
+    });
+    const result = buildAdvancedAssessments([order()], sources, now)[0];
+    expect(result.timing).toBe("available");
+    expect(result.elapsedWorkingMinutes).toBe(150);
+    expect(result.overLimit).toBe(false);
+  });
+
+  it("lets a date exception override the weekly schedule", () => {
+    const sources = timingSources({
+      calendarExceptions: [{
+        id: "exception-1", calendar_version_id: "calendar-1", exception_date: "2026-11-02",
+        working: false, starts_local: null, ends_local: null,
+      }],
+    });
+    expect(calculateWorkingMinutes(
+      interval.entered_at, now.toISOString(), sources.calendars[0],
+      sources.calendarPeriods, sources.calendarExceptions,
+    )).toBe(0);
+  });
+
+  it("does not calculate from unverified baselines or a rule revised after entry", () => {
+    const unverified = timingSources({
+      stageIntervals: [{ ...interval, evidence_state: "unverified" }],
+    });
+    expect(buildAdvancedAssessments([order()], unverified, now)[0].timing).toBe("insufficient");
+
+    const revised = timingSources({
+      timingRules: [{
+        id: "rule-1", scope: "PRODUCTION", stalled_limit_minutes: 180,
+        calendar_version_id: "calendar-1", calendar_verified: true,
+        revision: 2, updated_at: "2026-11-02T12:00:00.000Z",
+      }],
+    });
+    expect(buildAdvancedAssessments([order()], revised, now)[0].timing).toBe("insufficient");
+  });
+
+  it("refuses timing when activity history predates collection or BLOCKED has no pause", () => {
+    const oldOperation = timingSources({
+      operations: [operation("op-1", "i1", { created_at: "2026-11-02T10:00:00.000Z" })],
+    });
+    expect(buildAdvancedAssessments([order()], oldOperation, now)[0].timing).toBe("insufficient");
+
+    const missingPause = timingSources({
+      operations: [operation("op-1", "i1", { status: "BLOCKED" })],
+    });
+    expect(buildAdvancedAssessments([order()], missingPause, now)[0].timing).toBe("insufficient");
+  });
+
+  it("refuses incomplete pause evidence and calendar coverage gaps", () => {
+    const unverifiedPause = timingSources({
+      stagePauses: [{
+        id: "pause-1", stage_interval_id: "interval-1", operation_id: "op-1",
+        started_at: "2026-11-02T12:00:00.000Z", ended_at: "2026-11-02T13:00:00.000Z",
+        reason: "Marco incompleto", evidence_state: "unverified",
+      }],
+    });
+    expect(buildAdvancedAssessments([order()], unverifiedPause, now)[0].timing).toBe("insufficient");
+
+    const orphanPause = timingSources({
+      stagePauses: [{
+        id: "pause-deleted", stage_interval_id: "interval-1", operation_id: null,
+        started_at: "2026-11-02T12:00:00.000Z", ended_at: "2026-11-02T13:00:00.000Z",
+        reason: "Atividade removida", evidence_state: "verified",
+      }],
+    });
+    expect(buildAdvancedAssessments([order()], orphanPause, now)[0].timing).toBe("insufficient");
+
+    const expiredCalendar = timingSources({
+      calendars: [{
+        id: "calendar-1", version: 1, time_zone: "America/Sao_Paulo",
+        effective_from: "2026-11-01", effective_until: "2026-11-01",
+      }],
+    });
+    expect(buildAdvancedAssessments([order()], expiredCalendar, now)[0].timing).toBe("insufficient");
   });
 });
