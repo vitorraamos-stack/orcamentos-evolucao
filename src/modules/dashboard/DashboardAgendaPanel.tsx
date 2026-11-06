@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { PreparationBadge } from "./DashboardPreparationBadge";
+import { summarizePreparation, type OrderPreparation } from "./dashboardPreparation";
 import { Link } from "wouter";
 import { AlertTriangle, ArrowRight, CalendarDays, Clock3, Truck, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,13 +21,19 @@ const FILTERS: Array<{ value: AgendaFilter; label: string }> = [
   { value: "conflicts", label: "Conflitos" },
 ];
 
-function EventRow({ event }: { event: AgendaEvent }) {
+function EventRow({ event, preparations, leadHours, now }: {
+  event: AgendaEvent;
+  preparations: Record<string, OrderPreparation> | null;
+  leadHours: number;
+  now: Date;
+}) {
   const Icon = event.kind === "installation" ? Wrench :
     event.kind === "delivery" ? Truck : CalendarDays;
   return (
-    <Link href={"/os/" + encodeURIComponent(event.order.id)}
-      className="evolu-dashboard__agenda-event"
-      aria-label={"Abrir OS " + (event.order.sale_number?.trim() || "sem número") + ": " + event.label}>
+    <div className="evolu-dashboard__agenda-event">
+      <Link href={"/os/" + encodeURIComponent(event.order.id)}
+        className="evolu-dashboard__agenda-open"
+        aria-label={"Abrir OS " + (event.order.sale_number?.trim() || "sem número") + ": " + event.label}>
       <span className="evolu-dashboard__agenda-event-top">
         <span className="evolu-dashboard__agenda-kind"><Icon aria-hidden="true" className="h-4 w-4" />{event.label}</span>
         <span className="evolu-dashboard__agenda-time">{agendaEventTime(event)}</span>
@@ -35,19 +43,29 @@ function EventRow({ event }: { event: AgendaEvent }) {
         <span aria-hidden="true"> · </span>{event.order.client_name?.trim() || "Cliente não informado"}
       </span>
       <span className="evolu-dashboard__agenda-status">{event.status} <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" /></span>
-      {event.warnings.map(warning => (
+      </Link>
+      <PreparationBadge preparation={preparations?.[event.order.id]} event={event} leadHours={leadHours} now={now} />
+      {(preparations?.[event.order.id] ? [] : event.warnings).map(warning => (
         <span key={warning} className="evolu-dashboard__agenda-warning">
           <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />{warning}
         </span>
       ))}
-    </Link>
+    </div>
   );
 }
 
 export function DashboardAgendaPanel({
-  agenda, error, now = new Date(),
-}: { agenda: DashboardAgenda | null; error?: string; now?: Date }) {
+  agenda, error, preparations = null, preparationError, now = new Date(),
+}: {
+  agenda: DashboardAgenda | null;
+  error?: string;
+  preparations?: Record<string, OrderPreparation> | null;
+  preparationError?: string;
+  now?: Date;
+}) {
   const [period, setPeriod] = useState<AgendaPeriod>("week");
+  const [leadHours, setLeadHours] = useState(48);
+  const summary = agenda && preparations ? summarizePreparation(agenda.events, preparations) : null;
   const [filter, setFilter] = useState<AgendaFilter>("all");
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
@@ -77,6 +95,23 @@ export function DashboardAgendaPanel({
             <Button type="button" variant={period === "week" ? "default" : "outline"} size="sm"
               onClick={() => setPeriod("week")} aria-pressed={period === "week"}>Próximos 7 dias</Button>
           </div>
+          <div className="evolu-dashboard__prep-lead">
+            <label htmlFor="dashboard-prep-lead" className="text-xs text-muted-foreground">Antecedência dos alertas</label>
+            <select id="dashboard-prep-lead" value={leadHours} onChange={e => setLeadHours(Number(e.target.value))}
+              className="h-9 rounded-md border bg-background px-2 text-xs">
+              <option value={24}>24 horas</option>
+              <option value={48}>48 horas</option>
+              <option value={72}>72 horas</option>
+            </select>
+          </div>
+          {preparationError && <p role="alert" className="evolu-dashboard__agenda-error">
+            Prontidão não disponível: {preparationError}
+          </p>}
+          {summary && <div className="evolu-dashboard__prep-summary" aria-label="Preparação operacional por OS">
+            <span><strong>{summary.pending}</strong> OS pendente(s)</span>
+            <span><strong>{summary.partial}</strong> OS parcialmente preparada(s)</span>
+            <span><strong>{summary.unverified}</strong> OS sem prontidão verificada</span>
+          </div>}
           {!agenda ? (
             <div role="status" aria-label="Carregando agenda" className="space-y-2">
               {error
@@ -87,7 +122,8 @@ export function DashboardAgendaPanel({
             <>
               <div className="evolu-dashboard__agenda-list">
                 {events.length
-                  ? events.slice(0, 5).map(event => <EventRow key={event.key} event={event} />)
+                  ? events.slice(0, 5).map(event => <EventRow key={event.key} event={event}
+                    preparations={preparations} leadHours={leadHours} now={now} />)
                   : <p className="evolu-dashboard__empty">Nenhum compromisso ou prazo registrado neste período.</p>}
               </div>
               {events.length > 5 &&
@@ -156,7 +192,8 @@ export function DashboardAgendaPanel({
                 </p>
                 <div className="space-y-2">
                   {visible.length
-                    ? visible.map(event => <EventRow key={event.key} event={event} />)
+                    ? visible.map(event => <EventRow key={event.key} event={event}
+                      preparations={preparations} leadHours={leadHours} now={now} />)
                     : <p className="evolu-dashboard__empty">Nenhum registro corresponde aos filtros.</p>}
                 </div>
               </div>
