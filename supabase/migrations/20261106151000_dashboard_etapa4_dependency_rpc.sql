@@ -177,11 +177,11 @@ CREATE TRIGGER dashboard_dependency_cleanup_order
  FOR EACH ROW EXECUTE FUNCTION public.dashboard_cleanup_dependencies_on_source();
 
 REVOKE ALL ON FUNCTION public.dashboard_link_operations(uuid,uuid,uuid,text)
-  FROM PUBLIC,anon,authenticated;
+  FROM PUBLIC,anon,authenticated,service_role;
 REVOKE ALL ON FUNCTION public.dashboard_unlink_operations(uuid,text)
-  FROM PUBLIC,anon,authenticated;
+  FROM PUBLIC,anon,authenticated,service_role;
 REVOKE ALL ON FUNCTION public.dashboard_cleanup_dependencies_on_source()
-  FROM PUBLIC,anon,authenticated;
+  FROM PUBLIC,anon,authenticated,service_role;
 GRANT EXECUTE ON FUNCTION public.dashboard_link_operations(uuid,uuid,uuid,text)
  TO authenticated;
 GRANT EXECUTE ON FUNCTION public.dashboard_unlink_operations(uuid,text)
