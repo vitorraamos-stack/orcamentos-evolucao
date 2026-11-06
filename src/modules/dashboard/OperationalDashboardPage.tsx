@@ -18,7 +18,7 @@ import "./operational-dashboard.css";
 const REFRESH_INTERVAL = 120_000;
 type Snapshot = { userId: string; overview: DashboardOverview; updatedAt: Date };
 type Assignments = { userId: string; rows: DashboardAssignee[] };
-type AgendaSnapshot = { userId: string; agenda: DashboardAgenda; updatedAt: Date };
+type AgendaSnapshot = { userId: string; accessKey: string; agenda: DashboardAgenda; updatedAt: Date };
 
 function dateLabel(date: string | null) {
   if (!date) return "Não informado";
@@ -182,6 +182,11 @@ export default function OperationalDashboardPage() {
   const { user, hasModuleAccess, hubPermissions } = useAuth();
   const userId = user?.id ?? null;
   const authorized = Boolean(userId && hubPermissions.canViewHubOS && hasModuleAccess("hub_os"));
+  const accessKey = [
+    hubPermissions.isManager ? "manager" : "member",
+    hubPermissions.canViewInstallations ? "installation" : "no-installation",
+    hubPermissions.canViewDeliveries ? "delivery" : "no-delivery",
+  ].join(":");
   const [stored, setStored] = useState<Snapshot | null>(null);
   const [storedAssignments, setStoredAssignments] = useState<Assignments | null>(null);
   const [storedAgenda, setStoredAgenda] = useState<AgendaSnapshot | null>(null);
@@ -194,7 +199,8 @@ export default function OperationalDashboardPage() {
   const snapshot = authorized && stored?.userId === userId ? stored : null;
   const assignments = authorized && storedAssignments?.userId === userId
     ? storedAssignments.rows : null;
-  const agenda = authorized && storedAgenda?.userId === userId ? storedAgenda.agenda : null;
+  const agenda = authorized && storedAgenda?.userId === userId && storedAgenda.accessKey === accessKey
+    ? storedAgenda.agenda : null;
 
   const refresh = useCallback(async () => {
     if (!authorized || !userId) return;
@@ -231,7 +237,9 @@ export default function OperationalDashboardPage() {
         canViewDeliveries: hubPermissions.canViewDeliveries,
       }, controller.signal).then(sources => {
         if (!controller.signal.aborted && requestId === requestIdRef.current)
-          setStoredAgenda({ userId, agenda: buildDashboardAgenda(rows, sources, now), updatedAt: new Date() });
+          setStoredAgenda({
+            userId, accessKey, agenda: buildDashboardAgenda(rows, sources, now), updatedAt: new Date(),
+          });
       }).catch(reason => {
         if (!controller.signal.aborted && requestId === requestIdRef.current)
           setAgendaError(reason instanceof Error ? reason.message : "Falha ao consultar a agenda.");
@@ -242,7 +250,7 @@ export default function OperationalDashboardPage() {
       setRefreshing(false);
     }
   }, [
-    authorized, userId, hubPermissions.isManager,
+    authorized, userId, accessKey, hubPermissions.isManager,
     hubPermissions.canViewInstallations, hubPermissions.canViewDeliveries,
   ]);
 
