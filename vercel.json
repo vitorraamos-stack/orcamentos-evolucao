@@ -58,8 +58,7 @@
   ],
   "git": {
     "deploymentEnabled": {
-      "feat/os-detail-uxui-integrated-20261030": false,
-      "feat/dashboard-agenda-operacional-etapa2-20261106": false
+      "feat/os-detail-uxui-integrated-20261030": false
     }
   }
 }
