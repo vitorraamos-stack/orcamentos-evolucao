@@ -50,6 +50,7 @@ describe("Dashboard Etapa 2 — agenda e conflitos", () => {
     ]), now);
     expect(agenda.waitingInstallations).toBe(1);
     expect(agenda.waitingDeliveries).toBe(0);
+    expect(agenda.deliveriesWithoutTime).toBe(1);
     expect(agenda.events.some(e => e.key.includes("old") || e.key.includes("missing"))).toBe(false);
     expect(agenda.events.every(e => e.order.id !== "c")).toBe(true);
   });
@@ -86,6 +87,23 @@ describe("Dashboard Etapa 2 — agenda e conflitos", () => {
     const agenda = buildDashboardAgenda(orders, sources([]), localNow);
     expect(filterDashboardAgenda(agenda, "today", "all", localNow).map(e => e.order.id)).toEqual(["today"]);
     expect(filterDashboardAgenda(agenda, "week", "all", localNow).map(e => e.order.id)).toEqual(["today", "last"]);
+  });
+
+  it("sorts events by actual instant even when ISO offsets differ", () => {
+    const events = buildDashboardAgenda([
+      order("a", { delivery_date: null }), order("b", { delivery_date: null }),
+    ], sources([
+      installation("a", "a", { scheduled_start: "2026-11-06T09:00:00-03:00" }),
+      installation("b", "b", { scheduled_start: "2026-11-06T11:00:00Z" }),
+    ]), now).events;
+    expect(events.map(event => event.order.id)).toEqual(["b", "a"]);
+  });
+
+  it("does not claim global installation waiting counts when visibility is team-limited", () => {
+    const result = buildDashboardAgenda([order("unassigned")], {
+      ...sources([]), canCountWaitingInstallations: false,
+    }, now);
+    expect(result.waitingInstallations).toBeNull();
   });
 
   it("does not leak restricted logistic counts or fabricate events from inaccessible tables", () => {

@@ -98,5 +98,6 @@ export async function listDashboardAgendaSources(
     deliveries: deliveryRows as DashboardDelivery[],
     canViewInstallations: access.canViewInstallations,
     canViewDeliveries: access.canViewDeliveries,
+    canCountWaitingInstallations: access.isManager,
   };
 }

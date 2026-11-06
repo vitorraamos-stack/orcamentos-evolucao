@@ -101,6 +101,11 @@ export function DashboardAgendaPanel({
                   <Link href="/entregas" className="evolu-dashboard__agenda-chip">
                     <strong>{agenda.waitingDeliveries}</strong> entrega(s) sem agendamento <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                   </Link>}
+                {agenda.deliveriesWithoutTime !== null && agenda.deliveriesWithoutTime > 0 &&
+                  <Link href="/entregas" className="evolu-dashboard__agenda-chip">
+                    <strong>{agenda.deliveriesWithoutTime}</strong> entrega(s) cadastrada(s) sem horário
+                    <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  </Link>}
                 {agenda.overdueWithoutCompletion > 0 &&
                   <button type="button" className="evolu-dashboard__agenda-chip" onClick={() => openFiltered("late")}>
                     <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />

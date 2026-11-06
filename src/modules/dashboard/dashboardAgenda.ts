@@ -35,6 +35,7 @@ export type DashboardAgenda = {
   events: AgendaEvent[];
   waitingInstallations: number | null;
   waitingDeliveries: number | null;
+  deliveriesWithoutTime: number | null;
   overdueWithoutCompletion: number;
   conflicts: number;
   missingInformation: number;
@@ -44,6 +45,8 @@ export type DashboardAgendaSources = {
   deliveries: readonly DashboardDelivery[];
   canViewInstallations: boolean;
   canViewDeliveries: boolean;
+  /** Null out global pending counts if the user sees only their own team. */
+  canCountWaitingInstallations?: boolean;
 };
 
 const validInstant = (value: string | null | undefined) =>
@@ -152,12 +155,12 @@ export function buildDashboardAgenda(
   }
   events.sort((a, b) =>
     a.dateKey.localeCompare(b.dateKey) ||
-    (a.hasTime && b.hasTime ? a.when.localeCompare(b.when) : a.hasTime ? -1 : b.hasTime ? 1 : 0) ||
+    (a.hasTime && b.hasTime ? Date.parse(a.when) - Date.parse(b.when) : a.hasTime ? -1 : b.hasTime ? 1 : 0) ||
     a.key.localeCompare(b.key)
   );
   return {
     events,
-    waitingInstallations: sources.canViewInstallations
+    waitingInstallations: sources.canViewInstallations && sources.canCountWaitingInstallations !== false
       ? Array.from(orderMap.values()).filter(o => o.logistic_type === "instalacao" &&
         (o.prod_status === "Pronto / Avisar Cliente" || o.prod_status === "Instalação Agendada") &&
         !activeInstallationIds.has(o.id)).length
@@ -166,6 +169,9 @@ export function buildDashboardAgenda(
       ? Array.from(orderMap.values()).filter(o => o.logistic_type === "entrega" &&
         (o.prod_status === "Pronto / Avisar Cliente" || o.prod_status === "Logística (Entrega/Transportadora)") &&
         !activeDeliveryIds.has(o.id)).length
+      : null,
+    deliveriesWithoutTime: sources.canViewDeliveries
+      ? activeDeliveries.filter(d => orderMap.has(d.os_id) && validInstant(d.scheduled_at) === null).length
       : null,
     overdueWithoutCompletion: events.filter(e => e.overdueWithoutCompletion).length,
     conflicts: events.filter(e => e.conflict).length,
