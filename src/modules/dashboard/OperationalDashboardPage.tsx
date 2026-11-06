@@ -1,387 +1,282 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import "./operational-dashboard.css";
 import {
-  AlertTriangle,
-  ArrowRight,
-  ChartNoAxesColumnIncreasing,
-  CircleDollarSign,
-  ClipboardList,
-  Clock3,
-  Factory,
-  PackageCheck,
-  Palette,
-  PackageSearch,
-  TriangleAlert,
-  Wrench,
+  AlertTriangle, ArrowRight, CalendarClock, ClipboardList,
+  Factory, Layers3, Palette, RefreshCw, Truck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { OsOrder } from "@/features/hubos/types";
-import {
-  getOperationalDashboardMetrics,
-  getOperationalAttentionMetrics,
-  listOperationalAttentionOrders,
-  type DashboardPeriod,
-  type OperationalDashboardMetrics,
-  type OperationalAttentionMetrics,
-} from "@/modules/orders/orderRepository";
-import { calculateOrderRisk } from "@/modules/orders/risk";
-import { addLocalDays, formatLocalDate } from "@/shared/lib/date";
-import { OrderRiskBadge } from "@/shared/components/OrderBadges";
-import {
-  ErrorState,
-  LoadingState,
-  PageHeader,
-  StatCard,
-} from "@/shared/components/OperationalUi";
+import { useAuth } from "@/contexts/AuthContext";
+import { ErrorState, PageHeader } from "@/shared/components/OperationalUi";
+import { buildDashboardOverview, type DashboardOverview, type DashboardOrder } from "./dashboardModel";
+import { listDashboardAssignees, listDashboardOrders, type DashboardAssignee } from "./dashboardRepository";
+import "./operational-dashboard.css";
 
-type Period = "today" | "week" | "month" | "all" | "custom";
+const REFRESH_INTERVAL = 120_000;
+type Snapshot = { userId: string; overview: DashboardOverview; updatedAt: Date };
+type Assignments = { userId: string; rows: DashboardAssignee[] };
 
-function periodRange(
-  period: Period,
-  start: string,
-  end: string
-): DashboardPeriod {
-  const now = new Date();
-  const today = formatLocalDate(now);
-  if (period === "all") return {};
-  if (period === "custom")
-    return { start: start || undefined, end: end || undefined };
-  if (period === "today") return { start: today, end: today };
-  if (period === "week")
-    return { start: today, end: formatLocalDate(addLocalDays(now, 7)) };
-  const [year, month] = today.split("-").map(Number);
-  const monthEnd = new Date(Date.UTC(year, month, 0, 15));
-  return {
-    start: `${year}-${String(month).padStart(2, "0")}-01`,
-    end: formatLocalDate(monthEnd),
-  };
+function dateLabel(date: string | null) {
+  if (!date) return "Não informado";
+  const [year, month, day] = date.split("-");
+  return year && month && day ? day + "/" + month + "/" + year : "Não informado";
+}
+
+function scopeForOrder(order: DashboardOrder) {
+  if (order.prod_status === "Instalação Agendada" || order.prod_status === "Logística (Entrega/Transportadora)") return "INSTALLATION";
+  if (order.prod_status === "Em Acabamento") return "FINISHING";
+  if (order.prod_status === "Produção" || order.prod_status === "Pronto / Avisar Cliente") return "PRODUCTION";
+  return "ART";
+}
+
+function responsibleLabel(order: DashboardOrder, assignments: DashboardAssignee[] | null) {
+  if (!assignments) return "Consultando…";
+  const people = assignments.filter(row => row.order_id === order.id);
+  const preferred = people.find(row => row.scope === scopeForOrder(order) && row.email);
+  const general = people.find(row => row.scope === "GENERAL" && row.email);
+  const any = people.find(row => row.email);
+  return (preferred ?? general ?? any)?.email ?? "Não informado";
+}
+
+function SummaryIndicators({ overview }: { overview: DashboardOverview | null }) {
+  const values = [
+    { label: "OS ativas", value: overview?.active, href: "/os?quick=active", icon: ClipboardList, tone: "primary" },
+    { label: "Exigem atenção", value: overview?.attention, href: "/os", icon: AlertTriangle, tone: "warning" },
+    { label: "Atrasadas", value: overview?.overdue, href: "/os?quick=overdue", icon: CalendarClock, tone: "danger" },
+    { label: "Vencem hoje", value: overview?.dueToday, href: "/os?quick=today", icon: CalendarClock, tone: "primary" },
+  ] as const;
+  return (
+    <section className="evolu-dashboard__indicators" aria-label="Indicadores operacionais">
+      {values.map(({ label, value, href, icon: Icon, tone }) => (
+        <Link
+          key={label} href={href}
+          className={"evolu-dashboard__indicator evolu-dashboard__indicator--" + tone}
+          aria-label={label + ": " + (value === undefined ? "carregando" : value) + " OS. Abrir Central de OS"}
+        >
+          <span className="evolu-dashboard__indicator-label"><Icon aria-hidden="true" className="h-5 w-5" /> {label}</span>
+          <span className="evolu-dashboard__indicator-value" aria-busy={value === undefined}>
+            {value === undefined ? "—" : value}
+          </span>
+          <span className="evolu-dashboard__indicator-hint">Consultar OS <ArrowRight aria-hidden="true" className="h-4 w-4" /></span>
+        </Link>
+      ))}
+    </section>
+  );
+}
+
+function PriorityOrders({
+  overview, assignments,
+}: { overview: DashboardOverview | null; assignments: DashboardAssignee[] | null }) {
+  return (
+    <section aria-labelledby="dashboard-priority-heading" className="min-w-0">
+      <Card className="evolu-dashboard__panel h-full">
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <div>
+            <CardTitle id="dashboard-priority-heading" className="text-base">OS prioritárias</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">Cinco ordens selecionadas por prazo, bloqueios e urgência.</p>
+          </div>
+          <Link href="/os" className="evolu-dashboard__text-link shrink-0">Todas as OS <ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {overview === null ? (
+            <div className="space-y-3" role="status" aria-label="Carregando prioridades">
+              {[1, 2, 3].map(item => <div key={item} className="evolu-dashboard__skeleton h-20" />)}
+            </div>
+          ) : overview.priorities.length === 0 ? (
+            <p className="evolu-dashboard__empty">Nenhuma OS ativa para priorizar.</p>
+          ) : overview.priorities.map(({ order, reason, stage }) => (
+            <Link
+              key={order.id}
+              href={"/os/" + encodeURIComponent(order.id)}
+              className="evolu-dashboard__priority"
+              aria-label={"Abrir OS " + (order.sale_number?.trim() || "sem número") + ", " + order.client_name}
+            >
+              <div className="evolu-dashboard__priority-top">
+                <div className="min-w-0">
+                  <p className="evolu-dashboard__priority-title">
+                    {order.sale_number?.trim() ? "OS " + order.sale_number : "Número não informado"}
+                    <span className="mx-2 text-muted-foreground" aria-hidden="true">·</span>
+                    {order.client_name?.trim() || "Cliente não informado"}
+                  </p>
+                  <p className="evolu-dashboard__priority-service">{order.title?.trim() || "Serviço não informado"}</p>
+                </div>
+                <span className="evolu-dashboard__priority-reason">{reason}</span>
+              </div>
+              <div className="evolu-dashboard__priority-details">
+                <span><strong>Etapa:</strong> {stage}</span>
+                <span><strong>Responsável:</strong> {responsibleLabel(order, assignments)}</span>
+                <span><strong>Prazo:</strong> {dateLabel(order.delivery_date)}</span>
+                <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0" />
+              </div>
+            </Link>
+          ))}
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function SectorFlow({ overview }: { overview: DashboardOverview | null }) {
+  const { hubPermissions } = useAuth();
+  const sectors = [
+    { label: "Arte e aprovação", value: overview?.sectors.artwork, icon: Palette, href: "/os/arte", allowed: hubPermissions.canViewArteBoard },
+    { label: "Produção", value: overview?.sectors.production, icon: Factory, href: "/os/producao", allowed: hubPermissions.canViewProducaoBoard },
+    { label: "Finalização", value: overview?.sectors.finishing, icon: Layers3, href: "/os/producao/acabamento", allowed: hubPermissions.canViewProducaoBoard },
+    { label: "Logística", value: overview?.sectors.logistics, icon: Truck, href: hubPermissions.canViewInstallations ? "/instalacoes" : "/entregas", allowed: hubPermissions.canViewInstallations || hubPermissions.canViewDeliveries },
+  ] as const;
+  return (
+    <section aria-labelledby="dashboard-flow-heading" className="mt-5">
+      <Card className="evolu-dashboard__panel">
+        <CardHeader>
+          <CardTitle id="dashboard-flow-heading" className="text-base">Fluxo por setores</CardTitle>
+          <p className="text-sm text-muted-foreground">Situação operacional registrada. Uma OS pode participar de mais de um setor quando há trabalho paralelo.</p>
+        </CardHeader>
+        <CardContent>
+          <div className="evolu-dashboard__sectors">
+            {sectors.map(({ label, value, icon: Icon, href, allowed }) => {
+              const child = (
+                <>
+                  <div className="flex items-center gap-2"><Icon aria-hidden="true" className="h-5 w-5 text-primary" /><span className="font-medium">{label}</span></div>
+                  <div className="flex items-end justify-between gap-3">
+                    <strong className="text-3xl tabular-nums" aria-busy={value === undefined}>{value === undefined ? "—" : value}</strong>
+                    {allowed && <ArrowRight aria-hidden="true" className="h-4 w-4 text-muted-foreground" />}
+                  </div>
+                </>
+              );
+              return allowed
+                ? <Link key={label} href={href} className="evolu-dashboard__sector evolu-dashboard__sector--link" aria-label={"Abrir " + label}>{child}</Link>
+                : <div key={label} className="evolu-dashboard__sector">{child}</div>;
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    </section>
+  );
 }
 
 export function OperationalDashboardSections({
-  metrics,
-  attentionMetrics,
-}: {
-  metrics: OperationalDashboardMetrics;
-  attentionMetrics: OperationalAttentionMetrics;
-  /** Kept optional for compatibility; consultant pending navigation is fixed. */
-  financeHref?: string;
-}) {
+  overview, assignments,
+}: { overview: DashboardOverview | null; assignments?: DashboardAssignee[] | null }) {
   return (
     <>
-      <section className="evolu-dashboard__panel evolu-ui-panel p-3 sm:p-4">
-        <div className="mb-2.5 flex items-start gap-2">
-          <ChartNoAxesColumnIncreasing
-            aria-hidden="true"
-            className="mt-0.5 h-5 w-5 text-primary"
-          />
-          <div>
-            <h2 className="font-semibold">Fluxo atual</h2>
-            <p className="text-xs text-muted-foreground">
-              Quantidade de OS por etapa atual da operação.
-            </p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-          <StatCard
-            label="OS ativas"
-            value={metrics.active}
-            icon={ClipboardList}
-            href="/os?quick=active"
-          />
-          <StatCard
-            label="Em Arte"
-            value={metrics.art}
-            icon={Palette}
-            href="/os/arte"
-          />
-          <StatCard
-            label="Aguardando aprovação"
-            value={metrics.approval}
-            tone="warning"
-            icon={Clock3}
-            href="/os/arte/aprovacoes"
-          />
-          <StatCard
-            label="Em Produção"
-            value={metrics.production}
-            icon={Factory}
-            href="/os/producao/em-producao"
-          />
-          <StatCard
-            label="Em Acabamento"
-            value={metrics.finish}
-            icon={Wrench}
-            href="/os/producao/acabamento"
-          />
-          <StatCard
-            label="Material pronto"
-            value={metrics.ready}
-            tone="success"
-            icon={PackageCheck}
-            href="/os/producao/pronto"
-          />
-        </div>
-      </section>
-      <section className="evolu-dashboard__panel evolu-dashboard__panel--attention evolu-ui-panel mt-4 p-3 sm:p-4">
-        <div className="mb-2.5 flex items-start gap-2">
-          <TriangleAlert
-            aria-hidden="true"
-            className="mt-0.5 h-5 w-5 text-destructive"
-          />
-          <div>
-            <h2 className="font-semibold">Atenção e pendências</h2>
-            <p className="text-xs text-muted-foreground">
-              Situações que exigem atenção para manter o fluxo da operação.
-            </p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-          <StatCard
-            label="Aguardando insumos"
-            value={attentionMetrics.awaitingSupplies}
-            tone="warning"
-            icon={PackageSearch}
-            href="/os/insumos"
-          />
-          <StatCard
-            label="Produção externa"
-            value={metrics.externalProduction}
-            tone="warning"
-            icon={Factory}
-            href="/os/producao/externa"
-          />
-          <StatCard
-            label="Pendências financeiras"
-            value={attentionMetrics.financePending}
-            tone="danger"
-            icon={CircleDollarSign}
-            href="/hub-os/pendentes"
-          />
-          <StatCard
-            label="Atrasadas"
-            value={metrics.overdue}
-            tone="danger"
-            icon={AlertTriangle}
-            href="/os?quick=overdue"
-          />
-          <StatCard
-            label="Prazo hoje"
-            value={metrics.today}
-            tone="danger"
-            icon={Clock3}
-            href="/os?quick=today"
-          />
-          <StatCard
-            label="Prazo amanhã"
-            value={metrics.tomorrow}
-            tone="warning"
-            icon={Clock3}
-            href="/os?quick=tomorrow"
-          />
-        </div>
-      </section>
+      <SummaryIndicators overview={overview} />
+      <div className="mt-5">
+        <PriorityOrders overview={overview} assignments={assignments ?? null} />
+      </div>
+      <SectorFlow overview={overview} />
     </>
   );
 }
 
 export default function OperationalDashboardPage() {
-  const [metrics, setMetrics] = useState<OperationalDashboardMetrics | null>(
-    null
-  );
-  const [attention, setAttention] = useState<OsOrder[]>([]);
-  const [attentionMetrics, setAttentionMetrics] =
-    useState<OperationalAttentionMetrics | null>(null);
-  const [period, setPeriod] = useState<Period>("week");
-  const [customStart, setCustomStart] = useState("");
-  const [customEnd, setCustomEnd] = useState("");
-  const [loading, setLoading] = useState(true);
+  const { user, hasModuleAccess, hubPermissions } = useAuth();
+  const userId = user?.id ?? null;
+  const authorized = Boolean(userId && hubPermissions.canViewHubOS && hasModuleAccess("hub_os"));
+  const [stored, setStored] = useState<Snapshot | null>(null);
+  const [storedAssignments, setStoredAssignments] = useState<Assignments | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const range = useMemo(
-    () => periodRange(period, customStart, customEnd),
-    [period, customStart, customEnd]
-  );
-  const invalidRange = Boolean(
-    range.start && range.end && range.start > range.end
-  );
-  const load = useCallback(() => {
-    if (invalidRange) return;
-    setLoading(true);
-    setError("");
-    Promise.all([
-      getOperationalDashboardMetrics(range),
-      getOperationalAttentionMetrics(),
-      listOperationalAttentionOrders(8),
-    ])
-      .then(([nextMetrics, nextAttentionMetrics, nextAttention]) => {
-        setMetrics(nextMetrics);
-        setAttentionMetrics(nextAttentionMetrics);
-        setAttention(nextAttention);
-      })
-      .catch(reason =>
-        setError(
-          reason instanceof Error
-            ? reason.message
-            : "Falha ao carregar o dashboard."
-        )
-      )
-      .finally(() => setLoading(false));
-  }, [invalidRange, range]);
-  useEffect(load, [load]);
+  const requestIdRef = useRef(0);
+  const controllerRef = useRef<AbortController | null>(null);
+  const lastSuccessRef = useRef(0);
+  const snapshot = authorized && stored?.userId === userId ? stored : null;
+  const assignments = authorized && storedAssignments?.userId === userId
+    ? storedAssignments.rows : null;
 
-  const workload = metrics
-    ? ([
-        ["Arte", metrics.art],
-        ["Produção", metrics.production],
-        ["Acabamento", metrics.finish],
-        ["Letra Caixa", metrics.letterBox],
-        ["Produção externa", metrics.externalProduction],
-        ["Instalação", metrics.installationLoad],
-      ] as const)
-    : [];
-  const maxLoad = Math.max(1, ...workload.map(([, value]) => value));
+  const refresh = useCallback(async () => {
+    if (!authorized || !userId) return;
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    const requestId = ++requestIdRef.current;
+    setRefreshing(true);
+    setError("");
+    try {
+      const now = new Date();
+      const rows = await listDashboardOrders(controller.signal);
+      if (controller.signal.aborted || requestId !== requestIdRef.current) return;
+      const overview = buildDashboardOverview(rows, now);
+      setStored({ userId, overview, updatedAt: new Date() });
+      setStoredAssignments(null);
+      lastSuccessRef.current = Date.now();
+      setRefreshing(false);
+      void listDashboardAssignees(overview.priorities.map(item => item.order.id), controller.signal)
+        .then(people => {
+          if (!controller.signal.aborted && requestId === requestIdRef.current)
+            setStoredAssignments({ userId, rows: people });
+        })
+        .catch(() => {
+          if (!controller.signal.aborted && requestId === requestIdRef.current)
+            setStoredAssignments({ userId, rows: [] });
+        });
+    } catch (reason) {
+      if (controller.signal.aborted || requestId !== requestIdRef.current) return;
+      setError(reason instanceof Error ? reason.message : "Falha ao consultar as ordens.");
+      setRefreshing(false);
+    }
+  }, [authorized, userId]);
+
+  useEffect(() => {
+    if (!authorized) {
+      controllerRef.current?.abort();
+      requestIdRef.current++;
+      return;
+    }
+    void refresh();
+    const periodic = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, REFRESH_INTERVAL);
+    const visibleAgain = () => {
+      if (document.visibilityState === "visible" &&
+          Date.now() - lastSuccessRef.current >= REFRESH_INTERVAL) void refresh();
+    };
+    document.addEventListener("visibilitychange", visibleAgain);
+    return () => {
+      window.clearInterval(periodic);
+      document.removeEventListener("visibilitychange", visibleAgain);
+      requestIdRef.current++;
+      controllerRef.current?.abort();
+    };
+  }, [authorized, refresh]);
+
+  if (!authorized) return null;
 
   return (
-    <div className="evolu-dashboard pb-10">
-      <div className="evolu-dashboard__eyebrow">Visão consolidada <span aria-hidden="true" /></div>
+    <div className="evolu-dashboard pb-10" aria-busy={refreshing && !snapshot}>
+      <div className="evolu-dashboard__eyebrow">Visão operacional <span aria-hidden="true" /></div>
       <PageHeader
         title="Dashboard operacional"
-        description="Estado atual da operação e prazos do período selecionado."
+        description="Prioridades, prazos e andamento das ordens de serviço."
         actions={
-          <Button asChild className="evolu-ui-primary-action">
-            <Link href="/os">
-              Ver todas as OS <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
+          <Button type="button" variant="outline" onClick={() => void refresh()} disabled={refreshing}
+            aria-label="Atualizar Dashboard">
+            <RefreshCw aria-hidden="true" className={"mr-2 h-4 w-4 " + (refreshing ? "animate-spin" : "")} />
+            {refreshing ? "Atualizando…" : "Atualizar"}
           </Button>
         }
       />
-      <div className="evolu-dashboard__filters mb-5 flex flex-wrap gap-2" aria-label="Período de análise">
-        {(
-          [
-            ["today", "Hoje"],
-            ["week", "Esta semana"],
-            ["month", "Este mês"],
-            ["all", "Todo o período"],
-            ["custom", "Personalizado"],
-          ] as const
-        ).map(([value, label]) => (
-          <Button
-            key={value}
-            size="sm"
-            aria-pressed={period === value}
-            className="evolu-dashboard__filter evolu-ui-filter-control"
-            variant={period === value ? "default" : "outline"}
-            onClick={() => setPeriod(value)}
-          >
-            {label}
-          </Button>
-        ))}
+      <div className="evolu-dashboard__updated" aria-live="polite">
+        {snapshot
+          ? "Atualizado às " + snapshot.updatedAt.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }) + " (SC) · atualização automática a cada 2 min"
+          : "Consultando dados operacionais…"}
       </div>
-      {period === "custom" && (
-        <div className="mb-5 grid max-w-lg gap-3 sm:grid-cols-2">
-          <label className="text-sm font-medium">
-            Data inicial
-            <Input
-              className="mt-1 evolu-ui-field"
-              type="date"
-              value={customStart}
-              onChange={event => setCustomStart(event.target.value)}
-            />
-          </label>
-          <label className="text-sm font-medium">
-            Data final
-            <Input
-              className="mt-1"
-              type="date"
-              value={customEnd}
-              onChange={event => setCustomEnd(event.target.value)}
-            />
-          </label>
-          {invalidRange && (
-            <p className="text-sm text-destructive sm:col-span-2">
-              A data final deve ser igual ou posterior à inicial.
-            </p>
-          )}
+      {error && (
+        <div className="evolu-dashboard__error" role="alert">
+          {snapshot ? "Não foi possível atualizar. Últimos dados válidos mantidos. " : "Não foi possível carregar o Dashboard. "}
+          {error}
+          <Button type="button" variant="link" onClick={() => void refresh()}>Tentar novamente</Button>
         </div>
       )}
-      {loading ? (
-        <LoadingState />
-      ) : error ? (
-        <ErrorState message={error} retry={load} />
+      {!snapshot && error ? (
+        <ErrorState message="Os dados operacionais estão indisponíveis." retry={() => void refresh()} />
       ) : (
-        metrics &&
-        attentionMetrics && (
-          <>
-            <OperationalDashboardSections
-              metrics={metrics}
-              attentionMetrics={attentionMetrics}
-            />
-            <div className="mt-6 grid gap-5 lg:grid-cols-5">
-              <Card className="evolu-dashboard__detail-card evolu-ui-panel lg:col-span-3">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <AlertTriangle className="h-5 w-5 text-amber-600" /> Atenção
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {attention.length === 0 ? (
-                    <p className="py-8 text-center text-sm text-muted-foreground">
-                      Nenhuma situação crítica.
-                    </p>
-                  ) : (
-                    attention.map(order => (
-                      <Link
-                        key={order.id}
-                        href={`/os/${order.id}`}
-                        className="flex items-center justify-between gap-3 rounded-md border p-3 hover:bg-muted/40"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold">
-                            #{order.sale_number} · {order.client_name}
-                          </p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {order.title ||
-                              order.prod_status ||
-                              order.art_status}
-                          </p>
-                        </div>
-                        <OrderRiskBadge risk={calculateOrderRisk(order)} />
-                      </Link>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-              <Card className="evolu-dashboard__detail-card evolu-ui-panel lg:col-span-2">
-                <CardHeader>
-                  <CardTitle className="text-base">Carga operacional</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {workload.map(([label, value]) => (
-                    <div key={label}>
-                      <div className="mb-1 flex justify-between text-sm">
-                        <span>{label}</span>
-                        <strong>{value}</strong>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-primary"
-                          style={{ width: `${(value / maxLoad) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-            <p className="mt-4 text-xs text-muted-foreground">
-              Fluxo atual, Aguardando insumos, Produção externa e Financeiro
-              refletem o estado atual das OS. Atrasos e prazos respeitam o
-              período selecionado; instalação permanece na carga operacional.
-            </p>
-          </>
-        )
+        <>
+          <OperationalDashboardSections overview={snapshot?.overview ?? null} assignments={assignments} />
+          <p className="mt-4 text-xs text-muted-foreground">
+            Contagens de OS distintas, com acesso limitado pelas permissões existentes. Prazos usam o calendário de Santa Catarina.
+            A classificação considera somente bloqueios, urgências e prazos registrados; sem prazo não significa atraso.
+          </p>
+        </>
       )}
     </div>
   );

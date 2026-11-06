@@ -12,8 +12,10 @@ describe("EvoluSystem operational visual primitives", () => {
   it("shares accessible surface, filter, field and primary action primitives", () => {
     for (const part of ["panel", "filter-control", "field", "primary-action"]) {
       expect(stylesheet).toContain(`.evolu-ui-${part}`);
-      expect(dashboard).toContain(`evolu-ui-${part}`);
     }
+    // Dashboard surfaces are intentionally scoped; Central keeps shared controls.
+    expect(dashboard).toContain("evolu-dashboard__panel");
+    expect(dashboard).toContain("evolu-dashboard__indicator");
     expect(orders).toContain("evolu-ui-panel");
     expect(orders).toContain("evolu-ui-filter-control");
     expect(orders).toContain("evolu-ui-primary-action");

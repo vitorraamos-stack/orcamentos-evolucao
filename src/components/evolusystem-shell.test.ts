@@ -48,11 +48,12 @@ describe("EvoluSystem premium shell", () => {
     expect(layout).toContain("isProductionCentralPage ||");
   });
 
-  it("does not change dashboard data contracts or recovery calls", () => {
-    expect(dashboard).toContain("getOperationalDashboardMetrics(range)");
-    expect(dashboard).toContain("getOperationalAttentionMetrics()");
-    expect(dashboard).toContain("listOperationalAttentionOrders(8)");
-    expect(dashboard).toContain("aria-pressed={period === value}");
+  it("keeps dashboard access read-only and preserves login recovery contracts", () => {
+    expect(dashboard).toContain('hasModuleAccess("hub_os")');
+    expect(dashboard).toContain("listDashboardOrders(controller.signal)");
+    expect(dashboard).toContain("buildDashboardOverview(rows, now)");
+    expect(dashboard).toContain("listDashboardAssignees(");
+    expect(dashboard).toContain("REFRESH_INTERVAL = 120_000");
     expect(login).toContain("supabase.auth.resetPasswordForEmail(email.trim()");
   });
 });
