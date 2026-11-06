@@ -78,7 +78,7 @@ export function findInstallationConflicts(rows: readonly DashboardInstallation[]
     }
   }
   const conflicts = new Set<string>();
-  for (const group of groups.values()) {
+  for (const group of Array.from(groups.values())) {
     group.sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
     for (let i = 0; i < group.length; i++) {
       for (let j = i + 1; j < group.length && group[j].start < group[i].end; j++) {
@@ -141,7 +141,7 @@ export function buildDashboardAgenda(
       warnings, overdueWithoutCompletion: late, conflict: false,
     });
   }
-  for (const order of orderMap.values()) {
+  for (const order of Array.from(orderMap.values())) {
     if (!order.delivery_date || !/^\d{4}-\d{2}-\d{2}$/.test(order.delivery_date)) continue;
     events.push({
       key: "deadline:" + order.id, kind: "deadline", order,
@@ -158,12 +158,12 @@ export function buildDashboardAgenda(
   return {
     events,
     waitingInstallations: sources.canViewInstallations
-      ? [...orderMap.values()].filter(o => o.logistic_type === "instalacao" &&
+      ? Array.from(orderMap.values()).filter(o => o.logistic_type === "instalacao" &&
         (o.prod_status === "Pronto / Avisar Cliente" || o.prod_status === "Instalação Agendada") &&
         !activeInstallationIds.has(o.id)).length
       : null,
     waitingDeliveries: sources.canViewDeliveries
-      ? [...orderMap.values()].filter(o => o.logistic_type === "entrega" &&
+      ? Array.from(orderMap.values()).filter(o => o.logistic_type === "entrega" &&
         (o.prod_status === "Pronto / Avisar Cliente" || o.prod_status === "Logística (Entrega/Transportadora)") &&
         !activeDeliveryIds.has(o.id)).length
       : null,
