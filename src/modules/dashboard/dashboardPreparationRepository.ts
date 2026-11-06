@@ -4,7 +4,7 @@ import type { PreparationItem, PreparationOperation, PreparationSources } from "
 const PAGE_SIZE = 500;
 const IN_BATCH = 80;
 const ITEM_PROJECTION = "id,order_id,name,status,updated_at";
-const OPERATION_PROJECTION = "id,item_id,work_center,status,is_required,assigned_to,blocked_reason,updated_at";
+const OPERATION_PROJECTION = "id,item_id,work_center,status,is_required,assigned_to,blocked_reason,updated_at,created_at";
 
 /** All lookups are RLS-controlled, read-only and limited to visible OS. */
 async function readByIds<T extends { id: string }>(

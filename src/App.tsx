@@ -20,6 +20,7 @@ import OsAuditPage from "@/modules/hub-os/pages/OsAuditPage";
 import OsPendentesPage from "@/modules/hub-os/pages/OsPendentesPage";
 import FinanceiroPortalPage from "@/modules/hub-os/pages/FinanceiroPortalPage";
 import OperationalDashboardPage from "@/modules/dashboard/OperationalDashboardPage";
+import DashboardOperationalSettingsPage from "@/modules/dashboard/DashboardOperationalSettingsPage";
 import OrdersCentralPage from "@/modules/orders/pages/OrdersCentralPage";
 import CreateOrderPage from "@/modules/orders/pages/CreateOrderPage";
 import ModulePlaceholderPage from "@/shared/components/ModulePlaceholderPage";
@@ -176,6 +177,18 @@ function Router() {
           <RequireModule moduleKey="materiais">
             {canAccessMateriais(authzContext) ? (
               <Materiais />
+            ) : (
+              <Redirect to="/" />
+            )}
+          </RequireModule>
+        </Layout>
+      </Route>
+
+      <Route path="/configuracoes/regras-operacionais">
+        <Layout>
+          <RequireModule moduleKey="configuracoes">
+            {canAccessConfiguracoes(authzContext) && hasModuleAccess("hub_os") ? (
+              <DashboardOperationalSettingsPage />
             ) : (
               <Redirect to="/" />
             )}

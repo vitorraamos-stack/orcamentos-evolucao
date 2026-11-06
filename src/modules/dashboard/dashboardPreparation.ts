@@ -18,6 +18,7 @@ export type PreparationOperation = {
   assigned_to: string | null;
   blocked_reason: string | null;
   updated_at: string;
+  created_at?: string | null;
 };
 export type PreparationSources = { items: PreparationItem[]; operations: PreparationOperation[] };
 

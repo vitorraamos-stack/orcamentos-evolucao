@@ -58,7 +58,8 @@
   ],
   "git": {
     "deploymentEnabled": {
-      "feat/os-detail-uxui-integrated-20261030": false
+      "feat/os-detail-uxui-integrated-20261030": false,
+      "feat/dashboard-inteligencia-avancada-etapa4-20261106": false
     }
   }
 }
