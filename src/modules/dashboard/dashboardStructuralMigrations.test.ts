@@ -43,7 +43,7 @@ describe("Dashboard Etapa 4 — migration authoring safety checks", () => {
     expect(rules).toContain("'retirada','entrega','instalacao'");
     expect(rules).toContain("p_scope='APPROVAL'");
     expect(rules).toContain("p_scope='LOGISTICS'");
-    expect(rules).toContain("public.scoped_rule_scope(p_scope)");
+    expect(rules).toContain("a.scope IN (p_scope, 'GENERAL')");
   });
   it("validates the calendar and rejects overlapping local work periods", () => {
     expect(rules).toContain("CREATE FUNCTION public.dashboard_publish_calendar(");
