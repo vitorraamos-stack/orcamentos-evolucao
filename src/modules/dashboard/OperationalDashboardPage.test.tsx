@@ -44,6 +44,10 @@ describe("Dashboard Etapa 1 — interface", () => {
     expect(html).toContain("Responsável:");
     expect(html).toContain("Não informado");
     expect(html).toContain("Fluxo por setores");
+    expect(html).toContain("Agenda operacional");
+    expect(html).toContain("Próximos 7 dias");
+    expect(html).toContain("Agenda completa");
+    expect(html).toContain("evolu-dashboard__main");
     expect(html).toContain('href="/os/arte"');
     expect(html).not.toContain('href="/os/producao"');
   });

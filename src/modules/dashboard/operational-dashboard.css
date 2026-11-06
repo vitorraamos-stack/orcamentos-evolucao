@@ -69,3 +69,51 @@
   .evolu-dashboard__indicator, .evolu-dashboard__skeleton { transition: none; animation: none; }
 }
 .dark .evolu-dashboard__priority-reason { color: #ffdda4; background: #4c320e; }
+
+/* Etapa 2 — prioridades 60% e agenda 40%, com empilhamento progressivo. */
+.evolu-dashboard__main {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  align-items: stretch;
+  gap: 16px;
+}
+.evolu-dashboard__agenda-period { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.evolu-dashboard__agenda-list { display: grid; align-content: start; gap: 8px; }
+.evolu-dashboard__agenda-event {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0;
+  padding: 11px 13px; border: 1px solid var(--border); border-radius: 12px;
+  background: var(--card); color: var(--card-foreground);
+}
+.evolu-dashboard__agenda-event:hover,
+.evolu-dashboard__agenda-chip:hover { border-color: var(--primary); }
+.evolu-dashboard__agenda-event:focus-visible,
+.evolu-dashboard__agenda-chip:focus-visible {
+  outline: 2px solid var(--ring); outline-offset: 2px;
+}
+.evolu-dashboard__agenda-event-top,
+.evolu-dashboard__agenda-kind,
+.evolu-dashboard__agenda-status {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+}
+.evolu-dashboard__agenda-event-top { justify-content: space-between; gap: 5px 9px; }
+.evolu-dashboard__agenda-kind { font-size: 13px; font-weight: 700; color: var(--primary); }
+.evolu-dashboard__agenda-time { font-size: 12px; font-weight: 650; color: var(--muted-foreground); }
+.evolu-dashboard__agenda-client { font-size: 14px; font-weight: 650; overflow-wrap: anywhere; }
+.evolu-dashboard__agenda-status { font-size: 12px; color: var(--muted-foreground); }
+.evolu-dashboard__agenda-warning {
+  display: flex; align-items: flex-start; gap: 5px;
+  font-size: 12px; color: #ab681a; line-height: 1.35;
+}
+.evolu-dashboard__agenda-attention { display: flex; flex-wrap: wrap; gap: 6px; }
+.evolu-dashboard__agenda-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 8px; border: 1px solid var(--border); border-radius: 9px;
+  color: var(--foreground); background: var(--background);
+  font-size: 12px; text-align: left; line-height: 1.4;
+}
+.evolu-dashboard__agenda-chip strong { font-variant-numeric: tabular-nums; }
+.evolu-dashboard__agenda-error { padding: 16px; font-size: 13px; color: var(--destructive); }
+.dark .evolu-dashboard__agenda-warning { color: #f0be79; }
+@media (max-width: 980px) {
+  .evolu-dashboard__main { grid-template-columns: minmax(0, 1fr); }
+}

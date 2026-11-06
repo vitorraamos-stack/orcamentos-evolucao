@@ -10,11 +10,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ErrorState, PageHeader } from "@/shared/components/OperationalUi";
 import { buildDashboardOverview, type DashboardOverview, type DashboardOrder } from "./dashboardModel";
 import { listDashboardAssignees, listDashboardOrders, type DashboardAssignee } from "./dashboardRepository";
+import { DashboardAgendaPanel } from "./DashboardAgendaPanel";
+import { buildDashboardAgenda, type DashboardAgenda } from "./dashboardAgenda";
+import { listDashboardAgendaSources } from "./dashboardAgendaRepository";
 import "./operational-dashboard.css";
 
 const REFRESH_INTERVAL = 120_000;
 type Snapshot = { userId: string; overview: DashboardOverview; updatedAt: Date };
 type Assignments = { userId: string; rows: DashboardAssignee[] };
+type AgendaSnapshot = { userId: string; accessKey: string; agenda: DashboardAgenda; updatedAt: Date };
 
 function dateLabel(date: string | null) {
   if (!date) return "Não informado";
@@ -155,13 +159,19 @@ function SectorFlow({ overview }: { overview: DashboardOverview | null }) {
 }
 
 export function OperationalDashboardSections({
-  overview, assignments,
-}: { overview: DashboardOverview | null; assignments?: DashboardAssignee[] | null }) {
+  overview, assignments, agenda, agendaError,
+}: {
+  overview: DashboardOverview | null;
+  assignments?: DashboardAssignee[] | null;
+  agenda?: DashboardAgenda | null;
+  agendaError?: string;
+}) {
   return (
     <>
       <SummaryIndicators overview={overview} />
-      <div className="mt-5">
+      <div className="evolu-dashboard__main mt-5">
         <PriorityOrders overview={overview} assignments={assignments ?? null} />
+        <DashboardAgendaPanel agenda={agenda ?? null} error={agendaError} />
       </div>
       <SectorFlow overview={overview} />
     </>
@@ -172,8 +182,15 @@ export default function OperationalDashboardPage() {
   const { user, hasModuleAccess, hubPermissions } = useAuth();
   const userId = user?.id ?? null;
   const authorized = Boolean(userId && hubPermissions.canViewHubOS && hasModuleAccess("hub_os"));
+  const accessKey = [
+    hubPermissions.isManager ? "manager" : "member",
+    hubPermissions.canViewInstallations ? "installation" : "no-installation",
+    hubPermissions.canViewDeliveries ? "delivery" : "no-delivery",
+  ].join(":");
   const [stored, setStored] = useState<Snapshot | null>(null);
   const [storedAssignments, setStoredAssignments] = useState<Assignments | null>(null);
+  const [storedAgenda, setStoredAgenda] = useState<AgendaSnapshot | null>(null);
+  const [agendaError, setAgendaError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const requestIdRef = useRef(0);
@@ -182,6 +199,8 @@ export default function OperationalDashboardPage() {
   const snapshot = authorized && stored?.userId === userId ? stored : null;
   const assignments = authorized && storedAssignments?.userId === userId
     ? storedAssignments.rows : null;
+  const agenda = authorized && storedAgenda?.userId === userId && storedAgenda.accessKey === accessKey
+    ? storedAgenda.agenda : null;
 
   const refresh = useCallback(async () => {
     if (!authorized || !userId) return;
@@ -191,6 +210,7 @@ export default function OperationalDashboardPage() {
     const requestId = ++requestIdRef.current;
     setRefreshing(true);
     setError("");
+    setAgendaError("");
     try {
       const now = new Date();
       const rows = await listDashboardOrders(controller.signal);
@@ -198,6 +218,7 @@ export default function OperationalDashboardPage() {
       const overview = buildDashboardOverview(rows, now);
       setStored({ userId, overview, updatedAt: new Date() });
       setStoredAssignments(null);
+      setStoredAgenda(null);
       lastSuccessRef.current = Date.now();
       setRefreshing(false);
       void listDashboardAssignees(overview.priorities.map(item => item.order.id), controller.signal)
@@ -209,12 +230,29 @@ export default function OperationalDashboardPage() {
           if (!controller.signal.aborted && requestId === requestIdRef.current)
             setStoredAssignments({ userId, rows: [] });
         });
+      void listDashboardAgendaSources({
+        userId,
+        isManager: hubPermissions.isManager,
+        canViewInstallations: hubPermissions.canViewInstallations,
+        canViewDeliveries: hubPermissions.canViewDeliveries,
+      }, controller.signal).then(sources => {
+        if (!controller.signal.aborted && requestId === requestIdRef.current)
+          setStoredAgenda({
+            userId, accessKey, agenda: buildDashboardAgenda(rows, sources, now), updatedAt: new Date(),
+          });
+      }).catch(reason => {
+        if (!controller.signal.aborted && requestId === requestIdRef.current)
+          setAgendaError(reason instanceof Error ? reason.message : "Falha ao consultar a agenda.");
+      });
     } catch (reason) {
       if (controller.signal.aborted || requestId !== requestIdRef.current) return;
       setError(reason instanceof Error ? reason.message : "Falha ao consultar as ordens.");
       setRefreshing(false);
     }
-  }, [authorized, userId]);
+  }, [
+    authorized, userId, accessKey, hubPermissions.isManager,
+    hubPermissions.canViewInstallations, hubPermissions.canViewDeliveries,
+  ]);
 
   useEffect(() => {
     if (!authorized) {
@@ -271,7 +309,8 @@ export default function OperationalDashboardPage() {
         <ErrorState message="Os dados operacionais estão indisponíveis." retry={() => void refresh()} />
       ) : (
         <>
-          <OperationalDashboardSections overview={snapshot?.overview ?? null} assignments={assignments} />
+          <OperationalDashboardSections overview={snapshot?.overview ?? null} assignments={assignments}
+            agenda={agenda} agendaError={agendaError} />
           <p className="mt-4 text-xs text-muted-foreground">
             Contagens de OS distintas, com acesso limitado pelas permissões existentes. Prazos usam o calendário de Santa Catarina.
             A classificação considera somente bloqueios, urgências e prazos registrados; sem prazo não significa atraso.
