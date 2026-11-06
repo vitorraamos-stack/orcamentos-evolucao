@@ -32,7 +32,7 @@ describe("Dashboard Etapa 2 — agenda e conflitos", () => {
     const o = [order("i"), order("d", { logistic_type: "entrega" })];
     const result = buildDashboardAgenda(o, sources([installation("a", "i")], [delivery("b", "d")]), now);
     expect(result.events.map(e => e.key)).toEqual([
-      "installation:a", "deadline:i", "deadline:d", "delivery:b",
+      "installation:a", "delivery:b", "deadline:d", "deadline:i",
     ]);
     expect(result.events.filter(e => e.kind === "deadline").every(e => !e.hasTime)).toBe(true);
     expect(result.events.find(e => e.kind === "installation")?.status).toBe("Agendada");
