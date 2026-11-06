@@ -1,61 +1,71 @@
-# Etapa 4 — estrutura e instrumentação aplicadas em produção
+# Etapa 4 — banco, eventos e medição temporal
 
-**Situação em 06/11/2026:** quatro migrations aplicadas diretamente no projeto Supabase de produção `evolucao-orcamentos`. Nenhum projeto, branch ou banco de testes foi criado. O PR #555 continua em rascunho e o frontend ainda não foi publicado.
+**Projeto:** Supabase de produção evolucao-orcamentos.
+**Política de execução:** migrations aplicadas diretamente no projeto existente, conforme autorização do usuário. Nenhum projeto, branch ou ambiente de teste foi criado.
 
-## Migrations aplicadas
+## Histórico de migrations
 
-| Migration | Versão registrada no Supabase | Conteúdo | Status |
-| --- | --- | --- | --- |
-| `dashboard_etapa4_foundation` | `20261106181834` | 9 tabelas, índices, constraints, RLS, privilégios e histórico imutável | Aplicada |
-| `dashboard_etapa4_rules_calendar_rpc` | `20261106181837` | Prévia e publicação gerencial de regras, calendário, turnos e exceções | Aplicada |
-| `dashboard_etapa4_dependency_rpc` | `20261106181942` | Criação/remoção de dependências, prevenção de ciclos e limpeza auditada | Aplicada |
-| `dashboard_etapa4_stage_event_instrumentation` | `20261106192023` | Captura de transições de etapa e pausas por operações bloqueadas | Aplicada |
+| Migration | Versão | Resultado |
+| --- | --- | --- |
+| dashboard_etapa4_foundation | 20261106181834 | 9 tabelas, índices, constraints, RLS e histórico imutável |
+| dashboard_etapa4_rules_calendar_rpc | 20261106181837 | Prévia/publicação de regras, calendário, jornadas e exceções |
+| dashboard_etapa4_dependency_rpc | 20261106181942 | Dependências, prevenção de ciclos e limpeza auditada |
+| dashboard_etapa4_stage_event_instrumentation | 20261106192023 | Transições de etapa e pausas BLOCKED |
+| dashboard_etapa4_operation_pause_trigger_timing_fix | 20261106193315 | INSERT/UPDATE AFTER e DELETE BEFORE para respeitar a FK da operação |
 
-Os nomes e timestamps dos arquivos `supabase/migrations` foram alinhados com o histórico real do Supabase, para evitar reaplicação acidental em uma futura sincronização.
+## Segurança verificada
 
-## Segurança e verificações realizadas
+- Nove tabelas com RLS habilitado e políticas explícitas.
+- Privilégios diretos: anon sem acesso; authenticated somente leitura; service_role sem acesso direto.
+- RPCs administrativas verificam usuário, perfil de gestor e acesso ao Hub OS.
+- Funções internas de trigger/helper não têm execução direta concedida aos papéis de API.
+- Histórico de publicação e auditoria de dependências é protegido contra alteração/exclusão direta.
 
-- As nove tabelas novas existem, estão com RLS habilitado e têm políticas explícitas.
-- Privilégios confirmados: `anon` sem acesso; `authenticated` somente leitura direta; `service_role` sem acesso direto. Escritas administrativas passam pelas RPCs protegidas por validação de gestor e acesso ao Hub OS.
-- Prévia consultiva de regra executada em contexto gerencial; publicação de regra e calendário exercitada em transação revertida; identidade sem perfil gerencial recusada.
-- Triggers instalados:
-  - `dashboard_stage_interval_order_transition` em `os_orders` (INSERT e atualização dos campos de etapa/arquivamento).
-  - `dashboard_stage_pause_operation_status` em `os_order_item_operations` (entrada/saída de BLOCKED, movimentação, exclusão lógica/física).
-  - `dashboard_stage_pause_item_change` em `os_order_items` (cancelamento, exclusão lógica/física ou movimentação do item).
-- Verificação transacional em uma OS real, com `ROLLBACK`: uma atualização observada na etapa existente gerou marco `unverified`; a mudança para Aprovação fechou esse marco e abriu intervalo `verified`. O rollback restaurou o status original.
-- Pós-rollback: `dashboard_stage_intervals` = 0 e `dashboard_stage_pauses` = 0. Nenhum registro de verificação permaneceu.
-- Nenhuma regra, jornada, feriado, exceção ou dependência foi publicada automaticamente.
+## Triggers instalados
 
-## Limites conhecidos
+- dashboard_stage_interval_order_transition em os_orders: AFTER INSERT/UPDATE de etapa e arquivamento.
+- dashboard_stage_pause_operation_status em os_order_item_operations: AFTER INSERT/UPDATE, para que a linha da operação já exista antes de gravar operation_id.
+- dashboard_stage_pause_operation_delete em os_order_item_operations: BEFORE DELETE, para encerrar a pausa antes da ação FK ON DELETE SET NULL.
+- dashboard_stage_pause_item_change em os_order_items: BEFORE cancelamento, exclusão lógica/física ou movimentação.
 
-1. O pgTAP `supabase/tests/dashboard_etapa4_security_contract.sql` não foi executado. Não foi criado ambiente de testes, conforme orientação. Os testes estáticos de SQL fazem parte do CI.
-2. A produção não possui operações em `os_order_item_operations`; por isso, o fluxo de pausa de uma operação BLOCKED ainda não foi exercitado com atividade real. Nenhuma fixture foi inserida.
-3. OS antigas não recebem histórico retroativo. A primeira atualização observada na mesma etapa cria um marco `unverified`; mudanças posteriores de etapa criam intervalos `verified`.
-4. Uma pausa só é registrada quando existe intervalo de etapa aberto. O motivo é copiado do bloqueio registrado; quando não há justificativa válida, o registro informa que ela não foi fornecida.
-5. A engine ainda não calcula permanência/gargalos. Para isso, precisará combinar intervalos `verified`, calendário vigente, revisão da regra e pausas completas. Até lá, duração continua indisponível.
-6. Não há reserva física de materiais vinculada à agenda. Materiais não devem ser declarados confirmados sem fonte real.
+## Sem retroprojeção
 
-## Engine de permanência útil (frontend da branch)
+- OS novas registram o primeiro intervalo no instante de criação quando o escopo é reconhecido.
+- OS antigas não recebem data de entrada inventada. A primeira atualização observada na mesma etapa cria marco unverified.
+- Transições de etapa efetivamente observadas abrem intervalos verified.
+- Pausas BLOCKED são registradas somente quando existe intervalo de etapa aberto. Bloqueios anteriores à coleta não recebem duração presumida.
+- Nenhuma regra, jornada, exceção ou dependência foi criada automaticamente.
 
-O cálculo está implementado em `dashboardAdvanced.ts` e usa fontes somente de leitura carregadas por `dashboardAdvancedRepository.ts`:
-- intervalos e pausas de etapa;
-- regra atual, sua revisão e calendário vinculados à entrada;
-- períodos semanais, exceções e fuso da versão publicada.
+## Verificação transacional em produção
 
-A engine só retorna duração quando:
-- o intervalo aberto é `verified`;
-- há revisão de regra e calendário vinculados, sem alteração posterior da regra;
-- a vigência do calendário cobre todo o intervalo e seus horários são interpretáveis;
-- as pausas estão verificadas e ligadas a operações ainda consultáveis;
-- as operações da OS foram criadas a partir do início da coleta, para não presumir histórico de bloqueios anterior à instrumentação.
+Foi usada uma OS existente dentro de uma transação revertida:
+1. Uma atualização observada na etapa atual abriu marco unverified.
+2. A mudança para Aprovação encerrou esse marco e abriu intervalo verified.
+3. ROLLBACK restaurou o status original e removeu os registros temporários.
 
-O tempo é calculado em minutos úteis locais, descontando a união de pausas verificadas para evitar dupla subtração. Exceções substituem a jornada semanal naquela data. Quando o limite não está publicado, a duração pode ser exibida sem alerta; quando o limite é atingido, a interface informa excedente de permanência, **não causa comprovada de gargalo**.
+Após o rollback, dashboard_stage_intervals e dashboard_stage_pauses permaneceram com zero linhas. Nenhuma OS, venda ou dado financeiro foi alterado de forma persistente.
 
-A engine possui testes unitários para conversão de fuso, exceções, pausas sobrepostas, revisão alterada, marcos não verificados e histórico incompleto. Como não há regras/calendários/intervalos reais publicados em produção, nenhuma duração real está sendo apresentada no momento.
+A instalação dos triggers de pausa foi conferida em information_schema.triggers. A produção não possui registros em os_order_item_operations, então o fluxo real de pausa não pôde ser exercitado sem inserir fixtures — o que foi evitado.
 
-## Estado de publicação
+## Engine de permanência útil na branch
 
-- Banco de produção: **4 migrations aplicadas**; tabelas de regras/calendário/dependências e tabelas de eventos permanecem sem dados operacionais fictícios.
-- PR #555: **draft, sem merge**.
-- Frontend/Preview/produção Vercel: **inalterados**; produção continua na Etapa 3.
-- A UI administrativa e o editor visual de dependências estão apenas na branch de implementação.
+O cálculo cruza intervalo verificado, revisão da regra, calendário versionado, jornada semanal, exceções e pausas. O cálculo só é liberado quando:
+- a regra não foi alterada depois da entrada na etapa;
+- o calendário vinculado cobre todo o intervalo;
+- as operações foram criadas após o início da coleta;
+- as pausas estão completas, verificadas e associadas a operações ainda consultáveis.
+
+Pausas sobrepostas são unidas antes de descontar o tempo útil. Exceções substituem a jornada semanal na data correspondente. Se houver lacuna ou inconsistência, a medição é suspensa. O limite excedido é apresentado como permanência acima do parâmetro, não como causa comprovada de gargalo.
+
+A engine possui testes unitários para fuso, exceções, pausas sobrepostas, revisão alterada, marco não verificado e histórico incompleto. Como não há regras/calendários/intervalos reais em produção, nenhuma duração real está sendo exibida.
+
+## Testes não executados em produção
+
+O pgTAP supabase/tests/dashboard_etapa4_security_contract.sql não foi executado. O CI valida TypeScript, testes unitários, build e contratos estáticos de migration; não executa pgTAP nem testes concorrentes contra produção. Não foram criados ambientes adicionais nem fixtures em produção.
+
+## Publicação
+
+- PR #555: draft, sem merge.
+- Frontend da Etapa 4: não publicado.
+- Vercel de produção: continua na Etapa 3.
+- Banco de produção: cinco migrations aplicadas; nenhuma configuração operacional foi presumida.

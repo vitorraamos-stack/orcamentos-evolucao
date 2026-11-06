@@ -2,9 +2,9 @@ import type { DashboardOrder } from "./dashboardModel";
 import type { PreparationItem, PreparationOperation } from "./dashboardPreparation";
 
 /**
- * Dashboard stage 4: evidence-first read-only analysis. The current database
- * has activities, assignments and deadlines, but no recorded dependencies or
- * persisted operational policy. Unavailable != empty / optional / zero.
+ * Dashboard stage 4: read-only analysis from persisted sources. Rules,
+ * calendars, dependencies and stage history are recognized only when present.
+ * Unavailable != empty / optional / zero.
  */
 export type OperationalScope = "ART" | "APPROVAL" | "PRODUCTION" | "FINISHING" | "INSTALLATION" | "LOGISTICS";
 export type Requirement = "required" | "optional" | "conditional";
@@ -504,9 +504,9 @@ function assessStageTiming(
 }
 
 /**
- * Blocked is a confirmed status; long-stalled/gargalo is NOT inferred.
- * Time computation remains explicitly unavailable until a versioned calendar,
- * complete stage entry history and verified pauses exist.
+ * BLOCKED is a confirmed status. Useful stage time is calculated only from a
+ * verified interval, unchanged rule revision, covering calendar and complete
+ * pause evidence. Exceeding a limit signals extra permanence, not its cause.
  */
 export function buildAdvancedAssessments(
   orders: readonly DashboardOrder[], sources: AdvancedSources, now: Date = new Date()

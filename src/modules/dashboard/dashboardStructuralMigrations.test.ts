@@ -12,6 +12,7 @@ const foundation = readFileSync(resolve(process.cwd(), base + "20261106181834_da
 const rules = readFileSync(resolve(process.cwd(), base + "20261106181837_dashboard_etapa4_rules_calendar_rpc.sql"), "utf8");
 const dependencies = readFileSync(resolve(process.cwd(), base + "20261106181942_dashboard_etapa4_dependency_rpc.sql"), "utf8");
 const stageEvents = readFileSync(resolve(process.cwd(), base + "20261106192023_dashboard_etapa4_stage_event_instrumentation.sql"), "utf8");
+const pauseTriggerFix = readFileSync(resolve(process.cwd(), base + "20261106193315_dashboard_etapa4_operation_pause_trigger_timing_fix.sql"), "utf8");
 
 describe("Dashboard Etapa 4 — migration safety contracts", () => {
   it("creates no implicit rules, calendar, dependency or stage records", () => {
@@ -81,7 +82,7 @@ describe("Dashboard Etapa 4 — migration safety contracts", () => {
 
   it("captures real stage transitions and blocked pauses without historical backfill", () => {
     expect(stageEvents).toContain("AFTER INSERT OR UPDATE OF art_status,prod_status,archived");
-    expect(stageEvents).toContain("BEFORE INSERT OR UPDATE OF status,item_id,deleted_at OR DELETE");
+    expect(stageEvents).toContain("CREATE OR REPLACE FUNCTION public.dashboard_capture_operation_pause()");
     expect(stageEvents).toContain("BEFORE UPDATE OF status,deleted_at,order_id OR DELETE");
     expect(stageEvents).toContain("dashboard_stage_interval_order_transition");
     expect(stageEvents).toContain("dashboard_stage_pause_operation_status");
@@ -91,5 +92,9 @@ describe("Dashboard Etapa 4 — migration safety contracts", () => {
     expect(stageEvents).toContain("ELSE NULL");
     expect(stageEvents).toContain("REVOKE ALL ON FUNCTION public.dashboard_capture_operation_pause()");
     expect(stageEvents).toContain("não afirma quando a etapa começou");
+    expect(pauseTriggerFix).toContain("DROP TRIGGER IF EXISTS dashboard_stage_pause_operation_status");
+    expect(pauseTriggerFix).toContain("AFTER INSERT OR UPDATE OF status,item_id,deleted_at");
+    expect(pauseTriggerFix).toContain("BEFORE DELETE");
+    expect(pauseTriggerFix).toContain("dashboard_stage_pause_operation_delete");
   });
 });
