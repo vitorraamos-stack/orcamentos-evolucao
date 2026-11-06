@@ -27,6 +27,7 @@ export function PreparationBadge({
     preparation.production === "ready" ? CheckCircle2 : CircleHelp;
   const details = [
     ...(alert?.additionalAlerts ?? []),
+    ...(event?.warnings ?? []),
     ...preparation.reasons,
   ];
   return (
