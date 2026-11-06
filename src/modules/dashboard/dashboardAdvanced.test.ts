@@ -204,6 +204,10 @@ describe("Dashboard Etapa 4 — permanência útil com evidência verificável",
 
   it("subtracts the union of verified pauses without double counting overlaps", () => {
     const sources = timingSources({
+      operations: [
+        operation("op-1", "i1", { created_at: "2026-11-02T11:30:00.000Z" }),
+        operation("op-2", "i1", { created_at: "2026-11-02T11:30:00.000Z" }),
+      ],
       stagePauses: [
         { id: "pause-1", stage_interval_id: "interval-1", operation_id: "op-1",
           started_at: "2026-11-02T12:00:00.000Z", ended_at: "2026-11-02T13:00:00.000Z",
@@ -255,13 +259,16 @@ describe("Dashboard Etapa 4 — permanência útil com evidência verificável",
     expect(buildAdvancedAssessments([order()], oldOperation, now)[0].timing).toBe("insufficient");
 
     const missingPause = timingSources({
-      operations: [operation("op-1", "i1", { status: "BLOCKED" })],
+      operations: [operation("op-1", "i1", {
+        status: "BLOCKED", created_at: "2026-11-02T11:30:00.000Z",
+      })],
     });
     expect(buildAdvancedAssessments([order()], missingPause, now)[0].timing).toBe("insufficient");
   });
 
   it("refuses incomplete pause evidence and calendar coverage gaps", () => {
     const unverifiedPause = timingSources({
+      operations: [operation("op-1", "i1", { created_at: "2026-11-02T11:30:00.000Z" })],
       stagePauses: [{
         id: "pause-1", stage_interval_id: "interval-1", operation_id: "op-1",
         started_at: "2026-11-02T12:00:00.000Z", ended_at: "2026-11-02T13:00:00.000Z",

@@ -10,6 +10,7 @@
 - Gestão de calendário versionado: jornadas semanais e exceções explícitas, sem horários padrão, feriados ou folgas presumidos.
 - Editor visual de dependências por OS, visível a gestores; inclusão e remoção por RPC, com justificativa e auditoria.
 - Instrumentação de entrada/saída de etapas e pausas associadas a operações BLOCKED, instalada por migration adicional no banco de produção.
+- Engine de permanência útil: cruza intervalos verificados, revisão de regra, calendário versionado, exceções e pausas. Só calcula quando a evidência cobre todo o período; não chama permanência acima do limite de causa comprovada.
 
 ## Regras de evidência
 
@@ -19,7 +20,8 @@
 - Aprovação não possui fonte própria de responsável e Logística não possui fonte própria de responsável/prazo. A interface preserva essas limitações.
 - Calendários publicados são imutáveis. Uma versão sem data final permanece aberta e impede uma próxima versão até encerramento formal.
 - A instrumentação não retroprojeta histórico. OS antigas sem intervalo recebem, na primeira atualização observada, um marco `unverified`; transições efetivamente observadas depois disso são `verified`.
-- Pausas só são registradas quando há intervalo de etapa aberto. Não se calcula tempo até que calendário, revisão de regra, intervalo completo e pausas estejam verificados.
+- Pausas só são registradas quando há intervalo de etapa aberto. A engine também exige atividades posteriores ao início da coleta, pausas verificadas, regra sem alteração posterior e calendário vigente durante todo o intervalo.
+- A engine está implementada na branch, mas a produção ainda não tem regra/calendário publicados nem intervalos reais; portanto, atualmente não há permanência calculável.
 
 ## Banco de produção
 
@@ -36,7 +38,7 @@ O pgTAP não foi executado e não foi criado ambiente separado. O fluxo de pausa
 ## Próximas etapas técnicas
 
 1. Validar o CI final com a migration de instrumentação e os testes administrativos.
-2. Integrar a leitura dos intervalos/pausas e implementar cálculo de tempo útil apenas quando calendário e evidências forem suficientes.
+2. Validar a engine de permanência útil com dados reais após a gestão publicar regras e calendário, sem inserir fixtures na produção.
 3. Continuar a validação visual na branch, sem merge nem deploy até autorização explícita.
 
 ## Publicação

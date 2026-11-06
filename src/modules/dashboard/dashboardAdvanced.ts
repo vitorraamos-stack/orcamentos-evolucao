@@ -448,7 +448,7 @@ function assessStageTiming(
   const operations = sources.operations.filter(operation => activeItemIds.has(operation.item_id));
   for (const operation of operations) {
     const createdAt = operation.created_at ? Date.parse(operation.created_at) : Number.NaN;
-    if (!Number.isFinite(createdAt) || createdAt < intervalStart)
+    if (!Number.isFinite(createdAt) || createdAt < intervalStart || createdAt > intervalEnd)
       return unavailableTiming("Há atividades anteriores ao início da coleta; o histórico de pausas não é integral.", "insufficient");
   }
 

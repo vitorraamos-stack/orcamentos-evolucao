@@ -35,6 +35,24 @@ Os nomes e timestamps dos arquivos `supabase/migrations` foram alinhados com o h
 5. A engine ainda não calcula permanência/gargalos. Para isso, precisará combinar intervalos `verified`, calendário vigente, revisão da regra e pausas completas. Até lá, duração continua indisponível.
 6. Não há reserva física de materiais vinculada à agenda. Materiais não devem ser declarados confirmados sem fonte real.
 
+## Engine de permanência útil (frontend da branch)
+
+O cálculo está implementado em `dashboardAdvanced.ts` e usa fontes somente de leitura carregadas por `dashboardAdvancedRepository.ts`:
+- intervalos e pausas de etapa;
+- regra atual, sua revisão e calendário vinculados à entrada;
+- períodos semanais, exceções e fuso da versão publicada.
+
+A engine só retorna duração quando:
+- o intervalo aberto é `verified`;
+- há revisão de regra e calendário vinculados, sem alteração posterior da regra;
+- a vigência do calendário cobre todo o intervalo e seus horários são interpretáveis;
+- as pausas estão verificadas e ligadas a operações ainda consultáveis;
+- as operações da OS foram criadas a partir do início da coleta, para não presumir histórico de bloqueios anterior à instrumentação.
+
+O tempo é calculado em minutos úteis locais, descontando a união de pausas verificadas para evitar dupla subtração. Exceções substituem a jornada semanal naquela data. Quando o limite não está publicado, a duração pode ser exibida sem alerta; quando o limite é atingido, a interface informa excedente de permanência, **não causa comprovada de gargalo**.
+
+A engine possui testes unitários para conversão de fuso, exceções, pausas sobrepostas, revisão alterada, marcos não verificados e histórico incompleto. Como não há regras/calendários/intervalos reais publicados em produção, nenhuma duração real está sendo apresentada no momento.
+
 ## Estado de publicação
 
 - Banco de produção: **4 migrations aplicadas**; tabelas de regras/calendário/dependências e tabelas de eventos permanecem sem dados operacionais fictícios.
