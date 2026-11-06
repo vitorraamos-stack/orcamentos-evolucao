@@ -12,7 +12,7 @@ export type RuleSpec = {
   scope: OperationalScope;
   owner: Requirement;
   deadline: Requirement;
-  conditionLogisticType: "instalacao" | "entrega" | null;
+  conditionLogisticType: "instalacao" | "entrega" | "retirada" | null;
   stalledLimitMinutes: number | null;
   calendarVerified: boolean;
 };
@@ -104,8 +104,13 @@ export function assessStageRequirements(
   const activeAssignees = assignees.filter(entry => entry.order_id === order.id);
   const activeDeadlines = deadlines.filter(entry => entry.order_id === order.id);
   // Logistics may be delivered by own team or carrier; no false mapping to INSTALLATION.
-  const requiredAssignee = policyRequired(rule, "owner", order);
-  const requiredDeadline = policyRequired(rule, "deadline", order);
+  // Não há fonte de responsável específico em APPROVAL, nem campos de
+  // responsável/prazo no escopo LOGISTICS dos registros de OS.
+  // Falhas de importação ou dados legados não devem inventar infrações.
+  const requiredAssignee = scope !== "APPROVAL" && scope !== "LOGISTICS" &&
+    policyRequired(rule, "owner", order);
+  const requiredDeadline = scope !== "LOGISTICS" &&
+    policyRequired(rule, "deadline", order);
   const hasScopeAssignee = activeAssignees.some(entry =>
     (entry.scope === scope || entry.scope === "GENERAL") && !!entry.user_id);
   const hasScopeDeadline = activeDeadlines.some(entry =>
