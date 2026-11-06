@@ -26,7 +26,7 @@ export function PreparationBadge({
   const Icon = preparation.combined === "pending" ? AlertTriangle :
     preparation.production === "ready" ? CheckCircle2 : CircleHelp;
   const details = [
-    ...alert?.additionalAlerts ?? [],
+    ...(alert?.additionalAlerts ?? []),
     ...preparation.reasons,
   ];
   return (
