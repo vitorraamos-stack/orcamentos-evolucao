@@ -11,6 +11,7 @@ import { ErrorState, PageHeader } from "@/shared/components/OperationalUi";
 import { buildDashboardOverview, type DashboardOverview, type DashboardOrder } from "./dashboardModel";
 import { listDashboardAssignees, listDashboardOrders, type DashboardAssignee } from "./dashboardRepository";
 import { DashboardAgendaPanel } from "./DashboardAgendaPanel";
+import { DashboardAdvancedPanel } from "./DashboardAdvancedPanel";
 import { buildDashboardAgenda, type DashboardAgenda } from "./dashboardAgenda";
 import { listDashboardAgendaSources } from "./dashboardAgendaRepository";
 import { supabase } from "@/lib/supabase";
@@ -206,6 +207,7 @@ export function OperationalDashboardSections({
           preparations={preparations} preparationError={preparationError} />
       </div>
       <SectorFlow overview={overview} />
+      <DashboardAdvancedPanel />
     </>
   );
 }
