@@ -232,7 +232,7 @@ export default function OperationalDashboardPage() {
   const lastSuccessRef = useRef(0);
   const changedOrdersRef = useRef<Set<string>>(new Set());
   const pendingFullRefreshRef = useRef(false);
-  const revalidationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const revalidationTimerRef = useRef<number | null>(null);
   const snapshot = authorized && stored?.userId === userId ? stored : null;
   const assignments = authorized && storedAssignments?.userId === userId
     ? storedAssignments.rows : null;
