@@ -150,7 +150,7 @@ REVOKE ALL ON TABLE
  public.dashboard_operational_rule_revisions, public.os_item_operation_dependencies,
  public.dashboard_operation_dependency_audit, public.dashboard_stage_intervals,
  public.dashboard_stage_pauses
-FROM PUBLIC, anon, authenticated;
+FROM PUBLIC, anon, authenticated, service_role;
 GRANT SELECT ON TABLE
  public.dashboard_work_calendar_versions, public.dashboard_work_calendar_periods,
  public.dashboard_work_calendar_exceptions, public.dashboard_operational_rules,
