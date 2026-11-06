@@ -11,7 +11,7 @@ const base = "supabase/migrations/";
 const foundation = readFileSync(resolve(process.cwd(), base + "20261106181834_dashboard_etapa4_foundation.sql"), "utf8");
 const rules = readFileSync(resolve(process.cwd(), base + "20261106181837_dashboard_etapa4_rules_calendar_rpc.sql"), "utf8");
 const dependencies = readFileSync(resolve(process.cwd(), base + "20261106181942_dashboard_etapa4_dependency_rpc.sql"), "utf8");
-const stageEvents = readFileSync(resolve(process.cwd(), base + "20261106192000_dashboard_etapa4_stage_event_instrumentation.sql"), "utf8");
+const stageEvents = readFileSync(resolve(process.cwd(), base + "20261106192023_dashboard_etapa4_stage_event_instrumentation.sql"), "utf8");
 
 describe("Dashboard Etapa 4 — migration safety contracts", () => {
   it("creates no implicit rules, calendar, dependency or stage records", () => {

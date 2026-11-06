@@ -227,7 +227,9 @@ BEGIN
         )
         VALUES(
           v_interval_id,NEW.id,v_now,NULL,
-          coalesce(nullif(btrim(NEW.blocked_reason),''),'Bloqueio operacional registrado'),
+          CASE WHEN length(btrim(coalesce(NEW.blocked_reason,''))) BETWEEN 3 AND 1000
+            THEN btrim(NEW.blocked_reason)
+            ELSE 'Bloqueio sem justificativa registrada' END,
           'verified',clock_timestamp(),auth.uid()
         );
       END IF;
