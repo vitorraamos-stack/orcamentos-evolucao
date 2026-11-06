@@ -178,6 +178,10 @@ BEGIN
    WHERE c.effective_from >= p_effective_from) THEN
    RAISE EXCEPTION 'A nova versão não pode retroagir a um calendário já publicado' USING ERRCODE='22023';
  END IF;
+ IF EXISTS (SELECT 1 FROM public.dashboard_work_calendar_versions c
+   WHERE c.effective_until IS NULL OR c.effective_until >= p_effective_from) THEN
+   RAISE EXCEPTION 'A nova jornada não pode sobrepor uma versão vigente' USING ERRCODE='22023';
+ END IF;
  INSERT INTO public.dashboard_work_calendar_versions
    (version,name,time_zone,effective_from,effective_until,status,published_by,publication_reason)
  VALUES(v_version+1,btrim(p_name),'America/Sao_Paulo',
