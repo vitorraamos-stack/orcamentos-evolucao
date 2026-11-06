@@ -154,3 +154,58 @@
 .evolu-dashboard__prep-summary strong { color: var(--foreground); font-variant-numeric: tabular-nums; }
 .dark .evolu-dashboard__prep[data-preparation="pending"] .evolu-dashboard__prep-title { color: #f5a879; }
 .dark .evolu-dashboard__prep[data-preparation="partial"] .evolu-dashboard__prep-title { color: #e3c377; }
+
+
+/* Etapa 4 — análise avançada consultiva, responsiva e sem alertas inventados. */
+.evolu-dashboard__advanced-muted {
+  color: var(--muted-foreground); font-size: 12px; line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.evolu-dashboard__advanced-summary {
+  display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px;
+  border-radius: 12px; background: var(--muted); padding: 12px;
+}
+.evolu-dashboard__advanced-summary span { font-size: 12px; line-height: 1.5; color: var(--muted-foreground); }
+.evolu-dashboard__advanced-summary strong {
+  color: var(--foreground); font-size: 19px; display: block; font-variant-numeric: tabular-nums;
+}
+.evolu-dashboard__advanced-row {
+  padding: 14px; border: 1px solid var(--border); border-radius: 12px;
+  background: var(--card); color: var(--card-foreground); min-width: 0;
+  overflow-wrap: anywhere;
+}
+.evolu-dashboard__advanced-row-head {
+  display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: start;
+  font-size: 14px;
+}
+.evolu-dashboard__advanced-flags {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
+}
+.evolu-dashboard__advanced-flags span {
+  padding: 4px 7px; font-size: 12px; border: 1px solid var(--border);
+  border-radius: 8px; background: var(--background);
+}
+.evolu-dashboard__advanced-details { margin-top: 10px; font-size: 13px; }
+.evolu-dashboard__advanced-details summary {
+  color: var(--primary); font-weight: 650; cursor: pointer;
+}
+.evolu-dashboard__advanced-details summary:focus-visible {
+  outline: 2px solid var(--ring); outline-offset: 3px;
+}
+.evolu-dashboard__advanced-warning {
+  color: var(--destructive); font-size: 12px; overflow-wrap: anywhere;
+}
+.evolu-dashboard__advanced-dependency {
+  margin-top: 8px; padding: 9px; border: 1px solid var(--border); border-radius: 8px;
+  font-size: 12px; display: grid; gap: 4px;
+}
+.evolu-dashboard__advanced-notice {
+  display: flex; align-items: flex-start; gap: 8px; padding: 11px;
+  border-radius: 10px; border: 1px solid var(--border);
+  background: var(--muted); color: var(--muted-foreground);
+  font-size: 12px; line-height: 1.5; overflow-wrap: anywhere;
+}
+@media(max-width: 580px) {
+  .evolu-dashboard__advanced-summary { grid-template-columns: minmax(0,1fr); }
+  .evolu-dashboard__advanced-row { padding: 11px; }
+}
