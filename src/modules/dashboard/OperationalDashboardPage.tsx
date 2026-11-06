@@ -13,12 +13,31 @@ import { listDashboardAssignees, listDashboardOrders, type DashboardAssignee } f
 import { DashboardAgendaPanel } from "./DashboardAgendaPanel";
 import { buildDashboardAgenda, type DashboardAgenda } from "./dashboardAgenda";
 import { listDashboardAgendaSources } from "./dashboardAgendaRepository";
+import { supabase } from "@/lib/supabase";
+import {
+  assessOrderPreparation, buildOrderPreparations,
+  type OrderPreparation, type PreparationItem, type PreparationOperation,
+} from "./dashboardPreparation";
+import {
+  listDashboardPreparationSources, resolvePreparationOrderByItem,
+} from "./dashboardPreparationRepository";
 import "./operational-dashboard.css";
 
 const REFRESH_INTERVAL = 120_000;
 type Snapshot = { userId: string; overview: DashboardOverview; updatedAt: Date };
 type Assignments = { userId: string; rows: DashboardAssignee[] };
 type AgendaSnapshot = { userId: string; accessKey: string; agenda: DashboardAgenda; updatedAt: Date };
+type PreparationSnapshot = {
+  userId: string; accessKey: string;
+  assessments: Record<string, OrderPreparation>;
+  items: PreparationItem[]; operations: PreparationOperation[];
+  updatedAt: Date;
+};
+function fieldOf(row: unknown, key: string): string | null {
+  if (!row || typeof row !== "object") return null;
+  const value = (row as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : null;
+}
 
 function dateLabel(date: string | null) {
   if (!date) return "Não informado";
@@ -69,8 +88,12 @@ function SummaryIndicators({ overview }: { overview: DashboardOverview | null })
 }
 
 function PriorityOrders({
-  overview, assignments,
-}: { overview: DashboardOverview | null; assignments: DashboardAssignee[] | null }) {
+  overview, assignments, preparations,
+}: {
+  overview: DashboardOverview | null;
+  assignments: DashboardAssignee[] | null;
+  preparations: Record<string, OrderPreparation> | null;
+}) {
   return (
     <section aria-labelledby="dashboard-priority-heading" className="min-w-0">
       <Card className="evolu-dashboard__panel h-full">
@@ -106,6 +129,12 @@ function PriorityOrders({
                 </div>
                 <span className="evolu-dashboard__priority-reason">{reason}</span>
               </div>
+              {preparations?.[order.id] && <p className="evolu-dashboard__prep-priority">
+                <strong>Preparação:</strong> {preparations[order.id].production === "ready" ? "Produção pronta" :
+                  preparations[order.id].production === "partial" ? "Produção parcial" :
+                  preparations[order.id].production === "pending" ? "Produção pendente" : "Produção não verificada"}
+                {" · "}Materiais {preparations[order.id].materials === "pending" ? "pendentes" : "não verificados"}
+              </p>}
               <div className="evolu-dashboard__priority-details">
                 <span><strong>Etapa:</strong> {stage}</span>
                 <span><strong>Responsável:</strong> {responsibleLabel(order, assignments)}</span>
@@ -159,19 +188,22 @@ function SectorFlow({ overview }: { overview: DashboardOverview | null }) {
 }
 
 export function OperationalDashboardSections({
-  overview, assignments, agenda, agendaError,
+  overview, assignments, agenda, agendaError, preparations, preparationError,
 }: {
   overview: DashboardOverview | null;
   assignments?: DashboardAssignee[] | null;
   agenda?: DashboardAgenda | null;
   agendaError?: string;
+  preparations?: Record<string, OrderPreparation> | null;
+  preparationError?: string;
 }) {
   return (
     <>
       <SummaryIndicators overview={overview} />
       <div className="evolu-dashboard__main mt-5">
-        <PriorityOrders overview={overview} assignments={assignments ?? null} />
-        <DashboardAgendaPanel agenda={agenda ?? null} error={agendaError} />
+        <PriorityOrders overview={overview} assignments={assignments ?? null} preparations={preparations ?? null} />
+        <DashboardAgendaPanel agenda={agenda ?? null} error={agendaError}
+          preparations={preparations} preparationError={preparationError} />
       </div>
       <SectorFlow overview={overview} />
     </>
@@ -190,17 +222,30 @@ export default function OperationalDashboardPage() {
   const [stored, setStored] = useState<Snapshot | null>(null);
   const [storedAssignments, setStoredAssignments] = useState<Assignments | null>(null);
   const [storedAgenda, setStoredAgenda] = useState<AgendaSnapshot | null>(null);
+  const [storedPreparation, setStoredPreparation] = useState<PreparationSnapshot | null>(null);
   const [agendaError, setAgendaError] = useState("");
+  const [preparationError, setPreparationError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const requestIdRef = useRef(0);
   const controllerRef = useRef<AbortController | null>(null);
   const lastSuccessRef = useRef(0);
+  const changedOrdersRef = useRef<Set<string>>(new Set());
+  const pendingFullRefreshRef = useRef(false);
+  const revalidationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const snapshot = authorized && stored?.userId === userId ? stored : null;
   const assignments = authorized && storedAssignments?.userId === userId
     ? storedAssignments.rows : null;
   const agenda = authorized && storedAgenda?.userId === userId && storedAgenda.accessKey === accessKey
     ? storedAgenda.agenda : null;
+  const preparationSnapshot = authorized && storedPreparation?.userId === userId &&
+    storedPreparation.accessKey === accessKey ? storedPreparation : null;
+  const preparations = preparationSnapshot?.assessments ?? null;
+  const liveRef = useRef<{
+    snapshot: Snapshot | null; agenda: DashboardAgenda | null;
+    preparation: PreparationSnapshot | null; userId: string | null; accessKey: string;
+  }>({ snapshot: null, agenda: null, preparation: null, userId: null, accessKey: "" });
+  liveRef.current = { snapshot, agenda, preparation: preparationSnapshot, userId, accessKey };
 
   const refresh = useCallback(async () => {
     if (!authorized || !userId) return;
@@ -211,6 +256,7 @@ export default function OperationalDashboardPage() {
     setRefreshing(true);
     setError("");
     setAgendaError("");
+    setPreparationError("");
     try {
       const now = new Date();
       const rows = await listDashboardOrders(controller.signal);
@@ -219,6 +265,7 @@ export default function OperationalDashboardPage() {
       setStored({ userId, overview, updatedAt: new Date() });
       setStoredAssignments(null);
       setStoredAgenda(null);
+      setStoredPreparation(null);
       lastSuccessRef.current = Date.now();
       setRefreshing(false);
       void listDashboardAssignees(overview.priorities.map(item => item.order.id), controller.signal)
@@ -236,10 +283,26 @@ export default function OperationalDashboardPage() {
         canViewInstallations: hubPermissions.canViewInstallations,
         canViewDeliveries: hubPermissions.canViewDeliveries,
       }, controller.signal).then(sources => {
-        if (!controller.signal.aborted && requestId === requestIdRef.current)
-          setStoredAgenda({
-            userId, accessKey, agenda: buildDashboardAgenda(rows, sources, now), updatedAt: new Date(),
+        if (controller.signal.aborted || requestId !== requestIdRef.current) return;
+        const nextAgenda = buildDashboardAgenda(rows, sources, now);
+        setStoredAgenda({ userId, accessKey, agenda: nextAgenda, updatedAt: new Date() });
+        const orderIds = Array.from(new Set([
+          ...overview.priorities.map(item => item.order.id),
+          ...nextAgenda.events.map(event => event.order.id),
+        ]));
+        void listDashboardPreparationSources(orderIds, controller.signal).then(preparationSources => {
+          if (controller.signal.aborted || requestId !== requestIdRef.current) return;
+          const eligible = rows.filter(order => orderIds.includes(order.id));
+          setStoredPreparation({
+            userId, accessKey,
+            assessments: buildOrderPreparations(eligible, preparationSources),
+            items: preparationSources.items, operations: preparationSources.operations,
+            updatedAt: new Date(),
           });
+        }).catch(reason => {
+          if (!controller.signal.aborted && requestId === requestIdRef.current)
+            setPreparationError(reason instanceof Error ? reason.message : "Falha ao consultar a preparação.");
+        });
       }).catch(reason => {
         if (!controller.signal.aborted && requestId === requestIdRef.current)
           setAgendaError(reason instanceof Error ? reason.message : "Falha ao consultar a agenda.");
@@ -253,6 +316,89 @@ export default function OperationalDashboardPage() {
     authorized, userId, accessKey, hubPermissions.isManager,
     hubPermissions.canViewInstallations, hubPermissions.canViewDeliveries,
   ]);
+
+  const revalidateAffected = useCallback(async (orderId: string) => {
+    const live = liveRef.current;
+    if (!live.userId || !live.preparation || !live.snapshot) return;
+    const order = [
+      ...live.snapshot.overview.priorities.map(row => row.order),
+      ...(live.agenda?.events.map(row => row.order) ?? []),
+    ].find(row => row.id === orderId);
+    if (!order || !Object.prototype.hasOwnProperty.call(live.preparation.assessments, orderId)) return;
+    const requestId = requestIdRef.current;
+    const signal = controllerRef.current?.signal;
+    try {
+      const updated = await listDashboardPreparationSources([orderId], signal);
+      if (signal?.aborted || requestId !== requestIdRef.current) return;
+      const assessment = assessOrderPreparation(order, updated.items, updated.operations);
+      setStoredPreparation(current => {
+        if (!current || current.userId !== live.userId || current.accessKey !== live.accessKey) return current;
+        const oldItemIds = new Set(current.items.filter(item => item.order_id === orderId).map(item => item.id));
+        return {
+          ...current,
+          assessments: { ...current.assessments, [orderId]: assessment },
+          items: [...current.items.filter(item => item.order_id !== orderId), ...updated.items],
+          operations: [
+            ...current.operations.filter(operation => !oldItemIds.has(operation.item_id)),
+            ...updated.operations,
+          ],
+          updatedAt: new Date(),
+        };
+      });
+    } catch {
+      if (signal?.aborted || requestId !== requestIdRef.current) return;
+      // A failed revalidation cannot leave a previously verified-looking label.
+      setStoredPreparation(current => {
+        if (!current || current.userId !== live.userId) return current;
+        const assessments = { ...current.assessments };
+        delete assessments[orderId];
+        return { ...current, assessments };
+      });
+      setPreparationError("Não foi possível revalidar um compromisso. Atualize o Dashboard.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authorized || !userId) return;
+    const queue = (orderId: string | null, full = false) => {
+      if (liveRef.current.userId !== userId) return;
+      if (full || !orderId) pendingFullRefreshRef.current = true;
+      else changedOrdersRef.current.add(orderId);
+      if (revalidationTimerRef.current) window.clearTimeout(revalidationTimerRef.current);
+      revalidationTimerRef.current = window.setTimeout(() => {
+        revalidationTimerRef.current = null;
+        const fullRefresh = pendingFullRefreshRef.current;
+        const affected = Array.from(changedOrdersRef.current);
+        pendingFullRefreshRef.current = false;
+        changedOrdersRef.current.clear();
+        if (fullRefresh) void refresh();
+        else affected.forEach(id => { void revalidateAffected(id); });
+      }, 350);
+    };
+    const channel = supabase.channel("dashboard-preparation-" + userId)
+      .on("postgres_changes", { event: "*", schema: "public", table: "os_order_items" }, payload => {
+        queue(fieldOf(payload.new, "order_id") ?? fieldOf(payload.old, "order_id"));
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "os_order_item_operations" }, payload => {
+        const itemId = fieldOf(payload.new, "item_id") ?? fieldOf(payload.old, "item_id");
+        if (!itemId) { queue(null, true); return; }
+        const cached = liveRef.current.preparation?.items.find(item => item.id === itemId)?.order_id;
+        if (cached) { queue(cached); return; }
+        void resolvePreparationOrderByItem(itemId).then(id => queue(id)).catch(() => queue(null, true));
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "os_orders" }, () => queue(null, true))
+      .on("postgres_changes", { event: "*", schema: "public", table: "os_order_assignees" }, () => queue(null, true))
+      .on("postgres_changes", { event: "*", schema: "public", table: "os_installations" }, () => queue(null, true))
+      .on("postgres_changes", { event: "*", schema: "public", table: "os_deliveries" }, () => queue(null, true))
+      .subscribe();
+    return () => {
+      if (revalidationTimerRef.current) window.clearTimeout(revalidationTimerRef.current);
+      revalidationTimerRef.current = null;
+      changedOrdersRef.current.clear();
+      pendingFullRefreshRef.current = false;
+      void supabase.removeChannel(channel);
+    };
+  }, [authorized, userId, refresh, revalidateAffected]);
 
   useEffect(() => {
     if (!authorized) {
@@ -310,7 +456,8 @@ export default function OperationalDashboardPage() {
       ) : (
         <>
           <OperationalDashboardSections overview={snapshot?.overview ?? null} assignments={assignments}
-            agenda={agenda} agendaError={agendaError} />
+            agenda={agenda} agendaError={agendaError}
+            preparations={preparations} preparationError={preparationError} />
           <p className="mt-4 text-xs text-muted-foreground">
             Contagens de OS distintas, com acesso limitado pelas permissões existentes. Prazos usam o calendário de Santa Catarina.
             A classificação considera somente bloqueios, urgências e prazos registrados; sem prazo não significa atraso.
