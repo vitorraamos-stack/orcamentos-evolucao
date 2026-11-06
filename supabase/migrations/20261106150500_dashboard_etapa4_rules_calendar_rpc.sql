@@ -84,7 +84,7 @@ BEGIN
    count(*) FILTER (WHERE require_owner AND NOT EXISTS (
      SELECT 1 FROM public.os_order_assignees a
      WHERE a.order_id=scoped.id AND a.user_id IS NOT NULL
-       AND a.scope IN (public.scoped_rule_scope(p_scope), 'GENERAL')
+       AND a.scope IN (p_scope, 'GENERAL')
    ))::int,
    count(*) FILTER (WHERE require_deadline AND NOT EXISTS (
      SELECT 1 FROM public.os_order_deadlines d
@@ -95,15 +95,6 @@ BEGIN
    'sem_responsavel',v_no_owner,'sem_prazo',v_no_deadline,
    'duracao_verificada',false,'observacao','Prévia do instante atual; revalidar antes da publicação.');
 END $$;
-
--- Operador SQL interno para comparação de escopos, sem decisão de
--- permissões; LOGISTICS/APPROVAL são barrados por dashboard_validate_rule.
-CREATE FUNCTION public.scoped_rule_scope(p_scope text) RETURNS text
- LANGUAGE sql IMMUTABLE STRICT SECURITY INVOKER SET search_path='' AS $$
- SELECT CASE WHEN p_scope IN ('ART','PRODUCTION','FINISHING','INSTALLATION')
-   THEN p_scope ELSE '__SEM_FONTE__' END
-$$;
-REVOKE ALL ON FUNCTION public.scoped_rule_scope(text) FROM PUBLIC,anon,authenticated;
 
 -- Publicação de regra transacional: optimistic lock, auditoria e calendário
 -- validado no servidor. A primeira publicação exige revision=0.
