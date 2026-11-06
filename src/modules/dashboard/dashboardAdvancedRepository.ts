@@ -57,7 +57,7 @@ async function readByOrderIds<T extends IdRecord>(
 export function isMissingSchema(error: unknown) {
   if (!error || typeof error !== "object") return false;
   const code = "code" in error ? String(error.code) : "";
-  return code === "42P01" || code === "PGRST205" || code === "PGRST200";
+  return code === "42P01" || code === "PGRST205";
 }
 
 function validRule(value: unknown): value is RuleSpec {
@@ -66,7 +66,14 @@ function validRule(value: unknown): value is RuleSpec {
   const validScope = ["ART", "APPROVAL", "PRODUCTION", "FINISHING", "INSTALLATION", "LOGISTICS"].includes(String(row.scope));
   const validRequirement = (v: unknown) => ["required", "optional", "conditional"].includes(String(v));
   return validScope && validRequirement(row.owner) && validRequirement(row.deadline) &&
-    (row.conditionLogisticType === null || row.conditionLogisticType === "instalacao" || row.conditionLogisticType === "entrega") &&
+    (row.conditionLogisticType === null || row.conditionLogisticType === "instalacao" ||
+      row.conditionLogisticType === "entrega" || row.conditionLogisticType === "retirada") &&
+    (((row.owner === "conditional" || row.deadline === "conditional") &&
+      row.conditionLogisticType !== null) ||
+      ((row.owner !== "conditional" && row.deadline !== "conditional") &&
+        row.conditionLogisticType === null)) &&
+    (row.scope !== "APPROVAL" || row.owner === "optional") &&
+    (row.scope !== "LOGISTICS" || (row.owner === "optional" && row.deadline === "optional")) &&
     (row.stalledLimitMinutes === null ||
       (Number.isSafeInteger(row.stalledLimitMinutes) && Number(row.stalledLimitMinutes) > 0)) &&
     typeof row.calendarVerified === "boolean";
