@@ -106,11 +106,14 @@ CREATE INDEX dashboard_exception_calendar_date_idx
 -- ATENÇÃO: FKs sozinhas NÃO garantem que operações pertençam a mesma OS,
 -- nem impedem ciclo nem vínculo com item/operação soft-deleted.
 -- Sem RPC + trava por OS + validação recursiva, ESTE DDL NÃO É PUBLICÁVEL.
+-- FKs ON DELETE CASCADE preservam o fluxo existente de exclusão física de OS;
+-- a remoção de vínculo deve ter auditoria própria ANTES da deleção. A
+-- exclusão lógica deve invalidar os vínculos no RPC operacional.
 CREATE TABLE public.os_item_operation_dependencies (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id uuid NOT NULL REFERENCES public.os_orders(id) ON DELETE CASCADE,
-  predecessor_operation_id uuid NOT NULL REFERENCES public.os_order_item_operations(id) ON DELETE RESTRICT,
-  successor_operation_id uuid NOT NULL REFERENCES public.os_order_item_operations(id) ON DELETE RESTRICT,
+  predecessor_operation_id uuid NOT NULL REFERENCES public.os_order_item_operations(id) ON DELETE CASCADE,
+  successor_operation_id uuid NOT NULL REFERENCES public.os_order_item_operations(id) ON DELETE CASCADE,
   created_at timestamptz NOT NULL DEFAULT now(),
   created_by uuid NOT NULL REFERENCES public.profiles(id),
   CONSTRAINT dashboard_dependency_not_self CHECK (predecessor_operation_id <> successor_operation_id),
@@ -124,7 +127,7 @@ CREATE INDEX dashboard_dependency_successor_idx
 CREATE TABLE public.dashboard_operation_dependency_audit (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   dependency_id uuid NOT NULL,
-  order_id uuid NOT NULL REFERENCES public.os_orders(id) ON DELETE RESTRICT,
+  order_id uuid NOT NULL,
   predecessor_operation_id uuid NOT NULL,
   successor_operation_id uuid NOT NULL,
   action text NOT NULL CHECK (action IN ('CREATED','REMOVED')),
@@ -139,7 +142,7 @@ CREATE INDEX dashboard_dep_audit_order_idx
 -- não preencher automaticamente com updated_at ou histórico incompleto.
 CREATE TABLE public.dashboard_stage_intervals (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id uuid NOT NULL REFERENCES public.os_orders(id) ON DELETE RESTRICT,
+  order_id uuid NOT NULL REFERENCES public.os_orders(id) ON DELETE CASCADE,
   scope text NOT NULL CHECK (scope IN
     ('ART','APPROVAL','PRODUCTION','FINISHING','INSTALLATION','LOGISTICS')),
   entered_at timestamptz NOT NULL,
@@ -157,8 +160,8 @@ CREATE INDEX dashboard_stage_interval_order_idx
 
 CREATE TABLE public.dashboard_stage_pauses (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  stage_interval_id uuid NOT NULL REFERENCES public.dashboard_stage_intervals(id) ON DELETE RESTRICT,
-  operation_id uuid REFERENCES public.os_order_item_operations(id) ON DELETE RESTRICT,
+  stage_interval_id uuid NOT NULL REFERENCES public.dashboard_stage_intervals(id) ON DELETE CASCADE,
+  operation_id uuid REFERENCES public.os_order_item_operations(id) ON DELETE SET NULL,
   started_at timestamptz NOT NULL,
   ended_at timestamptz,
   reason text NOT NULL CHECK (length(btrim(reason)) BETWEEN 3 AND 1000),
