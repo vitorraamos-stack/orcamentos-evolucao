@@ -1,4 +1,4 @@
--- Dashboard Etapa 4 — CONTRATOS E RLS. Somente código; não aplicar sem homologação.
+-- Dashboard Etapa 4 — estrutura aditiva, RLS e contratos. Não cria dados operacionais.
 -- Nenhuma regra, jornada, feriado, pausa ou dependência é inserida automaticamente.
 -- A API pública tem SELECT mínimo; todas as gravações passam por RPCs gerenciais.
 CREATE TABLE public.dashboard_work_calendar_versions (
