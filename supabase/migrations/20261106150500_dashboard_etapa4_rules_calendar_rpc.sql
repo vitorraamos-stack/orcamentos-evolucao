@@ -1,5 +1,5 @@
 -- Dashboard Etapa 4 — publication RPCs. Protected by auth + serialized writes.
--- Dependências e regras SEM valores padrão. Não aplicar sem banco de homologação.
+-- Regras e calendários permanecem vazios até publicação gerencial explícita.
 CREATE FUNCTION public.dashboard_assert_manager() RETURNS uuid
  LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE v_user uuid := auth.uid();
