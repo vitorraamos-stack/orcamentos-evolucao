@@ -1,47 +1,42 @@
-# Etapa 4 — Implementação estrutural preparada, NÃO aplicada
+# Etapa 4 — Estrutura de banco aplicada em produção
 
-**Situação:** código e migrations adicionados ao PR #555, ainda em rascunho. Não houve execução de SQL no Supabase, aplicação de migrations, merge, Preview ou publicação. As Etapas 1 a 3 continuam em produção.
+**Situação em 06/11/2026:** as três migrations foram aplicadas com sucesso diretamente no projeto Supabase de produção \`evolucao-orcamentos\`. Não foi criado projeto, branch ou banco de testes. O PR #555 permanece em rascunho, sem merge; não houve deploy do frontend.
 
-## Artefatos versionados
+## Migrations aplicadas
 
-| Arquivo | Conteúdo | Aplicado? |
-| --- | --- | --- |
-| \`supabase/migrations/20261106150000_dashboard_etapa4_foundation.sql\` | 9 tabelas, índices, constraints, RLS, grants explícitos, log imutável | Não |
-| \`supabase/migrations/20261106150500_dashboard_etapa4_rules_calendar_rpc.sql\` | Validação das exigências, prévia de impacto, publicação de regras com revisão otimista, calendário/versionamento/turnos/feriados | Não |
-| \`supabase/migrations/20261106151000_dashboard_etapa4_dependency_rpc.sql\` | Criar/remover dependências via RPC gerencial, validar mesma OS/ativos, detectar ciclos, lock por OS, remover vínculos inválidos auditadamente | Não |
-| \`supabase/tests/dashboard_etapa4_security_contract.sql\` | 24 asserções pgTAP de estruturas, RLS, grants e RPCs, para banco de testes | Não executado |
-| \`src/modules/dashboard/dashboardStructuralMigrations.test.ts\` | Testes *estáticos* de proteção de migrações no CI | Sim, quando o CI executar |
-| \`src/modules/dashboard/dashboardAdvanced.ts\` e leitor | Corrige \`retirada\`, mapeamento restritivo de escopos e distinção entre schema inexistente e erro PostgREST | Validado via testes frontend |
+| Migration | Versão registrada no Supabase | Conteúdo | Status |
+| --- | --- | --- | --- |
+| \`dashboard_etapa4_foundation\` | \`20261106181834\` | 9 tabelas, índices, constraints, RLS, privilégios e histórico imutável | Aplicada |
+| \`dashboard_etapa4_rules_calendar_rpc\` | \`20261106181837\` | Prévia e publicação gerencial de regras, calendário, turnos e exceções | Aplicada |
+| \`dashboard_etapa4_dependency_rpc\` | \`20261106181942\` | Criação/remoção de dependências, prevenção de ciclos e limpeza auditada | Aplicada |
 
-O arquivo \`docs/tasks/dashboard-operacional-etapa4-ddl-rascunho.sql\` continua como **referência bloqueada**, fora das migrations. Não deve ser executado.
+## Verificações realizadas em produção
 
-## Limites reais da entrega
+- CI do PR: \`npm run check\`, testes, \`npm run build:app\` e \`npm run verify:prod\` aprovados no commit \`c4ce21f62a4eb81955222b1ed06d811e9209d9c9\`.
+- As nove tabelas novas existem e estão com RLS habilitado; cada uma tem política de leitura explícita.
+- Privilégios confirmados: \`anon\` sem acesso; \`authenticated\` somente leitura direta; \`service_role\` sem acesso direto. As cinco RPCs públicas exigem validação de gestor do Hub OS; funções internas não são executáveis pelos papéis de API.
+- Prévia consultiva chamada em contexto de gestor autenticado, com resposta válida.
+- Publicação de um calendário e de uma regra executada em transação de verificação e revertida integralmente (\`ROLLBACK\`).
+- Chamada da prévia por identidade sem perfil de gestor foi recusada.
+- Após o rollback, todas as tabelas novas continuam com **zero registros**. Nenhuma regra, jornada, feriado, pausa ou dependência foi publicada.
+- Os três gatilhos de limpeza e os cinco gatilhos de imutabilidade estão instalados.
+- Advisor não identificou novas tabelas com RLS sem política. Os avisos preexistentes de outras tabelas/extension continuam. As cinco RPCs gerenciais aparecem no aviso genérico de \`SECURITY DEFINER\`, mas verificam módulo e perfil de gestor no servidor antes de executar.
 
-1. As migrations estão prontas **para revisão e execução posterior em homologação**, não certificadas em PostgreSQL. Passar no TypeScript/Vitest não valida sintaxe SQL, grants reais, execução das RPCs ou ausência de deadlocks.
-2. **Nenhuma linha inicial** é criada em regras, calendários, vínculos ou intervalos/pausas. Após aplicar o esquema, essas fontes continuarão vazias até publicações autorizadas.
-3. \`dashboard_publish_calendar\` publica versões com jornada/feriados explicitamente informados; não assume horário comercial, folgas nem feriados brasileiros. O fuso da operação é \`America/Sao_Paulo\`.
-4. \`dashboard_publish_rule\` exige gestor/admin do Hub OS, justificativa, revisão esperada e calendário publicado para limites de tempo. O leitor não calcula gargalo temporal enquanto não existir trilha confiável de entrada/saída e pausas.
-5. \`dashboard_link_operations\` e \`dashboard_unlink_operations\` exigem gestor/admin, validam vínculos de atividades ativas da mesma OS, trava transacional, ciclo completo via CTE e log de criação/remoção. Triggers de limpeza auditam cancelamento, exclusão lógica ou física e alterações de vínculo de item. A homologação precisa testar concorrência com as RPCs operacionais existentes.
-6. **Persistência de intervalos de etapa e pausas** está modelada, com leitura protegida, mas a escrita/instrumentação por eventos do fluxo atual ainda não está conectada. O cálculo de permanência permanece indisponível (e não deve ser estimado).
-7. A interface administrativa **Configurações → Regras Operacionais**, a tela de edição de dependências e o pré-cálculo de impacto por OS ainda dependem de implementação de frontend/API e autorização de acesso aos ambientes de testes.
-8. No banco, os setores de responsáveis e prazos não são idênticos: \`APPROVAL\` não possui responsável próprio; \`LOGISTICS\` não possui responsável/prazo próprio. Regra com exigência não verificável é recusada por constraint e RPC. \`retirada\`, \`entrega\` e \`instalacao\` são aceitos como condição.
+## Limites e pendências
 
-## Homologação obrigatória antes de qualquer aplicação de produção
+1. Não foi executado o arquivo pgTAP \`supabase/tests/dashboard_etapa4_security_contract.sql\`. Não foi criado ambiente de testes, conforme orientação do usuário. A validação real de concorrência, ciclos e falhas transacionais permanece limitada.
+2. A produção atualmente não tem registros de operações em \`os_order_item_operations\`; por isso, o caminho de criação/remoção de dependências não foi exercitado com atividades reais. Nenhuma fixture foi inserida na OS existente.
+3. \`dashboard_publish_calendar\` exige jornada e exceções explicitamente informadas; não presume horário comercial, folgas nem feriados brasileiros. Fuso: \`America/Sao_Paulo\`.
+4. \`dashboard_publish_rule\` exige gestor/admin do Hub OS, justificativa, revisão esperada e calendário publicado para limites de tempo. Nenhuma regra está publicada.
+5. \`dashboard_stage_intervals\` e \`dashboard_stage_pauses\` estão modeladas e protegidas, mas ainda não recebem eventos automaticamente. Permanência/gargalo temporal não deve ser calculado ou exibido como confirmado.
+6. A interface **Configurações → Regras Operacionais**, a edição visual de dependências e a integração de eventos de entrada/saída/pausas ainda precisam ser implementadas.
+7. \`APPROVAL\` não possui responsável próprio e \`LOGISTICS\` não possui fonte própria de responsável/prazo. As RPCs recusam exigências não verificáveis. Condições logísticas aceitas: \`retirada\`, \`entrega\`, \`instalacao\`.
+8. A preparação de materiais continua sem reserva física vinculada à agenda. Não declarar materiais confirmados sem uma fonte real.
 
-- Criar/identificar **banco isolado e ativo** autorizado pelo usuário, nunca aplicar no projeto \`evolucao-orcamentos\` de produção durante esta fase.
-- Rodar migrations do projeto em ordem no banco de testes, verificando erros, PostgREST Data API, grant e RLS.
-- Rodar \`supabase/tests/dashboard_etapa4_security_contract.sql\` em ambiente com pgTAP.
-- Preparar fixtures transacionais usando usuários anon, sem Hub, operador e gerente/admin. Demonstrar rejeição de acesso direto e RPC negada a não gestores, incluindo perfis desconectados.
-- Exercitar regras condicionais (incluindo retirada), rejeição de escopos incompatíveis, revisões concorrentes, calendário sem turnos/sobreposto, exceções inválidas, mutação da auditoria e publicação sem justificativa.
-- Validar bloqueio de auto-referência, relação cruzada entre OS, predecessor excluído/cancelado, duplicatas, caminho A→B→C→A, edição concorrente, exclusão/soft-delete de item e operação, exclusão de OS, rollback integral em erros e integridade do histórico.
-- Confirmar **sem regressão** nas RPCs atuais de movimentação da OS e operações de produção; não alterar vendas/financeiro.
-- Testar contratos do leitor já existente com os dados publicados e dados ausentes: nunca declarar materiais, gargalos ou dependências como comprovados sem dados.
-- Somente após resultados confiáveis, solicitar autorização para aplicar em ambiente de homologação e, em decisão separada, para produção. Aplicar o esquema antes de liberar UI que dependa dele; ter plano de backup, janela e rollback revisado.
+## Estado de publicação
 
-## Critérios de aceite desta subetapa
-
-- Branch isolada e PR em rascunho: **sim**.
-- Migrations + RPCs + contratos de auditoria criados no repositório: **sim**.
-- Verificação estática no CI: **em execução/conforme resultado do PR**.
-- Execução SQL em banco real e pgTAP comportamental: **não efetuadas**.
-- Migrations aplicadas, merge ou publicação: **não autorizados e não efetuados**.
+- Banco de produção: **migrations aplicadas; tabelas vazias e protegidas**.
+- PR #555: **draft, sem merge**.
+- Frontend/Preview/produção Vercel: **inalterados**.
+- Etapas 1, 2 e 3: continuam como estavam; nenhum código novo da Etapa 4 foi publicado.
+- Próximo trabalho: implementar UI administrativa e conectar eventos de operações/pausas, preservando a regra de que nenhum calendário ou exigência operacional é presumido.
