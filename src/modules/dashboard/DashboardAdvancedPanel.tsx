@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { AlertTriangle, ArrowRight, GitBranch, RefreshCw, ShieldAlert, TimerOff } from "lucide-react";
+import { AlertTriangle, ArrowRight, GitBranch, RefreshCw, ShieldAlert, TimerOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,9 @@ import {
   type AdvancedOrderAssessment, type AdvancedSources,
 } from "./dashboardAdvanced";
 import { listDashboardAdvancedSources } from "./dashboardAdvancedRepository";
-import { WORK_CENTER_LABELS, type WorkCenter } from "@/modules/production/operations";
+import { OPERATION_STATUS_LABELS, WORK_CENTER_LABELS, type WorkCenter } from "@/modules/production/operations";
+import { toast } from "sonner";
+import { createDashboardDependency, removeDashboardDependency } from "./dashboardDependencyRepository";
 
 const workCenterLabel = (center: string) =>
   Object.prototype.hasOwnProperty.call(WORK_CENTER_LABELS, center)
@@ -21,8 +23,145 @@ const workCenterLabel = (center: string) =>
 type Result = { rows: AdvancedOrderAssessment[]; source: AdvancedSources };
 type Filter = "attention" | "blocked" | "dependencies" | "all";
 
-function OperationDependencies({ row, source }: {
-  row: AdvancedOrderAssessment; source: AdvancedSources;
+function DependencyManager({ orderId, source, onChanged }: {
+  orderId: string;
+  source: AdvancedSources;
+  onChanged: () => Promise<void>;
+}) {
+  const [predecessorId, setPredecessorId] = useState("");
+  const [successorId, setSuccessorId] = useState("");
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const items = source.items.filter(item => item.order_id === orderId && item.status !== "CANCELLED");
+  const itemIds = new Set(items.map(item => item.id));
+  const itemById = new Map(items.map(item => [item.id, item]));
+  const operations = source.operations.filter(operation => itemIds.has(operation.item_id));
+  const operationById = new Map(operations.map(operation => [operation.id, operation]));
+  const links = source.dependencies.state === "available"
+    ? source.dependencies.links.filter(link => link.order_id === orderId)
+    : [];
+  const label = (operationId: string) => {
+    const operation = operationById.get(operationId);
+    if (!operation) return "Atividade não identificada";
+    const item = itemById.get(operation.item_id);
+    const status = OPERATION_STATUS_LABELS[operation.status] ?? operation.status;
+    return (item?.name || "Item") + " · " + workCenterLabel(operation.work_center) + " · " + status;
+  };
+
+  const add = async () => {
+    if (!predecessorId || !successorId || predecessorId === successorId || reason.trim().length < 3) return;
+    setSaving(true);
+    try {
+      await createDashboardDependency({
+        orderId, predecessorId, successorId, reason: reason.trim(),
+      });
+      toast.success("Dependência registrada.");
+      setPredecessorId("");
+      setSuccessorId("");
+      setReason("");
+      await onChanged();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível registrar a dependência.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (dependencyId: string) => {
+    if (reason.trim().length < 3) {
+      toast.error("Informe uma justificativa com pelo menos 3 caracteres.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await removeDashboardDependency({ dependencyId, reason: reason.trim() });
+      toast.success("Dependência removida; a alteração ficou registrada no histórico.");
+      setReason("");
+      await onChanged();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível remover a dependência.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!operations.length) return (
+    <p className="evolu-dashboard__advanced-muted">
+      Esta OS ainda não possui atividades estruturadas disponíveis para vincular.
+    </p>
+  );
+
+  return (
+    <div className="mt-3 space-y-3 rounded-lg border border-dashed p-3">
+      <div>
+        <strong className="text-sm">Gerenciar dependências</strong>
+        <p className="evolu-dashboard__advanced-muted">
+          Registre apenas relações reais: a atividade sucessora só depende da predecessora quando isso foi definido na operação.
+        </p>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="grid gap-1 text-xs font-medium">
+          Predecessora
+          <select value={predecessorId} onChange={event => {
+            setPredecessorId(event.target.value);
+            if (event.target.value === successorId) setSuccessorId("");
+          }} className="h-10 min-w-0 rounded-md border border-input bg-background px-2 text-sm">
+            <option value="">Selecione a atividade anterior</option>
+            {operations.map(operation => (
+              <option key={operation.id} value={operation.id}>{label(operation.id)}</option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs font-medium">
+          Sucessora
+          <select value={successorId} onChange={event => setSuccessorId(event.target.value)}
+            className="h-10 min-w-0 rounded-md border border-input bg-background px-2 text-sm">
+            <option value="">Selecione a atividade dependente</option>
+            {operations.filter(operation => operation.id !== predecessorId).map(operation => (
+              <option key={operation.id} value={operation.id}>{label(operation.id)}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label className="grid gap-1 text-xs font-medium">
+        Justificativa da alteração
+        <Input value={reason} maxLength={1000} onChange={event => setReason(event.target.value)}
+          placeholder="Explique por que o vínculo deve existir ou ser removido" />
+      </label>
+      <Button type="button" size="sm" onClick={() => void add()}
+        disabled={saving || !predecessorId || !successorId || reason.trim().length < 3}>
+        {saving ? "Salvando…" : "Registrar dependência"}
+      </Button>
+      <div className="space-y-2">
+        <p className="text-xs font-semibold">Vínculos atuais ({links.length})</p>
+        {links.length === 0
+          ? <p className="evolu-dashboard__advanced-muted">Nenhuma dependência explícita registrada.</p>
+          : links.map(link => (
+            <div key={link.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
+              <p className="min-w-0 flex-1 text-xs">
+                <strong>{label(link.predecessor_operation_id)}</strong>
+                <span className="mx-1 text-muted-foreground" aria-hidden="true">→</span>
+                {label(link.successor_operation_id)}
+              </p>
+              <Button type="button" variant="ghost" size="sm" disabled={saving || reason.trim().length < 3}
+                onClick={() => void remove(link.id)}>
+                <Trash2 className="mr-1 h-3.5 w-3.5" /> Remover
+              </Button>
+            </div>
+          ))}
+      </div>
+      <p className="evolu-dashboard__advanced-muted">
+        O servidor impede vínculos entre OS diferentes, duplicidades e ciclos. Inclusões e remoções ficam auditadas.
+      </p>
+    </div>
+  );
+}
+
+function OperationDependencies({ row, source, isManager, onChanged }: {
+  row: AdvancedOrderAssessment;
+  source: AdvancedSources;
+  isManager: boolean;
+  onChanged: () => Promise<void>;
 }) {
   const graph = row.dependency;
   if (graph.state === "unavailable") return (
@@ -32,9 +171,13 @@ function OperationDependencies({ row, source }: {
     </p>
   );
   const operations = new Map(source.operations.map(op => [op.id, op]));
+  const items = new Map(source.items.map(item => [item.id, item]));
   const describe = (id: string) => {
     const op = operations.get(id);
-    return op ? workCenterLabel(op.work_center) + " (" + op.status + ")" : "Atividade não identificada";
+    if (!op) return "Atividade não identificada";
+    const item = items.get(op.item_id);
+    return (item?.name || "Item") + " · " + workCenterLabel(op.work_center) +
+      " (" + (OPERATION_STATUS_LABELS[op.status] ?? op.status) + ")";
   };
   const active = graph.rows.filter(op => op.predecessorIds.length);
   return (
@@ -64,13 +207,16 @@ function OperationDependencies({ row, source }: {
         <p className="evolu-dashboard__advanced-muted">
           {graph.independentIds.length} atividade(s) sem vínculo registrado, potencialmente paralelas. Nenhuma ordem artificial aplicada.
         </p>}
+      {isManager && <DependencyManager orderId={row.order.id} source={source} onChanged={onChanged} />}
     </div>
   );
 }
 
-function AdvancedOrderRow({ assessment, source }: {
+function AdvancedOrderRow({ assessment, source, isManager, onChanged }: {
   assessment: AdvancedOrderAssessment;
   source: AdvancedSources;
+  isManager: boolean;
+  onChanged: () => Promise<void>;
 }) {
   const { order, blocked, requirementWarnings, dependency } = assessment;
   return (
@@ -110,7 +256,7 @@ function AdvancedOrderRow({ assessment, source }: {
               : <p className="evolu-dashboard__advanced-muted">Nenhuma ausência identificada segundo as exigências registradas para esta etapa.</p>}
           <div className="space-y-1">
             <strong>Dependências registradas</strong>
-            <OperationDependencies row={assessment} source={source} />
+            <OperationDependencies row={assessment} source={source} isManager={isManager} onChanged={onChanged} />
           </div>
           <p className="evolu-dashboard__advanced-muted">
             <TimerOff aria-hidden="true" className="mr-1 inline h-3.5 w-3.5" />
@@ -124,7 +270,7 @@ function AdvancedOrderRow({ assessment, source }: {
 
 /** Lazy, RLS read-only advanced view. Never blocks the main dashboard. */
 export function DashboardAdvancedPanel() {
-  const { user } = useAuth();
+  const { user, hubPermissions } = useAuth();
   const userId = user?.id ?? null;
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<Filter>("attention");
@@ -255,7 +401,8 @@ export function DashboardAdvancedPanel() {
                           Nenhum registro confirmado corresponde ao filtro. Isso não confirma a inexistência de gargalos não mensuráveis.
                         </p>
                       : matching.slice(0,60).map(row =>
-                        <AdvancedOrderRow key={row.order.id} assessment={row} source={result.source} />)}
+                        <AdvancedOrderRow key={row.order.id} assessment={row} source={result.source}
+                          isManager={hubPermissions.isManager} onChanged={load} />)}
                     {matching.length>60 && <p className="evolu-dashboard__advanced-muted">
                       {matching.length-60} OS adicionais. Refine a busca para consultá-las.
                     </p>}
