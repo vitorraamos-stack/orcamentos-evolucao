@@ -68,5 +68,7 @@ describe("Dashboard Etapa 4 — migration authoring safety checks", () => {
     expect(dependencies).toContain("CREATE TRIGGER dashboard_dependency_cleanup_order");
     expect(dependencies).toContain("OLD.status<>'CANCELLED' AND NEW.status='CANCELLED'");
     expect(dependencies).toContain("'REMOVED',auth.uid()");
+    expect(dependencies).toContain("Cada ramo usa somente campos existentes no tipo de linha OLD");
+    expect(dependencies).not.toContain("TG_TABLE_NAME='os_orders' AND d.order_id=OLD.id");
   });
 });
