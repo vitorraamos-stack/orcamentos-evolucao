@@ -1,43 +1,52 @@
-# Dashboard operacional — Etapa 4 (inteligência avançada, fase sem migrations)
+# Dashboard operacional — Etapa 4: inteligência avançada
 
-**Base publicada:** Etapas 1–3; decisões 01–44 preservadas. Decisões desta etapa: 15–20, 35–37, 41, 43–44. Implementação isolada da branch, sem merge, Supabase migrations ou deploy.
+**Base publicada:** Etapas 1–3; decisões 01–44 preservadas. A Etapa 4 permanece isolada na branch `feat/dashboard-inteligencia-avancada-etapa4-20261106` e no PR #555, ainda em rascunho. Nenhum frontend da Etapa 4 foi publicado.
 
-## Análise de código e do esquema existente
+## Estado atual
 
-Inspeção do repositório e das colunas/policies reais do projeto Supabase \`evolucao-orcamentos\` (somente SQL SELECT de metadados):
-- Existem \`os_order_items\`, \`os_order_item_operations\`, \`os_order_assignees\`, \`os_order_deadlines\`, \`os_orders_event\` e suas políticas RLS de Hub OS.
-- As operações possuem status \`BLOCKED\` e motivo; é possível afirmar **bloqueio operacional registrado**, mas não o tempo de gargalo automaticamente.
-- **Não existem** tabela ou contrato persistente para limites por etapa, calendário operacional versionado, exigências obrigatórias/opcionais/condicionais, pausas verificadas ou vínculos predecessor→sucessor entre atividades.
-- A existência de \`sort_order\`, \`updated_at\`, atividade no mesmo setor ou duas operações com status pendente **não comprova dependência, tempo parado, caminho crítico ou gargalo**.
+- As migrations de estrutura, regras/calendários e dependências foram aplicadas diretamente no Supabase de produção `evolucao-orcamentos` por orientação expressa. Não foi criado projeto, branch ou banco de testes.
+- A interface administrativa **Configurações → Regras Operacionais** foi implementada na branch: regras por etapa, prévia de impacto, publicação auditada, histórico, calendário semanal e exceções.
+- O painel **Gargalos e dependências** agora permite que gestores registrem e removam vínculos explícitos entre atividades da mesma OS. Inclusões e remoções passam pelas RPCs protegidas e exigem justificativa.
+- A instrumentação de entrada/saída de etapa e pausas por operação bloqueada foi adicionada como migration. Ela não retroprojeta o histórico das OS antigas.
+- CI, testes e build foram aprovados nos commits de implementação da interface e do editor de dependências. A validação final desta migration será registrada após a aplicação.
 
-## Entrega funcional desta fase
+## Comportamento e limites de evidência
 
-- Painel **Gargalos e dependências** sob demanda, sem prejudicar carregamento dos indicadores, agenda e prioridades.
-- Consulta de **todas as OS ativas com acesso via RLS** somente ao abrir o painel; itens, operações, responsáveis e prazos vinculados. Paginação com contagem exata, lotes de IDs, detecção de leituras inconsistentes e erros explícitos. Sem leitura de dados financeiros.
-- Contagem por OS distinta de bloqueios comprovados, listagem com busca e filtro, acesso direto à OS; detalhes expansíveis com centro de trabalho e motivo registrado, ou ausência de motivo.
-- Motor puro para **exigências por etapa**: distingue \`required\`, \`optional\` e \`conditional\` baseado apenas em regra válida e aplicável. Na ausência da tabela de regras não assinala como infração a falta de responsável ou prazo.
-- Motor para **dependências exclusivamente registradas**: suporta múltiplas predecessoras, atividades independentes/paralelas, diferencia predecessora \`BLOCKED\` de mera espera por conclusão, detecta ciclos, autorreferência, vínculos com atividades ausentes/de outra OS e dados inconsistentes. Não reordena, bloqueia ou edita operações.
-- Contratos futuros opcionais de leitura \`dashboard_operational_rules\` e \`os_item_operation_dependencies\`. A API diferencia \`42P01/PGRST205\` (tabela inexistente) de erros RLS/network, sem converter indisponibilidade em vazio. Nenhuma dessas tabelas é criada nesta branch.
-- Exibe o motivo de tempo/gargalo não mensurável, mesmo que a OS tenha bloqueio registrado; não calcula limites, pausas, dias úteis ou tempos com base em timestamps incompletos.
-- Interface responsiva, painel lateral com resumo compacto e detalhes sob demanda; sem ações de escrita, sem alterar ordem/prioridade original do Dashboard.
+### Regras e calendário
 
-## Itens ainda dependentes de autorização e infraestrutura (não concluídos)
+- Não há jornada, feriado, exigência ou limite de tempo presumido.
+- A primeira publicação de cada regra exige prévia de impacto, justificativa e revisão esperada.
+- Calendários são versionados e imutáveis; intervalos sobrepostos e vigências conflitantes são recusados no servidor.
+- Uma versão sem data final permanece aberta e impede a publicação de uma versão posterior até que sua vigência seja encerrada formalmente.
+- Aprovação não tem fonte própria de responsável e Logística não tem fonte própria de responsável/prazo. A interface mantém essas exigências opcionais, conforme o contrato validado no banco.
 
-1. **Decisões 15–20:** limites editáveis, calendário de trabalho/férias/feriados, unidades, horas confiáveis, pausas registradas, histórico auditável e recálculo de gargalos por etapa só podem ser ativados após existir regra operacional persistida e trilha de eventos/pausas confiável. Sem esses dados, não há categoria "possível gargalo" por tempo.
-2. **Decisões 35–37, 41:** Configurações → Regras Operacionais requer persistência auditada com aprovação de permissões e prévia de impacto; a engine de requisitos está preparada, mas não há edição, gravação ou interface administrativa fictícia nesta fase. Os rótulos "exigência ausente" aparecem somente com uma regra realmente gravada, validada e visível via RLS.
-3. **Decisões 43–44:** a engine/visualização para dependências explícitas está pronta para receber vínculos. Sem uma tabela que os armazene, o painel sinaliza claramente "dependências não disponíveis"; isso **não significa que as operações sejam independentes**.
+### Dependências
 
-### Contratos mínimos a decidir antes de migração
+- Só são registradas relações explicitamente definidas pelo gestor.
+- O banco valida que ambas as atividades pertencem à mesma OS, estão ativas, são distintas e não criam ciclo.
+- A interface não altera status, prioridade, ordem de produção ou prazo das atividades.
+- A produção atual não possui atividades em `os_order_item_operations`; portanto, os controles de vínculo podem aparecer sem opções até que existam atividades reais.
 
-- \`dashboard_operational_rules\`: um registro válido por \`scope\` (ART, APPROVAL, PRODUCTION, FINISHING, INSTALLATION, LOGISTICS); campos \`owner\` e \`deadline\` = required/optional/conditional; \`condition_logistic_type\` opcional; \`stalled_limit_minutes\` inteiro positivo/NULL; \`calendar_verified\` bool. Requer calendário auditável separado e versões efetivas.
-- \`os_item_operation_dependencies\`: \`id\`, \`order_id\`, \`predecessor_operation_id\`, \`successor_operation_id\`. RLS SELECT somente quem pode consultar Hub OS, restrições transacionais/servidor: atividades da **mesma OS**, ativas e distintas; evitar ciclos, vínculos duplicados e referências excluídas. Nenhuma escrita pelo Dashboard.
-- Gestão: mudanças de regras apenas por usuário autorizado e auditadas em histórico imutável; prévia de impacto antes da confirmação; não reescrever registros históricos; remover permissões de INSERT/UPDATE/DELETE para papéis não autorizados.
-- Atividades: registrar eventos confiáveis de entrada/saída por etapa e pausas verificadas para cálculo de tempo útil. Sem isso o motor deve recusar calcular duração.
+### Eventos de etapa e pausas
 
-**Estas são propostas de contrato, não migrations aplicadas.** Exigem revisão específica de segurança, política de dados e aprovação antes de implementação. Nenhuma configuração foi presumida como existente.
+- Novas OS passam a registrar o primeiro intervalo no momento de sua criação, quando o escopo é reconhecido.
+- Para OS existentes sem histórico, a primeira atualização observada dentro da mesma etapa cria apenas um marco `unverified`; isso não afirma quando a etapa realmente começou e não pode alimentar cálculo de duração.
+- Mudanças reais de etapa registram o fechamento do intervalo anterior e a abertura de outro `verified`.
+- Uma operação que entra em `BLOCKED` registra uma pausa somente se houver intervalo de etapa aberto. A pausa termina ao sair do bloqueio, cancelar/excluir/mover o item ou mudar a etapa da OS.
+- Eventos anteriores à instalação da instrumentação não são reconstruídos. Nenhuma linha histórica foi preenchida artificialmente.
+- Mesmo com eventos `verified`, o cálculo de permanência/gargalo ainda precisa validar calendário vigente, intervalos completos e pausas. Até essa etapa, o Dashboard não deve apresentar duração como confirmada.
 
-## Testes e homologação
+## Verificações e restrições
 
-- \`npm run check\`, \`npm run test\`, \`npm run build:app\`; GitHub CI e workflow de Dashboard.
-- Casos cobertos: regra inexistente versus opcional, condicional aplicável, várias predecessoras, paralelismo, espera legítima, predecessor bloqueada, atividades inválidas, ciclo, repetição, RLS, paginação, erro de schema versus permissão e OS sem registros.
-- Revisão visual com dados reais requer Preview autorizado em separado. **NÃO fazer merge, aplicar migrations ou publicar** até nova autorização explícita.
+- Migrations e privilégios são verificados diretamente no projeto de produção.
+- CI executa `npm run verify:prod` e testes estáticos das migrations; não executa pgTAP contra produção.
+- O contrato pgTAP `supabase/tests/dashboard_etapa4_security_contract.sql` permanece disponível, mas não foi executado, conforme a orientação de não criar ambiente de testes.
+- Nenhuma fixture ou OS fictícia será inserida na produção para simular dependências.
+- Não há integração de reserva física de materiais com a agenda; materiais continuam como não verificados quando não existe fonte vinculada.
+
+## Publicação
+
+- PR #555: **draft, sem merge**.
+- Frontend da Etapa 4: **não publicado**.
+- Vercel de produção: continua na versão publicada da Etapa 3.
+- Banco: migrations aplicadas diretamente em produção; nenhuma regra, calendário, exceção ou dependência foi criada automaticamente.
