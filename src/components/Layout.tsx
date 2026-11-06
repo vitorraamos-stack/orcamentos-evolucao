@@ -10,6 +10,7 @@ import {
   Palette,
   Factory,
   CalendarDays,
+  CalendarClock,
   Truck,
   Package,
   LogOut,
@@ -78,12 +79,13 @@ export default function Layout({ children }: LayoutProps) {
   const canViewMateriais = isAdmin && hasModuleAccess("materiais");
   const canViewConfiguracoes =
     hubPermissions.canManageUsers && hasModuleAccess("configuracoes");
+  const canViewOperationalSettings = canViewConfiguracoes && hasModuleAccess("hub_os");
   const canViewFinanceiro = hasModuleAccess("hub_os_financeiro");
   // Os agrupamentos apenas organizam a navegação; os controles de acesso
   // continuam sendo os mesmos usados nas rotas de cada módulo.
   const hasCommercialModules = canViewOrcamentista || canViewCalculadora || canViewLibrary;
   const hasResourceModules = canViewGaleria || canViewMateriais;
-  const hasManagementModules = canViewFinanceiro || canViewConfiguracoes || canManageLibrary;
+  const hasManagementModules = canViewFinanceiro || canViewConfiguracoes || canViewOperationalSettings || canManageLibrary;
 
   const operationalLinks = [
     { href: "/hub-os", label: "Dashboard", Icon: LayoutDashboard, active: location === "/hub-os" },
@@ -266,6 +268,21 @@ export default function Layout({ children }: LayoutProps) {
                   Preços e Custos
                 </Button>
               </Link>
+              {canViewOperationalSettings && (
+                <Link href="/configuracoes/regras-operacionais">
+                  <Button
+                    variant={location === "/configuracoes/regras-operacionais" ? "secondary" : "ghost"}
+                    className={cn(
+                      "evolu-nav__item w-full justify-start",
+                      location === "/configuracoes/regras-operacionais" &&
+                        "bg-sidebar-accent text-sidebar-accent-foreground"
+                    )}
+                  >
+                    <CalendarClock className="mr-2 h-4 w-4" />
+                    Regras Operacionais
+                  </Button>
+                </Link>
+              )}
               <Link href="/configuracoes">
                 <Button
                   variant={location === "/configuracoes" ? "secondary" : "ghost"}
