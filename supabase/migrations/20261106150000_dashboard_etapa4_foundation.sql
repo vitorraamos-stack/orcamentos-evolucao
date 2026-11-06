@@ -181,12 +181,23 @@ CREATE POLICY dashboard_stage_pauses_read ON public.dashboard_stage_pauses
 CREATE FUNCTION public.dashboard_reject_audit_mutation() RETURNS trigger
  LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
 BEGIN
-  RAISE EXCEPTION 'Histórico operacional imutável' USING ERRCODE='42501';
+  RAISE EXCEPTION 'Histórico ou calendário publicado imutável' USING ERRCODE='42501';
 END $$;
 CREATE TRIGGER dashboard_rules_audit_immutable
  BEFORE UPDATE OR DELETE ON public.dashboard_operational_rule_revisions
  FOR EACH ROW EXECUTE FUNCTION public.dashboard_reject_audit_mutation();
 CREATE TRIGGER dashboard_dependency_audit_immutable
  BEFORE UPDATE OR DELETE ON public.dashboard_operation_dependency_audit
+ FOR EACH ROW EXECUTE FUNCTION public.dashboard_reject_audit_mutation();
+-- A publicação é atômica e cria uma nova versão: nenhuma versão publicada,
+-- período ou exceção anteriores podem ser reescritos.
+CREATE TRIGGER dashboard_calendar_version_immutable
+ BEFORE UPDATE OR DELETE ON public.dashboard_work_calendar_versions
+ FOR EACH ROW EXECUTE FUNCTION public.dashboard_reject_audit_mutation();
+CREATE TRIGGER dashboard_calendar_period_immutable
+ BEFORE UPDATE OR DELETE ON public.dashboard_work_calendar_periods
+ FOR EACH ROW EXECUTE FUNCTION public.dashboard_reject_audit_mutation();
+CREATE TRIGGER dashboard_calendar_exception_immutable
+ BEFORE UPDATE OR DELETE ON public.dashboard_work_calendar_exceptions
  FOR EACH ROW EXECUTE FUNCTION public.dashboard_reject_audit_mutation();
 REVOKE ALL ON FUNCTION public.dashboard_reject_audit_mutation() FROM PUBLIC, anon, authenticated;
