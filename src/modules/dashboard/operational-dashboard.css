@@ -117,3 +117,38 @@
 @media (max-width: 980px) {
   .evolu-dashboard__main { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Etapa 3 — prontidão separada por produção/material, sem falsa confirmação. */
+.evolu-dashboard__prep {
+  display: grid; gap: 5px; min-width: 0; margin-top: 5px;
+  border-top: 1px dashed var(--border); padding-top: 8px;
+  font-size: 12px; line-height: 1.4; overflow-wrap: anywhere;
+}
+.evolu-dashboard__prep-title {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 700; color: var(--foreground);
+}
+.evolu-dashboard__prep[data-preparation="pending"] .evolu-dashboard__prep-title { color: #b44e1b; }
+.evolu-dashboard__prep[data-preparation="partial"] .evolu-dashboard__prep-title { color: #aa7b12; }
+.evolu-dashboard__prep-muted { color: var(--muted-foreground); font-size: 12px; }
+.evolu-dashboard__prep-main-alert {
+  display: inline-flex; align-items: flex-start; gap: 5px;
+  font-weight: 650; color: var(--destructive);
+}
+.evolu-dashboard__prep-details { color: var(--muted-foreground); }
+.evolu-dashboard__prep-details summary { cursor: pointer; color: var(--primary); font-weight: 600; }
+.evolu-dashboard__prep-details summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.evolu-dashboard__prep-details[open] { padding-top: 4px; }
+.evolu-dashboard__prep-priority {
+  margin-top: 7px; font-size: 12px; color: var(--muted-foreground); overflow-wrap: anywhere;
+}
+.evolu-dashboard__prep-priority strong { color: var(--foreground); }
+.evolu-dashboard__prep-lead { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+.evolu-dashboard__prep-summary {
+  display: flex; flex-wrap: wrap; gap: 5px 12px;
+  padding: 9px 11px; border-radius: 10px;
+  background: var(--muted); color: var(--muted-foreground); font-size: 12px;
+}
+.evolu-dashboard__prep-summary strong { color: var(--foreground); font-variant-numeric: tabular-nums; }
+.dark .evolu-dashboard__prep[data-preparation="pending"] .evolu-dashboard__prep-title { color: #f5a879; }
+.dark .evolu-dashboard__prep[data-preparation="partial"] .evolu-dashboard__prep-title { color: #e3c377; }
