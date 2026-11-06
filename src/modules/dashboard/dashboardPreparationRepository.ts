@@ -71,9 +71,9 @@ export async function listDashboardPreparationSources(
 export async function resolvePreparationOrderByItem(
   itemId: string, signal?: AbortSignal
 ): Promise<string | null> {
-  let query = supabase.from("os_order_items").select("order_id").eq("id", itemId).maybeSingle();
+  let query = supabase.from("os_order_items").select("order_id").eq("id", itemId);
   if (signal) query = query.abortSignal(signal);
-  const { data, error } = await query;
+  const { data, error } = await query.maybeSingle();
   if (error) throw new Error(error.message);
   return data?.order_id ?? null;
 }
