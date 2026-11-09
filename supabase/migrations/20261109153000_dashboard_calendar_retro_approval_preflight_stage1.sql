@@ -98,16 +98,47 @@ BEGIN
     FROM public.dashboard_operational_thresholds t
     WHERE t.calendar_version_id=v_request.calendar_version_id;
 
-  -- Conservative server fingerprint: stable date, request and evidence shapes.
-  -- A transaction applying a correction must recompute all source durations
-  -- and alert classifications instead of trusting this diagnostic fingerprint.
-  SELECT pg_catalog.md5(coalesce(pg_catalog.string_agg(
-    si.id::text||':'||si.order_id::text||':'||si.scope||':'||
-    si.entered_at::text||':'||coalesce(si.left_at::text,'open')||':'||
-    si.evidence_state||':'||coalesce(si.calendar_version_id::text,'none')||':'||
-    coalesce(si.rule_revision_id::text,'none'),',' ORDER BY si.id),'')) INTO v_signature
-    FROM public.dashboard_stage_intervals si
-    WHERE si.entered_at < v_end AND coalesce(si.left_at,now()) > v_begin;
+  -- Snapshot of all consulted evidence, not only stage intervals. Revisions,
+  -- pauses, rule links, exception and review events are part of the digest.
+  -- It remains diagnostic: no approval is authorized by a hash.
+  SELECT pg_catalog.md5(
+    to_jsonb(v_request)::text || '|' ||
+    coalesce((SELECT jsonb_agg(to_jsonb(si) ORDER BY si.id)::text
+      FROM public.dashboard_stage_intervals si
+      WHERE si.entered_at<v_end AND coalesce(si.left_at,now())>v_begin),'[]') || '|' ||
+    coalesce((SELECT jsonb_agg(to_jsonb(sp) ORDER BY sp.id)::text
+      FROM public.dashboard_stage_pauses sp
+      JOIN public.dashboard_stage_intervals si ON si.id=sp.stage_interval_id
+      WHERE si.entered_at<v_end AND coalesce(si.left_at,now())>v_begin),'[]') || '|' ||
+    coalesce((SELECT jsonb_agg(to_jsonb(ex) ORDER BY ex.id)::text
+      FROM public.dashboard_work_calendar_exceptions ex
+      WHERE ex.calendar_version_id=v_request.calendar_version_id
+        AND ex.exception_date=v_request.exception_date),'[]') || '|' ||
+    coalesce((SELECT jsonb_agg(to_jsonb(period) ORDER BY period.id)::text
+      FROM public.dashboard_work_calendar_periods period
+      WHERE period.calendar_version_id=v_request.calendar_version_id),'[]') || '|' ||
+    coalesce((SELECT jsonb_agg(to_jsonb(calendar) ORDER BY calendar.version)::text
+      FROM public.dashboard_work_calendar_versions calendar
+      WHERE calendar.effective_from<=v_request.exception_date),'[]') || '|' ||
+    coalesce((SELECT jsonb_agg(to_jsonb(sector) ORDER BY sector.id)::text
+      FROM public.dashboard_sector_calendar_revisions sector
+      WHERE sector.base_calendar_version_id=v_request.calendar_version_id
+        AND sector.effective_from<=v_request.exception_date
+        AND (sector.effective_until IS NULL OR sector.effective_until>=v_request.exception_date)),'[]') || '|' ||
+    coalesce((SELECT jsonb_agg(to_jsonb(threshold) ORDER BY threshold.scope)::text
+      FROM public.dashboard_operational_thresholds threshold
+      WHERE threshold.calendar_version_id=v_request.calendar_version_id),'[]') || '|' ||
+    coalesce((SELECT jsonb_agg(to_jsonb(rule) ORDER BY rule.id)::text
+      FROM public.dashboard_operational_rule_revisions rule
+      WHERE EXISTS (
+        SELECT 1 FROM public.dashboard_stage_intervals si
+        WHERE si.rule_revision_id=rule.id AND
+          si.entered_at<v_end AND coalesce(si.left_at,now())>v_begin
+      )),'[]') || '|' ||
+    coalesce((SELECT jsonb_agg(to_jsonb(event) ORDER BY event.id)::text
+      FROM public.dashboard_calendar_retro_review_events event
+      WHERE event.request_id=p_request_id),'[]')
+  ) INTO v_signature;
 
   IF v_rejected THEN
     v_reasons := v_reasons || jsonb_build_array('Solicitação já rejeitada.');
@@ -160,6 +191,7 @@ DECLARE
   v_actor uuid;
   v_preview jsonb;
   v_saved public.dashboard_calendar_retro_approval_dossiers;
+  v_request public.dashboard_calendar_retro_review_requests;
 BEGIN
   v_actor := public.dashboard_assert_manager();
   IF p_request_id IS NULL OR p_expected_preview IS NULL OR
@@ -168,6 +200,17 @@ BEGIN
     RAISE EXCEPTION 'Justificativa e prévia gerencial são obrigatórias'
       USING ERRCODE='22023';
   END IF;
+  SELECT * INTO v_request
+    FROM public.dashboard_calendar_retro_review_requests
+    WHERE id=p_request_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Solicitação histórica não encontrada' USING ERRCODE='22023';
+  END IF;
+  -- Shared date lock serializes against rejection and resubmission.
+  PERFORM pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('dashboard-retro-review:'||
+      v_request.calendar_version_id::text||':'||v_request.exception_date::text,0)
+  );
   PERFORM pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended('dashboard-retro-approval:'||p_request_id::text,0)
   );
