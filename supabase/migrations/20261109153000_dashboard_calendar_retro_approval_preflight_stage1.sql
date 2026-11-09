@@ -264,6 +264,11 @@ DECLARE
   v_new_windows tstzmultirange := '{}'::tstzmultirange;
   v_pause_union tstzmultirange;
   v_stage record;
+  v_threshold public.dashboard_operational_thresholds;
+  v_alert_status text;
+  v_alert_reason text;
+  v_alert_recalculation_candidates integer := 0;
+  v_alert_inconclusive_intervals integer := 0;
   v_window tstzrange;
   v_pause tstzrange;
   v_clipped tstzrange;
@@ -400,9 +405,13 @@ BEGIN
     END IF;
 
     IF v_reason IS NOT NULL THEN
+      v_alert_status := 'insufficient';
+      v_alert_reason := 'Alertas não avaliáveis sem comprovação da jornada e das pausas.';
+      v_alert_inconclusive_intervals := v_alert_inconclusive_intervals+1;
       v_rows := v_rows || jsonb_build_array(jsonb_build_object(
         'order_id',v_stage.order_id,'interval_id',v_stage.id,
         'scope',v_stage.scope,'state','insufficient','reason',v_reason,
+        'alert_review_status',v_alert_status,'alert_review_reason',v_alert_reason,
         'minutes_before',NULL,'minutes_proposed',NULL,
         'pause_minutes_before',NULL,'pause_minutes_proposed',NULL,
         'useful_minutes_before',NULL,'useful_minutes_proposed',NULL
@@ -453,10 +462,13 @@ BEGIN
     -- Do not turn sub-minute timestamps into misleading exact-minute effects.
     IF mod(v_old_seconds,60)<>0 OR mod(v_new_seconds,60)<>0 OR
        mod(v_old_pause_seconds,60)<>0 OR mod(v_new_pause_seconds,60)<>0 THEN
+      v_alert_inconclusive_intervals := v_alert_inconclusive_intervals+1;
       v_rows := v_rows || jsonb_build_array(jsonb_build_object(
         'order_id',v_stage.order_id,'interval_id',v_stage.id,
         'scope',v_stage.scope,'state','insufficient',
         'reason','Há segundos fracionários: arredondamento exige conferência.',
+        'alert_review_status','insufficient',
+        'alert_review_reason','Alertas não avaliáveis sem arredondamento comprovado.',
         'minutes_before',NULL,'minutes_proposed',NULL,
         'pause_minutes_before',NULL,'pause_minutes_proposed',NULL,
         'useful_minutes_before',NULL,'useful_minutes_proposed',NULL
@@ -472,9 +484,38 @@ BEGIN
       RAISE EXCEPTION 'Sobreposição de pausas inconsistente: verificação bloqueada'
         USING ERRCODE='22023';
     END IF;
+    -- Never infer the *total* current alert from a single-day change.
+    -- Eligible open stages are flagged for recomputation against their
+    -- full history; closed stages require historical audit, not current alert
+    -- classification. Published thresholds can have changed since entry.
+    IF v_old_minutes=v_new_minutes AND v_old_pause=v_new_pause THEN
+      v_alert_status := 'no_day_change';
+      v_alert_reason := 'A proposta não altera minutos deste dia para esta etapa.';
+    ELSIF v_stage.left_at IS NOT NULL THEN
+      v_alert_status := 'historical_review';
+      v_alert_reason := 'Etapa encerrada: eventuais alertas anteriores exigem revisão histórica.';
+      v_alert_inconclusive_intervals := v_alert_inconclusive_intervals+1;
+    ELSE
+      SELECT * INTO v_threshold
+        FROM public.dashboard_operational_thresholds t
+        WHERE t.scope=v_stage.scope;
+      IF NOT FOUND OR v_threshold.calendar_version_id IS DISTINCT FROM
+          v_stage.calendar_version_id OR
+          v_threshold.effective_from>v_stage.entered_at OR
+          v_threshold.updated_at>v_stage.entered_at THEN
+        v_alert_status := 'unavailable';
+        v_alert_reason := 'Limites publicados não comprovam vigência na entrada desta etapa.';
+        v_alert_inconclusive_intervals := v_alert_inconclusive_intervals+1;
+      ELSE
+        v_alert_status := 'requires_recalculation';
+        v_alert_reason := 'Limites candidatos identificados; falta recalcular toda a permanência e os alertas no servidor.';
+        v_alert_recalculation_candidates := v_alert_recalculation_candidates+1;
+      END IF;
+    END IF;
     v_rows := v_rows || jsonb_build_array(jsonb_build_object(
       'order_id',v_stage.order_id,'interval_id',v_stage.id,
       'scope',v_stage.scope,'state','verified',
+      'alert_review_status',v_alert_status,'alert_review_reason',v_alert_reason,
       'reason','Prévia de um dia no calendário geral; sem revisão de alertas.',
       'minutes_before',v_old_minutes,
       'minutes_proposed',v_new_minutes,
@@ -499,7 +540,10 @@ BEGIN
     'candidate_intervals',v_stage_count,
     'verified_intervals',v_verified,
     'insufficient_intervals',v_unverified,
-    'changed_intervals',v_affected,'rows',v_rows,
+    'changed_intervals',v_affected,
+    'alert_recalculation_candidates',v_alert_recalculation_candidates,
+    'alert_review_inconclusive_intervals',v_alert_inconclusive_intervals,
+    'rows',v_rows,
     'scope','calendar_base_single_day',
     'historical_coverage_verified',false,
     'alerts_verified',false,
