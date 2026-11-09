@@ -162,12 +162,12 @@ export default function Layout({ children }: LayoutProps) {
       )}
 
       {canViewCalculadora && (
-        <Link href="/">
+        <Link href="/calculadora">
           <Button
-            variant={location === "/" ? "secondary" : "ghost"}
+            variant={location === "/calculadora" ? "secondary" : "ghost"}
             className={cn(
               "evolu-nav__item w-full justify-start",
-              location === "/" &&
+              location === "/calculadora" &&
                 "bg-sidebar-accent text-sidebar-accent-foreground"
             )}
           >
