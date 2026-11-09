@@ -218,6 +218,34 @@ describe("Dashboard Etapa 4 — permanência útil com evidência verificável",
     expect(result.thresholdSeverity).toBe("critical");
   });
 
+  it("suspende Atenção/Crítico após sucessão do calendário até revisão da gestão", () => {
+    const current = timingSources({
+      calendars: [
+        { id: "calendar-1", version: 1, time_zone: "America/Sao_Paulo",
+          effective_from: "2026-11-01", effective_until: null },
+        { id: "calendar-2", version: 2, time_zone: "America/Sao_Paulo",
+          effective_from: "2026-11-03", effective_until: null },
+      ],
+      calendarPeriods: [
+        { id: "period-1", calendar_version_id: "calendar-1", weekday: 1,
+          starts_local: "08:00:00", ends_local: "12:00:00" },
+        { id: "period-2", calendar_version_id: "calendar-2", weekday: 2,
+          starts_local: "08:00:00", ends_local: "12:00:00" },
+      ],
+      thresholds: { state: "available", rows: [{
+        scope: "PRODUCTION", attention_limit_minutes: 120,
+        critical_limit_minutes: 240, calendar_version_id: "calendar-1",
+        revision: 1, effective_from: "2026-11-01T00:00:00Z",
+        updated_at: "2026-11-01T00:00:00Z",
+      }] },
+    });
+    const result = buildAdvancedAssessments([order()], current, new Date("2026-11-03T15:00:00.000Z"))[0];
+    expect(result.timing).toBe("available");
+    expect(result.totalWorkingMinutes).toBe(480);
+    expect(result.thresholdSeverity).toBeNull();
+    expect(result.thresholdReason).toContain("revisão");
+  });
+
   it("não classifica retroativamente por limite publicado depois da entrada na etapa", () => {
     const result = buildAdvancedAssessments([order()], timingSources({
       thresholds: { state: "available", rows: [{
