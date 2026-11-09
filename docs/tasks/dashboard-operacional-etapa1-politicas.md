@@ -70,3 +70,23 @@
 - Correções retroativas com impacto calculado e auditoria específica continuam pendentes.
 - Não existem publicações fictícias de calendários, limites ou feriados.
 - O botão de publicação depende de autorização gerencial dentro do aplicativo após aplicação futura da migration; o merge/execução da migration/publicação Vercel continuam sem autorização.
+
+
+## Quarto incremento (09/11/2026) — sucessão global e solicitação retroativa
+
+- \`dashboardCalendarTimeline.ts\`: determina a versão geral em vigor para **cada data**, sem reabrir versões superadas nem considerar dias de lacuna como trabalhados. O término *efetivo* de uma versão aberta é o dia anterior ao início da próxima.
+- \`calculateWorkingMinutes\`: uma OS que permanece na mesma etapa durante a troca de calendário passa a ser avaliada dia a dia com a versão correta e seus respectivos feriados; não reescreve o calendário vinculado à entrada da OS. Evidência de entrada desatualizada permanece sinalizada como insuficiente.
+- Consulta das versões globais, turnos e exceções com paginação de contagem exata, para não calcular sobre histórico incompleto.
+- Migration PROPOSTA \`20261109131500_dashboard_calendar_successions_stage1.sql\`: nova RPC de sucessão **prospectiva**, com prévia consultiva, auditoria imutável e bloqueio de inserções retroativas também na RPC antiga. O registro da versão anterior nunca é atualizado nem removido.
+- A página administrativa oferece prévia de vigência, indicação de intervalos e regras potencialmente afetadas, confirmação antes da publicação e histórico com término efetivo de cada versão. A prévia **não afirma** quantos minutos/alertas mudarão sem evidência completa.
+- Migration PROPOSTA \`20261109134000_dashboard_calendar_retro_requests_stage1.sql\`: consulta e registro **imutável de solicitações** para corrigir um único dia anterior, com justificativa, versão histórica, prévia de intervalos candidatos e identificação do gestor. O novo painel administrativo permite registrar a solicitação **sem aplicar** nenhum ajuste retroativo.
+- Testes de sucessão, lacunas, histórico, novas RPCs e limites de segurança foram adicionados. Ambas as migrations permanecem não aplicadas.
+
+### Pendências críticas
+
+1. **Aprovação e aplicação retroativa real ainda NÃO estão implementadas**. Solicitações permanecem \`pending_review\` e não alteram calendários, horas, indicadores, alertas ou OS; a aplicação exigirá nova decisão técnica, simulação comprovável de impacto e autorização específica.
+2. A nova RPC global não republica automaticamente regras vinculadas à versão anterior. A gestão deve revisar regras e limiares; avaliações sem evidência completa permanecem indisponíveis.
+3. A prévia de impacto global e retroativa informa vínculos/candidatos, não diferença verificada de horas nem alertas.
+4. Há migrations de calendário e limites ainda não aplicadas; a migração precisa ser verificada em banco apropriado (RLS, grants, triggers, concorrência e segurança) antes de produção.
+5. Supervisores ainda não possuem papel operacional independente nem fluxo próprio de sugestões.
+6. Antes de merge, atualizar a branch conforme mudanças recentes na \`main\` e validar eventuais conflitos. Não publicar automaticamente por Git/Vercel.
