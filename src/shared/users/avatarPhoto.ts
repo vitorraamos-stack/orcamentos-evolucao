@@ -2,12 +2,29 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export const AVATAR_BUCKET = 'user-avatars';
-
 export const AVATAR_UPDATED_EVENT = 'evolusystem:avatar-updated';
 
 export type AvatarUpdateEvent = CustomEvent<{ userId: string }>;
 
+// Signed URLs last 30 minutes; refresh our in-memory cache before that deadline.
+// Never persist private avatar URLs in localStorage or across sign-outs.
+const SIGNED_URL_CACHE_MS = 20 * 60 * 1000;
+const NO_PHOTO_CACHE_MS = 30 * 1000;
+
+type AvatarCacheEntry = {
+  expiresAt: number;
+  signedUrlPromise: Promise<string | null>;
+  preloadPromise?: Promise<string | null>;
+  readyUrl?: string;
+};
+const avatarCache = new Map<string, AvatarCacheEntry>();
+
+export function clearAvatarPhotoCache() {
+  avatarCache.clear();
+}
+
 export function notifyAvatarUpdated(userId: string) {
+  avatarCache.delete(userId);
   window.dispatchEvent(new CustomEvent(AVATAR_UPDATED_EVENT, { detail: { userId } }));
 }
 
@@ -21,7 +38,7 @@ export async function readAvatarPath(userId: string): Promise<string | null> {
   return data?.storage_path ?? null;
 }
 
-export async function signedAvatarUrl(userId: string): Promise<string | null> {
+async function fetchSignedAvatarUrl(userId: string): Promise<string | null> {
   const path = await readAvatarPath(userId);
   if (!path) return null;
   // Never render a path for another user or a different storage bucket.
@@ -31,8 +48,64 @@ export async function signedAvatarUrl(userId: string): Promise<string | null> {
   return data?.signedUrl ?? null;
 }
 
+function getAvatarEntry(userId: string): AvatarCacheEntry {
+  const cached = avatarCache.get(userId);
+  if (cached && cached.expiresAt > Date.now()) return cached;
+
+  const entry: AvatarCacheEntry = {
+    expiresAt: Date.now() + SIGNED_URL_CACHE_MS,
+    signedUrlPromise: fetchSignedAvatarUrl(userId),
+  };
+  avatarCache.set(userId, entry);
+  // Share one database lookup and one URL signature across the welcome screen and sidebar.
+  void entry.signedUrlPromise.then(
+    (url) => {
+      if (avatarCache.get(userId) === entry) {
+        entry.expiresAt = Date.now() + (url ? SIGNED_URL_CACHE_MS : NO_PHOTO_CACHE_MS);
+      }
+    },
+    () => {
+      if (avatarCache.get(userId) === entry) avatarCache.delete(userId);
+    },
+  );
+  return entry;
+}
+
+export function signedAvatarUrl(userId: string): Promise<string | null> {
+  return getAvatarEntry(userId).signedUrlPromise;
+}
+
+export function getReadyAvatarPhotoUrl(userId: string | null | undefined): string | null {
+  if (!userId) return null;
+  const cached = avatarCache.get(userId);
+  return cached && cached.expiresAt > Date.now() ? cached.readyUrl ?? null : null;
+}
+
+/** Fetch the signed URL once and preload/decode the image before displaying it. */
+export function preloadAvatarPhoto(userId: string): Promise<string | null> {
+  const entry = getAvatarEntry(userId);
+  if (!entry.preloadPromise) {
+    entry.preloadPromise = entry.signedUrlPromise.then(async (url) => {
+      if (!url) return null;
+      const image = new Image();
+      image.decoding = 'async';
+      image.src = url;
+      try {
+        await image.decode();
+      } catch {
+        return null;
+      }
+      // An upload or sign-out may have invalidated the request while it was in flight.
+      if (!image.naturalWidth || avatarCache.get(userId) !== entry) return null;
+      entry.readyUrl = url;
+      return url;
+    });
+  }
+  return entry.preloadPromise;
+}
+
 export function useAvatarPhoto(userId: string | null | undefined) {
-  const [url, setUrl] = useState<string | null>(null);
+  const [url, setUrl] = useState<string | null>(() => getReadyAvatarPhotoUrl(userId));
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
@@ -47,11 +120,13 @@ export function useAvatarPhoto(userId: string | null | undefined) {
 
   useEffect(() => {
     let active = true;
-    setUrl(null);
+    setUrl(getReadyAvatarPhotoUrl(userId));
     if (!userId) return () => { active = false; };
-    void signedAvatarUrl(userId)
+
+    void preloadAvatarPhoto(userId)
       .then((nextUrl) => { if (active) setUrl(nextUrl); })
       .catch(() => { if (active) setUrl(null); });
+
     return () => { active = false; };
   }, [userId, version]);
 

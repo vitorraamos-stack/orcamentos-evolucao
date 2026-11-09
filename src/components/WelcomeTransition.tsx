@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { User } from '@supabase/supabase-js';
 import { useLocation } from 'wouter';
 import { getCurrentUserDisplayName } from '@/shared/users/userDisplay';
-import { signedAvatarUrl } from '@/shared/users/avatarPhoto';
+import { getReadyAvatarPhotoUrl, preloadAvatarPhoto } from '@/shared/users/avatarPhoto';
 import './welcome-transition.css';
 
 // Allow users to read their name and see their photo, even on a fast connection.
@@ -14,7 +14,7 @@ type WelcomeContextValue = { beginWelcome: (user: User) => void };
 const WelcomeContext = createContext<WelcomeContextValue>({ beginWelcome: () => {} });
 export const useWelcomeTransition = () => useContext(WelcomeContext);
 
-function WelcomeOverlay({ info, avatarUrl, exiting }: { info: WelcomeInfo; avatarUrl: string | null; exiting: boolean }) {
+function WelcomeOverlay({ info, avatarUrl, avatarReady, exiting }: { info: WelcomeInfo; avatarUrl: string | null; avatarReady: boolean; exiting: boolean }) {
   const firstName = info.displayName.includes('@') ? 'usuário' : info.displayName.split(/\s+/)[0];
   const initial = firstName.charAt(0).toUpperCase() || 'U';
 
@@ -31,7 +31,9 @@ function WelcomeOverlay({ info, avatarUrl, exiting }: { info: WelcomeInfo; avata
         <div className="evolu-welcome__avatar">
           {avatarUrl
             ? <img src={avatarUrl} alt={`Foto de ${info.displayName}`} className="evolu-welcome__photo" />
-            : <span aria-label={`Inicial de ${info.displayName}`}>{initial}</span>}
+            : avatarReady
+              ? <span aria-label={`Inicial de ${info.displayName}`}>{initial}</span>
+              : <span className="evolu-welcome__avatar-pending" aria-hidden="true" />}
         </div>
         <h1 className="evolu-welcome__heading">Bem-vindo, {firstName}!</h1>
         <p className="evolu-welcome__subtitle">Carregando sistema...</p>
@@ -50,34 +52,25 @@ export function WelcomeTransitionProvider({ children }: { children: ReactNode })
   const [minimumElapsed, setMinimumElapsed] = useState(false);
 
   const beginWelcome = (user: User) => {
-    setAvatarReady(false);
+    const preloaded = getReadyAvatarPhotoUrl(user.id);
+    setAvatarReady(Boolean(preloaded));
     setMinimumElapsed(false);
-    setAvatarUrl(null);
+    setAvatarUrl(preloaded);
     setExiting(false);
     setInfo({ userId: user.id, displayName: getCurrentUserDisplayName(user) });
   };
 
-  // Load the private user photo before ending the transition, with a short fallback.
+  // Authentication prefetches the avatar; reuse its in-flight image request here.
+  // Show a subtle placeholder rather than flashing the user's initial before the photo.
   useEffect(() => {
     if (!info) return;
     let active = true;
     const fallbackTimer = window.setTimeout(() => { if (active) setAvatarReady(true); }, 1800);
-    const load = async () => {
-      try {
-        const signedUrl = await signedAvatarUrl(info.userId);
-        if (signedUrl) {
-          const image = new Image();
-          image.src = signedUrl;
-          try { await image.decode(); } catch { /* Use initials if image cannot be decoded. */ }
-          if (active && image.naturalWidth > 0) setAvatarUrl(signedUrl);
-        }
-      } catch {
-        // No photo, missing migration, or lost connection: initials remain available.
-      } finally {
-        if (active) setAvatarReady(true);
-      }
-    };
-    void load();
+    void preloadAvatarPhoto(info.userId)
+      .then((url) => { if (active) setAvatarUrl(url); })
+      .catch(() => { /* Keep initials when the photo cannot be fetched. */ })
+      .finally(() => { if (active) setAvatarReady(true); });
+
     return () => {
       active = false;
       window.clearTimeout(fallbackTimer);
@@ -121,7 +114,7 @@ export function WelcomeTransitionProvider({ children }: { children: ReactNode })
   return (
     <WelcomeContext.Provider value={{ beginWelcome }}>
       {children}
-      {info && <WelcomeOverlay info={info} avatarUrl={avatarUrl} exiting={exiting} />}
+      {info && <WelcomeOverlay info={info} avatarUrl={avatarUrl} avatarReady={avatarReady} exiting={exiting} />}
     </WelcomeContext.Provider>
   );
 }

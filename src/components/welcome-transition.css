@@ -55,6 +55,17 @@
   font-weight: 700;
 }
 .evolu-welcome__photo { width: 100%; height: 100%; object-fit: cover; }
+.evolu-welcome__avatar-pending {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(198, 231, 251, 0.25);
+  border-top-color: rgba(198, 231, 251, 0.95);
+  border-radius: 50%;
+  animation: evolu-welcome-avatar-spin 750ms linear infinite;
+}
+@keyframes evolu-welcome-avatar-spin {
+  to { transform: rotate(360deg); }
+}
 .evolu-welcome__heading {
   margin: 27px 0 8px;
   font-size: clamp(25px, 5vw, 36px);
@@ -93,7 +104,7 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .evolu-welcome, .evolu-welcome__content, .evolu-welcome__track > span {
+  .evolu-welcome, .evolu-welcome__content, .evolu-welcome__track > span, .evolu-welcome__avatar-pending {
     animation: none !important;
     transition: none !important;
   }
