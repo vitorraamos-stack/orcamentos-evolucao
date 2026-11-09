@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CalendarRetroRequest } from "./dashboardCalendarRetroRepository";
+import { previewRetroServerDayImpact, type RetroServerDayImpact } from "./dashboardCalendarRetroServerImpactRepository";
 import {
   listRetroApprovalDossiers, prepareRetroApprovalDossier, previewRetroApprovalPreflight,
   type RetroApprovalDossier, type RetroApprovalPreflight,
@@ -23,6 +24,9 @@ export function DashboardCalendarRetroApprovalPanel({ request }: {
   const [sending, setSending] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
+  const [serverImpact, setServerImpact] = useState<RetroServerDayImpact | null>(null);
+  const [serverBusy, setServerBusy] = useState(false);
+  const [serverError, setServerError] = useState("");
 
   const refresh = useCallback(async () => {
     setLoading(true); setError("");
@@ -38,8 +42,8 @@ export function DashboardCalendarRetroApprovalPanel({ request }: {
   useEffect(() => { void refresh(); }, [refresh]);
 
   const check = async () => {
-    if (!available || checking || sending) return;
-    setPreview(null); setChecking(true);
+    if (!available || checking || sending || serverBusy) return;
+    setPreview(null); setServerImpact(null); setServerError(""); setChecking(true);
     try {
       setPreview(await previewRetroApprovalPreflight(request.id));
     } catch (cause) {
@@ -47,8 +51,18 @@ export function DashboardCalendarRetroApprovalPanel({ request }: {
     } finally { setChecking(false); }
   };
 
+  const inspectServerImpact = async () => {
+    if (!available || checking || sending || serverBusy) return;
+    setServerBusy(true); setServerImpact(null); setServerError("");
+    try {
+      setServerImpact(await previewRetroServerDayImpact(request.id));
+    } catch (cause) {
+      setServerError(cause instanceof Error ? cause.message : "Falha na análise das OS.");
+    } finally { setServerBusy(false); }
+  };
+
   const send = async () => {
-    if (!preview || sending || checking || reason.trim().length < 3) return;
+    if (!preview || sending || checking || serverBusy || reason.trim().length < 3) return;
     if (!window.confirm(
       "Registrar encaminhamento para verificação técnica? Esta ação NÃO aprova, aplica ou altera nenhuma correção histórica."
     )) return;
@@ -85,11 +99,60 @@ export function DashboardCalendarRetroApprovalPanel({ request }: {
             Etapa indisponível: a migration de preparação da aprovação ainda não foi aplicada.
           </p>
         )}
-        <Button type="button" variant="outline" disabled={!available || checking || sending || loading}
+        <Button type="button" variant="outline" disabled={!available || checking || sending || serverBusy || loading}
           onClick={() => void check()}>
           <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
           {checking ? "Verificando no servidor…" : "Revalidar condições de aprovação"}
         </Button>
+        <div className="space-y-2 border-t pt-3">
+          <Button type="button" variant="outline"
+            disabled={!available || checking || sending || serverBusy || loading}
+            onClick={() => void inspectServerImpact()}>
+            {serverBusy ? "Calculando etapas no Supabase…" : "Conferir impacto diário das OS no servidor"}
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Prévia somente leitura do dia solicitado. Não comprova alertas,
+            cobertura histórica completa ou autorização para aplicação.
+          </p>
+          {serverError && <p role="alert" className="text-sm text-destructive">{serverError}</p>}
+          {serverImpact && (
+            <div className="space-y-2 rounded-lg border p-3 text-sm">
+              <p className="font-semibold">Resultado calculado no Supabase — {serverImpact.exception_date.split("-").reverse().join("/")}</p>
+              <p>{serverImpact.candidate_orders} OS candidatas ·
+                {" "}{serverImpact.verified_intervals} etapas verificadas ·
+                {" "}{serverImpact.insufficient_intervals} inconclusivas ·
+                {" "}{serverImpact.changed_intervals} com diferença de tempo</p>
+              <p className="text-xs text-amber-700 dark:text-amber-300">{serverImpact.observacao}</p>
+              <details className="rounded-md border p-2">
+                <summary className="cursor-pointer font-medium">
+                  Ver etapas e justificativas ({serverImpact.rows.length})
+                </summary>
+                <div className="mt-2 max-h-96 space-y-2 overflow-y-auto">
+                  {serverImpact.rows.map(row => (
+                    <div key={row.interval_id} className="rounded border p-2 text-xs">
+                      <p className="font-medium">OS {row.order_id} · {row.scope}</p>
+                      {row.state === "verified" ? (
+                        <>
+                          <p>Jornada no dia: {row.minutes_before} min → {row.minutes_proposed} min</p>
+                          <p>Pausas verificadas: {row.pause_minutes_before} min → {row.pause_minutes_proposed} min</p>
+                          <p>Tempo útil sem pausa: {row.useful_minutes_before} min → {row.useful_minutes_proposed} min</p>
+                        </>
+                      ) : <p className="text-amber-700 dark:text-amber-300">
+                        Inconclusivo: {row.reason}
+                      </p>}
+                    </div>
+                  ))}
+                  {serverImpact.rows.length === 0 && (
+                    <p className="text-muted-foreground">
+                      Nenhum intervalo registrado nessa data. Isso não comprova ausência
+                      de atividades antes da instrumentação.
+                    </p>
+                  )}
+                </div>
+              </details>
+            </div>
+          )}
+        </div>
         {preview && (
           <div className="space-y-3 rounded-lg border p-3 text-sm">
             <p className="font-semibold flex items-center gap-2 text-amber-700 dark:text-amber-300">
