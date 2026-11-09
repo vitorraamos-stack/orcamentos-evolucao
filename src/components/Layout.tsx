@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getCurrentUserDisplayName } from "@/shared/users/userDisplay";
+import { useAvatarPhoto } from "@/shared/users/avatarPhoto";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
@@ -306,6 +307,7 @@ export default function Layout({ children }: LayoutProps) {
 
   const displayName = getCurrentUserDisplayName(user);
   const initial = displayName.charAt(0).toUpperCase();
+  const avatarUrl = useAvatarPhoto(user?.id);
 
   return (
     <div className={cn(
@@ -321,7 +323,11 @@ export default function Layout({ children }: LayoutProps) {
         </nav>
         <div className="evolu-shell__account px-3 py-4">
           <div className="flex items-center gap-3 px-2 pb-3">
-            <div className="evolu-shell__avatar" aria-hidden="true">{initial}</div>
+            <div className="evolu-shell__avatar">
+              {avatarUrl
+                ? <img className="h-full w-full object-cover" src={avatarUrl} alt={`Foto de ${displayName}`} />
+                : <span aria-hidden="true">{initial}</span>}
+            </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-white">{displayName}</p>
               <p className="truncate text-xs text-[#9BB6D3]">{getRoleLabel(role)}</p>
