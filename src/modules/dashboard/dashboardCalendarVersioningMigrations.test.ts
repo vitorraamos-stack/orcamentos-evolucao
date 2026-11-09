@@ -87,8 +87,8 @@ describe("Dashboard Etapa 1 — preparação de aprovação sem efeito operacion
     expect(preflight).toContain("'approval_allowed',false");
     expect(preflight).toContain("'application_allowed',false");
     expect(preflight).toContain("dashboard_retro_approval_dossiers_immutable");
-    expect(preflight).not.toMatch(/(?:UPDATE|DELETE)\\s+public\\.dashboard_work_calendar_/i);
-    expect(preflight).not.toMatch(/INSERT\\s+INTO\\s+public\\.dashboard_work_calendar_exceptions/i);
+    expect(preflight).not.toMatch(/(?:UPDATE|DELETE)\s+public\.dashboard_work_calendar_/i);
+    expect(preflight).not.toMatch(/INSERT\s+INTO\s+public\.dashboard_work_calendar_exceptions/i);
   });
   it("autoriza somente gestão e exige recálculo de prévia no servidor", () => {
     expect(preflight).toContain("public.dashboard_assert_manager()");
