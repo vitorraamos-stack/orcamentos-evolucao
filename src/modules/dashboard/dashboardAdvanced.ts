@@ -1,6 +1,7 @@
 import type { DashboardOrder } from "./dashboardModel";
 import type { PreparationItem, PreparationOperation } from "./dashboardPreparation";
 import { assessOperationalThreshold } from "./dashboardOperationalPolicy";
+import { selectGlobalCalendarForDate } from "./dashboardCalendarTimeline";
 import {
   resolveSectorCalendarDay, type SectorCalendarRevision,
 } from "./dashboardSectorCalendar";
@@ -350,6 +351,7 @@ export function calculateWorkingMinutes(
   startAt: string, endAt: string, calendar: WorkCalendarVersion,
   periods: readonly WorkCalendarPeriod[], exceptions: readonly WorkCalendarException[],
   scope?: OperationalScope, sectorRevisions: readonly SectorCalendarRevision[] = [],
+  publishedVersions: readonly WorkCalendarVersion[] = [calendar],
 ): number | null {
   const startMs = Date.parse(startAt);
   const endMs = Date.parse(endAt);
@@ -362,15 +364,20 @@ export function calculateWorkingMinutes(
   let totalMs = 0;
 
   for (let dayIndex = 0; dayIndex < 3700; dayIndex++) {
+    const resolvedCalendar = selectGlobalCalendarForDate(publishedVersions, date);
+    if (resolvedCalendar.state !== "available") return null;
+    const activeCalendar = resolvedCalendar.calendar;
+    if (activeCalendar.time_zone !== calendar.time_zone ||
+        !periods.some(row => row.calendar_version_id === activeCalendar.id)) return null;
     const exception = exceptions.find(row =>
-      row.calendar_version_id === calendar.id && row.exception_date === date
+      row.calendar_version_id === activeCalendar.id && row.exception_date === date
     );
     let ranges: LocalTimeRange[];
     if (scope && sectorRevisions.length) {
       if (exception?.working && (!exception.starts_local || !exception.ends_local)) return null;
       const day = resolveSectorCalendarDay({
-        date, scope, baseCalendarId: calendar.id,
-        baseWeek: periods.filter(row => row.calendar_version_id === calendar.id)
+        date, scope, baseCalendarId: activeCalendar.id,
+        baseWeek: periods.filter(row => row.calendar_version_id === activeCalendar.id)
           .map(row => ({ weekday: row.weekday, start: row.starts_local.slice(0, 5),
             end: row.ends_local.slice(0, 5) })),
         baseException: exception
@@ -389,7 +396,7 @@ export function calculateWorkingMinutes(
       else return null;
     } else {
       ranges = periods.filter(row =>
-        row.calendar_version_id === calendar.id && row.weekday === weekdayForDate(date)
+        row.calendar_version_id === activeCalendar.id && row.weekday === weekdayForDate(date)
       ).map(row => ({ start: row.starts_local, end: row.ends_local }))
         .sort((a,b) => a.start.localeCompare(b.start));
     }
@@ -486,9 +493,15 @@ function assessStageTiming(
   if (!calendar) return unavailableTiming("A versão do calendário vinculada ao intervalo não está disponível.");
   const startDate = localDateKey(intervalStart, calendar.time_zone);
   const endDate = localDateKey(intervalEnd, calendar.time_zone);
-  if (startDate < calendar.effective_from ||
-      (calendar.effective_until !== null && endDate > calendar.effective_until))
-    return unavailableTiming("A vigência do calendário não cobre todo o intervalo observado.", "insufficient");
+  const entryCalendar = selectGlobalCalendarForDate(sources.calendars, startDate);
+  if (entryCalendar.state !== "available" ||
+      entryCalendar.calendar.id !== interval.calendar_version_id)
+    return unavailableTiming("O calendário registrado na entrada não corresponde à versão vigente naquela data.", "insufficient");
+  // Calendar successors during a stage are resolved per day below. Never
+  // rewrite or extrapolate the stage's original calendar evidence.
+  const endCalendar = selectGlobalCalendarForDate(sources.calendars, endDate);
+  if (endCalendar.state !== "available")
+    return unavailableTiming("Não há calendário publicado para toda a permanência observada.", "insufficient");
 
   const activeItemIds = new Set(sources.items.filter(item =>
     item.order_id === order.id && item.status !== "CANCELLED"
@@ -520,14 +533,14 @@ function assessStageTiming(
   if (rule.stalled_limit_minutes !== null &&
       (!Number.isSafeInteger(rule.stalled_limit_minutes) || rule.stalled_limit_minutes <= 0))
     return unavailableTiming("O limite publicado para esta etapa é inválido.", "insufficient");
-  const calendarPeriods = sources.calendarPeriods.filter(row => row.calendar_version_id === calendar.id);
-  if (!calendarPeriods.length)
+  const calendarPeriods = sources.calendarPeriods;
+  if (!calendarPeriods.some(row => row.calendar_version_id === calendar.id))
     return unavailableTiming("A versão do calendário não possui intervalos semanais legíveis.", "insufficient");
-  const calendarExceptions = sources.calendarExceptions.filter(row => row.calendar_version_id === calendar.id);
+  const calendarExceptions = sources.calendarExceptions;
   const sectorRevisions = sources.sectorCalendars?.state === "available"
     ? sources.sectorCalendars.revisions : [];
   const grossMinutes = calculateWorkingMinutes(interval.entered_at, now.toISOString(),
-    calendar, calendarPeriods, calendarExceptions, scope, sectorRevisions);
+    calendar, calendarPeriods, calendarExceptions, scope, sectorRevisions, sources.calendars);
   if (grossMinutes === null)
     return unavailableTiming("Não foi possível interpretar todos os horários locais do calendário.", "insufficient");
 
@@ -536,6 +549,7 @@ function assessStageTiming(
     const pauseMinutesForCalendar = calculateWorkingMinutes(
       new Date(pause.start).toISOString(), new Date(pause.end).toISOString(),
       calendar, calendarPeriods, calendarExceptions, scope, sectorRevisions,
+      sources.calendars,
     );
     if (pauseMinutesForCalendar === null)
       return unavailableTiming("Não foi possível calcular uma pausa usando o calendário publicado.", "insufficient");
