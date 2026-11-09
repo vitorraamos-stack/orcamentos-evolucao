@@ -40,6 +40,11 @@ describe("prévia de impacto retroativo calculada no Supabase", () => {
     expect(sql).toContain("PERFORM public.dashboard_assert_manager()");
     expect(sql).toContain("v_stage_count>1200 OR v_order_count>300");
     expect(sql).toContain("pg_catalog.range_agg");
+    expect(sql).toContain("jsonb_agg(to_jsonb(sp) ORDER BY sp.id)");
+    expect(sql).toContain("jsonb_agg(to_jsonb(sector) ORDER BY sector.id)");
+    expect(sql).toContain("jsonb_agg(to_jsonb(rule) ORDER BY rule.id)");
+    expect(sql).toContain("dashboard-retro-review:");
+    expect(sql).toContain("v_preview IS DISTINCT FROM p_expected_preview");
     expect(sql).toContain("'application_allowed',false");
     expect(sql).toContain("'alerts_verified',false");
     expect(sql).toContain("REVOKE ALL ON FUNCTION public.dashboard_preview_calendar_retro_day_stage_impact");
