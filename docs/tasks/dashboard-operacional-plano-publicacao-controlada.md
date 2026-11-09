@@ -1,5 +1,19 @@
 # PR #556 — Plano de publicação controlada do Dashboard
 
+## Execução autorizada em 09/11/2026 — Supabase aplicado
+
+- Gestão autorizou a aplicação sem backup, informando que a base continha somente dados de testes.
+- Supabase projeto `evolucao-orcamentos` (`zffpvykekwrmkbyjsgbh`): **sete migrations aplicadas e registradas** via ferramenta de migrations, na ordem prevista.
+- Versões efetivamente registradas no banco: `20261109215154`, `20261109215212`, `20261109215223`, `20261109215233`, `20261109215242`, `20261109215251`, `20261109215301`. Os nomes dos sete arquivos SQL no repositório foram alinhados ao histórico remoto e o conteúdo foi preservado.
+- Conferência pós-aplicação: sete tabelas presentes com RLS, 12 funções/RPCs esperadas presentes, `anon` sem EXECUTE nessas funções e `authenticated` com EXECUTE conforme o desenho. As funções de gestão continuam protegidas pelo `dashboard_assert_manager()`.
+- Nenhuma correção retroativa foi aplicada; `approval_allowed=false` e `application_allowed=false` continuam previstos nas respostas.
+- A implantação do frontend, via merge da `main`, só é considerada concluída após CI e deploy Vercel confirmados.
+
+---
+
+## Histórico de planejamento (estado anterior à execução)
+
+
 Status em 09/11/2026: **preparação, sem autorização para alterar produção**.
 
 ## Diagnóstico confirmado
