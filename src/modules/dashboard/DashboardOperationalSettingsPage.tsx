@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { OperationalScope, Requirement } from "./dashboardAdvanced";
 import { DashboardThresholdsPanel } from "./DashboardThresholdsPanel";
 import { DashboardSectorCalendarsPanel } from "./DashboardSectorCalendarsPanel";
+import { DashboardCalendarRetroPanel } from "./DashboardCalendarRetroPanel";
 import { proposedEvolucaoWorkweek, verifiedSaoJose2026Observances } from "./dashboardOperationalPolicy";
 import { effectiveCalendarEnd, previewGlobalSuccessor } from "./dashboardCalendarTimeline";
 import {
@@ -851,6 +852,7 @@ export default function DashboardOperationalSettingsPage() {
                     versions={data.calendars} />
                 ))}
             </div>
+            <DashboardCalendarRetroPanel calendars={data.calendars} />
           </TabsContent>
         </Tabs>
       )}
