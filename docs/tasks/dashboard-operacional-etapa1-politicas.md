@@ -164,3 +164,12 @@
 - Qualquer RPC indisponível, divergência nas contagens/identidades de etapas ou falha de consulta aparece explicitamente. **Encaminhamento técnico exige que as três consultas terminem sem discrepância estrutural**; a RPC do Supabase ainda revalida a prévia e pode recusar se os dados mudaram.
 - Consultas executadas separadamente não formam um snapshot transacional, portanto valores não são efeitos históricos confirmados. Permanece explícito que `approval_allowed=false` e `application_allowed=false`.
 - Testes pontuais de agregação por OS, pendências, contagens divergentes e identidade incoerente; nenhum banco de testes criado, nenhuma migration aplicada e nenhum deploy ou merge efetuado.
+
+## Décimo segundo incremento (09/11/2026) — sincronização com main e auditoria estática das migrations
+
+- A branch `feat/dashboard-operacional-politicas-etapa1-20261109` incorporou o commit mais recente da `main` por merge **somente na branch**, preservando os arquivos anteriores do PR e as 33 atualizações independentes do aplicativo. Não houve merge do PR #556 em `main`.
+- As sete migrations propostas permanecem ordenadas: (1) limites operacionais, (2) calendários setoriais, (3) sucessão de calendários globais, (4) solicitações retroativas, (5) pareceres gerenciais, (6) descoberta de OS candidatas, (7) pré-validação, dossiês e simulações de um dia/permanência integral.
+- `dashboardCalendarMigrationReadiness.test.ts` acrescenta verificações **estáticas** para ordem e presença das definições; pares de delimitadores PostgreSQL `AS $$ ... END $$;`; checagem de gestão, `search_path`, `REVOKE` e `GRANT` nas RPCs expostas; RLS, auditoria imutável e ausência de escrita de correções históricas nas RPCs consultivas.
+- O código mantém `approval_allowed=false` e `application_allowed=false`. A verificação estática não demonstra que as migrations executam no PostgreSQL nem comprova RLS, concorrência, carga real ou permissões efetivas.
+- Por decisão de gestão, **não criar banco de testes**. Antes de qualquer aplicação no Supabase de produção, ainda são necessários revisão do estado real das migrations existentes, cópia de segurança/recuperação, checagem de funções e permissões diretamente em transação controlada e autorização expressa para a aplicação.
+- Sem migration aplicada, sem merge em `main`, sem deploy ou alteração de dados operacionais.
