@@ -272,8 +272,26 @@ function AdvancedOrderRow({ assessment, source, isManager, onChanged }: {
             <div className="min-w-0 space-y-1">
               {assessment.timing === "available" ? <>
                 <p className="text-xs">
-                  Permanência útil nesta etapa: <strong>{formatWorkingMinutes(assessment.elapsedWorkingMinutes)}</strong>
+                  Permanência útil total: <strong>{formatWorkingMinutes(assessment.totalWorkingMinutes)}</strong>
                 </p>
+                <p className="text-xs">
+                  Espera comprovada: <strong>{formatWorkingMinutes(assessment.pauseWorkingMinutes)}</strong>
+                </p>
+                <p className="text-xs">
+                  Tempo útil não bloqueado: <strong>{formatWorkingMinutes(assessment.elapsedWorkingMinutes)}</strong>
+                </p>
+                {assessment.thresholdSeverity === "critical" &&
+                  <p className="evolu-dashboard__advanced-warning">
+                    <strong>Crítico:</strong> {assessment.thresholdReason}
+                  </p>}
+                {assessment.thresholdSeverity === "attention" &&
+                  <p className="evolu-dashboard__advanced-warning">
+                    <strong>Atenção:</strong> {assessment.thresholdReason}
+                  </p>}
+                {assessment.thresholdSeverity === "normal" &&
+                  <p className="evolu-dashboard__advanced-muted">Permanência total dentro dos limites publicados.</p>}
+                {assessment.thresholdSeverity === null &&
+                  <p className="evolu-dashboard__advanced-muted">Atenção/Crítico: {assessment.thresholdReason}</p>}
                 {assessment.limitMinutes === null
                   ? <p className="evolu-dashboard__advanced-muted">{assessment.timingReason}</p>
                   : assessment.overLimit
