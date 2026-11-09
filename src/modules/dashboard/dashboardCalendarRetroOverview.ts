@@ -59,12 +59,14 @@ export function buildRetroOverview(input: {
     else stages.set(row.interval_id, { orderId: row.order_id, day: null, full: row });
   }
   const orders = new Map<string, RetroOverviewOrder>();
-  for (const [id, entry] of stages) {
+  for (const [id, entry] of Array.from(stages.entries())) {
     const issues: string[] = [];
     if (!entry.day || !entry.full) issues.push("Etapa ausente em uma das prévias.");
     if (entry.day && entry.full &&
-        (entry.day.order_id !== entry.full.order_id || entry.day.scope !== entry.full.scope))
+        (entry.day.order_id !== entry.full.order_id || entry.day.scope !== entry.full.scope)) {
       issues.push("OS ou setor divergem entre as prévias.");
+      warnings.push("Uma etapa está associada a OS ou setor diferentes nas consultas.");
+    }
     if (entry.day?.state === "insufficient") issues.push("Dia: " + entry.day.reason);
     if (entry.full?.state === "insufficient") issues.push("Permanência: " + entry.full.reason);
     if (entry.full?.state === "verified" &&
