@@ -393,3 +393,59 @@ describe("Dashboard Etapa 1 — cálculo útil considera versões setoriais", ()
     )).toBe(120);
   });
 });
+
+
+describe("Dashboard Etapa 1 — intervalo de OS atravessando calendário geral", () => {
+  const version1 = {
+    id: "global1", version: 1, time_zone: "America/Sao_Paulo",
+    effective_from: "2026-11-01", effective_until: null,
+  };
+  const version2 = {
+    id: "global2", version: 2, time_zone: "America/Sao_Paulo",
+    effective_from: "2026-11-10", effective_until: null,
+  };
+  const periods = [
+    { id: "mon-old", calendar_version_id: "global1", weekday: 1,
+      starts_local: "08:00:00", ends_local: "12:00:00" },
+    { id: "tue-old", calendar_version_id: "global1", weekday: 2,
+      starts_local: "08:00:00", ends_local: "12:00:00" },
+    { id: "tue-new", calendar_version_id: "global2", weekday: 2,
+      starts_local: "10:00:00", ends_local: "12:00:00" },
+  ];
+
+  it("soma segunda na versão 1 e terça na versão 2, sem reescrever a versão antiga", () => {
+    const minutes = calculateWorkingMinutes(
+      "2026-11-09T11:00:00Z", "2026-11-10T15:00:00Z",
+      version1, periods, [], "PRODUCTION", [], [version1, version2],
+    );
+    expect(minutes).toBe(360); // seg 08–12 = 240; ter 10–12 = 120
+    expect(version1.effective_until).toBeNull();
+  });
+
+  it("suspende o cálculo diante de uma lacuna ou de turnos da nova versão indisponíveis", () => {
+    const missing = calculateWorkingMinutes(
+      "2026-11-09T11:00:00Z","2026-11-10T15:00:00Z",
+      version1, periods.filter(row=>row.calendar_version_id==="global1"),
+      [],"PRODUCTION",[],[version1,version2],
+    );
+    expect(missing).toBeNull();
+    const gap = calculateWorkingMinutes(
+      "2026-11-09T11:00:00Z","2026-11-10T15:00:00Z",
+      { ...version1, effective_until: "2026-11-09" }, periods, [],
+      "PRODUCTION",[],[{ ...version1, effective_until:"2026-11-09" },
+        { ...version2,effective_from:"2026-11-11" }],
+    );
+    expect(gap).toBeNull();
+  });
+
+  it("honra exceção da versão nova e não altera o expediente da segunda anterior", () => {
+    const ex = [{
+      id:"holiday2",calendar_version_id:"global2",exception_date:"2026-11-10",
+      working:false,starts_local:null,ends_local:null,
+    }];
+    expect(calculateWorkingMinutes(
+      "2026-11-09T11:00:00Z","2026-11-10T15:00:00Z",
+      version1,periods,ex,"PRODUCTION",[],[version1,version2],
+    )).toBe(240);
+  });
+});
