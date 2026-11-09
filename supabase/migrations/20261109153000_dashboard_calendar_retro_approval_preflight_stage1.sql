@@ -556,3 +556,327 @@ REVOKE ALL ON FUNCTION public.dashboard_preview_calendar_retro_day_stage_impact(
   FROM PUBLIC,anon,authenticated,service_role;
 GRANT EXECUTE ON FUNCTION public.dashboard_preview_calendar_retro_day_stage_impact(uuid)
   TO authenticated;
+
+
+-- Full-stage what-if preview, READ ONLY. It enumerates every local calendar
+-- day through the stage end and counts verified recorded pauses as a union.
+-- Sector-specific calendars and unverifiable historical revisions fail closed.
+-- An alert is a *candidate* based on current threshold rows, not permission to
+-- change a historical alert. No updates, approvals, or applications occur.
+CREATE FUNCTION public.dashboard_preview_calendar_retro_full_stage_alerts(
+  p_request_id uuid
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE
+  v_request public.dashboard_calendar_retro_review_requests;
+  v_stage record;
+  v_calendar public.dashboard_work_calendar_versions;
+  v_calendar_today public.dashboard_work_calendar_versions;
+  v_exception public.dashboard_work_calendar_exceptions;
+  v_threshold public.dashboard_operational_thresholds;
+  v_now timestamptz := now();
+  v_start_day date;
+  v_last_day date;
+  v_day date;
+  v_end timestamptz;
+  v_old_windows tstzmultirange;
+  v_new_windows tstzmultirange;
+  v_pauses tstzmultirange;
+  v_window tstzrange;
+  v_pause tstzrange;
+  v_intersection tstzrange;
+  v_pause_intersection tstzrange;
+  v_full_range tstzrange;
+  v_gross_before numeric;
+  v_gross_proposed numeric;
+  v_pause_before numeric;
+  v_pause_proposed numeric;
+  v_min_before integer;
+  v_min_proposed integer;
+  v_pause_min_before integer;
+  v_pause_min_proposed integer;
+  v_severity_before text;
+  v_severity_proposed text;
+  v_severity_status text;
+  v_reason text;
+  v_total integer;
+  v_candidate_orders integer;
+  v_verified integer := 0;
+  v_inconclusive integer := 0;
+  v_candidate_alert_changes integer := 0;
+  v_rows jsonb := '[]'::jsonb;
+BEGIN
+  PERFORM public.dashboard_assert_manager();
+  SELECT * INTO v_request FROM public.dashboard_calendar_retro_review_requests
+    WHERE id=p_request_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Solicitação retroativa não encontrada' USING ERRCODE='22023';
+  END IF;
+  PERFORM public.dashboard_preview_calendar_retro_request(
+    v_request.calendar_version_id,v_request.exception_date
+  );
+  IF EXISTS(SELECT 1 FROM public.dashboard_calendar_retro_review_events
+    WHERE request_id=p_request_id AND action='rejected') THEN
+    RAISE EXCEPTION 'Solicitação rejeitada não pode ser simulada'
+      USING ERRCODE='22023';
+  END IF;
+
+  SELECT count(*)::integer,count(DISTINCT si.order_id)::integer
+    INTO v_total,v_candidate_orders
+    FROM public.dashboard_stage_intervals si
+    WHERE si.entered_at <
+      ((v_request.exception_date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
+      AND coalesce(si.left_at,v_now) >
+      (v_request.exception_date::timestamp AT TIME ZONE 'America/Sao_Paulo');
+  IF v_total>1200 OR v_candidate_orders>300 THEN
+    RAISE EXCEPTION 'OS ou etapas excedem os limites de simulação integral'
+      USING ERRCODE='54000';
+  END IF;
+
+  FOR v_stage IN
+    SELECT si.* FROM public.dashboard_stage_intervals si
+    WHERE si.entered_at <
+      ((v_request.exception_date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
+      AND coalesce(si.left_at,v_now) >
+      (v_request.exception_date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+    ORDER BY si.order_id,si.entered_at,si.id
+  LOOP
+    v_reason := NULL;
+    v_severity_before := NULL;
+    v_severity_proposed := NULL;
+    v_severity_status := 'unavailable';
+    v_end := coalesce(v_stage.left_at,v_now);
+    v_start_day := (v_stage.entered_at AT TIME ZONE 'America/Sao_Paulo')::date;
+    v_last_day := ((v_end - interval '1 microsecond')
+      AT TIME ZONE 'America/Sao_Paulo')::date;
+    IF v_end<=v_stage.entered_at THEN
+      v_reason := 'Etapa sem permanência positiva.';
+    ELSIF v_last_day<v_start_day OR v_last_day-v_start_day>365 THEN
+      v_reason := 'A permanência ultrapassa a janela verificável de 366 dias.';
+    ELSIF v_stage.evidence_state<>'verified'
+      OR v_stage.calendar_version_id IS NULL
+      OR v_stage.rule_revision_id IS NULL THEN
+      v_reason := 'Marco ou revisão histórica da etapa não verificados.';
+    ELSIF NOT EXISTS (
+      SELECT 1 FROM public.dashboard_operational_rule_revisions rev
+      WHERE rev.id=v_stage.rule_revision_id AND rev.changed_at<=v_stage.entered_at
+    ) THEN
+      v_reason := 'Revisão operacional da entrada não comprovada.';
+    END IF;
+    IF v_reason IS NULL THEN
+      SELECT count(*)::integer INTO v_total
+        FROM public.dashboard_stage_pauses sp
+        WHERE sp.stage_interval_id=v_stage.id
+          AND (sp.evidence_state<>'verified' OR sp.operation_id IS NULL
+            OR sp.ended_at IS NULL OR sp.started_at<v_stage.entered_at
+            OR sp.ended_at>v_end OR sp.ended_at<=sp.started_at);
+      IF v_total>0 THEN
+        v_reason := 'Pausas ausentes, abertas ou sem evidência íntegra.';
+      END IF;
+    END IF;
+
+    IF v_reason IS NULL THEN
+      SELECT coalesce(pg_catalog.range_agg(tstzrange(
+        sp.started_at,sp.ended_at,'[)'
+      )),'{}'::tstzmultirange)
+        INTO v_pauses FROM public.dashboard_stage_pauses sp
+        WHERE sp.stage_interval_id=v_stage.id;
+      v_full_range := tstzrange(v_stage.entered_at,v_end,'[)');
+      v_gross_before := 0;
+      v_gross_proposed := 0;
+      v_pause_before := 0;
+      v_pause_proposed := 0;
+
+      FOR v_day IN SELECT generate_series(v_start_day,v_last_day,'1 day'::interval)::date LOOP
+        SELECT * INTO v_calendar FROM public.dashboard_work_calendar_versions c
+        WHERE c.effective_from<=v_day
+        ORDER BY c.effective_from DESC,c.version DESC LIMIT 1;
+        IF NOT FOUND OR v_calendar.status<>'published' OR
+           v_calendar.time_zone<>'America/Sao_Paulo' OR
+           (v_calendar.effective_until IS NOT NULL AND v_calendar.effective_until<v_day) THEN
+          v_reason := 'Existe dia sem versão global de calendário publicada e vigente.';
+          EXIT;
+        END IF;
+        IF v_day=v_start_day AND
+           v_calendar.id IS DISTINCT FROM v_stage.calendar_version_id THEN
+          v_reason := 'A revisão da entrada não coincide com o calendário vigente.';
+          EXIT;
+        END IF;
+        IF EXISTS (
+          SELECT 1 FROM public.dashboard_sector_calendar_revisions sc
+          WHERE sc.scope=v_stage.scope AND
+            sc.base_calendar_version_id=v_calendar.id AND
+            sc.effective_from<=v_day AND
+            (sc.effective_until IS NULL OR sc.effective_until>=v_day)
+        ) THEN
+          v_reason := 'Jornada setorial na permanência exige cálculo setorial próprio.';
+          EXIT;
+        END IF;
+        IF NOT EXISTS (
+          SELECT 1 FROM public.dashboard_work_calendar_periods p
+          WHERE p.calendar_version_id=v_calendar.id
+        ) THEN
+          v_reason := 'Não há expediente semanal verificável nesta versão.';
+          EXIT;
+        END IF;
+        v_old_windows := '{}'::tstzmultirange;
+        v_new_windows := '{}'::tstzmultirange;
+        SELECT * INTO v_exception FROM public.dashboard_work_calendar_exceptions e
+        WHERE e.calendar_version_id=v_calendar.id AND e.exception_date=v_day;
+        IF FOUND THEN
+          IF v_exception.working THEN
+            v_old_windows := tstzmultirange(tstzrange(
+              (v_day+v_exception.starts_local) AT TIME ZONE 'America/Sao_Paulo',
+              (v_day+v_exception.ends_local) AT TIME ZONE 'America/Sao_Paulo','[)'
+            ));
+          END IF;
+        ELSE
+          SELECT coalesce(pg_catalog.range_agg(tstzrange(
+            (v_day+p.starts_local) AT TIME ZONE 'America/Sao_Paulo',
+            (v_day+p.ends_local) AT TIME ZONE 'America/Sao_Paulo','[)'
+          )),'{}'::tstzmultirange)
+            INTO v_old_windows
+          FROM public.dashboard_work_calendar_periods p
+          WHERE p.calendar_version_id=v_calendar.id
+            AND p.weekday=extract(dow FROM v_day)::integer;
+        END IF;
+
+        IF v_day=v_request.exception_date THEN
+          IF v_request.proposed_working THEN
+            v_new_windows := tstzmultirange(tstzrange(
+              (v_day+v_request.proposed_start) AT TIME ZONE 'America/Sao_Paulo',
+              (v_day+v_request.proposed_end) AT TIME ZONE 'America/Sao_Paulo','[)'
+            ));
+          END IF;
+        ELSE
+          v_new_windows := v_old_windows;
+        END IF;
+
+        FOR v_window IN SELECT unnest(v_old_windows) LOOP
+          v_intersection := v_window * v_full_range;
+          IF isempty(v_intersection) THEN CONTINUE; END IF;
+          v_gross_before := v_gross_before +
+            extract(epoch FROM upper(v_intersection)-lower(v_intersection));
+          FOR v_pause IN SELECT unnest(v_pauses) LOOP
+            v_pause_intersection := v_pause * v_intersection;
+            IF NOT isempty(v_pause_intersection) THEN
+              v_pause_before := v_pause_before+
+                extract(epoch FROM upper(v_pause_intersection)-lower(v_pause_intersection));
+            END IF;
+          END LOOP;
+        END LOOP;
+        FOR v_window IN SELECT unnest(v_new_windows) LOOP
+          v_intersection := v_window * v_full_range;
+          IF isempty(v_intersection) THEN CONTINUE; END IF;
+          v_gross_proposed := v_gross_proposed +
+            extract(epoch FROM upper(v_intersection)-lower(v_intersection));
+          FOR v_pause IN SELECT unnest(v_pauses) LOOP
+            v_pause_intersection := v_pause * v_intersection;
+            IF NOT isempty(v_pause_intersection) THEN
+              v_pause_proposed := v_pause_proposed+
+                extract(epoch FROM upper(v_pause_intersection)-lower(v_pause_intersection));
+            END IF;
+          END LOOP;
+        END LOOP;
+      END LOOP;
+    END IF;
+
+    IF v_reason IS NULL AND (
+      mod(v_gross_before,60)<>0 OR mod(v_gross_proposed,60)<>0 OR
+      mod(v_pause_before,60)<>0 OR mod(v_pause_proposed,60)<>0 OR
+      v_pause_before>v_gross_before OR v_pause_proposed>v_gross_proposed
+    ) THEN
+      v_reason := 'Precisão temporal ou pausas não permitem contagem íntegra em minutos.';
+    END IF;
+    IF v_reason IS NOT NULL THEN
+      v_inconclusive := v_inconclusive+1;
+      v_rows := v_rows || jsonb_build_array(jsonb_build_object(
+        'order_id',v_stage.order_id,'interval_id',v_stage.id,
+        'scope',v_stage.scope,'state','insufficient','reason',v_reason,
+        'gross_before',NULL,'gross_proposed',NULL,
+        'pause_before',NULL,'pause_proposed',NULL,
+        'useful_before',NULL,'useful_proposed',NULL,
+        'severity_before',NULL,'severity_proposed',NULL,
+        'severity_status','unavailable'
+      ));
+      CONTINUE;
+    END IF;
+
+    v_min_before := (v_gross_before/60)::integer;
+    v_min_proposed := (v_gross_proposed/60)::integer;
+    v_pause_min_before := (v_pause_before/60)::integer;
+    v_pause_min_proposed := (v_pause_proposed/60)::integer;
+
+    -- Current severity comparisons require current, published thresholds
+    -- belonging to the same calendar AND unchanged since stage entry.
+    -- Closed-stage alerts cannot be reconstructed as present-day alerts.
+    SELECT * INTO v_threshold FROM public.dashboard_operational_thresholds t
+      WHERE t.scope=v_stage.scope;
+    SELECT * INTO v_calendar_today FROM public.dashboard_work_calendar_versions c
+      WHERE c.effective_from <= (v_now AT TIME ZONE 'America/Sao_Paulo')::date
+      ORDER BY c.effective_from DESC,c.version DESC LIMIT 1;
+    IF v_stage.left_at IS NULL AND v_threshold.scope IS NOT NULL AND
+       v_threshold.calendar_version_id=v_stage.calendar_version_id AND
+       v_threshold.updated_at<=v_stage.entered_at AND
+       v_threshold.effective_from<=v_stage.entered_at AND
+       v_calendar_today.id=v_stage.calendar_version_id THEN
+      v_severity_before := CASE
+        WHEN v_min_before>=v_threshold.critical_limit_minutes THEN 'critical'
+        WHEN v_min_before>=v_threshold.attention_limit_minutes THEN 'attention'
+        ELSE 'normal' END;
+      v_severity_proposed := CASE
+        WHEN v_min_proposed>=v_threshold.critical_limit_minutes THEN 'critical'
+        WHEN v_min_proposed>=v_threshold.attention_limit_minutes THEN 'attention'
+        ELSE 'normal' END;
+      v_severity_status := 'candidate';
+      IF v_severity_before IS DISTINCT FROM v_severity_proposed THEN
+        v_candidate_alert_changes := v_candidate_alert_changes+1;
+      END IF;
+    ELSE
+      v_severity_status := CASE WHEN v_stage.left_at IS NULL
+        THEN 'threshold_unverified' ELSE 'historical_review' END;
+    END IF;
+    v_verified := v_verified+1;
+    v_rows := v_rows || jsonb_build_array(jsonb_build_object(
+      'order_id',v_stage.order_id,'interval_id',v_stage.id,
+      'scope',v_stage.scope,'state','verified',
+      'reason','Contagem consultiva de toda a permanência registrada.',
+      'gross_before',v_min_before,'gross_proposed',v_min_proposed,
+      'pause_before',v_pause_min_before,'pause_proposed',v_pause_min_proposed,
+      'useful_before',v_min_before-v_pause_min_before,
+      'useful_proposed',v_min_proposed-v_pause_min_proposed,
+      'severity_before',v_severity_before,
+      'severity_proposed',v_severity_proposed,
+      'severity_status',v_severity_status
+    ));
+  END LOOP;
+
+  IF jsonb_array_length(v_rows)<>v_total THEN
+    -- v_total was also used for pause validation inside the loop; count again.
+    SELECT count(*)::integer INTO v_total
+    FROM public.dashboard_stage_intervals si
+    WHERE si.entered_at <
+      ((v_request.exception_date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
+      AND coalesce(si.left_at,v_now) >
+      (v_request.exception_date::timestamp AT TIME ZONE 'America/Sao_Paulo');
+    IF jsonb_array_length(v_rows)<>v_total THEN
+      RAISE EXCEPTION 'Evidência de etapas mudou durante consulta'
+        USING ERRCODE='40001';
+    END IF;
+  END IF;
+  RETURN jsonb_build_object(
+    'request_id',v_request.id,'as_of',v_now,
+    'candidate_orders',v_candidate_orders,'candidate_intervals',v_total,
+    'verified_intervals',v_verified,'insufficient_intervals',v_inconclusive,
+    'candidate_alert_changes',v_candidate_alert_changes,
+    'rows',v_rows,'scope','full_stage_consultative',
+    'historical_coverage_verified',false,'alerts_verified',false,
+    'approval_allowed',false,'application_allowed',false,
+    'observacao','Comparação consultiva de toda a permanência registrada, sujeito à revisão de cobertura histórica. Níveis de alerta são candidatos, não efeitos históricos confirmados.'
+  );
+END $$;
+
+REVOKE ALL ON FUNCTION public.dashboard_preview_calendar_retro_full_stage_alerts(uuid)
+  FROM PUBLIC,anon,authenticated,service_role;
+GRANT EXECUTE ON FUNCTION public.dashboard_preview_calendar_retro_full_stage_alerts(uuid)
+  TO authenticated;
