@@ -89,6 +89,7 @@ DECLARE
   v_open_intervals integer;
   v_future_intervals integer;
   v_rules integer;
+  v_sector_revisions integer;
 BEGIN
   PERFORM public.dashboard_assert_manager();
   v_previous := public.dashboard_validate_calendar_successor_date(
@@ -104,6 +105,11 @@ BEGIN
   SELECT count(*)::integer INTO v_rules
     FROM public.dashboard_operational_rules r
     WHERE r.calendar_version_id=v_previous.id;
+  SELECT count(DISTINCT scope)::integer INTO v_sector_revisions
+    FROM public.dashboard_sector_calendar_revisions c
+    WHERE c.base_calendar_version_id=v_previous.id
+      AND c.effective_from<=p_effective_from
+      AND (c.effective_until IS NULL OR c.effective_until>=p_effective_from);
   RETURN jsonb_build_object(
     'previous_version',v_previous.version,
     'previous_calendar_id',v_previous.id,
@@ -112,6 +118,7 @@ BEGIN
     'open_stage_intervals',v_open_intervals,
     'stage_intervals_from_effective_date',v_future_intervals,
     'rules_still_linked_to_previous',v_rules,
+    'sector_calendars_requiring_review',v_sector_revisions,
     'duration_impact_verified',false,
     'observacao','Prévia de vínculos e intervalos candidatos; não comprova diferença de minutos nem alteração de alertas.'
   );
