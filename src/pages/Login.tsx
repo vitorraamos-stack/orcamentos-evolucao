@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useLocation } from 'wouter';
 import { supabase } from '@/lib/supabase';
 import { useWelcomeTransition } from '@/components/WelcomeTransition';
@@ -148,6 +148,13 @@ export default function Login() {
     setPassword('');
   };
 
+  // Make Enter submit the same form as the button, keeping native required-field validation.
+  const handleEnterToSubmit = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter' || event.repeat || event.nativeEvent.isComposing || loading) return;
+    event.preventDefault();
+    event.currentTarget.form?.requestSubmit();
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (loading) return;
@@ -234,6 +241,8 @@ export default function Login() {
                     onChange={(event) => { setEmail(event.target.value); setFeedback(''); }}
                     placeholder="seu@email.com"
                     autoComplete="username"
+                    enterKeyHint="go"
+                    onKeyDown={handleEnterToSubmit}
                     autoCapitalize="none"
                     spellCheck={false}
                     required
@@ -258,6 +267,8 @@ export default function Login() {
                       onChange={(event) => { setPassword(event.target.value); setFeedback(''); }}
                       placeholder="Digite sua senha"
                       autoComplete="current-password"
+                      enterKeyHint="go"
+                      onKeyDown={handleEnterToSubmit}
                       required
                       disabled={loading}
                       className={fieldClass + ' pr-12'}
