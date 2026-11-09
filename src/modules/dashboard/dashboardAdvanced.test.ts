@@ -195,6 +195,43 @@ describe("Dashboard Etapa 4 — permanência útil com evidência verificável",
     expect(result.timingReason).toContain("não comprova sozinho a causa");
   });
 
+  it("separa permanência total, pausa comprovada e alerta crítico calculado sobre o total", () => {
+    const threshold = {
+      scope: "PRODUCTION" as const, attention_limit_minutes: 120,
+      critical_limit_minutes: 220, calendar_version_id: "calendar-1", revision: 1,
+      effective_from: "2026-11-01T00:00:00.000Z",
+      updated_at: "2026-11-01T00:00:00.000Z",
+    };
+    const sources = timingSources({
+      thresholds: { state: "available", rows: [threshold] },
+      operations: [operation("op-1", "i1", { created_at: "2026-11-02T11:30:00.000Z" })],
+      stagePauses: [{
+        id: "pause-1", stage_interval_id: "interval-1", operation_id: "op-1",
+        started_at: "2026-11-02T12:00:00.000Z", ended_at: "2026-11-02T13:00:00.000Z",
+        reason: "Aguardando material", evidence_state: "verified",
+      }],
+    });
+    const result = buildAdvancedAssessments([order()], sources, now)[0];
+    expect(result.totalWorkingMinutes).toBe(240);
+    expect(result.pauseWorkingMinutes).toBe(60);
+    expect(result.elapsedWorkingMinutes).toBe(180);
+    expect(result.thresholdSeverity).toBe("critical");
+  });
+
+  it("não classifica retroativamente por limite publicado depois da entrada na etapa", () => {
+    const result = buildAdvancedAssessments([order()], timingSources({
+      thresholds: { state: "available", rows: [{
+        scope: "PRODUCTION", attention_limit_minutes: 120, critical_limit_minutes: 220,
+        calendar_version_id: "calendar-1", revision: 1,
+        effective_from: "2026-11-02T12:00:00.000Z",
+        updated_at: "2026-11-02T12:00:00.000Z",
+      }] },
+    }), now)[0];
+    expect(result.totalWorkingMinutes).toBe(240);
+    expect(result.thresholdSeverity).toBeNull();
+    expect(result.thresholdReason).toContain("vigência");
+  });
+
   it("does not calculate when temporal evidence tables are unavailable", () => {
     const sources = timingSources({ timingEvidenceAvailable: false });
     const result = buildAdvancedAssessments([order()], sources, now)[0];
