@@ -123,3 +123,14 @@
 - **A aprovação efetiva e a aplicação histórica NÃO foram implementadas**: tanto `approval_allowed` como `application_allowed` permanecem `false`. Não é possível garantir uma transação segura reproduzindo todos os minutos e alertas e a cobertura das OS anteriores à instrumentação apenas com os dados atuais.
 - Antes de habilitar efeitos operacionais: comprovar cobertura da instrumentação por período; recálculo completo de minutos e alertas **no servidor** com controle de concorrência; snapshot das regras e calendários setoriais; modelo de exceções retroativas aplicado sem UPDATE/DELETE do calendário original; revalidação de permissões, RLS e auditoria em banco de teste.
 - Sem merge, sem aplicação de migrations, sem publicação Vercel ou alteração de OS de produção.
+
+## Oitavo incremento (09/11/2026) — cálculo diário por etapa no servidor (prévia consultiva)
+
+- A migration **já proposta e ainda não aplicada** `20261109153000_dashboard_calendar_retro_approval_preflight_stage1.sql` passou a incluir `dashboard_preview_calendar_retro_day_stage_impact`: RPC de gestão, somente leitura, que calcula o efeito hipotético da exceção do calendário geral para **um dia histórico**.
+- O servidor agrupa janelas de expediente e pausas com intervalos PostgreSQL, evita contagem duplicada de pausas sobrepostas e compara os minutos planejados antes/depois, por intervalo de etapa/OS. Com mais de 300 OS ou 1.200 intervalos, falha em vez de amostrar resultados.
+- Intervalos sem evidência, com versão de calendário incompatível, com revisão setorial ativa, pausas abertas ou duração com segundos não arredondados são apresentados como **inconclusivos**.
+- `DashboardCalendarRetroApprovalPanel` exibe a prévia feita no servidor ao lado da prévia cliente já existente, sem prometer equivalência a horas efetivamente trabalhadas.
+- O contrato de resposta exige contagens íntegros, nunca aceita aprovação/aplicação e preserva `historical_coverage_verified=false` e `alerts_verified=false`.
+- Testes restritos checam o formato da prévia e os contratos de somente leitura.
+- **Ainda não foi executado SQL num banco PostgreSQL real.** Antes de liberar aplicação retroativa, serão necessários cenários de teste com registros reais anonimizados, revisão de calendários setoriais e da classificação dos alertas, evidência de cobertura histórica e verificação transacional de concorrência.
+- Branch isolada, sem merge, sem migrations aplicadas, sem publicação.
