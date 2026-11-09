@@ -124,6 +124,7 @@ DECLARE
   v_actor uuid;
   v_preview jsonb;
   v_saved public.dashboard_calendar_retro_review_events;
+  v_request public.dashboard_calendar_retro_review_requests;
 BEGIN
   v_actor := public.dashboard_assert_manager();
   IF p_request_id IS NULL OR p_action IS NULL OR
@@ -132,6 +133,16 @@ BEGIN
      p_expected_preview IS NULL OR jsonb_typeof(p_expected_preview)<>'object' THEN
     RAISE EXCEPTION 'Parecer ou justificativa inválidos' USING ERRCODE='22023';
   END IF;
+  SELECT * INTO v_request FROM public.dashboard_calendar_retro_review_requests
+    WHERE id=p_request_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Solicitação não encontrada' USING ERRCODE='22023';
+  END IF;
+  -- Serializes rejection against resubmission on the same calendar/day.
+  PERFORM pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('dashboard-retro-review:'||
+      v_request.calendar_version_id::text||':'||v_request.exception_date::text,0)
+  );
   PERFORM pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended('dashboard-retro-review-decision:'||p_request_id::text,0)
   );
@@ -157,3 +168,50 @@ GRANT EXECUTE ON FUNCTION public.dashboard_preview_calendar_retro_review(uuid)
   TO authenticated;
 GRANT EXECUTE ON FUNCTION public.dashboard_record_calendar_retro_review(uuid,text,text,jsonb)
   TO authenticated;
+
+
+-- A rejected request is immutable but no longer blocks a corrected submission.
+-- A still-pending request, including one marked needs_evidence, blocks duplicates.
+-- Both submission and rejection share the per-day advisory lock.
+CREATE OR REPLACE FUNCTION public.dashboard_request_calendar_retro_review(
+  p_calendar_version_id uuid,p_date date,p_working boolean,
+  p_start time,p_end time,p_reason text
+) RETURNS public.dashboard_calendar_retro_review_requests
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE
+  v_actor uuid;
+  v_preview jsonb;
+  v_row public.dashboard_calendar_retro_review_requests;
+BEGIN
+  v_actor := public.dashboard_assert_manager();
+  IF p_working IS NULL OR p_reason IS NULL OR length(btrim(p_reason)) NOT BETWEEN 3 AND 1000 OR
+     (p_working AND (p_start IS NULL OR p_end IS NULL OR p_end<=p_start)) OR
+     (NOT p_working AND (p_start IS NOT NULL OR p_end IS NOT NULL)) THEN
+    RAISE EXCEPTION 'Exceção retroativa ou justificativa inválida'
+      USING ERRCODE='22023';
+  END IF;
+  PERFORM pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('dashboard-retro-review:'||p_calendar_version_id::text||':'||p_date::text,0)
+  );
+  v_preview := public.dashboard_preview_calendar_retro_request(p_calendar_version_id,p_date);
+  -- Duplicate unresolved requests for a date should be reviewed rather than
+  -- silently overwritten or filed repeatedly.
+  IF EXISTS (
+    SELECT 1 FROM public.dashboard_calendar_retro_review_requests r
+    WHERE r.calendar_version_id=p_calendar_version_id
+      AND r.exception_date=p_date AND r.state='pending_review'
+      AND NOT EXISTS (SELECT 1 FROM public.dashboard_calendar_retro_review_events e
+        WHERE e.request_id=r.id AND e.action='rejected')
+  ) THEN
+    RAISE EXCEPTION 'Já existe solicitação pendente para esta data e calendário'
+      USING ERRCODE='22023';
+  END IF;
+  INSERT INTO public.dashboard_calendar_retro_review_requests (
+    calendar_version_id,exception_date,proposed_working,proposed_start,
+    proposed_end,previous_exception,preview,reason,submitted_by
+  ) VALUES (
+    p_calendar_version_id,p_date,p_working,p_start,p_end,
+    v_preview->'existing_exception',v_preview,btrim(p_reason),v_actor
+  ) RETURNING * INTO v_row;
+  RETURN v_row;
+END $$;
