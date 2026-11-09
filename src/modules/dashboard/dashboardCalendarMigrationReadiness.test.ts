@@ -71,8 +71,10 @@ describe("Dashboard — prontidão estática das migrations propostas (sem execu
       expect(all).toContain("CREATE TABLE public." + name);
       expect(all).toContain("ALTER TABLE public." + name + " ENABLE ROW LEVEL SECURITY");
       expect(all).toContain("ON public." + name + "\n");
+      const revokes = all.match(/REVOKE ALL ON[^;]+;/g) ?? [];
+      expect(revokes.some(statement => statement.includes("public." + name))).toBe(true);
       expect(all).toMatch(new RegExp(
-        "REVOKE ALL ON (?:TABLE )?public\\." + name + "(?:\\s|,)"
+        "CREATE TRIGGER[^;]*BEFORE UPDATE OR DELETE ON public\\." + name
       ));
     }
   });
