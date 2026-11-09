@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useLocation } from 'wouter';
 import { supabase } from '@/lib/supabase';
-import { toast } from 'sonner';
+import { useWelcomeTransition } from '@/components/WelcomeTransition';
 import './login-layout.css';
 import {
   ArrowLeft,
@@ -139,6 +139,7 @@ export default function Login() {
   const [feedback, setFeedback] = useState('');
   const [sent, setSent] = useState(false);
   const [, setLocation] = useLocation();
+  const { beginWelcome } = useWelcomeTransition();
 
   const switchMode = (nextMode: Mode) => {
     setMode(nextMode);
@@ -163,12 +164,12 @@ export default function Login() {
         return;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
       if (error) throw error;
-      toast.success('Bem-vindo ao EvoluSystem!');
+      if (data.user) beginWelcome(data.user);
       setLocation('/');
     } catch (error) {
       if (mode === 'recover') {
