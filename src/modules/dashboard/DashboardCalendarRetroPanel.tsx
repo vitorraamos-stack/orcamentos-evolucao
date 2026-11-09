@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CalendarVersionRecord } from "./dashboardOperationalSettingsRepository";
 import { selectGlobalCalendarForDate } from "./dashboardCalendarTimeline";
+import { DashboardCalendarRetroReviewPanel } from "./DashboardCalendarRetroReviewPanel";
 import {
   listCalendarRetroRequests, previewCalendarRetroRequest, requestCalendarRetroReview,
   type CalendarRetroPreview, type CalendarRetroRequest,
@@ -179,7 +180,7 @@ export function DashboardCalendarRetroPanel({ calendars }: { calendars: Calendar
               <div key={row.id} className="rounded-md border p-2 text-sm">
                 <p><strong>{row.exception_date.split("-").reverse().join("/")}</strong> · {row.reason}</p>
                 <p className="text-xs text-muted-foreground">
-                  Pendente de revisão · solicitada em{" "}
+                  Solicitação registrada · consulte o parecer gerencial abaixo · solicitada em{" "}
                   {new Date(row.submitted_at).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo"})}
                 </p>
                 <details className="mt-2 rounded-md bg-muted/20 p-2">
@@ -205,6 +206,7 @@ export function DashboardCalendarRetroPanel({ calendars }: { calendars: Calendar
             ))}
           </div>
         )}
+        <DashboardCalendarRetroReviewPanel requests={rows} />
         <p className="flex items-start gap-2 text-xs text-muted-foreground">
           <Clock3 className="h-4 w-4 shrink-0"/>
           A aprovação e aplicação retroativa exigirão novo fluxo, simulação completa e autorização específica.
