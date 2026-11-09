@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ from: vi.fn(), preparation: vi.fn() }));
+const mocks = vi.hoisted(() => ({ from: vi.fn(), preparation: vi.fn(), thresholds: vi.fn() }));
 vi.mock("@/lib/supabase", () => ({ supabase: { from: mocks.from } }));
 vi.mock("./dashboardPreparationRepository", () => ({
   listDashboardPreparationSources: mocks.preparation,
+}));
+vi.mock("./dashboardThresholdsRepository", () => ({
+  loadPublishedThresholds: mocks.thresholds,
 }));
 import {
   isMissingSchema, listDashboardAdvancedSources, listDashboardDependencies, listDashboardOperationalRules,
@@ -36,6 +39,7 @@ describe("Dashboard Etapa 4 — consulta RLS e degradação segura", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.preparation.mockResolvedValue({ items: [], operations: [] });
+    mocks.thresholds.mockResolvedValue({ state: "unavailable", rows: [] });
   });
 
   it("recognizes missing schema only by explicit Postgres/PostgREST codes", () => {
@@ -59,6 +63,7 @@ describe("Dashboard Etapa 4 — consulta RLS e degradação segura", () => {
     expect(result.dependencies.state).toBe("unavailable");
     expect(result.assignees).toEqual([]);
     expect(result.deadlines).toEqual([]);
+    expect(result.thresholds.state).toBe("unavailable");
   });
 
   it("surfaces permission errors instead of hiding them as missing configuration", async () => {
