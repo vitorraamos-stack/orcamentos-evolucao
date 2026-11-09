@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import type { OperationalScope, Requirement } from "./dashboardAdvanced";
+import { DashboardThresholdsPanel } from "./DashboardThresholdsPanel";
+import { proposedEvolucaoWorkweek, verifiedSaoJose2026Observances } from "./dashboardOperationalPolicy";
 import {
   loadDashboardOperationalSettings, previewDashboardRuleImpact,
   publishDashboardCalendar, publishDashboardRule,
@@ -199,6 +201,31 @@ export default function DashboardOperationalSettingsPage() {
   const [periods, setPeriods] = useState<PeriodDraft[]>([]);
   const [exceptions, setExceptions] = useState<ExceptionDraft[]>([]);
   const [publishingCalendar, setPublishingCalendar] = useState(false);
+
+  const proposeWorkweek = () => {
+    if (periods.length && !window.confirm("Substituir todos os turnos digitados pela jornada aprovada?")) return;
+    setPeriods(proposedEvolucaoWorkweek().map(period => ({
+      key: draftKey++, weekday: String(period.weekday), start: period.start, end: period.end,
+    })));
+  };
+
+  const propose2026Holidays = () => {
+    if (!effectiveFrom) {
+      toast.error("Defina a data de início da vigência antes de sugerir feriados.");
+      return;
+    }
+    const legal = verifiedSaoJose2026Observances().filter(item => item.kind === "holiday" &&
+      item.date >= effectiveFrom && (!effectiveUntil || item.date <= effectiveUntil));
+    const previouslyAdded = new Set(exceptions.map(item => item.date));
+    const suggested = legal.filter(item => !previouslyAdded.has(item.date)).map(item => ({
+      key: draftKey++, date: item.date, working: "false" as const, start: "", end: "",
+      reason: item.name + " (" + item.jurisdiction + "; fonte oficial 2026)",
+    }));
+    setExceptions(previous => [...previous, ...suggested].sort((a, b) => a.date.localeCompare(b.date)));
+    toast.success(suggested.length
+      ? suggested.length + " feriados sugeridos para conferência. Nada foi publicado."
+      : "Nenhum feriado novo de 2026 dentro da vigência informada.");
+  };
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -412,9 +439,10 @@ export default function DashboardOperationalSettingsPage() {
 
       {data && (
         <Tabs defaultValue="rules" className="space-y-4">
-          <TabsList className="grid h-auto w-full grid-cols-2 sm:w-[420px]">
+          <TabsList className="grid h-auto w-full grid-cols-3 sm:w-[620px]">
             <TabsTrigger value="rules">Regras por etapa</TabsTrigger>
             <TabsTrigger value="calendar">Jornada e exceções</TabsTrigger>
+            <TabsTrigger value="thresholds">Atenção / Crítico</TabsTrigger>
           </TabsList>
 
           <TabsContent value="rules" className="space-y-4">
@@ -572,6 +600,10 @@ export default function DashboardOperationalSettingsPage() {
             )}
           </TabsContent>
 
+          <TabsContent value="thresholds" className="space-y-4">
+            <DashboardThresholdsPanel calendars={data.calendars} />
+          </TabsContent>
+
           <TabsContent value="calendar" className="space-y-4">
             <Card>
               <CardHeader>
@@ -614,6 +646,9 @@ export default function DashboardOperationalSettingsPage() {
                     ])} disabled={periods.length >= 28}>
                       <Plus className="mr-1 h-4 w-4" /> Adicionar horário
                     </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={proposeWorkweek}>
+                      Sugerir jornada aprovada (44h)
+                    </Button>
                   </div>
                   {periods.length === 0 && (
                     <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
@@ -647,12 +682,18 @@ export default function DashboardOperationalSettingsPage() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <h3 className="font-semibold">Feriados e exceções</h3>
-                      <p className="text-xs text-muted-foreground">Cadastre datas sem expediente ou com jornada especial.</p>
+                      <p className="text-xs text-muted-foreground">
+                        Cadastre datas sem expediente ou com jornada especial. Sugestões de feriados são válidas
+                        apenas para 2026; pontos facultativos permanecem dias normais sem exceção explícita.
+                      </p>
                     </div>
                     <Button type="button" variant="outline" size="sm" onClick={() => setExceptions(current => [
                       ...current, { key: draftKey++, date: "", working: "", start: "", end: "", reason: "" },
                     ])} disabled={exceptions.length >= 3660}>
                       <Plus className="mr-1 h-4 w-4" /> Adicionar exceção
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={propose2026Holidays}>
+                      Sugerir feriados oficiais 2026
                     </Button>
                   </div>
                   {exceptions.map((row, index) => (
