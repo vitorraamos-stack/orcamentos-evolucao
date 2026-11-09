@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, ClipboardList, RefreshCw, ShieldCheck } from "lucide-react";
+import { Link } from "wouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -217,6 +218,10 @@ export function DashboardCalendarRetroApprovalPanel({ request }: {
                     {" "}{order.stages.length === 1 ? "etapa" : "etapas"}
                   </summary>
                   <div className="mt-3 space-y-2">
+                    <Link href={"/os/" + encodeURIComponent(order.id)}
+                      className="inline-flex text-sm font-medium underline underline-offset-2">
+                      Abrir OS no EvoluSystem
+                    </Link>
                     {order.stages.map(stage => (
                       <div key={stage.id} className="rounded-md border p-2 text-xs">
                         <p className="font-semibold">{stage.scope} · {labels[stage.status]}</p>
