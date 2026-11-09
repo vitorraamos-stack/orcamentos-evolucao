@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { loadUserDisplayNamesByIds } from "@/shared/repositories/userDisplayNamesRepository";
 import { calculateOrderRisk } from "@/modules/orders/risk";
 import type { BoardAssignee, BoardCardModel, BoardKind } from "./types";
 import type { OsOrder } from "@/features/hubos/types";
@@ -67,6 +68,7 @@ export async function listBoardOrders(
   ]);
   for (const result of [assignees, items, comments, deadlines])
     if (result.error) throw result.error;
+  const displayNames = await loadUserDisplayNamesByIds((assignees.data ?? []).map(row => row.user_id));
   const assigneeByOrderId = new Map(
     (assignees.data ?? []).map(row => [row.order_id, row])
   );
@@ -99,7 +101,7 @@ export async function listBoardOrders(
         ? {
             userId: assignment.user_id,
             name:
-              profile?.email?.split("@")[0] || profile?.email || "Responsável",
+              displayNames.get(assignment.user_id)?.name || profile?.email || "Responsável",
             email: profile?.email ?? null,
           }
         : null,
@@ -180,12 +182,13 @@ export async function listBoardAssignees(
     .select("user_id,profiles!os_order_assignees_user_id_fkey(email)")
     .eq("scope", scope);
   if (error) throw error;
+  const displayNames = await loadUserDisplayNamesByIds((data ?? []).map(row => row.user_id));
   const unique = new Map<string, BoardAssignee>();
   for (const row of data ?? []) {
     const profile = row.profiles as unknown as { email?: string | null } | null;
     unique.set(row.user_id, {
       userId: row.user_id,
-      name: profile?.email?.split("@")[0] || profile?.email || "Responsável",
+      name: displayNames.get(row.user_id)?.name || profile?.email || "Responsável",
       email: profile?.email ?? null,
     });
   }

@@ -56,10 +56,10 @@ function scopeForOrder(order: DashboardOrder) {
 function responsibleLabel(order: DashboardOrder, assignments: DashboardAssignee[] | null) {
   if (!assignments) return "Consultando…";
   const people = assignments.filter(row => row.order_id === order.id);
-  const preferred = people.find(row => row.scope === scopeForOrder(order) && row.email);
-  const general = people.find(row => row.scope === "GENERAL" && row.email);
-  const any = people.find(row => row.email);
-  return (preferred ?? general ?? any)?.email ?? "Não informado";
+  const preferred = people.find(row => row.scope === scopeForOrder(order) && row.name);
+  const general = people.find(row => row.scope === "GENERAL" && row.name);
+  const any = people.find(row => row.name);
+  return (preferred ?? general ?? any)?.name ?? "Não informado";
 }
 
 function SummaryIndicators({ overview }: { overview: DashboardOverview | null }) {

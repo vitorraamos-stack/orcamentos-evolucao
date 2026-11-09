@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { getCurrentUserDisplayName } from "@/shared/users/userDisplay";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
@@ -303,7 +304,8 @@ export default function Layout({ children }: LayoutProps) {
     </div>
   );
 
-  const initial = (user.email?.trim().charAt(0) || "E").toUpperCase();
+  const displayName = getCurrentUserDisplayName(user);
+  const initial = displayName.charAt(0).toUpperCase();
 
   return (
     <div className={cn(
@@ -321,7 +323,7 @@ export default function Layout({ children }: LayoutProps) {
           <div className="flex items-center gap-3 px-2 pb-3">
             <div className="evolu-shell__avatar" aria-hidden="true">{initial}</div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-white">{user.email}</p>
+              <p className="truncate text-sm font-semibold text-white">{displayName}</p>
               <p className="truncate text-xs text-[#9BB6D3]">{getRoleLabel(role)}</p>
             </div>
           </div>
@@ -356,7 +358,7 @@ export default function Layout({ children }: LayoutProps) {
                   <NavItems />
                 </nav>
                 <div className="evolu-shell__account shrink-0 px-3 py-4">
-                  <p className="mb-3 truncate px-2 text-xs text-[#C2D2E5]">{user.email}</p>
+                  <p className="mb-3 truncate px-2 text-xs text-[#C2D2E5]">{displayName}</p>
                   <ThemeSwitcher />
                   <Button variant="ghost" className="evolu-shell__signout w-full justify-start" onClick={() => { setMobileOpen(false); void signOut(); }}>
                     <LogOut className="mr-2 h-4 w-4" aria-hidden="true" /> Sair do sistema

@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { loadUserDisplayNamesByIds } from "@/shared/repositories/userDisplayNamesRepository";
 import type { DashboardOrder } from "./dashboardModel";
 
 /**
@@ -56,6 +57,7 @@ export async function listDashboardOrders(signal?: AbortSignal) {
 export type DashboardAssignee = {
   order_id: string;
   scope: string;
+  name: string | null;
   email: string | null;
 };
 
@@ -63,14 +65,21 @@ export type DashboardAssignee = {
 export async function listDashboardAssignees(ids: string[], signal?: AbortSignal): Promise<DashboardAssignee[]> {
   if (!ids.length) return [];
   let query = supabase.from("os_order_assignees")
-    .select("order_id,scope,profiles!os_order_assignees_user_id_fkey(email)")
+    .select("order_id,user_id,scope,profiles!os_order_assignees_user_id_fkey(email)")
     .in("order_id", ids);
   if (signal) query = query.abortSignal(signal);
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return (data ?? []).map(row => {
+  const rows = data ?? [];
+  const names = await loadUserDisplayNamesByIds(rows.map(row => row.user_id));
+  return rows.map(row => {
     const profile = row.profiles as unknown as { email?: string | null } | { email?: string | null }[] | null;
     const value = Array.isArray(profile) ? profile[0] : profile;
-    return { order_id: row.order_id, scope: row.scope, email: value?.email ?? null };
+    return {
+      order_id: row.order_id,
+      scope: row.scope,
+      name: names.get(row.user_id)?.name ?? value?.email ?? null,
+      email: value?.email ?? null,
+    };
   });
 }

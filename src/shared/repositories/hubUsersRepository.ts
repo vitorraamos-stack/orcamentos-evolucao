@@ -1,15 +1,10 @@
 import { supabase } from "@/lib/supabase";
+import { loadUserDisplayNamesByIds } from "./userDisplayNamesRepository";
 
 type ProfileRow = {
   id: string;
   email: string | null;
   role: string;
-};
-
-type UserDisplayRow = {
-  id: string;
-  full_name: string | null;
-  email: string | null;
 };
 
 export type HubUser = {
@@ -26,19 +21,7 @@ const throwIfError = (error: { message: string } | null) => {
 async function resolveHubUsers(profiles: ProfileRow[]): Promise<HubUser[]> {
   if (profiles.length === 0) return [];
 
-  const { data: displayData, error: displayError } = await supabase.rpc(
-    "get_user_display_names",
-    { user_ids: profiles.map(profile => profile.id) }
-  );
-
-  throwIfError(displayError);
-
-  const displays = new Map(
-    ((displayData ?? []) as UserDisplayRow[]).map(display => [
-      display.id,
-      display,
-    ])
-  );
+  const displays = await loadUserDisplayNamesByIds(profiles.map(profile => profile.id));
 
   return profiles.map(profile => {
     const display = displays.get(profile.id);
@@ -46,7 +29,7 @@ async function resolveHubUsers(profiles: ProfileRow[]): Promise<HubUser[]> {
 
     return {
       id: profile.id,
-      name: display?.full_name || email || "Usuário",
+      name: display?.name || email || "Usuário",
       email,
       role: profile.role,
     };
