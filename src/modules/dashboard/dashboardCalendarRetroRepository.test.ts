@@ -6,13 +6,13 @@ import {
   listCalendarRetroRequests, previewCalendarRetroRequest, requestCalendarRetroReview,
 } from "./dashboardCalendarRetroRepository";
 
-function query(rows: unknown[], error: object | null = null) {
-  const q = { select: vi.fn(), order: vi.fn(), limit: vi.fn(), then: vi.fn() };
+function query(rows: unknown[], error: object | null = null, total = rows.length) {
+  const q = { select: vi.fn(), order: vi.fn(), range: vi.fn(), then: vi.fn() };
   q.select.mockReturnValue(q);
   q.order.mockReturnValue(q);
-  q.limit.mockReturnValue(q);
+  q.range.mockReturnValue(q);
   q.then.mockImplementation((resolve: (value: unknown) => unknown) =>
-    Promise.resolve(resolve({ data: error ? null : rows, error })),
+    Promise.resolve(resolve({ data: error ? null : rows, error, count: total })),
   );
   return q;
 }
@@ -30,6 +30,28 @@ describe("Dashboard — solicitações retroativas conservadoras", () => {
   it("erro de permissão é exibido em vez de ocultado", async () => {
     mocks.from.mockReturnValue(query([], { code: "42501", message: "Sem autorização" }));
     await expect(listCalendarRetroRequests()).rejects.toThrow("Sem autorização");
+  });
+
+  it("consulta todas as páginas e nunca corta o histórico em 100 registros", async () => {
+    const first = Array.from({ length: 500 }, (_, i) => ({ id: "id-" + (1000-i) }));
+    const second = Array.from({ length: 2 }, (_, i) => ({ id: "id-" + (500-i) }));
+    const firstQuery = query(first, null, 502);
+    const secondQuery = query(second, null, 502);
+    mocks.from.mockReturnValueOnce(firstQuery).mockReturnValueOnce(secondQuery);
+    const result = await listCalendarRetroRequests();
+    expect(result.state).toBe("available");
+    expect(result.rows).toHaveLength(502);
+    expect(firstQuery.range).toHaveBeenCalledWith(0, 499);
+    expect(secondQuery.range).toHaveBeenCalledWith(500, 999);
+  });
+
+  it("rejeita histórico truncado ou modificado durante paginação", async () => {
+    mocks.from.mockReturnValueOnce(query([{id:"1"}], null, 2));
+    await expect(listCalendarRetroRequests()).rejects.toThrow("Histórico incompleto");
+    mocks.from.mockReset();
+    mocks.from.mockReturnValueOnce(query(Array.from({length:500},(_,i)=>({id:String(i)})), null, 501))
+      .mockReturnValueOnce(query([{id:"501"}], null, 502));
+    await expect(listCalendarRetroRequests()).rejects.toThrow("histórico mudou");
   });
 
   it("prévia não publica nem altera períodos e solicita apenas a data selecionada", async () => {
