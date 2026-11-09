@@ -23,6 +23,8 @@ export type CalendarRetroRequest = {
   submitted_at: string;
   submitted_by: string;
   state: "pending_review";
+  previous_exception: CalendarRetroPreview["existing_exception"];
+  preview: CalendarRetroPreview;
 };
 
 export type CalendarRetroInput = {
@@ -51,7 +53,7 @@ export async function listCalendarRetroRequests(): Promise<
   let expectedCount: number | null = null;
   for (let offset = 0; ; offset += pageSize) {
     const { data, error, count } = await supabase.from("dashboard_calendar_retro_review_requests")
-      .select("id,calendar_version_id,exception_date,proposed_working,proposed_start,proposed_end,reason,submitted_at,submitted_by,state", { count: "exact" })
+      .select("id,calendar_version_id,exception_date,proposed_working,proposed_start,proposed_end,reason,submitted_at,submitted_by,state,previous_exception,preview", { count: "exact" })
       .order("submitted_at", { ascending: false })
       .order("id", { ascending: false })
       .range(offset, offset + pageSize - 1);
