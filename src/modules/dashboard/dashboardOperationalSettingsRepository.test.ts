@@ -70,7 +70,8 @@ describe("Dashboard Etapa 4 — RPCs administrativas", () => {
       previous_version: 1, previous_calendar_id: "calendar-old",
       effective_from: "2026-11-12", old_effective_until: null,
       open_stage_intervals: 4, stage_intervals_from_effective_date: 1,
-      rules_still_linked_to_previous: 2, duration_impact_verified: false,
+      rules_still_linked_to_previous: 2, sector_calendars_requiring_review: 1,
+      duration_impact_verified: false,
       observacao: "Prévia consultiva",
     };
     mocks.rpc.mockResolvedValue({ data: preview, error: null });
