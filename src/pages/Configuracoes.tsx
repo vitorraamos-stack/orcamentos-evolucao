@@ -21,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { HUB_ROLE_LABEL, HUB_ROLE_VALUES, type HubRole } from '@/lib/hubRoles';
 import { APP_MODULES, type AppModuleKey } from '@/constants/modules';
+import UserAvatarEditor from '@/components/UserAvatarEditor';
 
 type AdminUser = {
   id: string;
@@ -485,6 +486,7 @@ export default function Configuracoes() {
             <DialogTitle>Editar usuário</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            {editingUser && <UserAvatarEditor key={editingUser.id} userId={editingUser.id} displayName={editName || editingUser.name || 'Usuário'} />}
             <Input placeholder="Nome" value={editName} onChange={(event) => setEditName(event.target.value)} />
             <Select value={editRole} onValueChange={(value) => setEditRole(value as HubRole)}>
               <SelectTrigger>
