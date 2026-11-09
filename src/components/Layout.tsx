@@ -314,7 +314,7 @@ export default function Layout({ children }: LayoutProps) {
     )}>
       <aside className="evolu-shell__sidebar hidden w-[264px] shrink-0 flex-col text-white md:flex" aria-label="Menu lateral">
         <div className="evolu-shell__branding">
-          <div className="evolu-shell__brand-name">Evolu<span>System</span></div>
+          <img src="/evolusystem-logo-dark.svg" alt="EvoluSystem" className="evolu-shell__brand-logo" />
         </div>
         <nav className="evolu-shell__navigation min-h-0 flex-1 overflow-y-auto px-3 py-3" aria-label="Navegação principal">
           <NavItems />
@@ -346,7 +346,7 @@ export default function Layout({ children }: LayoutProps) {
               <SheetContent side="left" className="w-[min(85vw,300px)] gap-0 border-r-0 bg-[#071A34] p-0 text-white">
                 <SheetTitle className="sr-only">Menu do EvoluSystem</SheetTitle>
                 <div className="evolu-shell__branding shrink-0">
-                  <div className="evolu-shell__brand-name">Evolu<span>System</span></div>
+                  <img src="/evolusystem-logo-dark.svg" alt="EvoluSystem" className="evolu-shell__brand-logo" />
                 </div>
                 <nav
                   aria-label="Navegação principal"
@@ -367,9 +367,7 @@ export default function Layout({ children }: LayoutProps) {
               </SheetContent>
             </Sheet>
             <div className="min-w-0">
-              <p className="truncate text-base font-extrabold tracking-[-.035em] text-[#172D49] dark:text-foreground">
-                Evolu<span className="text-[#068BCF]">System</span>
-              </p>
+              <img src="/evolusystem-logo.svg" alt="EvoluSystem" className="h-auto w-[180px] max-w-full" />
               <p className="truncate text-[10px] font-semibold uppercase tracking-[.14em] text-[#71839A]">
                 Controle Operacional
               </p>

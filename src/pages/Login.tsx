@@ -35,7 +35,7 @@ function BrandPanel() {
   return (
     <section
       aria-label="Sobre o EvoluSystem"
-      className="evolu-login__brand relative isolate hidden flex-col justify-between overflow-hidden bg-[#071A34] px-10 text-white lg:flex xl:px-16"
+      className="evolu-login__brand relative isolate hidden flex-col overflow-hidden bg-[#071A34] px-10 text-white lg:flex xl:px-16"
     >
       <div
         className="pointer-events-none absolute inset-0 -z-10"
@@ -86,21 +86,13 @@ function BrandPanel() {
         )}
       </svg>
 
-      <div className="relative">
-        <img
-          src="/logo-branca.png"
-          alt="Evolução Comunicação Visual"
-          className="evolu-login__brand-logo h-auto w-48 object-contain xl:w-56"
-        />
-      </div>
-
       <div className="evolu-login__brand-content relative max-w-[660px]">
         <div className="evolu-login__brand-eyebrow flex items-center gap-3 text-xs font-semibold uppercase tracking-[.24em] text-[#AFD2EE]">
           <span className="h-px w-10 bg-[#0BA5EE]" aria-hidden="true" />
           Uma operação conectada
         </div>
-        <h1 className="evolu-login__brand-title font-extrabold leading-[.99] tracking-[-.065em]">
-          Evolu<span className="text-[#0C9DED]">System</span>
+        <h1 className="evolu-login__brand-title">
+          <img src="/evolusystem-logo-dark.svg" alt="EvoluSystem" className="evolu-login__brand-title-logo" />
         </h1>
         <p className="evolu-login__brand-subtitle text-sm font-semibold uppercase tracking-[.39em] text-[#D5E6F6] sm:text-base">
           Controle Operacional
@@ -194,21 +186,13 @@ export default function Login() {
       <BrandPanel />
 
       <section className="evolu-login__form-side flex flex-col items-center justify-center px-4 sm:px-8 lg:px-10">
-        <div className="evolu-login__mobile-brand flex items-center gap-3 lg:hidden">
-          <img src="/logo.png" alt="Evolução Comunicação Visual" className="h-14 w-auto" />
-          <div className="border-l border-[#D8E0EA] pl-3">
-            <p className="text-xl font-extrabold tracking-[-.04em]">Evolu<span className="text-[#008DDD]">System</span></p>
-            <p className="text-[10px] font-bold uppercase tracking-[.16em] text-[#67788D]">Controle Operacional</p>
-          </div>
-        </div>
-
         <div className="evolu-login__card w-full max-w-[540px] rounded-[28px] border border-[#E8EDF4] bg-white shadow-[0_24px_70px_-32px_rgba(23,49,82,.25)]">
           <header className="evolu-login__card-header">
             <p className="text-[11px] font-bold uppercase tracking-[.36em] text-[#72849B]">
               {mode === 'login' ? 'Bem-vindo(a) ao' : 'Recuperação de acesso'}
             </p>
-            <div className="evolu-login__card-title mt-2 font-extrabold leading-tight tracking-[-.065em]">
-              Evolu<span className="text-[#008DE1]">System</span>
+            <div className="evolu-login__card-title mt-2">
+              <img src="/evolusystem-logo.svg" alt="EvoluSystem" className="evolu-login__card-title-logo" />
             </div>
             <p className="mt-1 text-xs font-bold uppercase tracking-[.32em] text-[#687C93]">
               Controle Operacional
