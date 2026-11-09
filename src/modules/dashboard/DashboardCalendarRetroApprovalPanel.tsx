@@ -122,6 +122,11 @@ export function DashboardCalendarRetroApprovalPanel({ request }: {
                 {" "}{serverImpact.verified_intervals} etapas verificadas ·
                 {" "}{serverImpact.insufficient_intervals} inconclusivas ·
                 {" "}{serverImpact.changed_intervals} com diferença de tempo</p>
+              <p>
+                Alertas que exigem recálculo: <strong>{serverImpact.alert_recalculation_candidates}</strong>
+                {" · "}alertas inconclusivos: <strong>{serverImpact.alert_review_inconclusive_intervals}</strong>.
+                Esta análise não confirma mudanças de nível dos alertas.
+              </p>
               <p className="text-xs text-amber-700 dark:text-amber-300">{serverImpact.observacao}</p>
               <details className="rounded-md border p-2">
                 <summary className="cursor-pointer font-medium">
@@ -136,9 +141,10 @@ export function DashboardCalendarRetroApprovalPanel({ request }: {
                           <p>Jornada no dia: {row.minutes_before} min → {row.minutes_proposed} min</p>
                           <p>Pausas verificadas: {row.pause_minutes_before} min → {row.pause_minutes_proposed} min</p>
                           <p>Tempo útil sem pausa: {row.useful_minutes_before} min → {row.useful_minutes_proposed} min</p>
+                          <p>Alerta: {row.alert_review_reason}</p>
                         </>
                       ) : <p className="text-amber-700 dark:text-amber-300">
-                        Inconclusivo: {row.reason}
+                        Inconclusivo: {row.reason}. {row.alert_review_reason}
                       </p>}
                     </div>
                   ))}
