@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { CalendarRetroRequest } from "./dashboardCalendarRetroRepository";
+import { DashboardCalendarRetroApprovalPanel } from "./DashboardCalendarRetroApprovalPanel";
 import { loadCalendarRetroOsImpact } from "./dashboardCalendarRetroOsImpactRepository";
 import type { RetroOsImpactResult } from "./dashboardCalendarRetroOsImpact";
 import {
@@ -247,6 +248,7 @@ export function DashboardCalendarRetroReviewPanel({ requests }: { requests: Cale
             </div>
           </div>
         )}
+        {selected && <DashboardCalendarRetroApprovalPanel key={selected.id} request={selected} />}
         {events.length > 0 && (
           <div className="space-y-2">
             <p className="text-sm font-semibold">Histórico imutável de pareceres</p>
