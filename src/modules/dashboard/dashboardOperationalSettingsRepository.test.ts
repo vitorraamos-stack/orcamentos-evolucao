@@ -5,6 +5,7 @@ vi.mock("@/lib/supabase", () => ({ supabase: { rpc: mocks.rpc } }));
 
 import {
   previewDashboardRuleImpact, publishDashboardCalendar, publishDashboardRule,
+  previewDashboardCalendarSuccessor, publishDashboardCalendarSuccessor,
 } from "./dashboardOperationalSettingsRepository";
 
 describe("Dashboard Etapa 4 — RPCs administrativas", () => {
@@ -61,6 +62,40 @@ describe("Dashboard Etapa 4 — RPCs administrativas", () => {
       p_effective_until: "2026-12-31", p_periods: periods,
       p_exceptions: exceptions, p_expected_last_version: 0,
       p_reason: "Configuração aprovada pela gestão",
+    });
+  });
+
+  it("prévia da sucessora verifica versão esperada sem alterar dados", async () => {
+    const preview = {
+      previous_version: 1, previous_calendar_id: "calendar-old",
+      effective_from: "2026-11-12", old_effective_until: null,
+      open_stage_intervals: 4, stage_intervals_from_effective_date: 1,
+      rules_still_linked_to_previous: 2, duration_impact_verified: false,
+      observacao: "Prévia consultiva",
+    };
+    mocks.rpc.mockResolvedValue({ data: preview, error: null });
+    await expect(previewDashboardCalendarSuccessor({
+      effectiveFrom: "2026-11-12", expectedLastVersion: 1,
+    })).resolves.toEqual(preview);
+    expect(mocks.rpc).toHaveBeenCalledWith("dashboard_preview_calendar_successor", {
+      p_effective_from: "2026-11-12", p_expected_last_version: 1,
+    });
+  });
+
+  it("publicação sucessora grava versão imutável com revisão otimista e motivo", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: { id: "calendar-new", version: 2, status: "published" }, error: null,
+    });
+    const periods = [{ weekday: 1, start: "08:00", end: "12:00" }];
+    await publishDashboardCalendarSuccessor({
+      name: "Jornada atualizada", effectiveFrom: "2026-11-12",
+      effectiveUntil: null, periods, exceptions: [], expectedLastVersion: 1,
+      reason: "Alteração aprovada pela gestão",
+    });
+    expect(mocks.rpc).toHaveBeenCalledWith("dashboard_publish_calendar_successor", {
+      p_name: "Jornada atualizada", p_effective_from: "2026-11-12",
+      p_effective_until: null, p_periods: periods, p_exceptions: [],
+      p_expected_last_version: 1, p_reason: "Alteração aprovada pela gestão",
     });
   });
 
