@@ -126,6 +126,9 @@ describe("Dashboard Etapa 4 — consulta RLS e degradação segura", () => {
       id: "calendar-1", version: 1, time_zone: "America/Sao_Paulo",
       effective_from: "2026-11-01", effective_until: null,
     };
+    const futureCalendar = {
+      ...calendar, id: "calendar-2", version: 2, effective_from: "2026-11-10",
+    };
     byTable({
       os_order_assignees: query([]),
       os_order_deadlines: query([]),
@@ -133,10 +136,13 @@ describe("Dashboard Etapa 4 — consulta RLS e degradação segura", () => {
       dashboard_operational_rules: query([rule]),
       dashboard_stage_intervals: query([interval]),
       dashboard_stage_pauses: query([pause]),
-      dashboard_work_calendar_versions: query([calendar]),
+      dashboard_work_calendar_versions: query([calendar, futureCalendar]),
       dashboard_work_calendar_periods: query([{
         id: "period-1", calendar_version_id: "calendar-1", weekday: 1,
         starts_local: "08:00:00", ends_local: "12:00:00",
+      }, {
+        id: "period-2", calendar_version_id: "calendar-2", weekday: 2,
+        starts_local: "09:00:00", ends_local: "12:00:00",
       }]),
       dashboard_work_calendar_exceptions: query([{
         id: "exception-1", calendar_version_id: "calendar-1",
@@ -149,8 +155,8 @@ describe("Dashboard Etapa 4 — consulta RLS e degradação segura", () => {
     expect(value.stageIntervals).toEqual([interval]);
     expect(value.stagePauses).toEqual([pause]);
     expect(value.timingRules[0].calendar_version_id).toBe("calendar-1");
-    expect(value.calendars).toEqual([calendar]);
-    expect(value.calendarPeriods).toHaveLength(1);
+    expect(value.calendars).toEqual([calendar, futureCalendar]);
+    expect(value.calendarPeriods).toHaveLength(2);
     expect(value.calendarExceptions).toHaveLength(1);
   });
 
