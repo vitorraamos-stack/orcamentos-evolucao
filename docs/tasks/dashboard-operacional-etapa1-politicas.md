@@ -132,5 +132,6 @@
 - `DashboardCalendarRetroApprovalPanel` exibe a prévia feita no servidor ao lado da prévia cliente já existente, sem prometer equivalência a horas efetivamente trabalhadas.
 - O contrato de resposta exige contagens íntegros, nunca aceita aprovação/aplicação e preserva `historical_coverage_verified=false` e `alerts_verified=false`.
 - Testes restritos checam o formato da prévia e os contratos de somente leitura.
+- O fingerprint da pré-validação gerencial agora incorpora também as pausas, regras publicadas, calendários setoriais, jornadas, exceções e pareceres. O encaminhamento compartilha o bloqueio por calendário/data com o fluxo de rejeição, reduzindo o risco de registrar uma prévia desatualizada. O fingerprint continua sendo **diagnóstico**, nunca autorização para aplicação.
 - **Ainda não foi executado SQL num banco PostgreSQL real.** Antes de liberar aplicação retroativa, serão necessários cenários de teste com registros reais anonimizados, revisão de calendários setoriais e da classificação dos alertas, evidência de cobertura histórica e verificação transacional de concorrência.
 - Branch isolada, sem merge, sem migrations aplicadas, sem publicação.
