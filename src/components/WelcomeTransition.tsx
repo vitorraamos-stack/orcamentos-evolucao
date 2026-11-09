@@ -5,6 +5,9 @@ import { getCurrentUserDisplayName } from '@/shared/users/userDisplay';
 import { signedAvatarUrl } from '@/shared/users/avatarPhoto';
 import './welcome-transition.css';
 
+// Allow users to read their name and see their photo, even on a fast connection.
+export const MIN_WELCOME_DURATION_MS = 2300;
+
 type WelcomeInfo = { userId: string; displayName: string };
 type WelcomeContextValue = { beginWelcome: (user: User) => void };
 
@@ -44,9 +47,11 @@ export function WelcomeTransitionProvider({ children }: { children: ReactNode })
   const [exiting, setExiting] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarReady, setAvatarReady] = useState(false);
+  const [minimumElapsed, setMinimumElapsed] = useState(false);
 
   const beginWelcome = (user: User) => {
     setAvatarReady(false);
+    setMinimumElapsed(false);
     setAvatarUrl(null);
     setExiting(false);
     setInfo({ userId: user.id, displayName: getCurrentUserDisplayName(user) });
@@ -79,13 +84,20 @@ export function WelcomeTransitionProvider({ children }: { children: ReactNode })
     };
   }, [info?.userId]);
 
-  // Keep overlay visible while root route resolves the permitted destination.
-  // Finish with a subtle fade only after navigation reaches a destination.
+  // Keep the greeting readable for a minimum duration, regardless of connection speed.
+  // The animation still waits for the permitted route and the avatar fallback.
   useEffect(() => {
-    if (!info || !avatarReady || location === '/' || location === '/login') return;
-    const exitTimer = window.setTimeout(() => setExiting(true), 300);
+    if (!info) return;
+    const durationTimer = window.setTimeout(() => setMinimumElapsed(true), MIN_WELCOME_DURATION_MS);
+    return () => window.clearTimeout(durationTimer);
+  }, [info]);
+
+  // Fade away only after the destination is ready and the greeting had time to be seen.
+  useEffect(() => {
+    if (!info || !minimumElapsed || !avatarReady || location === '/' || location === '/login') return;
+    const exitTimer = window.setTimeout(() => setExiting(true), 120);
     return () => window.clearTimeout(exitTimer);
-  }, [info, avatarReady, location]);
+  }, [info, minimumElapsed, avatarReady, location]);
 
   useEffect(() => {
     if (!info || !exiting) return;
