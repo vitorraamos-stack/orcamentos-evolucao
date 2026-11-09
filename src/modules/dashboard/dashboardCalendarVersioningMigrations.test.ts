@@ -7,6 +7,7 @@ const migration = (name: string) =>
 
 const succession = migration("20261109131500_dashboard_calendar_successions_stage1.sql");
 const retro = migration("20261109134000_dashboard_calendar_retro_requests_stage1.sql");
+const preflight = migration("20261109153000_dashboard_calendar_retro_approval_preflight_stage1.sql");
 const review = migration("20261109142500_dashboard_calendar_retro_review_triage_stage1.sql");
 
 describe("Dashboard Etapa 1 — segurança de versões globais prospectivas", () => {
@@ -75,5 +76,24 @@ describe("Dashboard Etapa 1 — revisão gerencial sem aplicação", () => {
     expect(review).toContain("CREATE OR REPLACE FUNCTION public.dashboard_request_calendar_retro_review(");
     expect(review).toContain("e.action='rejected'");
     expect(review).toContain("dashboard-retro-review:");
+  });
+});
+
+
+describe("Dashboard Etapa 1 — preparação de aprovação sem efeito operacional", () => {
+  it("só permite encaminhar para validação, sem aprovação ou aplicação de exceções", () => {
+    expect(preflight).toContain("CREATE TABLE public.dashboard_calendar_retro_approval_dossiers");
+    expect(preflight).toContain("CHECK (status = 'awaiting_server_verification')");
+    expect(preflight).toContain("'approval_allowed',false");
+    expect(preflight).toContain("'application_allowed',false");
+    expect(preflight).toContain("dashboard_retro_approval_dossiers_immutable");
+    expect(preflight).not.toMatch(/(?:UPDATE|DELETE)\\s+public\\.dashboard_work_calendar_/i);
+    expect(preflight).not.toMatch(/INSERT\\s+INTO\\s+public\\.dashboard_work_calendar_exceptions/i);
+  });
+  it("autoriza somente gestão e exige recálculo de prévia no servidor", () => {
+    expect(preflight).toContain("public.dashboard_assert_manager()");
+    expect(preflight).toContain("v_preview := public.dashboard_preview_calendar_retro_approval_preflight(p_request_id)");
+    expect(preflight).toContain("v_preview IS DISTINCT FROM p_expected_preview");
+    expect(preflight).toContain("GRANT EXECUTE ON FUNCTION public.dashboard_prepare_calendar_retro_approval");
   });
 });
