@@ -48,3 +48,25 @@
 - O cálculo de 'tempo útil não bloqueado' **não comprova execução efetiva**; é apenas permanência descontadas pausas comprovadas.
 - A função `dashboardAdvanced.ts` ainda depende de regras/calendários legados e histórico confiável para liberar durações. Nenhum valor foi retroprojetado.
 - **Não realizar merge, não executar migrations e não publicar em Vercel** sem nova autorização específica. A branch mantém o deploy automático desativado.
+
+
+## Terceiro incremento (09/11/2026) — calendário setorial versionado
+
+- `dashboardSectorCalendar.ts`: resolução determinística e conservadora de versões setoriais por data, preservando dias anteriores e evitando reativar uma revisão vencida após nova versão.
+- Herança: quando não existe jornada própria, o setor usa a jornada geral. A ordem de precedência é **exceção setorial autorizada > exceção do calendário geral/feriado > jornada setorial > jornada geral**. Uma jornada setorial semanal NÃO ignora feriados automaticamente.
+- Revisões específicas por setor com vigência, modo de herança ou substituição dos turnos, e exceções com até seis intervalos no mesmo dia, inclusive folga integral ou plantão autorizado.
+- `DashboardSectorCalendarsPanel.tsx`: editor administrativo integrado à aba **Por setor** em Regras Operacionais, com histórico, justificativa, prévia ilustrativa dos horários, confirmação antes da publicação e bloqueio se o schema não estiver instalado.
+- `dashboardSectorCalendarRepository.ts`: leitura completa com contagem exata e publicação somente pela RPC de gestão, sem escrita direta em tabelas.
+- `dashboardAdvanced.ts`: interseção de tempos úteis e pausas passa a considerar a versão setorial vigente em cada data, sem reescrever durações históricas.
+- Migration **proposta, não aplicada**: `20261109120500_dashboard_sector_calendars_stage1.sql`, com RLS, revisões imutáveis, validação de horários, revision lock e vigência presente/futura (sem retroatividade silenciosa).
+- Testes unitários, integração temporal, contrato estático de segurança e cliente RPC adicionados.
+
+### Limitações antes de produção
+
+- A migration não foi executada em banco real. Falta teste de execução SQL e permissões autenticadas; contrato estático e CI não substituem validação real.
+- A prévia no editor cobre a primeira semana e datas de exceções relevantes, não uma simulação integral de todas as OS atingidas.
+- O calendário **geral** antigo ainda não permite substituição auditada de versão com vigência em aberto. Esse fluxo requer revisão separada antes de ativar novas regras operacionais.
+- A nomenclatura de supervisor e um canal de sugestões não estão modelados nas permissões atuais; não presumir que todo colaborador do setor seja supervisor.
+- Correções retroativas com impacto calculado e auditoria específica continuam pendentes.
+- Não existem publicações fictícias de calendários, limites ou feriados.
+- O botão de publicação depende de autorização gerencial dentro do aplicativo após aplicação futura da migration; o merge/execução da migration/publicação Vercel continuam sem autorização.
