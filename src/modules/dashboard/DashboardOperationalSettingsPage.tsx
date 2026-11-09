@@ -652,7 +652,7 @@ export default function DashboardOperationalSettingsPage() {
 
           <TabsContent value="sector" className="space-y-4">
             <DashboardSectorCalendarsPanel
-              calendars={data.calendars} periods={data.periods} exceptions={data.exceptions} versions={data.calendars} />
+              calendars={data.calendars} periods={data.periods} exceptions={data.exceptions} />
           </TabsContent>
 
           <TabsContent value="calendar" className="space-y-4">
@@ -847,7 +847,8 @@ export default function DashboardOperationalSettingsPage() {
                   </CardContent></Card>
                 : data.calendars.map(calendar => (
                   <CalendarCard key={calendar.id} calendar={calendar}
-                    periods={data.periods} exceptions={data.exceptions} />
+                    periods={data.periods} exceptions={data.exceptions}
+                    versions={data.calendars} />
                 ))}
             </div>
           </TabsContent>
