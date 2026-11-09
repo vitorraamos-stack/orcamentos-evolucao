@@ -122,7 +122,7 @@ BEGIN
   FOR v_row IN SELECT value FROM jsonb_array_elements(p_exceptions) LOOP
     IF jsonb_typeof(v_row)<>'object'
       OR coalesce(v_row->>'date','') !~ '^\d{4}-\d{2}-\d{2}$'
-      OR jsonb_typeof(v_row->'windows')<>'array'
+      OR coalesce(jsonb_typeof(v_row->'windows'),'')<>'array'
       OR jsonb_array_length(v_row->'windows')>6
       OR length(btrim(coalesce(v_row->>'reason',''))) NOT BETWEEN 1 AND 500 THEN
       RAISE EXCEPTION 'Exceção setorial malformada' USING ERRCODE='22023';
