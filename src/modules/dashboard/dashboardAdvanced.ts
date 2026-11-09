@@ -598,9 +598,18 @@ export function buildAdvancedAssessments(
     const currentInterval = sources.stageIntervals.find(interval =>
       interval.order_id === order.id && interval.scope === scope && interval.left_at === null
     );
+    const pinnedCalendar = sources.calendars.find(row => row.id === currentInterval?.calendar_version_id);
+    const calendarCurrent = pinnedCalendar
+      ? selectGlobalCalendarForDate(sources.calendars, localDateKey(now.getTime(), pinnedCalendar.time_zone))
+      : null;
+    // A rule bound to the OLD calendar is never silently treated as if
+    // it had been reviewed for a newly published global workweek.
     const thresholdCanApply = Boolean(
-      published && currentInterval && currentInterval.calendar_version_id === published.calendar_version_id &&
-      Date.parse(published.effective_from) <= Date.parse(currentInterval.entered_at)
+      published && currentInterval &&
+      currentInterval.calendar_version_id === published.calendar_version_id &&
+      Date.parse(published.effective_from) <= Date.parse(currentInterval.entered_at) &&
+      calendarCurrent?.state === "available" &&
+      calendarCurrent.calendar.id === currentInterval.calendar_version_id
     );
     const threshold = published && thresholdCanApply
       ? assessOperationalThreshold(timing.totalWorkingMinutes, {
