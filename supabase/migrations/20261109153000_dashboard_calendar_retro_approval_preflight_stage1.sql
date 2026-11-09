@@ -650,8 +650,8 @@ BEGIN
     v_start_day := (v_stage.entered_at AT TIME ZONE 'America/Sao_Paulo')::date;
     v_last_day := ((v_end - interval '1 microsecond')
       AT TIME ZONE 'America/Sao_Paulo')::date;
-    IF v_end<=v_stage.entered_at THEN
-      v_reason := 'Etapa sem permanência positiva.';
+    IF v_end<=v_stage.entered_at OR v_end>v_now THEN
+      v_reason := 'Etapa sem permanência positiva ou com término futuro.';
     ELSIF v_last_day<v_start_day OR v_last_day-v_start_day>365 THEN
       v_reason := 'A permanência ultrapassa a janela verificável de 366 dias.';
     ELSIF v_stage.evidence_state<>'verified'
@@ -688,7 +688,9 @@ BEGIN
       v_pause_before := 0;
       v_pause_proposed := 0;
 
-      FOR v_day IN SELECT generate_series(v_start_day,v_last_day,'1 day'::interval)::date LOOP
+      FOR v_day IN SELECT generate_series(
+        v_start_day::timestamp,v_last_day::timestamp,'1 day'::interval
+      )::date LOOP
         SELECT * INTO v_calendar FROM public.dashboard_work_calendar_versions c
         WHERE c.effective_from<=v_day
         ORDER BY c.effective_from DESC,c.version DESC LIMIT 1;
