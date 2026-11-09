@@ -128,6 +128,34 @@ export async function listDashboardDependencies(
   }
 }
 
+/**
+ * The full immutable global-calendar timeline is required for an OS that
+ * crosses a calendar publication. Checking only the calendar pinned at stage
+ * entry would silently apply the old shift to all later dates.
+ */
+async function listAllGlobalCalendarVersions(signal?: AbortSignal): Promise<WorkCalendarVersion[]> {
+  const all: WorkCalendarVersion[] = [];
+  let expected: number | null = null;
+  for (let offset = 0; offset <= 20000; offset += PAGE_SIZE) {
+    let q = supabase.from("dashboard_work_calendar_versions")
+      .select("id,version,time_zone,effective_from,effective_until", { count: "exact" })
+      .order("version", { ascending: true })
+      .range(offset,offset+PAGE_SIZE-1);
+    if (signal) q = q.abortSignal(signal);
+    const { data, count, error } = await q;
+    if (error) throw error;
+    if (count === null) throw new Error("Contagem exata de calendários globais indisponível.");
+    if (expected === null) expected = count;
+    if (expected !== count) throw new Error("Calendários alterados durante a consulta. Atualize o Dashboard.");
+    const rows = (data ?? []) as WorkCalendarVersion[];
+    if (rows.length !== Math.min(PAGE_SIZE, Math.max(0,count-offset)))
+      throw new Error("Histórico global de calendários incompleto.");
+    all.push(...rows);
+    if (all.length===expected) return all;
+  }
+  throw new Error("Histórico de calendários excede a paginação segura.");
+}
+
 type TimingSourceBundle = {
   timingRules: TimingRule[];
   timingEvidenceAvailable: boolean;
@@ -163,8 +191,11 @@ async function listDashboardTimingSources(
     if (rulesResult.error) throw rulesResult.error;
     const timingRules = (rulesResult.data ?? []) as TimingRule[];
     const intervalIds = stageIntervals.map(row => row.id);
-    const calendarIds = Array.from(new Set(stageIntervals
+    const recordedCalendarIds = Array.from(new Set(stageIntervals
       .map(row => row.calendar_version_id).filter((id): id is string => Boolean(id))));
+    const calendars = recordedCalendarIds.length
+      ? await listAllGlobalCalendarVersions(signal) : [];
+    const calendarIds = calendars.map(row => row.id);
 
     const stagePauses = intervalIds.length
       ? await readByIds<StagePause>(
@@ -174,16 +205,10 @@ async function listDashboardTimingSources(
         )
       : [];
 
-    let calendars: WorkCalendarVersion[] = [];
     let calendarPeriods: WorkCalendarPeriod[] = [];
     let calendarExceptions: WorkCalendarException[] = [];
     if (calendarIds.length) {
-      [calendars, calendarPeriods, calendarExceptions] = await Promise.all([
-        readByIds<WorkCalendarVersion>(
-          "dashboard_work_calendar_versions",
-          "id,version,time_zone,effective_from,effective_until",
-          "id", calendarIds, signal,
-        ),
+      [calendarPeriods, calendarExceptions] = await Promise.all([
         readByIds<WorkCalendarPeriod>(
           "dashboard_work_calendar_periods",
           "id,calendar_version_id,weekday,starts_local,ends_local",
