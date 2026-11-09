@@ -826,6 +826,8 @@ export default function DashboardOperationalSettingsPage() {
                           vinculados à versão anterior.</p>
                         <p>{calendarPreview.impact.rules_still_linked_to_previous} regras continuam vinculadas
                           à versão anterior e precisarão de revisão gerencial.</p>
+                        <p>{calendarPreview.impact.sector_calendars_requiring_review} setores com calendários
+                          específicos vinculados à versão anterior precisarão de revalidação.</p>
                         <p className="text-amber-700 dark:text-amber-300">
                           Esta prévia não comprova diferenças de horas nem mudança de criticidade.
                           A simulação completa depende de evidências temporais verificadas.
