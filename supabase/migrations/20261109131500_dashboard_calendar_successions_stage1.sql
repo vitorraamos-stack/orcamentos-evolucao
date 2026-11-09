@@ -3,6 +3,23 @@
 -- Preserva os registros de calendário de todas as versões anteriores sem UPDATE.
 -- A versão com maior effective_from vigente em cada data prevalece no cliente,
 -- mesmo quando a versão predecessora possuía effective_until=NULL.
+-- Protect even the preexisting first-publication RPC from silently backdating
+-- an initial calendar. Authorized historical corrections use a separate channel.
+CREATE FUNCTION public.dashboard_reject_backdated_calendar_insert() RETURNS trigger
+LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $
+BEGIN
+  IF NEW.effective_from < (now() AT TIME ZONE 'America/Sao_Paulo')::date THEN
+    RAISE EXCEPTION 'Publicação retroativa exige solicitação e auditoria específicas'
+      USING ERRCODE='22023';
+  END IF;
+  RETURN NEW;
+END $;
+REVOKE ALL ON FUNCTION public.dashboard_reject_backdated_calendar_insert()
+  FROM PUBLIC,anon,authenticated,service_role;
+CREATE TRIGGER dashboard_calendar_no_implicit_backdate
+  BEFORE INSERT ON public.dashboard_work_calendar_versions
+  FOR EACH ROW EXECUTE FUNCTION public.dashboard_reject_backdated_calendar_insert();
+
 CREATE TABLE public.dashboard_calendar_succession_audit (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   previous_calendar_version_id uuid NOT NULL
