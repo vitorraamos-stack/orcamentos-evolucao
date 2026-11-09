@@ -4,8 +4,9 @@ const mocks = vi.hoisted(() => ({
   from: vi.fn(),
   range: vi.fn(),
   in: vi.fn(),
+  rpc: vi.fn(),
 }));
-vi.mock("@/lib/supabase", () => ({ supabase: { from: mocks.from } }));
+vi.mock("@/lib/supabase", () => ({ supabase: { from: mocks.from, rpc: mocks.rpc } }));
 
 import { listDashboardOrders, listDashboardAssignees } from "./dashboardRepository";
 
@@ -66,12 +67,14 @@ describe("dashboard repository — consulta read-only e RLS", () => {
   it("enriches only selected orders with permitted profiles", async () => {
     const query = setup();
     mocks.in.mockResolvedValue({
-      data: [{ order_id: "a", scope: "GENERAL", profiles: { email: "responsavel@empresa.com" } }],
+      data: [{ order_id: "a", user_id: "u1", scope: "GENERAL", profiles: { email: "responsavel@empresa.com" } }],
       error: null,
     });
+    mocks.rpc.mockResolvedValue({ data: [{ id: "u1", full_name: "Larissa", email: "responsavel@empresa.com" }], error: null });
     const assignments = await listDashboardAssignees(["a", "b"]);
     expect(mocks.from).toHaveBeenCalledWith("os_order_assignees");
     expect(query.in).toHaveBeenCalledWith("order_id", ["a", "b"]);
-    expect(assignments).toEqual([{ order_id: "a", scope: "GENERAL", email: "responsavel@empresa.com" }]);
+    expect(mocks.rpc).toHaveBeenCalledWith("get_user_display_names", { user_ids: ["u1"] });
+    expect(assignments).toEqual([{ order_id: "a", scope: "GENERAL", name: "Larissa", email: "responsavel@empresa.com" }]);
   });
 });
