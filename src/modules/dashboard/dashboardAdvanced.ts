@@ -300,7 +300,7 @@ function datePartsInZone(epochMs: number, timeZone: string) {
     hour: value("hour"), minute: value("minute"), second: value("second") };
 }
 
-function localDateKey(epochMs: number, timeZone: string): string {
+export function localDateKey(epochMs: number, timeZone: string): string {
   const parts = datePartsInZone(epochMs, timeZone);
   return String(parts.year).padStart(4, "0") + "-" +
     String(parts.month).padStart(2, "0") + "-" + String(parts.day).padStart(2, "0");
@@ -319,7 +319,7 @@ function weekdayForDate(value: string): number {
   return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
 }
 
-function localDateTimeEpoch(value: string, time: string, timeZone: string): number | null {
+export function localDateTimeEpoch(value: string, time: string, timeZone: string): number | null {
   const [year, month, day] = value.split("-").map(Number);
   const match = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.exec(time);
   if (!match || ![year, month, day].every(Number.isFinite)) return null;
@@ -417,7 +417,7 @@ export function calculateWorkingMinutes(
   return null;
 }
 
-function mergePauseRanges(
+export function mergePauseRanges(
   pauses: readonly StagePause[], intervalStart: number, intervalEnd: number,
 ): Array<{ start: number; end: number }> | null {
   const ranges: Array<{ start: number; end: number }> = [];
