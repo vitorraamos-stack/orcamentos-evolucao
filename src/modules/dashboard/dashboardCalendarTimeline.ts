@@ -15,8 +15,9 @@ export type TimelineResolution =
 export function selectGlobalCalendarForDate(
   versions: readonly WorkCalendarVersion[], date: string,
 ): TimelineResolution {
+  const ms = Date.parse(date + "T12:00:00Z");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) ||
-      new Date(date + "T12:00:00Z").toISOString().slice(0, 10) !== date) {
+      !Number.isFinite(ms) || new Date(ms).toISOString().slice(0, 10) !== date) {
     return { state: "unavailable", calendar: null, reason: "Data local inválida." };
   }
   const applicable = versions.filter(row => row.effective_from <= date)
@@ -35,6 +36,11 @@ function previousDate(date: string): string {
   const [year, month, day] = date.split("-").map(Number);
   const previous = new Date(Date.UTC(year, month - 1, day - 1));
   return previous.toISOString().slice(0, 10);
+}
+
+function nextDate(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
 }
 
 export function effectiveCalendarEnd(
@@ -67,15 +73,14 @@ export function previewGlobalSuccessor(
     successorVersion: (latest?.version ?? 0) + 1, effectiveFrom,
     previousEffectiveEnd: null, reason: "",
   };
+  const ms = Date.parse(effectiveFrom + "T12:00:00Z");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom) ||
-      Number.isNaN(Date.parse(effectiveFrom + "T12:00:00Z")) ||
-      new Date(effectiveFrom + "T12:00:00Z").toISOString().slice(0, 10) !== effectiveFrom)
+      !Number.isFinite(ms) ||
+      new Date(ms).toISOString().slice(0, 10) !== effectiveFrom)
     return { ...fallback, reason: "Data de vigência inválida." };
   if (latest && effectiveFrom <= latest.effective_from)
     return { ...fallback, reason: "A nova vigência precisa começar após o início da versão mais recente." };
-  if (latest?.effective_until && effectiveFrom > previousDate(
-    new Date(Date.parse(latest.effective_until + "T12:00:00Z") + 2 * 86_400_000).toISOString().slice(0,10)
-  )) {
+  if (latest?.effective_until && effectiveFrom > nextDate(latest.effective_until)) {
     // The successor can start later, but missing days cannot be inferred as worked.
     return {
       ...fallback,
