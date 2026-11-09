@@ -207,6 +207,7 @@ export type CalendarSuccessorImpactPreview = {
   open_stage_intervals: number;
   stage_intervals_from_effective_date: number;
   rules_still_linked_to_previous: number;
+  sector_calendars_requiring_review: number;
   duration_impact_verified: false;
   observacao: string;
 };
