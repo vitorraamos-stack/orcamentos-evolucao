@@ -12,6 +12,12 @@ import {
 } from "./dashboardCalendarRetroReviewRepository";
 
 const labelDate = (date: string) => date.split("-").reverse().join("/");
+const formatMinutes = (value: number) => {
+  const sign = value < 0 ? "−" : "";
+  const absolute = Math.abs(value);
+  return sign + Math.floor(absolute / 60) + "h " +
+    String(absolute % 60).padStart(2, "0") + "min";
+};
 /** Manager review is non-operative: review opinions do not change OS or calendars. */
 export function DashboardCalendarRetroReviewPanel({ requests }: { requests: CalendarRetroRequest[] }) {
   const [events, setEvents] = useState<CalendarRetroReviewEvent[]>([]);
