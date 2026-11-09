@@ -67,11 +67,11 @@ describe("Dashboard Etapa 1 — revisão gerencial sem aplicação", () => {
     expect(review).toContain("p_expected_preview");
     expect(review).toContain("'approval_allowed',false");
     expect(review).toContain("action IN ('needs_evidence','rejected')");
-    expect(review).not.toMatch(/UPDATE\\s+public\\.(?:dashboard_work_calendar_|os_orders)/i);
-    expect(review).not.toMatch(/DELETE\\s+FROM\\s+public\\.dashboard_work_calendar_/i);
+    expect(review).not.toMatch(/UPDATE\s+public\.(?:dashboard_work_calendar_|os_orders)/i);
+    expect(review).not.toMatch(/DELETE\s+FROM\s+public\.dashboard_work_calendar_/i);
   });
   it("corrige a delimitação SQL e permite reenvio após rejeição auditada", () => {
-    expect(succession).not.toContain("AS $\\n");
+    expect(succession).not.toContain("AS $\n");
     expect(review).toContain("CREATE OR REPLACE FUNCTION public.dashboard_request_calendar_retro_review(");
     expect(review).toContain("e.action='rejected'");
     expect(review).toContain("dashboard-retro-review:");
