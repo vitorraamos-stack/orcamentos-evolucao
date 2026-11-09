@@ -5,6 +5,7 @@ import Login from "@/pages/Login";
 import ResetPassword from "@/pages/ResetPassword";
 import Home from "@/pages/Home";
 import InitialRoute from "@/pages/InitialRoute";
+import { WelcomeTransitionProvider } from "@/components/WelcomeTransition";
 import HubOS from "@/pages/HubOS";
 import Galeria from "@/pages/Galeria";
 // IMPORTANTE: Agora estamos importando o componente real!
@@ -404,10 +405,12 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light" switchable>
         <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
+          <WelcomeTransitionProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+            </TooltipProvider>
+          </WelcomeTransitionProvider>
         </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>
