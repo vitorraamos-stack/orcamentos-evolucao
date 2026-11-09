@@ -46,6 +46,9 @@ export default function Layout({ children }: LayoutProps) {
   } = useAuth();
   const [location, setLocation] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Hooks must run on every render, including loading and signed-out states.
+  const avatarUrl = useAvatarPhoto(user?.id);
   const isCreateOrderPage = location.startsWith("/os/novo");
   const isOrdersCentralPage = location === "/os";
   const isArtworkCentralPage = location.startsWith("/os/arte");
@@ -307,7 +310,6 @@ export default function Layout({ children }: LayoutProps) {
 
   const displayName = getCurrentUserDisplayName(user);
   const initial = displayName.charAt(0).toUpperCase();
-  const avatarUrl = useAvatarPhoto(user?.id);
 
   return (
     <div className={cn(
