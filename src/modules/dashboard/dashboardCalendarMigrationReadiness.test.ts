@@ -20,6 +20,13 @@ const all = sql.join("\n");
 describe("Dashboard — prontidão estática das migrations propostas (sem executar SQL)", () => {
   it("mantém dependências em ordem e não perde migrations no PR", () => {
     expect([...migrations].sort()).toEqual([...migrations]);
+    // Última migration aplicada em produção na conferência pré-release.
+    // As sete novas migrações não podem ficar para trás no histórico remoto.
+    const latestProductionVersionAtReview = "20261109153553";
+    for (const name of migrations) {
+      expect(name.slice(0, 14) > latestProductionVersionAtReview,
+        "Migration anterior à versão já aplicada: " + name).toBe(true);
+    }
     expect(sql[0]).toContain("CREATE TABLE public.dashboard_operational_thresholds");
     expect(sql[1]).toContain("CREATE TABLE public.dashboard_sector_calendar_revisions");
     expect(sql[2]).toContain("CREATE FUNCTION public.dashboard_publish_calendar_successor");
