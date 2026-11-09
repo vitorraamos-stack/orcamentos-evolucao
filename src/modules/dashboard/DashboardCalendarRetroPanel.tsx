@@ -177,11 +177,30 @@ export function DashboardCalendarRetroPanel({ calendars }: { calendars: Calendar
             <p className="font-semibold text-sm">Solicitações registradas</p>
             {rows.map(row => (
               <div key={row.id} className="rounded-md border p-2 text-sm">
-                <p><strong>{row.exception_date}</strong> · {row.reason}</p>
+                <p><strong>{row.exception_date.split("-").reverse().join("/")}</strong> · {row.reason}</p>
                 <p className="text-xs text-muted-foreground">
                   Pendente de revisão · solicitada em{" "}
                   {new Date(row.submitted_at).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo"})}
                 </p>
+                <details className="mt-2 rounded-md bg-muted/20 p-2">
+                  <summary className="cursor-pointer text-sm font-medium">Conferir solicitação e evidências registradas</summary>
+                  <div className="mt-2 grid gap-1 text-xs">
+                    <p>Solicitado: <strong>{row.proposed_working
+                      ? `Expediente ${row.proposed_start?.slice(0, 5) ?? "?"}–${row.proposed_end?.slice(0, 5) ?? "?"}`
+                      : "Sem expediente"}</strong></p>
+                    <p>Exceção anterior: {row.previous_exception
+                      ? (row.previous_exception.working
+                        ? `Expediente ${row.previous_exception.start?.slice(0, 5) ?? "?"}–${row.previous_exception.end?.slice(0, 5) ?? "?"}`
+                        : "Sem expediente")
+                      : "Nenhuma exceção cadastrada"}</p>
+                    <p>Versão de calendário: {calendars.find(c => c.id === row.calendar_version_id)?.version ?? "não localizada"}</p>
+                    <p>Intervalos candidatos na prévia arquivada: {row.preview?.stage_intervals_candidates ?? "não comprovado"}</p>
+                    <p>Intervalos com marco verificado: {row.preview?.verified_stage_intervals_candidates ?? "não comprovado"}</p>
+                    <p className="text-amber-700 dark:text-amber-300">
+                      Minutos e alertas não calculados nesta prévia. Revisar antes de qualquer aprovação futura.
+                    </p>
+                  </div>
+                </details>
               </div>
             ))}
           </div>
