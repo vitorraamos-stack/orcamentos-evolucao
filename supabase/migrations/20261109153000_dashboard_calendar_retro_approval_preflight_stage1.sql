@@ -600,6 +600,7 @@ DECLARE
   v_severity_status text;
   v_reason text;
   v_total integer;
+  v_invalid_pauses integer;
   v_candidate_orders integer;
   v_verified integer := 0;
   v_inconclusive integer := 0;
@@ -664,13 +665,13 @@ BEGIN
       v_reason := 'Revisão operacional da entrada não comprovada.';
     END IF;
     IF v_reason IS NULL THEN
-      SELECT count(*)::integer INTO v_total
+      SELECT count(*)::integer INTO v_invalid_pauses
         FROM public.dashboard_stage_pauses sp
         WHERE sp.stage_interval_id=v_stage.id
           AND (sp.evidence_state<>'verified' OR sp.operation_id IS NULL
             OR sp.ended_at IS NULL OR sp.started_at<v_stage.entered_at
             OR sp.ended_at>v_end OR sp.ended_at<=sp.started_at);
-      IF v_total>0 THEN
+      IF v_invalid_pauses>0 THEN
         v_reason := 'Pausas ausentes, abertas ou sem evidência íntegra.';
       END IF;
     END IF;
@@ -819,7 +820,10 @@ BEGIN
        v_threshold.calendar_version_id=v_stage.calendar_version_id AND
        v_threshold.updated_at<=v_stage.entered_at AND
        v_threshold.effective_from<=v_stage.entered_at AND
-       v_calendar_today.id=v_stage.calendar_version_id THEN
+       v_calendar_today.id=v_stage.calendar_version_id AND
+       v_calendar_today.status='published' AND
+       (v_calendar_today.effective_until IS NULL OR
+         v_calendar_today.effective_until>=(v_now AT TIME ZONE 'America/Sao_Paulo')::date) THEN
       v_severity_before := CASE
         WHEN v_min_before>=v_threshold.critical_limit_minutes THEN 'critical'
         WHEN v_min_before>=v_threshold.attention_limit_minutes THEN 'attention'
@@ -852,17 +856,8 @@ BEGIN
   END LOOP;
 
   IF jsonb_array_length(v_rows)<>v_total THEN
-    -- v_total was also used for pause validation inside the loop; count again.
-    SELECT count(*)::integer INTO v_total
-    FROM public.dashboard_stage_intervals si
-    WHERE si.entered_at <
-      ((v_request.exception_date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
-      AND coalesce(si.left_at,v_now) >
-      (v_request.exception_date::timestamp AT TIME ZONE 'America/Sao_Paulo');
-    IF jsonb_array_length(v_rows)<>v_total THEN
-      RAISE EXCEPTION 'Evidência de etapas mudou durante consulta'
-        USING ERRCODE='40001';
-    END IF;
+    RAISE EXCEPTION 'Evidência de etapas mudou durante consulta'
+      USING ERRCODE='40001';
   END IF;
   RETURN jsonb_build_object(
     'request_id',v_request.id,'as_of',v_now,
