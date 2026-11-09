@@ -121,7 +121,7 @@ export function DashboardSectorCalendarsPanel({ calendars, periods, exceptions }
       published_by: "PREVIEW-ONLY", published_at: "", reason: "Prévia não publicada",
     };
     const lines: PreviewLine[] = [];
-    for (const date of [...allDates].sort().slice(0, 14)) {
+    for (const date of Array.from(allDates).sort().slice(0, 14)) {
       if (date < draft.effectiveFrom || (draft.effectiveUntil && date > draft.effectiveUntil)) continue;
       const base = exceptions.find(row => row.calendar_version_id === selection.id && row.exception_date === date);
       const resolved = resolveSectorCalendarDay({
