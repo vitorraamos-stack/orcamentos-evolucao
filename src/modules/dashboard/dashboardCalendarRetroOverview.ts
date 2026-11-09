@@ -67,6 +67,10 @@ export function buildRetroOverview(input: {
       issues.push("OS ou setor divergem entre as prévias.");
     if (entry.day?.state === "insufficient") issues.push("Dia: " + entry.day.reason);
     if (entry.full?.state === "insufficient") issues.push("Permanência: " + entry.full.reason);
+    if (entry.full?.state === "verified" &&
+        entry.full.useful_before !== entry.full.useful_proposed &&
+        entry.full.severity_status !== "candidate")
+      issues.push("O nível do alerta ainda exige revisão histórica ou de limites.");
     const status: RetroOverviewStatus = issues.length ? "pending" :
       entry.full?.severity_status === "candidate" &&
         entry.full.severity_before !== entry.full.severity_proposed ? "alert_change" :
@@ -80,16 +84,21 @@ export function buildRetroOverview(input: {
   }
   const items = Array.from(orders.values()).sort((a, b) =>
     priority[a.status] - priority[b.status] || a.id.localeCompare(b.id));
-  if (day && full && day.rows.some(row => !full.rows.some(other => other.interval_id === row.interval_id)) ||
-      day && full && full.rows.some(row => !day.rows.some(other => other.interval_id === row.interval_id)))
+  if (day && full && (
+    day.rows.some(row => !full.rows.some(other => other.interval_id === row.interval_id)) ||
+    full.rows.some(row => !day.rows.some(other => other.interval_id === row.interval_id))
+  ))
     warnings.push("As prévias não concordam sobre quais etapas atravessam a data.");
 
   return {
     complete: !!(preflight && day && full) && warnings.length === 0,
     warnings,
-    affectedOrders: items.filter(item => item.status === "alert_change" || item.status === "time_change").length,
+    affectedOrders: items.filter(item => item.stages.some(stage =>
+      stage.full?.state === "verified" &&
+      stage.full.useful_before !== stage.full.useful_proposed)).length,
     candidateAlertChanges: items.reduce((count, order) => count + order.stages.filter(stage =>
-      stage.status === "alert_change").length, 0),
+      stage.full?.state === "verified" && stage.full.severity_status === "candidate" &&
+      stage.full.severity_before !== stage.full.severity_proposed).length, 0),
     pendingOrders: items.filter(item => item.status === "pending").length,
     unchangedOrders: items.filter(item => item.status === "unchanged").length,
     orders: items,
