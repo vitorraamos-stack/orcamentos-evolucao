@@ -64,7 +64,7 @@ export function simulateCalendarRetroOsImpact(input: {
   asOf: string;
 }): RetroOsImpactResult {
   const { request, sources, asOf } = input;
-  const candidateIds = [...new Set(input.candidateOrderIds)];
+  const candidateIds = Array.from(new Set(input.candidateOrderIds));
   const asOfMs = Date.parse(asOf);
   const startMs = localDateTimeEpoch(request.exception_date, "00:00", "America/Sao_Paulo");
   const nextDate = new Date(Date.parse(request.exception_date + "T12:00:00Z") + 86_400_000)
