@@ -135,3 +135,12 @@
 - O fingerprint da pré-validação gerencial agora incorpora também as pausas, regras publicadas, calendários setoriais, jornadas, exceções e pareceres. O encaminhamento compartilha o bloqueio por calendário/data com o fluxo de rejeição, reduzindo o risco de registrar uma prévia desatualizada. O fingerprint continua sendo **diagnóstico**, nunca autorização para aplicação.
 - **Ainda não foi executado SQL num banco PostgreSQL real.** Antes de liberar aplicação retroativa, serão necessários cenários de teste com registros reais anonimizados, revisão de calendários setoriais e da classificação dos alertas, evidência de cobertura histórica e verificação transacional de concorrência.
 - Branch isolada, sem merge, sem migrations aplicadas, sem publicação.
+
+## Nono incremento (09/11/2026) — triagem de alertas por etapa, sem banco de testes
+
+- A prévia SQL já proposta em `20261109153000_dashboard_calendar_retro_approval_preflight_stage1.sql` agora sinaliza, por etapa, **recalcular alertas**, **revisar histórico**, **indisponível**, **inconclusivo** ou **sem diferença de tempo neste dia**.
+- A seleção compara evidências de cada etapa com a vigência dos limites publicados; **não transforma diferença de um único dia em classificação de alerta de toda a permanência**.
+- `DashboardCalendarRetroApprovalPanel` apresenta contagens de recálculo e de avaliações inconclusivas e detalha o motivo por etapa.
+- `dashboardCalendarRetroServerImpactRepository` rejeita respostas com contagens ou estados de alerta inconsistentes, mantendo `alerts_verified=false`, `approval_allowed=false` e `application_allowed=false`.
+- Por orientação da gestão, **não criar um banco de testes**. A validação nesta etapa utiliza TypeScript, testes pontuais e build no GitHub Actions; **não substitui execução SQL com transações, RLS e concorrência em ambiente apropriado**. O código proposto permanece isolado e indisponível no Supabase real.
+- Nenhum merge, migration aplicada ou deploy realizado. A sincronização integral com a `main` continua pendente.
