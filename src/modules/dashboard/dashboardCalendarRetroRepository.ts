@@ -44,12 +44,31 @@ export async function listCalendarRetroRequests(): Promise<
   { state: "available"; rows: CalendarRetroRequest[] } |
   { state: "unavailable"; rows: [] }
 > {
-  const { data, error } = await supabase.from("dashboard_calendar_retro_review_requests")
-    .select("id,calendar_version_id,exception_date,proposed_working,proposed_start,proposed_end,reason,submitted_at,submitted_by,state")
-    .order("submitted_at", { ascending: false }).limit(100);
-  if (isMissingSchema(error)) return { state: "unavailable", rows: [] };
-  if (error) throw new Error(error.message || "Não foi possível consultar solicitações históricas.");
-  return { state: "available", rows: (data ?? []) as CalendarRetroRequest[] };
+  // Exhaust the history: a silent .limit(100) would hide older audit requests.
+  // Count and page explicitly; never present a partial read as a complete history.
+  const pageSize = 500;
+  const rows: CalendarRetroRequest[] = [];
+  let expectedCount: number | null = null;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error, count } = await supabase.from("dashboard_calendar_retro_review_requests")
+      .select("id,calendar_version_id,exception_date,proposed_working,proposed_start,proposed_end,reason,submitted_at,submitted_by,state", { count: "exact" })
+      .order("submitted_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(offset, offset + pageSize - 1);
+    if (isMissingSchema(error)) return { state: "unavailable", rows: [] };
+    if (error) throw new Error(error.message || "Não foi possível consultar solicitações históricas.");
+    if (count == null || !Number.isSafeInteger(count) || count < 0)
+      throw new Error("Contagem do histórico indisponível: não é seguro exibir um histórico parcial.");
+    if (expectedCount === null) expectedCount = count;
+    if (expectedCount !== count)
+      throw new Error("O histórico mudou durante a leitura. Atualize para obter os registros completos.");
+    const page = (data ?? []) as CalendarRetroRequest[];
+    if (page.length !== Math.min(pageSize, expectedCount - offset))
+      throw new Error("Histórico incompleto. Atualize para tentar novamente.");
+    rows.push(...page);
+    if (rows.length === expectedCount) break;
+  }
+  return { state: "available", rows };
 }
 
 export async function previewCalendarRetroRequest(input: {
