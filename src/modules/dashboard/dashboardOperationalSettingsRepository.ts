@@ -197,3 +197,56 @@ export async function publishDashboardCalendar(input: {
   if (!data || typeof data !== "object") throw new Error("A publicação do calendário não retornou confirmação.");
   return data as CalendarVersionRecord;
 }
+
+
+export type CalendarSuccessorImpactPreview = {
+  previous_version: number;
+  previous_calendar_id: string;
+  effective_from: string;
+  old_effective_until: string | null;
+  open_stage_intervals: number;
+  stage_intervals_from_effective_date: number;
+  rules_still_linked_to_previous: number;
+  sector_calendars_requiring_review: number;
+  duration_impact_verified: false;
+  observacao: string;
+};
+
+/** Read-only server preview. Counts are candidates, not a fabricated impact estimate. */
+export async function previewDashboardCalendarSuccessor(input: {
+  effectiveFrom: string; expectedLastVersion: number;
+}): Promise<CalendarSuccessorImpactPreview> {
+  const { data, error } = await supabase.rpc("dashboard_preview_calendar_successor", {
+    p_effective_from: input.effectiveFrom,
+    p_expected_last_version: input.expectedLastVersion,
+  });
+  if (error) throw new Error(error.message || "Falha na prévia de sucessão do calendário.");
+  if (!data || typeof data !== "object")
+    throw new Error("A prévia do calendário não retornou dados válidos.");
+  return data as CalendarSuccessorImpactPreview;
+}
+
+/** Creates a new immutable version + audit link; never updates previous periods. */
+export async function publishDashboardCalendarSuccessor(input: {
+  name: string;
+  effectiveFrom: string;
+  effectiveUntil: string | null;
+  periods: Array<{ weekday: number; start: string; end: string }>;
+  exceptions: Array<{ date: string; working: boolean; start: string | null; end: string | null; reason: string }>;
+  expectedLastVersion: number;
+  reason: string;
+}): Promise<CalendarVersionRecord> {
+  const { data, error } = await supabase.rpc("dashboard_publish_calendar_successor", {
+    p_name: input.name,
+    p_effective_from: input.effectiveFrom,
+    p_effective_until: input.effectiveUntil,
+    p_periods: input.periods,
+    p_exceptions: input.exceptions,
+    p_expected_last_version: input.expectedLastVersion,
+    p_reason: input.reason,
+  });
+  if (error) throw new Error(error.message || "Falha ao publicar a versão sucessora.");
+  if (!data || typeof data !== "object")
+    throw new Error("A publicação não retornou versão confirmada.");
+  return data as CalendarVersionRecord;
+}

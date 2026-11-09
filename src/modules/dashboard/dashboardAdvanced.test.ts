@@ -195,6 +195,71 @@ describe("Dashboard Etapa 4 — permanência útil com evidência verificável",
     expect(result.timingReason).toContain("não comprova sozinho a causa");
   });
 
+  it("separa permanência total, pausa comprovada e alerta crítico calculado sobre o total", () => {
+    const threshold = {
+      scope: "PRODUCTION" as const, attention_limit_minutes: 120,
+      critical_limit_minutes: 220, calendar_version_id: "calendar-1", revision: 1,
+      effective_from: "2026-11-01T00:00:00.000Z",
+      updated_at: "2026-11-01T00:00:00.000Z",
+    };
+    const sources = timingSources({
+      thresholds: { state: "available", rows: [threshold] },
+      operations: [operation("op-1", "i1", { created_at: "2026-11-02T11:30:00.000Z" })],
+      stagePauses: [{
+        id: "pause-1", stage_interval_id: "interval-1", operation_id: "op-1",
+        started_at: "2026-11-02T12:00:00.000Z", ended_at: "2026-11-02T13:00:00.000Z",
+        reason: "Aguardando material", evidence_state: "verified",
+      }],
+    });
+    const result = buildAdvancedAssessments([order()], sources, now)[0];
+    expect(result.totalWorkingMinutes).toBe(240);
+    expect(result.pauseWorkingMinutes).toBe(60);
+    expect(result.elapsedWorkingMinutes).toBe(180);
+    expect(result.thresholdSeverity).toBe("critical");
+  });
+
+  it("suspende Atenção/Crítico após sucessão do calendário até revisão da gestão", () => {
+    const current = timingSources({
+      calendars: [
+        { id: "calendar-1", version: 1, time_zone: "America/Sao_Paulo",
+          effective_from: "2026-11-01", effective_until: null },
+        { id: "calendar-2", version: 2, time_zone: "America/Sao_Paulo",
+          effective_from: "2026-11-03", effective_until: null },
+      ],
+      calendarPeriods: [
+        { id: "period-1", calendar_version_id: "calendar-1", weekday: 1,
+          starts_local: "08:00:00", ends_local: "12:00:00" },
+        { id: "period-2", calendar_version_id: "calendar-2", weekday: 2,
+          starts_local: "08:00:00", ends_local: "12:00:00" },
+      ],
+      thresholds: { state: "available", rows: [{
+        scope: "PRODUCTION", attention_limit_minutes: 120,
+        critical_limit_minutes: 240, calendar_version_id: "calendar-1",
+        revision: 1, effective_from: "2026-11-01T00:00:00Z",
+        updated_at: "2026-11-01T00:00:00Z",
+      }] },
+    });
+    const result = buildAdvancedAssessments([order()], current, new Date("2026-11-03T15:00:00.000Z"))[0];
+    expect(result.timing).toBe("available");
+    expect(result.totalWorkingMinutes).toBe(480);
+    expect(result.thresholdSeverity).toBeNull();
+    expect(result.thresholdReason).toContain("revisão");
+  });
+
+  it("não classifica retroativamente por limite publicado depois da entrada na etapa", () => {
+    const result = buildAdvancedAssessments([order()], timingSources({
+      thresholds: { state: "available", rows: [{
+        scope: "PRODUCTION", attention_limit_minutes: 120, critical_limit_minutes: 220,
+        calendar_version_id: "calendar-1", revision: 1,
+        effective_from: "2026-11-02T12:00:00.000Z",
+        updated_at: "2026-11-02T12:00:00.000Z",
+      }] },
+    }), now)[0];
+    expect(result.totalWorkingMinutes).toBe(240);
+    expect(result.thresholdSeverity).toBeNull();
+    expect(result.thresholdReason).toContain("vigência");
+  });
+
   it("does not calculate when temporal evidence tables are unavailable", () => {
     const sources = timingSources({ timingEvidenceAvailable: false });
     const result = buildAdvancedAssessments([order()], sources, now)[0];
@@ -293,5 +358,122 @@ describe("Dashboard Etapa 4 — permanência útil com evidência verificável",
       }],
     });
     expect(buildAdvancedAssessments([order()], expiredCalendar, now)[0].timing).toBe("insufficient");
+  });
+});
+
+
+describe("Dashboard Etapa 1 — cálculo útil considera versões setoriais", () => {
+  const calendar = {
+    id: "base-1", version: 1, time_zone: "America/Sao_Paulo",
+    effective_from: "2026-11-01", effective_until: null,
+  };
+  const periods = [
+    { id: "period-1", calendar_version_id: "base-1", weekday: 1,
+      starts_local: "08:00:00", ends_local: "12:00:00" },
+    { id: "period-2", calendar_version_id: "base-1", weekday: 1,
+      starts_local: "13:12:00", ends_local: "18:00:00" },
+  ];
+  const revision = {
+    id: "r1", scope: "PRODUCTION" as const, base_calendar_version_id: "base-1",
+    revision: 1, effective_from: "2026-11-09", effective_until: null,
+    mode: "override" as const,
+    periods: [{ weekday: 1, start: "09:00", end: "12:00" }],
+    exceptions: [], published_by: "gestor", published_at: "2026-11-09T12:00:00Z",
+    reason: "Jornada do setor",
+  };
+
+  it("usa a jornada específica após a data de vigência e preserva a jornada histórica", () => {
+    const before = calculateWorkingMinutes(
+      "2026-11-02T11:00:00Z", "2026-11-02T13:00:00Z",
+      calendar, periods, [], "PRODUCTION", [revision],
+    );
+    const after = calculateWorkingMinutes(
+      "2026-11-09T11:00:00Z", "2026-11-09T13:00:00Z",
+      calendar, periods, [], "PRODUCTION", [revision],
+    );
+    expect(before).toBe(120); // 08–10h, jornada geral
+    expect(after).toBe(60);   // 09–10h, jornada setorial
+  });
+
+  it("mantém feriado do calendário geral mesmo com jornada setorial, salvo exceção explícita", () => {
+    const closed = [{
+      id: "holiday-1", calendar_version_id: "base-1", exception_date: "2026-11-09",
+      working: false, starts_local: null, ends_local: null,
+    }];
+    const interval = ["2026-11-09T12:00:00Z","2026-11-09T15:00:00Z"] as const;
+    expect(calculateWorkingMinutes(interval[0], interval[1],calendar,periods,closed,
+      "PRODUCTION",[revision])).toBe(0);
+    const overtime = {
+      ...revision, exceptions: [{
+        date: "2026-11-09", reason: "Plantão autorizado", windows: [
+          { start: "09:00", end: "10:00" }, { start: "11:00", end: "12:00" },
+        ],
+      }],
+    };
+    expect(calculateWorkingMinutes(interval[0], interval[1],calendar,periods,closed,
+      "PRODUCTION",[overtime])).toBe(120);
+  });
+
+  it("não altera a jornada de instalação quando a exceção é da produção", () => {
+    expect(calculateWorkingMinutes(
+      "2026-11-09T11:00:00Z", "2026-11-09T13:00:00Z",
+      calendar, periods, [], "INSTALLATION", [revision],
+    )).toBe(120);
+  });
+});
+
+
+describe("Dashboard Etapa 1 — intervalo de OS atravessando calendário geral", () => {
+  const version1 = {
+    id: "global1", version: 1, time_zone: "America/Sao_Paulo",
+    effective_from: "2026-11-01", effective_until: null,
+  };
+  const version2 = {
+    id: "global2", version: 2, time_zone: "America/Sao_Paulo",
+    effective_from: "2026-11-10", effective_until: null,
+  };
+  const periods = [
+    { id: "mon-old", calendar_version_id: "global1", weekday: 1,
+      starts_local: "08:00:00", ends_local: "12:00:00" },
+    { id: "tue-old", calendar_version_id: "global1", weekday: 2,
+      starts_local: "08:00:00", ends_local: "12:00:00" },
+    { id: "tue-new", calendar_version_id: "global2", weekday: 2,
+      starts_local: "10:00:00", ends_local: "12:00:00" },
+  ];
+
+  it("soma segunda na versão 1 e terça na versão 2, sem reescrever a versão antiga", () => {
+    const minutes = calculateWorkingMinutes(
+      "2026-11-09T11:00:00Z", "2026-11-10T15:00:00Z",
+      version1, periods, [], "PRODUCTION", [], [version1, version2],
+    );
+    expect(minutes).toBe(360); // seg 08–12 = 240; ter 10–12 = 120
+    expect(version1.effective_until).toBeNull();
+  });
+
+  it("suspende o cálculo diante de uma lacuna ou de turnos da nova versão indisponíveis", () => {
+    const missing = calculateWorkingMinutes(
+      "2026-11-09T11:00:00Z","2026-11-10T15:00:00Z",
+      version1, periods.filter(row=>row.calendar_version_id==="global1"),
+      [],"PRODUCTION",[],[version1,version2],
+    );
+    expect(missing).toBeNull();
+    const gap = calculateWorkingMinutes(
+      "2026-11-09T11:00:00Z","2026-11-10T15:00:00Z",
+      { ...version1, effective_until: "2026-11-09" }, periods, [],
+      "PRODUCTION",[],[{ ...version1, effective_until:"2026-11-09" },
+        { ...version2,effective_from:"2026-11-11" }],
+    );
+    expect(gap).toBeNull();
+  });
+
+  it("honra exceção da versão nova e não altera o expediente da segunda anterior", () => {
+    const ex = [{
+      id:"holiday2",calendar_version_id:"global2",exception_date:"2026-11-10",
+      working:false,starts_local:null,ends_local:null,
+    }];
+    expect(calculateWorkingMinutes(
+      "2026-11-09T11:00:00Z","2026-11-10T15:00:00Z",
+      version1,periods,ex,"PRODUCTION",[],[version1,version2],
+    )).toBe(240);
   });
 });

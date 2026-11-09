@@ -5,7 +5,8 @@ on:
     branches: [main]
     paths:
       - "src/modules/dashboard/**"
-      - "docs/tasks/dashboard-operacional-etapa1.md"
+      - "supabase/migrations/*dashboard*"
+      - "docs/tasks/dashboard-operacional-etapa1-politicas.md"
       - ".github/workflows/dashboard-etapa1-validation.yml"
 
 permissions:

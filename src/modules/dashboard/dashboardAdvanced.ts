@@ -1,5 +1,10 @@
 import type { DashboardOrder } from "./dashboardModel";
 import type { PreparationItem, PreparationOperation } from "./dashboardPreparation";
+import { assessOperationalThreshold } from "./dashboardOperationalPolicy";
+import { selectGlobalCalendarForDate } from "./dashboardCalendarTimeline";
+import {
+  resolveSectorCalendarDay, type SectorCalendarRevision,
+} from "./dashboardSectorCalendar";
 
 /**
  * Dashboard stage 4: read-only analysis from persisted sources. Rules,
@@ -84,7 +89,24 @@ export type WorkCalendarException = {
   ends_local: string | null;
 };
 
+export type PublishedThreshold = {
+  scope: OperationalScope;
+  attention_limit_minutes: number;
+  critical_limit_minutes: number;
+  calendar_version_id: string;
+  revision: number;
+  effective_from: string;
+  updated_at: string;
+};
+export type ThresholdSource =
+  | { state: "unavailable"; rows: [] }
+  | { state: "available"; rows: PublishedThreshold[] };
+
 export type AdvancedSources = {
+  /** Undefined only in existing tests/legacy snapshots: treat as unavailable, never as zero. */
+  thresholds?: ThresholdSource;
+  sectorCalendars?: { state: "available"; revisions: SectorCalendarRevision[] } |
+    { state: "unavailable"; revisions: [] };
   items: PreparationItem[];
   operations: PreparationOperation[];
   assignees: StageAssignee[];
@@ -130,6 +152,10 @@ export type AdvancedOrderAssessment = {
   timing: "unavailable" | "insufficient" | "available";
   timingReason: string;
   elapsedWorkingMinutes: number | null;
+  totalWorkingMinutes: number | null;
+  pauseWorkingMinutes: number | null;
+  thresholdSeverity: "normal" | "attention" | "critical" | null;
+  thresholdReason: string;
   limitMinutes: number | null;
   overLimit: boolean | null;
 };
@@ -274,7 +300,7 @@ function datePartsInZone(epochMs: number, timeZone: string) {
     hour: value("hour"), minute: value("minute"), second: value("second") };
 }
 
-function localDateKey(epochMs: number, timeZone: string): string {
+export function localDateKey(epochMs: number, timeZone: string): string {
   const parts = datePartsInZone(epochMs, timeZone);
   return String(parts.year).padStart(4, "0") + "-" +
     String(parts.month).padStart(2, "0") + "-" + String(parts.day).padStart(2, "0");
@@ -293,7 +319,7 @@ function weekdayForDate(value: string): number {
   return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
 }
 
-function localDateTimeEpoch(value: string, time: string, timeZone: string): number | null {
+export function localDateTimeEpoch(value: string, time: string, timeZone: string): number | null {
   const [year, month, day] = value.split("-").map(Number);
   const match = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.exec(time);
   if (!match || ![year, month, day].every(Number.isFinite)) return null;
@@ -324,6 +350,8 @@ function localDateTimeEpoch(value: string, time: string, timeZone: string): numb
 export function calculateWorkingMinutes(
   startAt: string, endAt: string, calendar: WorkCalendarVersion,
   periods: readonly WorkCalendarPeriod[], exceptions: readonly WorkCalendarException[],
+  scope?: OperationalScope, sectorRevisions: readonly SectorCalendarRevision[] = [],
+  publishedVersions: readonly WorkCalendarVersion[] = [calendar],
 ): number | null {
   const startMs = Date.parse(startAt);
   const endMs = Date.parse(endAt);
@@ -336,18 +364,39 @@ export function calculateWorkingMinutes(
   let totalMs = 0;
 
   for (let dayIndex = 0; dayIndex < 3700; dayIndex++) {
+    const resolvedCalendar = selectGlobalCalendarForDate(publishedVersions, date);
+    if (resolvedCalendar.state !== "available") return null;
+    const activeCalendar = resolvedCalendar.calendar;
+    if (activeCalendar.time_zone !== calendar.time_zone ||
+        !periods.some(row => row.calendar_version_id === activeCalendar.id)) return null;
     const exception = exceptions.find(row =>
-      row.calendar_version_id === calendar.id && row.exception_date === date
+      row.calendar_version_id === activeCalendar.id && row.exception_date === date
     );
     let ranges: LocalTimeRange[];
-    if (exception) {
+    if (scope && sectorRevisions.length) {
+      if (exception?.working && (!exception.starts_local || !exception.ends_local)) return null;
+      const day = resolveSectorCalendarDay({
+        date, scope, baseCalendarId: activeCalendar.id,
+        baseWeek: periods.filter(row => row.calendar_version_id === activeCalendar.id)
+          .map(row => ({ weekday: row.weekday, start: row.starts_local.slice(0, 5),
+            end: row.ends_local.slice(0, 5) })),
+        baseException: exception
+          ? { windows: exception.working
+              ? [{ start: exception.starts_local!.slice(0, 5), end: exception.ends_local!.slice(0, 5) }]
+              : [], reason: "Exceção do calendário padrão" }
+          : null,
+        sectorRevisions,
+      });
+      if (day.state !== "available") return null;
+      ranges = day.windows;
+    } else if (exception) {
       if (!exception.working) ranges = [];
       else if (exception.starts_local && exception.ends_local)
         ranges = [{ start: exception.starts_local, end: exception.ends_local }];
       else return null;
     } else {
       ranges = periods.filter(row =>
-        row.calendar_version_id === calendar.id && row.weekday === weekdayForDate(date)
+        row.calendar_version_id === activeCalendar.id && row.weekday === weekdayForDate(date)
       ).map(row => ({ start: row.starts_local, end: row.ends_local }))
         .sort((a,b) => a.start.localeCompare(b.start));
     }
@@ -368,7 +417,7 @@ export function calculateWorkingMinutes(
   return null;
 }
 
-function mergePauseRanges(
+export function mergePauseRanges(
   pauses: readonly StagePause[], intervalStart: number, intervalEnd: number,
 ): Array<{ start: number; end: number }> | null {
   const ranges: Array<{ start: number; end: number }> = [];
@@ -394,12 +443,18 @@ type TimingAssessment = {
   state: "unavailable" | "insufficient" | "available";
   reason: string;
   elapsedWorkingMinutes: number | null;
+  totalWorkingMinutes: number | null;
+  pauseWorkingMinutes: number | null;
   limitMinutes: number | null;
   overLimit: boolean | null;
 };
 
 function unavailableTiming(reason: string, state: "unavailable" | "insufficient" = "unavailable"): TimingAssessment {
-  return { state, reason, elapsedWorkingMinutes: null, limitMinutes: null, overLimit: null };
+  return {
+    state, reason, elapsedWorkingMinutes: null,
+    totalWorkingMinutes: null, pauseWorkingMinutes: null,
+    limitMinutes: null, overLimit: null,
+  };
 }
 
 function assessStageTiming(
@@ -438,9 +493,15 @@ function assessStageTiming(
   if (!calendar) return unavailableTiming("A versão do calendário vinculada ao intervalo não está disponível.");
   const startDate = localDateKey(intervalStart, calendar.time_zone);
   const endDate = localDateKey(intervalEnd, calendar.time_zone);
-  if (startDate < calendar.effective_from ||
-      (calendar.effective_until !== null && endDate > calendar.effective_until))
-    return unavailableTiming("A vigência do calendário não cobre todo o intervalo observado.", "insufficient");
+  const entryCalendar = selectGlobalCalendarForDate(sources.calendars, startDate);
+  if (entryCalendar.state !== "available" ||
+      entryCalendar.calendar.id !== interval.calendar_version_id)
+    return unavailableTiming("O calendário registrado na entrada não corresponde à versão vigente naquela data.", "insufficient");
+  // Calendar successors during a stage are resolved per day below. Never
+  // rewrite or extrapolate the stage's original calendar evidence.
+  const endCalendar = selectGlobalCalendarForDate(sources.calendars, endDate);
+  if (endCalendar.state !== "available")
+    return unavailableTiming("Não há calendário publicado para toda a permanência observada.", "insufficient");
 
   const activeItemIds = new Set(sources.items.filter(item =>
     item.order_id === order.id && item.status !== "CANCELLED"
@@ -472,12 +533,14 @@ function assessStageTiming(
   if (rule.stalled_limit_minutes !== null &&
       (!Number.isSafeInteger(rule.stalled_limit_minutes) || rule.stalled_limit_minutes <= 0))
     return unavailableTiming("O limite publicado para esta etapa é inválido.", "insufficient");
-  const calendarPeriods = sources.calendarPeriods.filter(row => row.calendar_version_id === calendar.id);
-  if (!calendarPeriods.length)
+  const calendarPeriods = sources.calendarPeriods;
+  if (!calendarPeriods.some(row => row.calendar_version_id === calendar.id))
     return unavailableTiming("A versão do calendário não possui intervalos semanais legíveis.", "insufficient");
-  const calendarExceptions = sources.calendarExceptions.filter(row => row.calendar_version_id === calendar.id);
+  const calendarExceptions = sources.calendarExceptions;
+  const sectorRevisions = sources.sectorCalendars?.state === "available"
+    ? sources.sectorCalendars.revisions : [];
   const grossMinutes = calculateWorkingMinutes(interval.entered_at, now.toISOString(),
-    calendar, calendarPeriods, calendarExceptions);
+    calendar, calendarPeriods, calendarExceptions, scope, sectorRevisions, sources.calendars);
   if (grossMinutes === null)
     return unavailableTiming("Não foi possível interpretar todos os horários locais do calendário.", "insufficient");
 
@@ -485,7 +548,8 @@ function assessStageTiming(
   for (const pause of mergedPauses) {
     const pauseMinutesForCalendar = calculateWorkingMinutes(
       new Date(pause.start).toISOString(), new Date(pause.end).toISOString(),
-      calendar, calendarPeriods, calendarExceptions,
+      calendar, calendarPeriods, calendarExceptions, scope, sectorRevisions,
+      sources.calendars,
     );
     if (pauseMinutesForCalendar === null)
       return unavailableTiming("Não foi possível calcular uma pausa usando o calendário publicado.", "insufficient");
@@ -500,7 +564,11 @@ function assessStageTiming(
     : overLimit
       ? "Permanência útil atingiu ou ultrapassou o limite publicado. Isso sinaliza excedente de permanência, mas não comprova sozinho a causa."
       : "Permanência útil dentro do limite publicado.";
-  return { state: "available", reason, elapsedWorkingMinutes, limitMinutes, overLimit };
+  return {
+    state: "available", reason, elapsedWorkingMinutes,
+    totalWorkingMinutes: grossMinutes, pauseWorkingMinutes: pauseMinutes,
+    limitMinutes, overLimit,
+  };
 }
 
 /**
@@ -525,6 +593,35 @@ export function buildAdvancedAssessments(
     const scope = orderOperationalScope(order);
     const configuredScopeRule = rules.state === "configured" && rules.rules.some(r => r.scope === scope);
     const timing = assessStageTiming(order, scope, sources, now);
+    const published = sources.thresholds?.state === "available"
+      ? sources.thresholds.rows.find(row => row.scope === scope) : undefined;
+    const currentInterval = sources.stageIntervals.find(interval =>
+      interval.order_id === order.id && interval.scope === scope && interval.left_at === null
+    );
+    const pinnedCalendar = sources.calendars.find(row => row.id === currentInterval?.calendar_version_id);
+    const calendarCurrent = pinnedCalendar
+      ? selectGlobalCalendarForDate(sources.calendars, localDateKey(now.getTime(), pinnedCalendar.time_zone))
+      : null;
+    // A rule bound to the OLD calendar is never silently treated as if
+    // it had been reviewed for a newly published global workweek.
+    const thresholdCanApply = Boolean(
+      published && currentInterval &&
+      currentInterval.calendar_version_id === published.calendar_version_id &&
+      Date.parse(published.effective_from) <= Date.parse(currentInterval.entered_at) &&
+      calendarCurrent?.state === "available" &&
+      calendarCurrent.calendar.id === currentInterval.calendar_version_id
+    );
+    const threshold = published && thresholdCanApply
+      ? assessOperationalThreshold(timing.totalWorkingMinutes, {
+          attentionMinutes: published.attention_limit_minutes,
+          criticalMinutes: published.critical_limit_minutes,
+        })
+      : {
+          state: "unavailable" as const, severity: null,
+          reason: published
+            ? "Os novos limites não cobrem a revisão e vigência desta entrada na etapa."
+            : "Limites Atenção/Crítico não publicados ou indisponíveis para este setor.",
+        };
     return {
       order, scope, blocked,
       confirmedBlockCount: blocked.length, dependency,
@@ -533,6 +630,10 @@ export function buildAdvancedAssessments(
       timing: timing.state,
       timingReason: timing.reason,
       elapsedWorkingMinutes: timing.elapsedWorkingMinutes,
+      totalWorkingMinutes: timing.totalWorkingMinutes,
+      pauseWorkingMinutes: timing.pauseWorkingMinutes,
+      thresholdSeverity: threshold.severity,
+      thresholdReason: threshold.reason,
       limitMinutes: timing.limitMinutes,
       overLimit: timing.overLimit,
     };

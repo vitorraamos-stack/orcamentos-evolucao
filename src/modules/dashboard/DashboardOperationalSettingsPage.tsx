@@ -7,12 +7,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import type { OperationalScope, Requirement } from "./dashboardAdvanced";
+import { DashboardThresholdsPanel } from "./DashboardThresholdsPanel";
+import { DashboardSectorCalendarsPanel } from "./DashboardSectorCalendarsPanel";
+import { DashboardCalendarRetroPanel } from "./DashboardCalendarRetroPanel";
+import { proposedEvolucaoWorkweek, verifiedSaoJose2026Observances } from "./dashboardOperationalPolicy";
+import { effectiveCalendarEnd, previewGlobalSuccessor } from "./dashboardCalendarTimeline";
 import {
   loadDashboardOperationalSettings, previewDashboardRuleImpact,
-  publishDashboardCalendar, publishDashboardRule,
+  publishDashboardCalendar, publishDashboardCalendarSuccessor, previewDashboardCalendarSuccessor,
+  publishDashboardRule,
   type CalendarExceptionRecord, type CalendarPeriodRecord, type CalendarVersionRecord,
   type DashboardOperationalSettings, type OperationalRuleRecord, type RuleImpactPreview,
-  type RuleRevisionRecord,
+  type RuleRevisionRecord, type CalendarSuccessorImpactPreview,
 } from "./dashboardOperationalSettingsRepository";
 
 const SCOPES: Array<{ value: OperationalScope; label: string; description: string }> = [
@@ -112,12 +118,14 @@ function RuleSummary({ rule }: { rule: OperationalRuleRecord | undefined }) {
 }
 
 function CalendarCard({
-  calendar, periods, exceptions,
+  calendar, periods, exceptions, versions,
 }: {
   calendar: CalendarVersionRecord;
   periods: CalendarPeriodRecord[];
   exceptions: CalendarExceptionRecord[];
+  versions: CalendarVersionRecord[];
 }) {
+  const effectiveUntilDerived = effectiveCalendarEnd(calendar, versions);
   const calendarPeriods = periods.filter(row => row.calendar_version_id === calendar.id);
   const calendarExceptions = exceptions.filter(row => row.calendar_version_id === calendar.id);
   return (
@@ -127,7 +135,7 @@ function CalendarCard({
           <div>
             <CardTitle className="text-base">{calendar.name} · versão {calendar.version}</CardTitle>
             <CardDescription>
-              Vigência: {formatDate(calendar.effective_from)} até {formatDate(calendar.effective_until)}
+              Vigência efetiva: {formatDate(calendar.effective_from)} até {formatDate(effectiveUntilDerived)}
             </CardDescription>
           </div>
           <span className="rounded-full border px-2.5 py-1 text-xs font-medium">Publicada</span>
@@ -170,9 +178,14 @@ function CalendarCard({
         <p className="border-t pt-2 text-xs text-muted-foreground">
           Justificativa: {calendar.publication_reason}
         </p>
-        {!calendar.effective_until && (
-          <p className="text-xs text-amber-700 dark:text-amber-400">
-            Esta versão não tem data final. Para publicar uma próxima versão, será necessário encerrar formalmente esta vigência.
+        {!effectiveUntilDerived && (
+          <p className="text-xs text-muted-foreground">
+            Vigência aberta. Uma versão sucessora pode começar posteriormente, preservando este histórico.
+          </p>
+        )}
+        {effectiveUntilDerived && calendar.effective_until !== effectiveUntilDerived && (
+          <p className="text-xs text-muted-foreground">
+            Versão substituída a partir do dia seguinte ao término efetivo indicado.
           </p>
         )}
       </CardContent>
@@ -199,6 +212,35 @@ export default function DashboardOperationalSettingsPage() {
   const [periods, setPeriods] = useState<PeriodDraft[]>([]);
   const [exceptions, setExceptions] = useState<ExceptionDraft[]>([]);
   const [publishingCalendar, setPublishingCalendar] = useState(false);
+  const [previewingCalendar, setPreviewingCalendar] = useState(false);
+  const [calendarPreview, setCalendarPreview] = useState<{
+    fingerprint: string; impact: CalendarSuccessorImpactPreview | null;
+  } | null>(null);
+
+  const proposeWorkweek = () => {
+    if (periods.length && !window.confirm("Substituir todos os turnos digitados pela jornada aprovada?")) return;
+    setPeriods(proposedEvolucaoWorkweek().map(period => ({
+      key: draftKey++, weekday: String(period.weekday), start: period.start, end: period.end,
+    })));
+  };
+
+  const propose2026Holidays = () => {
+    if (!effectiveFrom) {
+      toast.error("Defina a data de início da vigência antes de sugerir feriados.");
+      return;
+    }
+    const legal = verifiedSaoJose2026Observances().filter(item => item.kind === "holiday" &&
+      item.date >= effectiveFrom && (!effectiveUntil || item.date <= effectiveUntil));
+    const previouslyAdded = new Set(exceptions.map(item => item.date));
+    const suggested = legal.filter(item => !previouslyAdded.has(item.date)).map(item => ({
+      key: draftKey++, date: item.date, working: "false" as const, start: "", end: "",
+      reason: item.name + " (" + item.jurisdiction + "; fonte oficial 2026)",
+    }));
+    setExceptions(previous => [...previous, ...suggested].sort((a, b) => a.date.localeCompare(b.date)));
+    toast.success(suggested.length
+      ? suggested.length + " feriados sugeridos para conferência. Nada foi publicado."
+      : "Nenhum feriado novo de 2026 dentro da vigência informada.");
+  };
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -307,6 +349,14 @@ export default function DashboardOperationalSettingsPage() {
     }
   };
 
+  const calendarFingerprint = JSON.stringify([
+    calendarName, effectiveFrom, effectiveUntil, calendarReason,
+    periods, exceptions, latestCalendar?.version ?? 0,
+  ]);
+  const calendarPreviewIsCurrent = Boolean(
+    calendarPreview && calendarPreview.fingerprint === calendarFingerprint,
+  );
+
   const calendarValidation = useMemo(() => {
     if (!calendarName.trim()) return "Informe o nome do calendário.";
     if (!effectiveFrom) return "Informe a data inicial da vigência.";
@@ -335,20 +385,40 @@ export default function DashboardOperationalSettingsPage() {
       if (row.working === "true" && (!row.start || !row.end || row.end <= row.start))
         return "Jornadas especiais precisam de início e fim válidos.";
     }
-    if (latestCalendar) {
-      if (!latestCalendar.effective_until)
-        return "A versão " + latestCalendar.version + " não tem data final. Não é possível sobrepor uma nova versão.";
-      if (effectiveFrom <= latestCalendar.effective_until)
-        return "A nova vigência precisa começar depois de " + formatDate(latestCalendar.effective_until) + ".";
-    }
+    const today = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date());
+    if (effectiveFrom < today)
+      return "Alterações retroativas exigem solicitação e autorização específicas.";
+    const succession = previewGlobalSuccessor(data?.calendars ?? [], effectiveFrom);
+    if (succession.state === "invalid") return succession.reason;
     return "";
-  }, [calendarName, effectiveFrom, effectiveUntil, calendarReason, periods, exceptions, latestCalendar]);
+  }, [calendarName, effectiveFrom, effectiveUntil, calendarReason, periods, exceptions, data?.calendars]);
+
+  const previewCalendar = async () => {
+    if (calendarValidation) return;
+    setPreviewingCalendar(true);
+    try {
+      const impact = latestCalendar
+        ? await previewDashboardCalendarSuccessor({
+            effectiveFrom, expectedLastVersion: latestCalendar.version,
+          })
+        : null;
+      setCalendarPreview({ fingerprint: calendarFingerprint, impact });
+    } catch (error) {
+      setCalendarPreview(null);
+      toast.error(error instanceof Error ? error.message : "Falha na prévia da nova vigência.");
+    } finally {
+      setPreviewingCalendar(false);
+    }
+  };
 
   const saveCalendar = async () => {
-    if (calendarValidation) return;
+    if (calendarValidation || !calendarPreviewIsCurrent) return;
+    if (!window.confirm("Publicar esta nova versão do calendário geral? As versões anteriores serão preservadas.")) return;
     setPublishingCalendar(true);
     try {
-      await publishDashboardCalendar({
+      const dataToPublish = {
         name: calendarName.trim(),
         effectiveFrom,
         effectiveUntil: effectiveUntil || null,
@@ -364,8 +434,11 @@ export default function DashboardOperationalSettingsPage() {
         })),
         expectedLastVersion: latestCalendar?.version ?? 0,
         reason: calendarReason.trim(),
-      });
-      toast.success("Nova versão do calendário publicada.");
+      };
+      if (latestCalendar) await publishDashboardCalendarSuccessor(dataToPublish);
+      else await publishDashboardCalendar(dataToPublish);
+      toast.success("Nova versão do calendário publicada com histórico preservado.");
+      setCalendarPreview(null);
       setCalendarName("");
       setEffectiveFrom("");
       setEffectiveUntil("");
@@ -412,9 +485,11 @@ export default function DashboardOperationalSettingsPage() {
 
       {data && (
         <Tabs defaultValue="rules" className="space-y-4">
-          <TabsList className="grid h-auto w-full grid-cols-2 sm:w-[420px]">
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:w-[800px] sm:grid-cols-4">
             <TabsTrigger value="rules">Regras por etapa</TabsTrigger>
             <TabsTrigger value="calendar">Jornada e exceções</TabsTrigger>
+            <TabsTrigger value="thresholds">Atenção / Crítico</TabsTrigger>
+            <TabsTrigger value="sector">Por setor</TabsTrigger>
           </TabsList>
 
           <TabsContent value="rules" className="space-y-4">
@@ -572,6 +647,15 @@ export default function DashboardOperationalSettingsPage() {
             )}
           </TabsContent>
 
+          <TabsContent value="thresholds" className="space-y-4">
+            <DashboardThresholdsPanel calendars={data.calendars} />
+          </TabsContent>
+
+          <TabsContent value="sector" className="space-y-4">
+            <DashboardSectorCalendarsPanel
+              calendars={data.calendars} periods={data.periods} exceptions={data.exceptions} />
+          </TabsContent>
+
           <TabsContent value="calendar" className="space-y-4">
             <Card>
               <CardHeader>
@@ -614,6 +698,9 @@ export default function DashboardOperationalSettingsPage() {
                     ])} disabled={periods.length >= 28}>
                       <Plus className="mr-1 h-4 w-4" /> Adicionar horário
                     </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={proposeWorkweek}>
+                      Sugerir jornada aprovada (44h)
+                    </Button>
                   </div>
                   {periods.length === 0 && (
                     <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
@@ -647,12 +734,18 @@ export default function DashboardOperationalSettingsPage() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <h3 className="font-semibold">Feriados e exceções</h3>
-                      <p className="text-xs text-muted-foreground">Cadastre datas sem expediente ou com jornada especial.</p>
+                      <p className="text-xs text-muted-foreground">
+                        Cadastre datas sem expediente ou com jornada especial. Sugestões de feriados são válidas
+                        apenas para 2026; pontos facultativos permanecem dias normais sem exceção explícita.
+                      </p>
                     </div>
                     <Button type="button" variant="outline" size="sm" onClick={() => setExceptions(current => [
                       ...current, { key: draftKey++, date: "", working: "", start: "", end: "", reason: "" },
                     ])} disabled={exceptions.length >= 3660}>
                       <Plus className="mr-1 h-4 w-4" /> Adicionar exceção
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={propose2026Holidays}>
+                      Sugerir feriados oficiais 2026
                     </Button>
                   </div>
                   {exceptions.map((row, index) => (
@@ -702,19 +795,47 @@ export default function DashboardOperationalSettingsPage() {
                 )}
                 {!calendarValidation && !effectiveUntil && (
                   <p className="text-xs text-muted-foreground">
-                    Sem data final: esta versão permanecerá aberta. Uma nova versão exigirá encerramento formal da vigência atual.
+                    Sem data final: esta versão permanecerá aberta até uma versão sucessora publicada. Histórico anterior imutável.
                   </p>
                 )}
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
                   <p className="text-xs text-muted-foreground">
                     Fuso horário fixo: America/Sao_Paulo · Próxima versão: v{(latestCalendar?.version ?? 0) + 1}
                   </p>
-                  <Button type="button" onClick={() => void saveCalendar()}
-                    disabled={Boolean(calendarValidation) || publishingCalendar || loading}>
-                    <Save className="mr-2 h-4 w-4" />
-                    {publishingCalendar ? "Publicando…" : "Publicar calendário"}
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" onClick={() => void previewCalendar()}
+                      disabled={Boolean(calendarValidation) || previewingCalendar || publishingCalendar || loading}>
+                      <ShieldCheck className="mr-2 h-4 w-4" />
+                      {previewingCalendar ? "Consultando…" : "Prévia de vigência"}
+                    </Button>
+                    <Button type="button" onClick={() => void saveCalendar()}
+                      disabled={Boolean(calendarValidation) || !calendarPreviewIsCurrent ||
+                        previewingCalendar || publishingCalendar || loading}>
+                      <Save className="mr-2 h-4 w-4" />
+                      {publishingCalendar ? "Publicando…" : "Publicar calendário"}
+                    </Button>
+                  </div>
                 </div>
+                {calendarPreviewIsCurrent && calendarPreview && (
+                  <div className="rounded-lg border p-3 text-sm">
+                    <p className="font-semibold">Prévia consultiva — não altera dados</p>
+                    <p>A nova vigência começa em {formatDate(effectiveFrom)}.</p>
+                    {calendarPreview.impact ? (
+                      <>
+                        <p>{calendarPreview.impact.open_stage_intervals} intervalos atualmente abertos
+                          vinculados à versão anterior.</p>
+                        <p>{calendarPreview.impact.rules_still_linked_to_previous} regras continuam vinculadas
+                          à versão anterior e precisarão de revisão gerencial.</p>
+                        <p>{calendarPreview.impact.sector_calendars_requiring_review} setores com calendários
+                          específicos vinculados à versão anterior precisarão de revalidação.</p>
+                        <p className="text-amber-700 dark:text-amber-300">
+                          Esta prévia não comprova diferenças de horas nem mudança de criticidade.
+                          A simulação completa depende de evidências temporais verificadas.
+                        </p>
+                      </>
+                    ) : <p>Primeira versão: sem calendário anterior a substituir.</p>}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -729,9 +850,11 @@ export default function DashboardOperationalSettingsPage() {
                   </CardContent></Card>
                 : data.calendars.map(calendar => (
                   <CalendarCard key={calendar.id} calendar={calendar}
-                    periods={data.periods} exceptions={data.exceptions} />
+                    periods={data.periods} exceptions={data.exceptions}
+                    versions={data.calendars} />
                 ))}
             </div>
+            <DashboardCalendarRetroPanel calendars={data.calendars} />
           </TabsContent>
         </Tabs>
       )}
