@@ -155,3 +155,12 @@
 - O painel `DashboardCalendarRetroApprovalPanel` expõe os resultados de forma consultiva. O cliente valida contagens e impede a representação de dados contraditórios como confirmação.
 - **Não há execução SQL verificada no PostgreSQL**: banco de testes separado dispensado pela gestão; CI de TypeScript/testes/build não comprova integridade SQL, RLS ou concorrência. `historical_coverage_verified=false`, `alerts_verified=false`, `approval_allowed=false` e `application_allowed=false` continuam inalterados.
 - Sem aplicação de migrations, merge ou deploy no projeto em produção.
+
+## Décimo primeiro incremento (09/11/2026) — visão gerencial consolidada
+
+- A interface `DashboardCalendarRetroApprovalPanel` passou a oferecer **uma ação principal**, `Analisar solicitação`, que consulta, em paralelo e de forma independente, os três diagnósticos já existentes: pré-validação gerencial, impacto diário e permanência integral/alertas.
+- O resumo `dashboardCalendarRetroOverview.ts` agrupa os registros por **OS e etapa**, destacando diferenças calculáveis, possíveis mudanças de alerta e pendências, com prioridade para registros inconclusivos.
+- O painel agora possui filtros `Todas`, `Com pendências`, `Possível mudança de alerta`, `Diferença de tempo` e `Sem diferença`, com detalhes recolhidos e link para a OS. A duplicação da prévia de horas/alertas no painel de pareceres foi removida, preservando o fluxo de registrar rejeição ou solicitar evidências.
+- Qualquer RPC indisponível, divergência nas contagens/identidades de etapas ou falha de consulta aparece explicitamente. **Encaminhamento técnico exige que as três consultas terminem sem discrepância estrutural**; a RPC do Supabase ainda revalida a prévia e pode recusar se os dados mudaram.
+- Consultas executadas separadamente não formam um snapshot transacional, portanto valores não são efeitos históricos confirmados. Permanece explícito que `approval_allowed=false` e `application_allowed=false`.
+- Testes pontuais de agregação por OS, pendências, contagens divergentes e identidade incoerente; nenhum banco de testes criado, nenhuma migration aplicada e nenhum deploy ou merge efetuado.
