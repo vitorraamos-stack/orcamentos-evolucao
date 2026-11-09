@@ -6,7 +6,7 @@ import { signedAvatarUrl } from '@/shared/users/avatarPhoto';
 import './welcome-transition.css';
 
 // Allow users to read their name and see their photo, even on a fast connection.
-export const MIN_WELCOME_DURATION_MS = 2300;
+export const MIN_WELCOME_DURATION_MS = 4000;
 
 type WelcomeInfo = { userId: string; displayName: string };
 type WelcomeContextValue = { beginWelcome: (user: User) => void };
