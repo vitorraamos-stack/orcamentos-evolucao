@@ -30,3 +30,21 @@
 **Importante:** decretos de expediente público não autorizam inferir pontos facultativos como dias sem expediente de uma empresa privada. A gestão deverá confirmar/registrar exceções.
 
 **Controle de deploy:** a branch mantém o Vercel desabilitado via `vercel.json`. A entrada deverá ser removida somente em uma revisão expressamente autorizada, antes de eventual merge para main.
+
+## Segundo incremento (09/11/2026) — integração parcial
+
+- Migration proposta `20261109115000_dashboard_operational_thresholds_stage1.sql`: novas tabelas de limites Atenção/Crítico por setor, histórico imutável, RLS, prévia e publicação com autorização da gestão, revisão otimista e auditoria. **Migration não aplicada no Supabase.**
+- Novo painel administrativo `DashboardThresholdsPanel.tsx`, integrado à página Regras Operacionais. Há confirmação explícita, prévia conservadora e histórico de revisões.
+- O calendário existente recebeu ações para **sugerir** a jornada de 44h e feriados legais de 2026 dentro da vigência informada. Nada é publicado sem confirmação gerencial. Pontos facultativos não são adicionados como folgas automáticas.
+- `dashboardAdvanced.ts` agora separa permanência útil total, espera comprovada e tempo não bloqueado. A criticidade Atenção/Crítico é avaliada sobre a permanência **total** usando somente evidência válida e limites vigentes desde a entrada na etapa.
+- `dashboardAdvancedRepository.ts` recupera limites apenas publicados; a ausência da nova tabela, antes da migration, é apresentada como indisponibilidade, não como zero alertas.
+- Testes para regras puras, RPCs, contrato de migration e integração do cálculo, sem alterar a produção.
+
+### Restrições e trabalho restante
+
+- **A Etapa 1 ainda não está concluída**: falta persistência de exceções/calendários setoriais (além do calendário global legado), mecanismo versionado de substituição de vigência aberta, supervisores consultando e sugerindo ajustes, fluxo formal de correção retroativa, e simulação de impacto de alertas com durações verificadas.
+- A prévia de limites no Supabase mostra OS e **intervalos candidatos**; não informa quantidade prevista de alertas Atenção/Crítico enquanto não houver cálculo completo verificável. A interface explicita essa limitação.
+- A migration proposta só foi revisada estaticamente. Nenhuma rotina pgTAP/concorrência/segurança foi executada em banco de teste ou produção.
+- O cálculo de 'tempo útil não bloqueado' **não comprova execução efetiva**; é apenas permanência descontadas pausas comprovadas.
+- A função `dashboardAdvanced.ts` ainda depende de regras/calendários legados e histórico confiável para liberar durações. Nenhum valor foi retroprojetado.
+- **Não realizar merge, não executar migrations e não publicar em Vercel** sem nova autorização específica. A branch mantém o deploy automático desativado.
