@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CalendarRetroRequest } from "./dashboardCalendarRetroRepository";
 import { previewRetroServerDayImpact, type RetroServerDayImpact } from "./dashboardCalendarRetroServerImpactRepository";
+import { previewRetroFullStageAlerts, type RetroFullStagePreview } from "./dashboardCalendarRetroFullStageRepository";
 import {
   listRetroApprovalDossiers, prepareRetroApprovalDossier, previewRetroApprovalPreflight,
   type RetroApprovalDossier, type RetroApprovalPreflight,
@@ -27,6 +28,9 @@ export function DashboardCalendarRetroApprovalPanel({ request }: {
   const [serverImpact, setServerImpact] = useState<RetroServerDayImpact | null>(null);
   const [serverBusy, setServerBusy] = useState(false);
   const [serverError, setServerError] = useState("");
+  const [fullPreview, setFullPreview] = useState<RetroFullStagePreview | null>(null);
+  const [fullBusy, setFullBusy] = useState(false);
+  const [fullError, setFullError] = useState("");
 
   const refresh = useCallback(async () => {
     setLoading(true); setError("");
@@ -61,8 +65,18 @@ export function DashboardCalendarRetroApprovalPanel({ request }: {
     } finally { setServerBusy(false); }
   };
 
+  const inspectFullStage = async () => {
+    if (!available || checking || sending || serverBusy || fullBusy) return;
+    setFullBusy(true); setFullPreview(null); setFullError("");
+    try {
+      setFullPreview(await previewRetroFullStageAlerts(request.id));
+    } catch (cause) {
+      setFullError(cause instanceof Error ? cause.message : "Falha na simulação integral.");
+    } finally { setFullBusy(false); }
+  };
+
   const send = async () => {
-    if (!preview || sending || checking || serverBusy || reason.trim().length < 3) return;
+    if (!preview || sending || checking || serverBusy || fullBusy || reason.trim().length < 3) return;
     if (!window.confirm(
       "Registrar encaminhamento para verificação técnica? Esta ação NÃO aprova, aplica ou altera nenhuma correção histórica."
     )) return;
@@ -99,7 +113,7 @@ export function DashboardCalendarRetroApprovalPanel({ request }: {
             Etapa indisponível: a migration de preparação da aprovação ainda não foi aplicada.
           </p>
         )}
-        <Button type="button" variant="outline" disabled={!available || checking || sending || serverBusy || loading}
+        <Button type="button" variant="outline" disabled={!available || checking || sending || serverBusy || fullBusy || loading}
           onClick={() => void check()}>
           <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
           {checking ? "Verificando no servidor…" : "Revalidar condições de aprovação"}
@@ -152,6 +166,65 @@ export function DashboardCalendarRetroApprovalPanel({ request }: {
                     <p className="text-muted-foreground">
                       Nenhum intervalo registrado nessa data. Isso não comprova ausência
                       de atividades antes da instrumentação.
+                    </p>
+                  )}
+                </div>
+              </details>
+            </div>
+          )}
+        </div>
+        <div className="space-y-2 border-t pt-3">
+          <Button type="button" variant="outline"
+            disabled={!available || checking || sending || serverBusy || fullBusy || loading}
+            onClick={() => void inspectFullStage()}>
+            {fullBusy ? "Calculando permanência completa…" : "Simular alertas de toda a etapa no servidor"}
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Reconstrói os minutos de toda a etapa em cada calendário publicado,
+            descontando pausas verificadas. Níveis de alerta são apenas candidatos;
+            o histórico anterior à instrumentação não pode ser presumido.
+          </p>
+          {fullError && <p role="alert" className="text-sm text-destructive">{fullError}</p>}
+          {fullPreview && (
+            <div className="space-y-2 rounded-lg border p-3 text-sm">
+              <p className="font-semibold">Prévia integral da permanência — somente leitura</p>
+              <p>{fullPreview.candidate_orders} OS ·
+                {" "}{fullPreview.verified_intervals} etapas calculadas ·
+                {" "}{fullPreview.insufficient_intervals} inconclusivas ·
+                {" "}{fullPreview.candidate_alert_changes} possíveis mudanças de alerta</p>
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                {fullPreview.observacao} Aprovação e aplicação permanecem bloqueadas.
+              </p>
+              <details className="rounded-md border p-2">
+                <summary className="cursor-pointer font-medium">
+                  Consultar etapas e níveis candidatos ({fullPreview.rows.length})
+                </summary>
+                <div className="mt-2 max-h-96 space-y-2 overflow-y-auto">
+                  {fullPreview.rows.map(row => (
+                    <div key={row.interval_id} className="rounded-md border p-2 text-xs">
+                      <p className="font-semibold">OS {row.order_id} · {row.scope}</p>
+                      {row.state === "verified" ? (
+                        <>
+                          <p>Jornada total: {row.gross_before} → {row.gross_proposed} min</p>
+                          <p>Pausas úteis: {row.pause_before} → {row.pause_proposed} min</p>
+                          <p>Permanência sem pausas: {row.useful_before} → {row.useful_proposed} min</p>
+                          {row.severity_status === "candidate" ? (
+                            <p className="font-medium">Níveis candidatos: {row.severity_before} →
+                              {" "}{row.severity_proposed}</p>
+                          ) : (
+                            <p className="text-amber-700 dark:text-amber-300">
+                              Classificação de alertas ainda não verificável ({row.severity_status}).
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-amber-700 dark:text-amber-300">Inconclusivo: {row.reason}</p>
+                      )}
+                    </div>
+                  ))}
+                  {fullPreview.rows.length === 0 && (
+                    <p className="text-muted-foreground">
+                      Nenhuma etapa foi registrada para a data. Isso não comprova cobertura histórica.
                     </p>
                   )}
                 </div>
