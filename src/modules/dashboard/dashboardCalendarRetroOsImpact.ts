@@ -137,6 +137,10 @@ export function simulateCalendarRetroOsImpact(input: {
         reject("Existem pausas associadas a operações não verificáveis.");
         continue;
       }
+      if (interval.left_at !== null && pauses.some(pause => pause.ended_at === null)) {
+        reject("Etapa encerrada com pausa sem término registrado: impacto inconclusivo.");
+        continue;
+      }
       if (operations.some(op => !op.created_at || !Number.isFinite(Date.parse(op.created_at)) ||
           Date.parse(op.created_at) < enteredMs || Date.parse(op.created_at) > actualEndMs)) {
         reject("O histórico de atividades não cobre a etapa integralmente.");
