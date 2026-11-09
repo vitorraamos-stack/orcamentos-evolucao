@@ -1,6 +1,9 @@
 import type { DashboardOrder } from "./dashboardModel";
 import type { PreparationItem, PreparationOperation } from "./dashboardPreparation";
 import { assessOperationalThreshold } from "./dashboardOperationalPolicy";
+import {
+  resolveSectorCalendarDay, type SectorCalendarRevision,
+} from "./dashboardSectorCalendar";
 
 /**
  * Dashboard stage 4: read-only analysis from persisted sources. Rules,
@@ -101,6 +104,8 @@ export type ThresholdSource =
 export type AdvancedSources = {
   /** Undefined only in existing tests/legacy snapshots: treat as unavailable, never as zero. */
   thresholds?: ThresholdSource;
+  sectorCalendars?: { state: "available"; revisions: SectorCalendarRevision[] } |
+    { state: "unavailable"; revisions: [] };
   items: PreparationItem[];
   operations: PreparationOperation[];
   assignees: StageAssignee[];
@@ -344,6 +349,7 @@ function localDateTimeEpoch(value: string, time: string, timeZone: string): numb
 export function calculateWorkingMinutes(
   startAt: string, endAt: string, calendar: WorkCalendarVersion,
   periods: readonly WorkCalendarPeriod[], exceptions: readonly WorkCalendarException[],
+  scope?: OperationalScope, sectorRevisions: readonly SectorCalendarRevision[] = [],
 ): number | null {
   const startMs = Date.parse(startAt);
   const endMs = Date.parse(endAt);
@@ -360,7 +366,23 @@ export function calculateWorkingMinutes(
       row.calendar_version_id === calendar.id && row.exception_date === date
     );
     let ranges: LocalTimeRange[];
-    if (exception) {
+    if (scope && sectorRevisions.length) {
+      if (exception?.working && (!exception.starts_local || !exception.ends_local)) return null;
+      const day = resolveSectorCalendarDay({
+        date, scope, baseCalendarId: calendar.id,
+        baseWeek: periods.filter(row => row.calendar_version_id === calendar.id)
+          .map(row => ({ weekday: row.weekday, start: row.starts_local.slice(0, 5),
+            end: row.ends_local.slice(0, 5) })),
+        baseException: exception
+          ? { windows: exception.working
+              ? [{ start: exception.starts_local!.slice(0, 5), end: exception.ends_local!.slice(0, 5) }]
+              : [], reason: "Exceção do calendário padrão" }
+          : null,
+        sectorRevisions,
+      });
+      if (day.state !== "available") return null;
+      ranges = day.windows;
+    } else if (exception) {
       if (!exception.working) ranges = [];
       else if (exception.starts_local && exception.ends_local)
         ranges = [{ start: exception.starts_local, end: exception.ends_local }];
@@ -502,8 +524,10 @@ function assessStageTiming(
   if (!calendarPeriods.length)
     return unavailableTiming("A versão do calendário não possui intervalos semanais legíveis.", "insufficient");
   const calendarExceptions = sources.calendarExceptions.filter(row => row.calendar_version_id === calendar.id);
+  const sectorRevisions = sources.sectorCalendars?.state === "available"
+    ? sources.sectorCalendars.revisions : [];
   const grossMinutes = calculateWorkingMinutes(interval.entered_at, now.toISOString(),
-    calendar, calendarPeriods, calendarExceptions);
+    calendar, calendarPeriods, calendarExceptions, scope, sectorRevisions);
   if (grossMinutes === null)
     return unavailableTiming("Não foi possível interpretar todos os horários locais do calendário.", "insufficient");
 
@@ -511,7 +535,7 @@ function assessStageTiming(
   for (const pause of mergedPauses) {
     const pauseMinutesForCalendar = calculateWorkingMinutes(
       new Date(pause.start).toISOString(), new Date(pause.end).toISOString(),
-      calendar, calendarPeriods, calendarExceptions,
+      calendar, calendarPeriods, calendarExceptions, scope, sectorRevisions,
     );
     if (pauseMinutesForCalendar === null)
       return unavailableTiming("Não foi possível calcular uma pausa usando o calendário publicado.", "insufficient");
