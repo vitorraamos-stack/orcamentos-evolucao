@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const sql = readFileSync(resolve(
-  process.cwd(), "supabase/migrations/20261109160001_dashboard_operational_thresholds_stage1.sql",
+  process.cwd(), "supabase/migrations/20261109215154_dashboard_operational_thresholds_stage1.sql",
 ), "utf8");
 
 describe("Dashboard novas decisões — migration de Atenção/Crítico (contrato estático)", () => {

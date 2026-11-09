@@ -67,7 +67,7 @@ describe("prévia integral de alertas e pausas por OS", () => {
 
   it("exige permissão gerencial e mantém o cálculo somente leitura no servidor", () => {
     const sql = readFileSync(resolve(process.cwd(),
-      "supabase/migrations/20261109160007_dashboard_calendar_retro_approval_preflight_stage1.sql"
+      "supabase/migrations/20261109215301_dashboard_calendar_retro_approval_preflight_stage1.sql"
     ), "utf8");
     const start = sql.indexOf("CREATE FUNCTION public.dashboard_preview_calendar_retro_full_stage_alerts(");
     expect(start).toBeGreaterThan(0);

@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const sql = readFileSync(resolve(
-  process.cwd(), "supabase/migrations/20261109160002_dashboard_sector_calendars_stage1.sql",
+  process.cwd(), "supabase/migrations/20261109215212_dashboard_sector_calendars_stage1.sql",
 ), "utf8");
 
 describe("Dashboard Etapa 1 — contrato estático da migration setorial", () => {

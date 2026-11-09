@@ -10,13 +10,13 @@ Status em 09/11/2026: **preparação, sem autorização para alterar produção*
 - A triagem de correções retroativas continua **somente leitura**. `approval_allowed=false` e `application_allowed=false` não devem ser alterados na publicação.
 
 ## Ordem das migrations a aplicar, somente depois de autorização expressa
-1. `20261109160001_dashboard_operational_thresholds_stage1.sql`: limites e histórico de revisão.
-2. `20261109160002_dashboard_sector_calendars_stage1.sql`: regras de calendário por setor.
-3. `20261109160003_dashboard_calendar_successions_stage1.sql`: sucessão global futura e auditoria.
-4. `20261109160004_dashboard_calendar_retro_requests_stage1.sql`: solicitações retroativas.
-5. `20261109160005_dashboard_calendar_retro_review_triage_stage1.sql`: pareceres gerenciais.
-6. `20261109160006_dashboard_calendar_retro_candidates_stage1.sql`: descoberta de OS candidatas.
-7. `20261109160007_dashboard_calendar_retro_approval_preflight_stage1.sql`: pré-validação, dossiês e simulações.
+1. `20261109215154_dashboard_operational_thresholds_stage1.sql`: limites e histórico de revisão.
+2. `20261109215212_dashboard_sector_calendars_stage1.sql`: regras de calendário por setor.
+3. `20261109215223_dashboard_calendar_successions_stage1.sql`: sucessão global futura e auditoria.
+4. `20261109215233_dashboard_calendar_retro_requests_stage1.sql`: solicitações retroativas.
+5. `20261109215242_dashboard_calendar_retro_review_triage_stage1.sql`: pareceres gerenciais.
+6. `20261109215251_dashboard_calendar_retro_candidates_stage1.sql`: descoberta de OS candidatas.
+7. `20261109215301_dashboard_calendar_retro_approval_preflight_stage1.sql`: pré-validação, dossiês e simulações.
 
 ## Condições para liberar o merge e a publicação
 - Confirmar que **CI geral e workflow do Dashboard** estão verdes para o mesmo HEAD do PR. Não aceitar checks antigos.

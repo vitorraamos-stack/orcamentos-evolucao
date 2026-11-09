@@ -5,10 +5,10 @@ import { describe, expect, it } from "vitest";
 const migration = (name: string) =>
   readFileSync(resolve(process.cwd(), "supabase/migrations/" + name), "utf8");
 
-const succession = migration("20261109160003_dashboard_calendar_successions_stage1.sql");
-const retro = migration("20261109160004_dashboard_calendar_retro_requests_stage1.sql");
-const preflight = migration("20261109160007_dashboard_calendar_retro_approval_preflight_stage1.sql");
-const review = migration("20261109160005_dashboard_calendar_retro_review_triage_stage1.sql");
+const succession = migration("20261109215223_dashboard_calendar_successions_stage1.sql");
+const retro = migration("20261109215233_dashboard_calendar_retro_requests_stage1.sql");
+const preflight = migration("20261109215301_dashboard_calendar_retro_approval_preflight_stage1.sql");
+const review = migration("20261109215242_dashboard_calendar_retro_review_triage_stage1.sql");
 
 describe("Dashboard Etapa 1 — segurança de versões globais prospectivas", () => {
   it("não reescreve calendários, horas ou exceções anteriores", () => {
