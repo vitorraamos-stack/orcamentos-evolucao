@@ -6,14 +6,14 @@
 -- Protect even the preexisting first-publication RPC from silently backdating
 -- an initial calendar. Authorized historical corrections use a separate channel.
 CREATE FUNCTION public.dashboard_reject_backdated_calendar_insert() RETURNS trigger
-LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $
+LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
 BEGIN
   IF NEW.effective_from < (now() AT TIME ZONE 'America/Sao_Paulo')::date THEN
     RAISE EXCEPTION 'Publicação retroativa exige solicitação e auditoria específicas'
       USING ERRCODE='22023';
   END IF;
   RETURN NEW;
-END $;
+END $$;
 REVOKE ALL ON FUNCTION public.dashboard_reject_backdated_calendar_insert()
   FROM PUBLIC,anon,authenticated,service_role;
 CREATE TRIGGER dashboard_calendar_no_implicit_backdate
