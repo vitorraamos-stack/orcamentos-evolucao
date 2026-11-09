@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import type { OperationalScope, Requirement } from "./dashboardAdvanced";
 import { DashboardThresholdsPanel } from "./DashboardThresholdsPanel";
+import { DashboardSectorCalendarsPanel } from "./DashboardSectorCalendarsPanel";
 import { proposedEvolucaoWorkweek, verifiedSaoJose2026Observances } from "./dashboardOperationalPolicy";
 import {
   loadDashboardOperationalSettings, previewDashboardRuleImpact,
@@ -439,10 +440,11 @@ export default function DashboardOperationalSettingsPage() {
 
       {data && (
         <Tabs defaultValue="rules" className="space-y-4">
-          <TabsList className="grid h-auto w-full grid-cols-3 sm:w-[620px]">
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:w-[800px] sm:grid-cols-4">
             <TabsTrigger value="rules">Regras por etapa</TabsTrigger>
             <TabsTrigger value="calendar">Jornada e exceções</TabsTrigger>
             <TabsTrigger value="thresholds">Atenção / Crítico</TabsTrigger>
+            <TabsTrigger value="sector">Por setor</TabsTrigger>
           </TabsList>
 
           <TabsContent value="rules" className="space-y-4">
@@ -602,6 +604,11 @@ export default function DashboardOperationalSettingsPage() {
 
           <TabsContent value="thresholds" className="space-y-4">
             <DashboardThresholdsPanel calendars={data.calendars} />
+          </TabsContent>
+
+          <TabsContent value="sector" className="space-y-4">
+            <DashboardSectorCalendarsPanel
+              calendars={data.calendars} periods={data.periods} exceptions={data.exceptions} />
           </TabsContent>
 
           <TabsContent value="calendar" className="space-y-4">
