@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { listDashboardPreparationSources } from "./dashboardPreparationRepository";
+import { loadPublishedThresholds } from "./dashboardThresholdsRepository";
 import type {
   AdvancedSources, OperationDependency, RelationSource, RuleSource, RuleSpec,
   StageAssignee, StageDeadline, StageInterval, StagePause, TimingRule,
@@ -209,7 +210,7 @@ async function listDashboardTimingSources(
 export async function listDashboardAdvancedSources(
   orderIds: string[], signal?: AbortSignal
 ): Promise<AdvancedSources> {
-  const [preparation, assignees, deadlines, rules, dependencies, timing] = await Promise.all([
+  const [preparation, assignees, deadlines, rules, dependencies, timing, thresholds] = await Promise.all([
     listDashboardPreparationSources(orderIds, signal),
     readByIds<StageAssignee>(
       "os_order_assignees", "id,order_id,user_id,scope", "order_id", orderIds, signal,
@@ -220,10 +221,11 @@ export async function listDashboardAdvancedSources(
     listDashboardOperationalRules(signal),
     listDashboardDependencies(orderIds, signal),
     listDashboardTimingSources(orderIds, signal),
+    loadPublishedThresholds(),
   ]);
   return {
     items: preparation.items, operations: preparation.operations,
-    assignees, deadlines, rules, dependencies, events: [],
+    assignees, deadlines, rules, dependencies, events: [], thresholds,
     ...timing,
   };
 }
