@@ -90,3 +90,15 @@
 4. Há migrations de calendário e limites ainda não aplicadas; a migração precisa ser verificada em banco apropriado (RLS, grants, triggers, concorrência e segurança) antes de produção.
 5. Supervisores ainda não possuem papel operacional independente nem fluxo próprio de sugestões.
 6. Antes de merge, atualizar a branch conforme mudanças recentes na \`main\` e validar eventuais conflitos. Não publicar automaticamente por Git/Vercel.
+
+## Quinto incremento (09/11/2026) — integridade e revisão gerencial
+
+- Histórico completo das solicitações retroativas em páginas com contagem exata; páginas incompletas não são apresentadas como histórico integral.
+- Nova migration PROPOSTA `20261109142500_dashboard_calendar_retro_review_triage_stage1.sql`, ainda não aplicada, para pareceres gerenciais imutáveis (`needs_evidence` ou `rejected`) e simulação do expediente do calendário geral em uma data.
+- A prévia compara minutos **planejados no calendário geral** antes e depois da proposta, contando intervalos candidatos e identificando vínculos setoriais e limites para revisão. **Não calcula impacto comprovado nas OS ou mudança em alertas.**
+- A interface permite registrar necessidade de evidências adicionais e rejeitar uma solicitação, com justificativa e auditoria. Não há função de aprovar ou aplicar a correção.
+- Uma solicitação rejeitada pode ser substituída por outra, sem alterar ou excluir o registro histórico. Reenvio e rejeição usam bloqueio transacional por calendário e data.
+- Correção de delimitadores SQL na migration de sucessão global, identificada antes da aplicação.
+- Testes de contrato essenciais foram adicionados; validação real de SQL, RLS, concorrência, simulação completa por OS e compatibilidade com `main` continuam necessárias antes de qualquer implantação em produção.
+
+**Proibido aplicar, fazer merge ou publicar sem autorização específica.** As migrations e os pareceres são somente código proposto na branch.
