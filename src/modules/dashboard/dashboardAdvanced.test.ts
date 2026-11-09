@@ -332,3 +332,64 @@ describe("Dashboard Etapa 4 — permanência útil com evidência verificável",
     expect(buildAdvancedAssessments([order()], expiredCalendar, now)[0].timing).toBe("insufficient");
   });
 });
+
+
+describe("Dashboard Etapa 1 — cálculo útil considera versões setoriais", () => {
+  const calendar = {
+    id: "base-1", version: 1, time_zone: "America/Sao_Paulo",
+    effective_from: "2026-11-01", effective_until: null,
+  };
+  const periods = [
+    { id: "period-1", calendar_version_id: "base-1", weekday: 1,
+      starts_local: "08:00:00", ends_local: "12:00:00" },
+    { id: "period-2", calendar_version_id: "base-1", weekday: 1,
+      starts_local: "13:12:00", ends_local: "18:00:00" },
+  ];
+  const revision = {
+    id: "r1", scope: "PRODUCTION" as const, base_calendar_version_id: "base-1",
+    revision: 1, effective_from: "2026-11-09", effective_until: null,
+    mode: "override" as const,
+    periods: [{ weekday: 1, start: "09:00", end: "12:00" }],
+    exceptions: [], published_by: "gestor", published_at: "2026-11-09T12:00:00Z",
+    reason: "Jornada do setor",
+  };
+
+  it("usa a jornada específica após a data de vigência e preserva a jornada histórica", () => {
+    const before = calculateWorkingMinutes(
+      "2026-11-02T11:00:00Z", "2026-11-02T13:00:00Z",
+      calendar, periods, [], "PRODUCTION", [revision],
+    );
+    const after = calculateWorkingMinutes(
+      "2026-11-09T11:00:00Z", "2026-11-09T13:00:00Z",
+      calendar, periods, [], "PRODUCTION", [revision],
+    );
+    expect(before).toBe(120); // 08–10h, jornada geral
+    expect(after).toBe(60);   // 09–10h, jornada setorial
+  });
+
+  it("mantém feriado do calendário geral mesmo com jornada setorial, salvo exceção explícita", () => {
+    const closed = [{
+      id: "holiday-1", calendar_version_id: "base-1", exception_date: "2026-11-09",
+      working: false, starts_local: null, ends_local: null,
+    }];
+    const interval = ["2026-11-09T12:00:00Z","2026-11-09T15:00:00Z"] as const;
+    expect(calculateWorkingMinutes(interval[0], interval[1],calendar,periods,closed,
+      "PRODUCTION",[revision])).toBe(0);
+    const overtime = {
+      ...revision, exceptions: [{
+        date: "2026-11-09", reason: "Plantão autorizado", windows: [
+          { start: "09:00", end: "10:00" }, { start: "11:00", end: "12:00" },
+        ],
+      }],
+    };
+    expect(calculateWorkingMinutes(interval[0], interval[1],calendar,periods,closed,
+      "PRODUCTION",[overtime])).toBe(120);
+  });
+
+  it("não altera a jornada de instalação quando a exceção é da produção", () => {
+    expect(calculateWorkingMinutes(
+      "2026-11-09T11:00:00Z", "2026-11-09T13:00:00Z",
+      calendar, periods, [], "INSTALLATION", [revision],
+    )).toBe(120);
+  });
+});
