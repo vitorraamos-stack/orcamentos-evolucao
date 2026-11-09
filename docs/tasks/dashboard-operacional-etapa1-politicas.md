@@ -113,3 +113,13 @@
 - SQL de corpo de função com delimitador incorreto na migration de sucessão foi efetivamente corrigido na branch. O erro anterior impedia a validação da migração.
 
 **Limites atuais:** a simulação usa uma fotografia de consultas, não um bloqueio transacional entre o carregamento de fontes. A aprovação/aplicação retroativa continuam proibidas (`approvalAllowed=false`) mesmo se a prévia parecer completa; futuras RPCs de aprovação precisam revalidar tudo no servidor, com auditoria e controle de concorrência. Nenhuma migration foi executada, nenhum merge ou deploy autorizado.
+
+## Sétimo incremento (09/11/2026) — pré-validação de aprovação gerencial
+
+- Migration **proposta, não aplicada** `20261109153000_dashboard_calendar_retro_approval_preflight_stage1.sql`: nova verificação gerencial no servidor de intervalos, vínculos, pausas, calendários setoriais e limites associados à data. Resultados lacunares aparecem como impedimentos.
+- `dashboard_calendar_retro_approval_dossiers`: registro imutável, com RLS somente para gestão e justificativa, de **encaminhamentos para validação técnica**; nunca é registro de aprovação.
+- A RPC `dashboard_prepare_calendar_retro_approval` repete a verificação no servidor antes de gravar o encaminhamento e rejeita prévias desatualizadas e pedidos rejeitados.
+- A UI de revisão apresenta contagens de evidência, motivos de bloqueio e histórico dos encaminhamentos.
+- **A aprovação efetiva e a aplicação histórica NÃO foram implementadas**: tanto `approval_allowed` como `application_allowed` permanecem `false`. Não é possível garantir uma transação segura reproduzindo todos os minutos e alertas e a cobertura das OS anteriores à instrumentação apenas com os dados atuais.
+- Antes de habilitar efeitos operacionais: comprovar cobertura da instrumentação por período; recálculo completo de minutos e alertas **no servidor** com controle de concorrência; snapshot das regras e calendários setoriais; modelo de exceções retroativas aplicado sem UPDATE/DELETE do calendário original; revalidação de permissões, RLS e auditoria em banco de teste.
+- Sem merge, sem aplicação de migrations, sem publicação Vercel ou alteração de OS de produção.
