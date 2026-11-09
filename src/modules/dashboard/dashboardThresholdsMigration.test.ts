@@ -10,7 +10,10 @@ describe("Dashboard novas decisões — migration de Atenção/Crítico (contrat
   it("não publica limites ou calendários implícitos e não modifica dados das OS", () => {
     expect(sql).toContain("CREATE TABLE public.dashboard_operational_thresholds");
     expect(sql).toContain("CREATE TABLE public.dashboard_operational_threshold_revisions");
-    expect(sql).not.toMatch(/INSERT\s+INTO\s+public\.(os_orders|dashboard_operational_thresholds|dashboard_work_calendar_versions)\b/i);
+    expect(sql).not.toMatch(/INSERT\s+INTO\s+public\.(os_orders|dashboard_work_calendar_versions)\b/i);
+    // INSERT é permitido apenas dentro da RPC gerencial, nunca como seed de migration.
+    expect(sql.indexOf("INSERT INTO public.dashboard_operational_thresholds"))
+      .toBeGreaterThan(sql.indexOf("CREATE FUNCTION public.dashboard_publish_thresholds("));
     expect(sql).not.toMatch(/\bUPDATE\s+public\.os_orders\b/i);
   });
 
