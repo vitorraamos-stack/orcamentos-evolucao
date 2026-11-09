@@ -79,7 +79,7 @@ export function buildRetroOverview(input: {
       entry.full?.useful_before !== entry.full?.useful_proposed ? "time_change" : "unchanged";
     const scope = entry.full?.scope ?? entry.day?.scope ?? "Indefinido";
     const stage: RetroOverviewStage = { id, scope, day: entry.day, full: entry.full, issues, status };
-    const owner = orders.get(entry.orderId) ?? { id: entry.orderId, status: "unchanged" as const, stages: [] };
+    const owner: RetroOverviewOrder = orders.get(entry.orderId) ?? { id: entry.orderId, status: "unchanged", stages: [] };
     owner.stages.push(stage);
     if (priority[status] < priority[owner.status]) owner.status = status;
     orders.set(entry.orderId, owner);
