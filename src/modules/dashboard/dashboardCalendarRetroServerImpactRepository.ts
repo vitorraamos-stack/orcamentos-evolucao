@@ -6,6 +6,10 @@ export type RetroServerStageImpactRow = {
   scope: string;
   state: "verified" | "insufficient";
   reason: string;
+  /** Readiness only: the server does not calculate full historical alert severity. */
+  alert_review_status: "insufficient" | "unavailable" | "historical_review" |
+    "requires_recalculation" | "no_day_change";
+  alert_review_reason: string;
   minutes_before: number | null;
   minutes_proposed: number | null;
   pause_minutes_before: number | null;
@@ -23,6 +27,8 @@ export type RetroServerDayImpact = {
   verified_intervals: number;
   insufficient_intervals: number;
   changed_intervals: number;
+  alert_recalculation_candidates: number;
+  alert_review_inconclusive_intervals: number;
   rows: RetroServerStageImpactRow[];
   scope: "calendar_base_single_day";
   historical_coverage_verified: false;
@@ -49,29 +55,42 @@ export function validateRetroServerDayImpact(
       !validInteger(v.candidate_orders) || v.candidate_orders > 300 ||
       !validInteger(v.candidate_intervals) || v.candidate_intervals > 1200 ||
       !validInteger(v.verified_intervals) || !validInteger(v.insufficient_intervals) ||
-      !validInteger(v.changed_intervals) || !Array.isArray(v.rows) ||
+      !validInteger(v.changed_intervals) ||
+      !validInteger(v.alert_recalculation_candidates) ||
+      !validInteger(v.alert_review_inconclusive_intervals) ||
+      !Array.isArray(v.rows) ||
       v.rows.length !== v.candidate_intervals ||
       v.verified_intervals + v.insufficient_intervals !== v.candidate_intervals ||
       v.changed_intervals > v.verified_intervals) return false;
   const ids = new Set<string>();
   let verified = 0;
   let insufficient = 0;
+  let recalculation = 0;
+  let alertInconclusive = 0;
   for (const row of v.rows) {
     if (!row || typeof row !== "object" || Array.isArray(row) ||
         typeof row.order_id !== "string" || !row.order_id ||
         typeof row.interval_id !== "string" || !row.interval_id ||
         typeof row.scope !== "string" || typeof row.reason !== "string" ||
+        typeof row.alert_review_reason !== "string" ||
+        !["insufficient","unavailable","historical_review",
+          "requires_recalculation","no_day_change"].includes(row.alert_review_status) ||
         ids.has(row.interval_id) || !["verified","insufficient"].includes(row.state)) {
       return false;
     }
     ids.add(row.interval_id);
+    if (row.alert_review_status === "requires_recalculation") recalculation += 1;
+    if (["insufficient","unavailable","historical_review"].includes(row.alert_review_status))
+      alertInconclusive += 1;
     if (row.state === "insufficient") {
+      if (row.alert_review_status !== "insufficient") return false;
       insufficient += 1;
       if (row.minutes_before !== null || row.minutes_proposed !== null ||
           row.pause_minutes_before !== null || row.pause_minutes_proposed !== null ||
           row.useful_minutes_before !== null || row.useful_minutes_proposed !== null)
         return false;
     } else {
+      if (row.alert_review_status === "insufficient") return false;
       verified += 1;
       const numbers = [
         row.minutes_before, row.minutes_proposed,
@@ -84,7 +103,9 @@ export function validateRetroServerDayImpact(
         return false;
     }
   }
-  return verified === v.verified_intervals && insufficient === v.insufficient_intervals;
+  return verified === v.verified_intervals && insufficient === v.insufficient_intervals &&
+    recalculation === v.alert_recalculation_candidates &&
+    alertInconclusive === v.alert_review_inconclusive_intervals;
 }
 
 /** Only manager RPC may compute this read-only advisory preview. */
