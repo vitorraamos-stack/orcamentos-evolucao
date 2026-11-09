@@ -257,7 +257,9 @@ export function DashboardSectorCalendarsPanel({ calendars, periods, exceptions }
                 <select className="h-10 rounded-md border bg-background px-3"
                   value={draft.mode} onChange={e => update({
                     mode: e.target.value as "inherit" | "override",
-                    periods: e.target.value === "inherit" ? [] : proposedEvolucaoWorkweek(),
+                    periods: e.target.value === "inherit" ? []
+                      : (draft.scope === "PRODUCTION" || draft.scope === "INSTALLATION")
+                        ? proposedEvolucaoWorkweek() : [],
                   })}>
                   <option value="inherit">Herdar jornada padrão</option>
                   <option value="override">Utilizar jornada específica por setor</option>
