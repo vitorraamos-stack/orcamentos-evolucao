@@ -7,6 +7,7 @@ const migration = (name: string) =>
 
 const succession = migration("20261109131500_dashboard_calendar_successions_stage1.sql");
 const retro = migration("20261109134000_dashboard_calendar_retro_requests_stage1.sql");
+const review = migration("20261109142500_dashboard_calendar_retro_review_triage_stage1.sql");
 
 describe("Dashboard Etapa 1 — segurança de versões globais prospectivas", () => {
   it("não reescreve calendários, horas ou exceções anteriores", () => {
@@ -55,5 +56,24 @@ describe("Dashboard Etapa 1 — segurança das solicitações retroativas", () =
     expect(retro).toContain("ORDER BY c.effective_from DESC,c.version DESC");
     expect(retro).toContain("'duration_impact_verified',false");
     expect(retro).toContain("stage_intervals_candidates");
+  });
+});
+
+
+describe("Dashboard Etapa 1 — revisão gerencial sem aplicação", () => {
+  it("exige gestão, auditoria imutável, prévia fresca e bloqueia aprovação", () => {
+    expect(review).toContain("public.dashboard_assert_manager()");
+    expect(review).toContain("dashboard_retro_review_events_immutable");
+    expect(review).toContain("p_expected_preview");
+    expect(review).toContain("'approval_allowed',false");
+    expect(review).toContain("action IN ('needs_evidence','rejected')");
+    expect(review).not.toMatch(/UPDATE\\s+public\\.(?:dashboard_work_calendar_|os_orders)/i);
+    expect(review).not.toMatch(/DELETE\\s+FROM\\s+public\\.dashboard_work_calendar_/i);
+  });
+  it("corrige a delimitação SQL e permite reenvio após rejeição auditada", () => {
+    expect(succession).not.toContain("AS $\\n");
+    expect(review).toContain("CREATE OR REPLACE FUNCTION public.dashboard_request_calendar_retro_review(");
+    expect(review).toContain("e.action='rejected'");
+    expect(review).toContain("dashboard-retro-review:");
   });
 });
