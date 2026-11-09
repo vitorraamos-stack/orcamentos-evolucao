@@ -75,6 +75,18 @@ describe("Dashboard calendários setoriais — resolução e vigência", () => {
     expect(resolveSectorCalendarDay(args("2026-11-10", revisions)).source).toBe("base");
   });
 
+  it("não reativa revisão antiga depois do fim de uma versão mais recente", () => {
+    const revisions: SectorCalendarRevision[] = [
+      base, {
+        ...base, id: "r2", revision: 2, effective_from: "2026-11-10",
+        effective_until: "2026-11-13", mode: "inherit", periods: [],
+      },
+    ];
+    expect(selectSectorCalendarRevision(revisions, "PRODUCTION", "base-1", "2026-11-13")?.revision).toBe(2);
+    expect(selectSectorCalendarRevision(revisions, "PRODUCTION", "base-1", "2026-11-14")).toBeNull();
+    expect(resolveSectorCalendarDay(args("2026-11-14", revisions)).source).toBe("base");
+  });
+
   it("valida datas, intervalos sobrepostos, duplicidade de exceção e vigência", () => {
     const draft = {
       scope: "PRODUCTION" as const, baseCalendarVersionId: "base-1",
