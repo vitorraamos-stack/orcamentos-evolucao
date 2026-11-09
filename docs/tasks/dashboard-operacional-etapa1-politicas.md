@@ -102,3 +102,14 @@
 - Testes de contrato essenciais foram adicionados; validação real de SQL, RLS, concorrência, simulação completa por OS e compatibilidade com `main` continuam necessárias antes de qualquer implantação em produção.
 
 **Proibido aplicar, fazer merge ou publicar sem autorização específica.** As migrations e os pareceres são somente código proposto na branch.
+
+## Sexto incremento (09/11/2026) — simulação por OS, pausas e alertas
+
+- Migration proposta `20261109150000_dashboard_calendar_retro_candidates_stage1.sql`: RPC gerencial **somente leitura** para descobrir OS com intervalos que atravessam o dia solicitado. Exige gestor, verifica a versão do calendário e bloqueia consultas com mais de 300 OS em vez de ocultar registros.
+- `dashboardCalendarRetroOsImpact.ts` recalcula, com as funções já usadas pelo Dashboard, horas úteis totais da etapa, horas úteis de pausas verificadas e tempo útil não bloqueado antes/depois de uma exceção histórica **hipotética**.
+- Reavalia Atenção/Crítico apenas quando a etapa é aberta e os limites, revisão da regra e versão do calendário permitem comparação verificável. Alertas não verificáveis permanecem indisponíveis; nenhum nível é presumido.
+- O painel de revisão gerencial apresenta diferenças por OS/etapa com estados **verificado** ou **inconclusivo**, sem alterar dados, e deixa claro que registros anteriores à instrumentação não podem ser reconstruídos por inferência.
+- Testes direcionados cobrem pausa verificada com mudança de alerta e bloqueio de cálculo diante de pausa sem evidência.
+- SQL de corpo de função com delimitador incorreto na migration de sucessão foi efetivamente corrigido na branch. O erro anterior impedia a validação da migração.
+
+**Limites atuais:** a simulação usa uma fotografia de consultas, não um bloqueio transacional entre o carregamento de fontes. A aprovação/aplicação retroativa continuam proibidas (`approvalAllowed=false`) mesmo se a prévia parecer completa; futuras RPCs de aprovação precisam revalidar tudo no servidor, com auditoria e controle de concorrência. Nenhuma migration foi executada, nenhum merge ou deploy autorizado.
