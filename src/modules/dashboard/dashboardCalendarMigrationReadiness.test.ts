@@ -3,13 +3,13 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const migrations = [
-  "20261109115000_dashboard_operational_thresholds_stage1.sql",
-  "20261109120500_dashboard_sector_calendars_stage1.sql",
-  "20261109131500_dashboard_calendar_successions_stage1.sql",
-  "20261109134000_dashboard_calendar_retro_requests_stage1.sql",
-  "20261109142500_dashboard_calendar_retro_review_triage_stage1.sql",
-  "20261109150000_dashboard_calendar_retro_candidates_stage1.sql",
-  "20261109153000_dashboard_calendar_retro_approval_preflight_stage1.sql",
+  "20261109160001_dashboard_operational_thresholds_stage1.sql",
+  "20261109160002_dashboard_sector_calendars_stage1.sql",
+  "20261109160003_dashboard_calendar_successions_stage1.sql",
+  "20261109160004_dashboard_calendar_retro_requests_stage1.sql",
+  "20261109160005_dashboard_calendar_retro_review_triage_stage1.sql",
+  "20261109160006_dashboard_calendar_retro_candidates_stage1.sql",
+  "20261109160007_dashboard_calendar_retro_approval_preflight_stage1.sql",
 ] as const;
 
 const sql = migrations.map(name => readFileSync(

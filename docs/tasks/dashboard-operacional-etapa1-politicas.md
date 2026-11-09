@@ -33,7 +33,7 @@
 
 ## Segundo incremento (09/11/2026) — integração parcial
 
-- Migration proposta `20261109115000_dashboard_operational_thresholds_stage1.sql`: novas tabelas de limites Atenção/Crítico por setor, histórico imutável, RLS, prévia e publicação com autorização da gestão, revisão otimista e auditoria. **Migration não aplicada no Supabase.**
+- Migration proposta `20261109160001_dashboard_operational_thresholds_stage1.sql`: novas tabelas de limites Atenção/Crítico por setor, histórico imutável, RLS, prévia e publicação com autorização da gestão, revisão otimista e auditoria. **Migration não aplicada no Supabase.**
 - Novo painel administrativo `DashboardThresholdsPanel.tsx`, integrado à página Regras Operacionais. Há confirmação explícita, prévia conservadora e histórico de revisões.
 - O calendário existente recebeu ações para **sugerir** a jornada de 44h e feriados legais de 2026 dentro da vigência informada. Nada é publicado sem confirmação gerencial. Pontos facultativos não são adicionados como folgas automáticas.
 - `dashboardAdvanced.ts` agora separa permanência útil total, espera comprovada e tempo não bloqueado. A criticidade Atenção/Crítico é avaliada sobre a permanência **total** usando somente evidência válida e limites vigentes desde a entrada na etapa.
@@ -58,7 +58,7 @@
 - `DashboardSectorCalendarsPanel.tsx`: editor administrativo integrado à aba **Por setor** em Regras Operacionais, com histórico, justificativa, prévia ilustrativa dos horários, confirmação antes da publicação e bloqueio se o schema não estiver instalado.
 - `dashboardSectorCalendarRepository.ts`: leitura completa com contagem exata e publicação somente pela RPC de gestão, sem escrita direta em tabelas.
 - `dashboardAdvanced.ts`: interseção de tempos úteis e pausas passa a considerar a versão setorial vigente em cada data, sem reescrever durações históricas.
-- Migration **proposta, não aplicada**: `20261109120500_dashboard_sector_calendars_stage1.sql`, com RLS, revisões imutáveis, validação de horários, revision lock e vigência presente/futura (sem retroatividade silenciosa).
+- Migration **proposta, não aplicada**: `20261109160002_dashboard_sector_calendars_stage1.sql`, com RLS, revisões imutáveis, validação de horários, revision lock e vigência presente/futura (sem retroatividade silenciosa).
 - Testes unitários, integração temporal, contrato estático de segurança e cliente RPC adicionados.
 
 ### Limitações antes de produção
@@ -77,9 +77,9 @@
 - \`dashboardCalendarTimeline.ts\`: determina a versão geral em vigor para **cada data**, sem reabrir versões superadas nem considerar dias de lacuna como trabalhados. O término *efetivo* de uma versão aberta é o dia anterior ao início da próxima.
 - \`calculateWorkingMinutes\`: uma OS que permanece na mesma etapa durante a troca de calendário passa a ser avaliada dia a dia com a versão correta e seus respectivos feriados; não reescreve o calendário vinculado à entrada da OS. Evidência de entrada desatualizada permanece sinalizada como insuficiente.
 - Consulta das versões globais, turnos e exceções com paginação de contagem exata, para não calcular sobre histórico incompleto.
-- Migration PROPOSTA \`20261109131500_dashboard_calendar_successions_stage1.sql\`: nova RPC de sucessão **prospectiva**, com prévia consultiva, auditoria imutável e bloqueio de inserções retroativas também na RPC antiga. O registro da versão anterior nunca é atualizado nem removido.
+- Migration PROPOSTA \`20261109160003_dashboard_calendar_successions_stage1.sql\`: nova RPC de sucessão **prospectiva**, com prévia consultiva, auditoria imutável e bloqueio de inserções retroativas também na RPC antiga. O registro da versão anterior nunca é atualizado nem removido.
 - A página administrativa oferece prévia de vigência, indicação de intervalos e regras potencialmente afetadas, confirmação antes da publicação e histórico com término efetivo de cada versão. A prévia **não afirma** quantos minutos/alertas mudarão sem evidência completa.
-- Migration PROPOSTA \`20261109134000_dashboard_calendar_retro_requests_stage1.sql\`: consulta e registro **imutável de solicitações** para corrigir um único dia anterior, com justificativa, versão histórica, prévia de intervalos candidatos e identificação do gestor. O novo painel administrativo permite registrar a solicitação **sem aplicar** nenhum ajuste retroativo.
+- Migration PROPOSTA \`20261109160004_dashboard_calendar_retro_requests_stage1.sql\`: consulta e registro **imutável de solicitações** para corrigir um único dia anterior, com justificativa, versão histórica, prévia de intervalos candidatos e identificação do gestor. O novo painel administrativo permite registrar a solicitação **sem aplicar** nenhum ajuste retroativo.
 - Testes de sucessão, lacunas, histórico, novas RPCs e limites de segurança foram adicionados. Ambas as migrations permanecem não aplicadas.
 
 ### Pendências críticas
@@ -94,7 +94,7 @@
 ## Quinto incremento (09/11/2026) — integridade e revisão gerencial
 
 - Histórico completo das solicitações retroativas em páginas com contagem exata; páginas incompletas não são apresentadas como histórico integral.
-- Nova migration PROPOSTA `20261109142500_dashboard_calendar_retro_review_triage_stage1.sql`, ainda não aplicada, para pareceres gerenciais imutáveis (`needs_evidence` ou `rejected`) e simulação do expediente do calendário geral em uma data.
+- Nova migration PROPOSTA `20261109160005_dashboard_calendar_retro_review_triage_stage1.sql`, ainda não aplicada, para pareceres gerenciais imutáveis (`needs_evidence` ou `rejected`) e simulação do expediente do calendário geral em uma data.
 - A prévia compara minutos **planejados no calendário geral** antes e depois da proposta, contando intervalos candidatos e identificando vínculos setoriais e limites para revisão. **Não calcula impacto comprovado nas OS ou mudança em alertas.**
 - A interface permite registrar necessidade de evidências adicionais e rejeitar uma solicitação, com justificativa e auditoria. Não há função de aprovar ou aplicar a correção.
 - Uma solicitação rejeitada pode ser substituída por outra, sem alterar ou excluir o registro histórico. Reenvio e rejeição usam bloqueio transacional por calendário e data.
@@ -105,7 +105,7 @@
 
 ## Sexto incremento (09/11/2026) — simulação por OS, pausas e alertas
 
-- Migration proposta `20261109150000_dashboard_calendar_retro_candidates_stage1.sql`: RPC gerencial **somente leitura** para descobrir OS com intervalos que atravessam o dia solicitado. Exige gestor, verifica a versão do calendário e bloqueia consultas com mais de 300 OS em vez de ocultar registros.
+- Migration proposta `20261109160006_dashboard_calendar_retro_candidates_stage1.sql`: RPC gerencial **somente leitura** para descobrir OS com intervalos que atravessam o dia solicitado. Exige gestor, verifica a versão do calendário e bloqueia consultas com mais de 300 OS em vez de ocultar registros.
 - `dashboardCalendarRetroOsImpact.ts` recalcula, com as funções já usadas pelo Dashboard, horas úteis totais da etapa, horas úteis de pausas verificadas e tempo útil não bloqueado antes/depois de uma exceção histórica **hipotética**.
 - Reavalia Atenção/Crítico apenas quando a etapa é aberta e os limites, revisão da regra e versão do calendário permitem comparação verificável. Alertas não verificáveis permanecem indisponíveis; nenhum nível é presumido.
 - O painel de revisão gerencial apresenta diferenças por OS/etapa com estados **verificado** ou **inconclusivo**, sem alterar dados, e deixa claro que registros anteriores à instrumentação não podem ser reconstruídos por inferência.
@@ -116,7 +116,7 @@
 
 ## Sétimo incremento (09/11/2026) — pré-validação de aprovação gerencial
 
-- Migration **proposta, não aplicada** `20261109153000_dashboard_calendar_retro_approval_preflight_stage1.sql`: nova verificação gerencial no servidor de intervalos, vínculos, pausas, calendários setoriais e limites associados à data. Resultados lacunares aparecem como impedimentos.
+- Migration **proposta, não aplicada** `20261109160007_dashboard_calendar_retro_approval_preflight_stage1.sql`: nova verificação gerencial no servidor de intervalos, vínculos, pausas, calendários setoriais e limites associados à data. Resultados lacunares aparecem como impedimentos.
 - `dashboard_calendar_retro_approval_dossiers`: registro imutável, com RLS somente para gestão e justificativa, de **encaminhamentos para validação técnica**; nunca é registro de aprovação.
 - A RPC `dashboard_prepare_calendar_retro_approval` repete a verificação no servidor antes de gravar o encaminhamento e rejeita prévias desatualizadas e pedidos rejeitados.
 - A UI de revisão apresenta contagens de evidência, motivos de bloqueio e histórico dos encaminhamentos.
@@ -126,7 +126,7 @@
 
 ## Oitavo incremento (09/11/2026) — cálculo diário por etapa no servidor (prévia consultiva)
 
-- A migration **já proposta e ainda não aplicada** `20261109153000_dashboard_calendar_retro_approval_preflight_stage1.sql` passou a incluir `dashboard_preview_calendar_retro_day_stage_impact`: RPC de gestão, somente leitura, que calcula o efeito hipotético da exceção do calendário geral para **um dia histórico**.
+- A migration **já proposta e ainda não aplicada** `20261109160007_dashboard_calendar_retro_approval_preflight_stage1.sql` passou a incluir `dashboard_preview_calendar_retro_day_stage_impact`: RPC de gestão, somente leitura, que calcula o efeito hipotético da exceção do calendário geral para **um dia histórico**.
 - O servidor agrupa janelas de expediente e pausas com intervalos PostgreSQL, evita contagem duplicada de pausas sobrepostas e compara os minutos planejados antes/depois, por intervalo de etapa/OS. Com mais de 300 OS ou 1.200 intervalos, falha em vez de amostrar resultados.
 - Intervalos sem evidência, com versão de calendário incompatível, com revisão setorial ativa, pausas abertas ou duração com segundos não arredondados são apresentados como **inconclusivos**.
 - `DashboardCalendarRetroApprovalPanel` exibe a prévia feita no servidor ao lado da prévia cliente já existente, sem prometer equivalência a horas efetivamente trabalhadas.
@@ -138,7 +138,7 @@
 
 ## Nono incremento (09/11/2026) — triagem de alertas por etapa, sem banco de testes
 
-- A prévia SQL já proposta em `20261109153000_dashboard_calendar_retro_approval_preflight_stage1.sql` agora sinaliza, por etapa, **recalcular alertas**, **revisar histórico**, **indisponível**, **inconclusivo** ou **sem diferença de tempo neste dia**.
+- A prévia SQL já proposta em `20261109160007_dashboard_calendar_retro_approval_preflight_stage1.sql` agora sinaliza, por etapa, **recalcular alertas**, **revisar histórico**, **indisponível**, **inconclusivo** ou **sem diferença de tempo neste dia**.
 - A seleção compara evidências de cada etapa com a vigência dos limites publicados; **não transforma diferença de um único dia em classificação de alerta de toda a permanência**.
 - `DashboardCalendarRetroApprovalPanel` apresenta contagens de recálculo e de avaliações inconclusivas e detalha o motivo por etapa.
 - `dashboardCalendarRetroServerImpactRepository` rejeita respostas com contagens ou estados de alerta inconsistentes, mantendo `alerts_verified=false`, `approval_allowed=false` e `application_allowed=false`.
@@ -147,7 +147,7 @@
 
 ## Décimo incremento (09/11/2026) — prévia integral de alertas por OS
 
-- A migration **proposta, ainda não aplicada** `20261109153000_dashboard_calendar_retro_approval_preflight_stage1.sql` passou a conter `dashboard_preview_calendar_retro_full_stage_alerts`, RPC somente leitura e acessível via checagem gerencial.
+- A migration **proposta, ainda não aplicada** `20261109160007_dashboard_calendar_retro_approval_preflight_stage1.sql` passou a conter `dashboard_preview_calendar_retro_full_stage_alerts`, RPC somente leitura e acessível via checagem gerencial.
 - Para etapas que atravessam a data retroativa, percorre cada dia da permanência registrada, escolhendo a versão de calendário geral publicada e vigente; compara o expediente original com a proposta no dia específico, sem alterar o histórico.
 - Pausas são contadas por união de intervalos para evitar duplicidades; valores de jornada total, pausas e tempo útil são exibidos antes/depois.
 - Regras de integridade: máximo de 300 OS, 1.200 etapas e 366 dias por etapa; não calcula diante de intervalos inválidos, pausas inconclusivas, revisões históricas não comprovadas, incompatibilidade na entrada ou qualquer calendário setorial vigente no período.

@@ -44,7 +44,7 @@ describe("prévia de impacto retroativo calculada no Supabase", () => {
   });
   it("mantém RPC gerencial, limites de leitura e exclusão de efeitos históricos", () => {
     const sql = readFileSync(resolve(process.cwd(),
-      "supabase/migrations/20261109153000_dashboard_calendar_retro_approval_preflight_stage1.sql"
+      "supabase/migrations/20261109160007_dashboard_calendar_retro_approval_preflight_stage1.sql"
     ), "utf8");
     expect(sql).toContain("CREATE FUNCTION public.dashboard_preview_calendar_retro_day_stage_impact(");
     expect(sql).toContain("PERFORM public.dashboard_assert_manager()");
