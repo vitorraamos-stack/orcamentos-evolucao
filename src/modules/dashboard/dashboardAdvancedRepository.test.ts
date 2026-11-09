@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ from: vi.fn(), preparation: vi.fn(), thresholds: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  from: vi.fn(), preparation: vi.fn(), thresholds: vi.fn(), sectorCalendars: vi.fn(),
+}));
 vi.mock("@/lib/supabase", () => ({ supabase: { from: mocks.from } }));
 vi.mock("./dashboardPreparationRepository", () => ({
   listDashboardPreparationSources: mocks.preparation,
 }));
 vi.mock("./dashboardThresholdsRepository", () => ({
   loadPublishedThresholds: mocks.thresholds,
+}));
+vi.mock("./dashboardSectorCalendarRepository", () => ({
+  loadSectorCalendarRevisions: mocks.sectorCalendars,
 }));
 import {
   isMissingSchema, listDashboardAdvancedSources, listDashboardDependencies, listDashboardOperationalRules,
@@ -40,6 +45,7 @@ describe("Dashboard Etapa 4 — consulta RLS e degradação segura", () => {
     vi.clearAllMocks();
     mocks.preparation.mockResolvedValue({ items: [], operations: [] });
     mocks.thresholds.mockResolvedValue({ state: "unavailable", rows: [] });
+    mocks.sectorCalendars.mockResolvedValue({ state: "unavailable", revisions: [] });
   });
 
   it("recognizes missing schema only by explicit Postgres/PostgREST codes", () => {
@@ -64,6 +70,7 @@ describe("Dashboard Etapa 4 — consulta RLS e degradação segura", () => {
     expect(result.assignees).toEqual([]);
     expect(result.deadlines).toEqual([]);
     expect(result.thresholds.state).toBe("unavailable");
+    expect(result.sectorCalendars.state).toBe("unavailable");
   });
 
   it("surfaces permission errors instead of hiding them as missing configuration", async () => {
