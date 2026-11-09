@@ -4,6 +4,8 @@ import NotFound from "@/pages/NotFound";
 import Login from "@/pages/Login";
 import ResetPassword from "@/pages/ResetPassword";
 import Home from "@/pages/Home";
+import InitialRoute from "@/pages/InitialRoute";
+import { WelcomeTransitionProvider } from "@/components/WelcomeTransition";
 import HubOS from "@/pages/HubOS";
 import Galeria from "@/pages/Galeria";
 // IMPORTANTE: Agora estamos importando o componente real!
@@ -75,8 +77,11 @@ function Router() {
         </Layout>
       </Route>
 
-      {/* Rota Principal */}
-      <Route path="/">
+      {/* Entrada padrão conforme os módulos autorizados de cada colaborador. */}
+      <Route path="/" component={InitialRoute} />
+
+      {/* Calculadora preservada fora da rota raiz. */}
+      <Route path="/calculadora">
         <Layout>
           <RequireModule moduleKey="calculadora">
             <Home />
@@ -400,10 +405,12 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light" switchable>
         <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
+          <WelcomeTransitionProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+            </TooltipProvider>
+          </WelcomeTransitionProvider>
         </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>

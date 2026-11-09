@@ -3,8 +3,7 @@
   background: radial-gradient(ellipse at 105% 5%, #11365d, #071a34 68%);
 }
 .evolu-shell__branding { border-bottom: 1px solid rgba(159,195,225,.15); padding: 25px 22px 22px; }
-.evolu-shell__brand-name { margin-top:0; color:white; font-size:26px; font-weight:800; letter-spacing:-.055em; line-height:1.1; }
-.evolu-shell__brand-name span { color:#31b6f5; }
+.evolu-shell__brand-logo { display:block; width:100%; max-width:220px; height:auto; }
 .evolu-shell__navigation { scrollbar-color:#395979 transparent; scrollbar-width:thin; }
 .evolu-shell__navigation .evolu-nav__section { color:#8aa9c9; font-size:13px; letter-spacing:.14em; }
 .evolu-shell__navigation .evolu-nav__item {
@@ -20,7 +19,7 @@
 .evolu-shell__account { border-top:1px solid rgba(159,195,225,.15); background:rgba(0,12,28,.18); }
 .evolu-shell__avatar {
   display:flex; flex:0 0 auto; align-items:center; justify-content:center; width:38px; height:38px;
-  border-radius:12px; background:#153f67; color:#a9e3ff; font-size:14px; font-weight:800;
+  border-radius:50%; overflow:hidden; background:#153f67; color:#a9e3ff; font-size:14px; font-weight:800;
 }
 .evolu-shell__signout { min-height:40px; color:#c2d4e6; }
 .evolu-shell__signout:hover, .evolu-shell__signout:focus-visible { background:rgba(91,150,207,.16); color:white; }

@@ -14,15 +14,18 @@ describe("EvoluSystem premium shell", () => {
     expect(layout).toContain("setMobileOpen(false)");
   });
 
-  it("shows only the EvoluSystem wordmark in desktop and mobile sidebars", () => {
-    const sidebarBrands = layout.match(/className="evolu-shell__brand-name"/g) ?? [];
+  it("shows the official EvoluSystem SVG in desktop and mobile sidebars", () => {
+    const sidebarBrands = layout.match(/src="\/evolusystem-logo-dark\.svg"/g) ?? [];
     expect(sidebarBrands).toHaveLength(2);
     expect(layout).not.toContain('src="/logo-branca.png"');
     expect(layout).not.toContain("evolu-shell__company-logo");
     expect(layout).not.toContain("evolu-shell__brand-description");
     expect(layout).not.toContain("evolu-shell__cmyk");
+    expect(shellStyles).toContain("evolu-shell__brand-logo");
     expect(shellStyles).not.toContain("evolu-shell__company-logo");
-    expect(login).toContain('src="/logo-branca.png"');
+    expect(login).toContain('src="/evolusystem-logo-dark.svg"');
+    expect(login).toContain('src="/evolusystem-logo.svg"');
+    expect(login).not.toContain('src="/logo-branca.png"');
   });
 
   it("keeps account identification in the sidebar and a compact mobile-only header", () => {

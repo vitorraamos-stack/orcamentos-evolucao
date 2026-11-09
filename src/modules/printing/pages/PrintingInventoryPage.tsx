@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
+import { getCurrentUserDisplayName } from "@/shared/users/userDisplay";
 import {
   loadPrintStock, recordPrint, searchPrintOrders,
   type PrintOrderSuggestion,
@@ -349,7 +350,7 @@ export default function PrintingInventoryPage() {
           </Card>
         </>
       )}
-      <footer className="text-[13px] text-muted-foreground">As movimentações são vinculadas ao usuário autenticado{user?.email ? " (" + user.email + ")" : ""} e gravadas no histórico.</footer>
+      <footer className="text-[13px] text-muted-foreground">As movimentações são vinculadas ao usuário autenticado ({getCurrentUserDisplayName(user)}) e gravadas no histórico.</footer>
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { getCurrentUserDisplayName } from "@/shared/users/userDisplay";
+import { useAvatarPhoto } from "@/shared/users/avatarPhoto";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,6 +46,9 @@ export default function Layout({ children }: LayoutProps) {
   } = useAuth();
   const [location, setLocation] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Hooks must run on every render, including loading and signed-out states.
+  const avatarUrl = useAvatarPhoto(user?.id);
   const isCreateOrderPage = location.startsWith("/os/novo");
   const isOrdersCentralPage = location === "/os";
   const isArtworkCentralPage = location.startsWith("/os/arte");
@@ -161,12 +166,12 @@ export default function Layout({ children }: LayoutProps) {
       )}
 
       {canViewCalculadora && (
-        <Link href="/">
+        <Link href="/calculadora">
           <Button
-            variant={location === "/" ? "secondary" : "ghost"}
+            variant={location === "/calculadora" ? "secondary" : "ghost"}
             className={cn(
               "evolu-nav__item w-full justify-start",
-              location === "/" &&
+              location === "/calculadora" &&
                 "bg-sidebar-accent text-sidebar-accent-foreground"
             )}
           >
@@ -303,7 +308,8 @@ export default function Layout({ children }: LayoutProps) {
     </div>
   );
 
-  const initial = (user.email?.trim().charAt(0) || "E").toUpperCase();
+  const displayName = getCurrentUserDisplayName(user);
+  const initial = displayName.charAt(0).toUpperCase();
 
   return (
     <div className={cn(
@@ -312,16 +318,20 @@ export default function Layout({ children }: LayoutProps) {
     )}>
       <aside className="evolu-shell__sidebar hidden w-[264px] shrink-0 flex-col text-white md:flex" aria-label="Menu lateral">
         <div className="evolu-shell__branding">
-          <div className="evolu-shell__brand-name">Evolu<span>System</span></div>
+          <img src="/evolusystem-logo-dark.svg" alt="EvoluSystem" className="evolu-shell__brand-logo" />
         </div>
         <nav className="evolu-shell__navigation min-h-0 flex-1 overflow-y-auto px-3 py-3" aria-label="Navegação principal">
           <NavItems />
         </nav>
         <div className="evolu-shell__account px-3 py-4">
           <div className="flex items-center gap-3 px-2 pb-3">
-            <div className="evolu-shell__avatar" aria-hidden="true">{initial}</div>
+            <div className="evolu-shell__avatar">
+              {avatarUrl
+                ? <img className="h-full w-full object-cover" src={avatarUrl} alt={`Foto de ${displayName}`} />
+                : <span aria-hidden="true">{initial}</span>}
+            </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-white">{user.email}</p>
+              <p className="truncate text-sm font-semibold text-white">{displayName}</p>
               <p className="truncate text-xs text-[#9BB6D3]">{getRoleLabel(role)}</p>
             </div>
           </div>
@@ -344,7 +354,7 @@ export default function Layout({ children }: LayoutProps) {
               <SheetContent side="left" className="w-[min(85vw,300px)] gap-0 border-r-0 bg-[#071A34] p-0 text-white">
                 <SheetTitle className="sr-only">Menu do EvoluSystem</SheetTitle>
                 <div className="evolu-shell__branding shrink-0">
-                  <div className="evolu-shell__brand-name">Evolu<span>System</span></div>
+                  <img src="/evolusystem-logo-dark.svg" alt="EvoluSystem" className="evolu-shell__brand-logo" />
                 </div>
                 <nav
                   aria-label="Navegação principal"
@@ -356,7 +366,7 @@ export default function Layout({ children }: LayoutProps) {
                   <NavItems />
                 </nav>
                 <div className="evolu-shell__account shrink-0 px-3 py-4">
-                  <p className="mb-3 truncate px-2 text-xs text-[#C2D2E5]">{user.email}</p>
+                  <p className="mb-3 truncate px-2 text-xs text-[#C2D2E5]">{displayName}</p>
                   <ThemeSwitcher />
                   <Button variant="ghost" className="evolu-shell__signout w-full justify-start" onClick={() => { setMobileOpen(false); void signOut(); }}>
                     <LogOut className="mr-2 h-4 w-4" aria-hidden="true" /> Sair do sistema
@@ -365,9 +375,7 @@ export default function Layout({ children }: LayoutProps) {
               </SheetContent>
             </Sheet>
             <div className="min-w-0">
-              <p className="truncate text-base font-extrabold tracking-[-.035em] text-[#172D49] dark:text-foreground">
-                Evolu<span className="text-[#068BCF]">System</span>
-              </p>
+              <img src="/evolusystem-logo.svg" alt="EvoluSystem" className="h-auto w-[180px] max-w-full" />
               <p className="truncate text-[10px] font-semibold uppercase tracking-[.14em] text-[#71839A]">
                 Controle Operacional
               </p>

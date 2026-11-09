@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { APP_MODULE_KEYS, type AppModuleKey } from '@/constants/modules';
 import { type HubRole } from '@/lib/hubRoles';
 import { buildAuthorizationSnapshot } from '@/lib/authz';
+import { clearAvatarPhotoCache, preloadAvatarPhoto } from '@/shared/users/avatarPhoto';
 
 interface AuthContextType {
   user: User | null;
@@ -42,16 +43,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [modules, setModules] = useState<AppModuleKey[]>([]);
 
   useEffect(() => {
+    // Start downloading the signed, private photo as soon as authentication is available.
+    // Defer Supabase requests outside the auth callback to avoid auth-lock contention.
+    const prefetchAvatar = (currentUser: User) => {
+      window.setTimeout(() => {
+        void preloadAvatarPhoto(currentUser.id).catch(() => { /* Initials remain available. */ });
+      }, 0);
+    };
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      if (session?.user) prefetchAvatar(session.user);
       void loadUserData(session?.user ?? null);
       setLoading(false);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (_event === 'SIGNED_OUT') clearAvatarPhotoCache();
+      if (session?.user && (_event === 'SIGNED_IN' || _event === 'INITIAL_SESSION')) {
+        prefetchAvatar(session.user);
+      }
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -94,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    clearAvatarPhotoCache();
   };
 
   const authorization = buildAuthorizationSnapshot(role);

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { orderItemInputSchema } from "@/features/hubos/createOrderDomain";
 import { supabase } from "@/lib/supabase";
+import { loadUserDisplayNamesByIds, type UserDisplayName } from "@/shared/repositories/userDisplayNamesRepository";
 import type { OsOrder, OsOrderLayoutAsset } from "@/features/hubos/types";
 import type {
   AssigneeScope,
@@ -62,13 +63,15 @@ const throwIfError = (error: { message: string } | null) => {
 };
 const profileToUser = (
   profile: unknown,
-  id: string
+  id: string,
+  names: Map<string, UserDisplayName>
 ): UserOption | undefined => {
   const row = Array.isArray(profile) ? profile[0] : profile;
   if (!row || typeof row !== "object") return undefined;
   const email =
     "email" in row && typeof row.email === "string" ? row.email : null;
-  return { id, email, name: email ?? "Usuário" };
+  const display = names.get(id);
+  return { id, email: display?.email ?? email, name: display?.name ?? email ?? "Usuário" };
 };
 
 export async function getOrderDetail(orderId: string): Promise<OrderDetail> {
@@ -95,9 +98,11 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail> {
   throwIfError(orderResult.error);
   throwIfError(assigneesResult.error);
   throwIfError(deadlinesResult.error);
-  const assignees = (assigneesResult.data ?? []).map(row => ({
+  const assigneeRows = assigneesResult.data ?? [];
+  const names = await loadUserDisplayNamesByIds(assigneeRows.map(row => row.user_id));
+  const assignees = assigneeRows.map(row => ({
     ...row,
-    user: profileToUser(row.profiles, row.user_id),
+    user: profileToUser(row.profiles, row.user_id, names),
   })) as unknown as OrderAssignee[];
   return {
     order: orderResult.data as unknown as OsOrder,
@@ -113,11 +118,12 @@ export async function listAssignableUsers(limit = 50): Promise<UserOption[]> {
     .order("email")
     .limit(Math.min(100, Math.max(1, limit)));
   throwIfError(error);
+  const names = await loadUserDisplayNamesByIds((data ?? []).map(profile => profile.id));
   return (data ?? []).map(profile => ({
     id: profile.id,
     email: profile.email,
-    name: profile.email ?? "Usuário",
-  }));
+    name: names.get(profile.id)?.name ?? profile.email ?? "Usuário",
+  })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }
 
 export async function setOrderAssignee(
@@ -458,9 +464,11 @@ export async function listOrderComments(orderId: string) {
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
   throwIfError(error);
-  return (data ?? []).map(row => ({
+  const rows = data ?? [];
+  const names = await loadUserDisplayNamesByIds(rows.map(row => row.user_id));
+  return rows.map(row => ({
     ...row,
-    user: profileToUser(row.profiles, row.user_id),
+    user: profileToUser(row.profiles, row.user_id, names),
   })) as unknown as OrderComment[];
 }
 export async function createOrderComment(orderId: string, message: string) {

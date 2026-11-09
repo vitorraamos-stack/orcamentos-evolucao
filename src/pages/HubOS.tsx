@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
+import { getCurrentUserDisplayName } from "@/shared/users/userDisplay";
 import { ART_COLUMNS, PROD_COLUMNS } from "@/features/hubos/constants";
 import type {
   ArtDirectionTag,
@@ -876,7 +877,7 @@ export default function HubOS() {
         payload: {
           avisado: !alreadyAvisado,
           actor_name:
-            user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
+            user ? getCurrentUserDisplayName(user) : null,
         },
         created_by: user?.id ?? null,
       });
@@ -910,7 +911,7 @@ export default function HubOS() {
       const result = await markRetiradoAndFinalize({
         identity: { sourceType: "os_orders", sourceId: order.id },
         actorName:
-          user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null,
+          user ? getCurrentUserDisplayName(user) : null,
       });
 
       updateLocalOrder({
@@ -940,7 +941,7 @@ export default function HubOS() {
       await archiveOrder(
         order.id,
         "Arquivamento solicitado no Hub OS legado",
-        user?.user_metadata?.full_name ?? user?.email ?? user?.id ?? null
+        user ? getCurrentUserDisplayName(user) : null
       );
       toast.success("Card arquivado.");
     } catch (error) {

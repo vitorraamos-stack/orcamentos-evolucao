@@ -1,0 +1,112 @@
+.evolu-welcome {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  isolation: isolate;
+  color: white;
+  background: rgba(4, 18, 39, 0.93);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  opacity: 1;
+  transition: opacity 280ms ease, backdrop-filter 280ms ease;
+}
+.evolu-welcome--exit {
+  opacity: 0;
+  pointer-events: none;
+}
+.evolu-welcome__glow {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(0, 148, 225, 0.24), transparent 44%),
+    radial-gradient(circle at 65% 80%, rgba(215, 0, 144, 0.08), transparent 45%),
+    linear-gradient(145deg, #0a2342, #061325);
+}
+.evolu-welcome__content {
+  width: min(100%, 460px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: evolu-welcome-arrive 400ms both ease-out;
+}
+.evolu-welcome__brand {
+  display: block;
+  width: min(200px, 65vw);
+  height: auto;
+  margin-bottom: 42px;
+}
+.evolu-welcome__avatar {
+  width: 110px;
+  height: 110px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 3px solid rgba(121, 208, 255, 0.9);
+  background: #17456d;
+  box-shadow: 0 0 0 8px rgba(0, 150, 233, 0.09), 0 20px 65px rgba(0, 0, 0, 0.27);
+  color: #e6f7ff;
+  font-size: 44px;
+  font-weight: 700;
+}
+.evolu-welcome__photo { width: 100%; height: 100%; object-fit: cover; }
+.evolu-welcome__avatar-pending {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(198, 231, 251, 0.25);
+  border-top-color: rgba(198, 231, 251, 0.95);
+  border-radius: 50%;
+  animation: evolu-welcome-avatar-spin 750ms linear infinite;
+}
+@keyframes evolu-welcome-avatar-spin {
+  to { transform: rotate(360deg); }
+}
+.evolu-welcome__heading {
+  margin: 27px 0 8px;
+  font-size: clamp(25px, 5vw, 36px);
+  font-weight: 750;
+  line-height: 1.22;
+  letter-spacing: -0.035em;
+}
+.evolu-welcome__subtitle {
+  color: #bdd6ea;
+  font-size: 15px;
+  letter-spacing: 0.015em;
+}
+.evolu-welcome__track {
+  position: relative;
+  margin-top: 28px;
+  width: min(200px, 65vw);
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(193, 222, 243, 0.2);
+  overflow: hidden;
+}
+.evolu-welcome__track > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 44%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #008ad0, #53c6fa);
+  animation: evolu-welcome-loading 1.2s ease-in-out infinite alternate;
+}
+@keyframes evolu-welcome-loading {
+  from { transform: translateX(-90%); }
+  to { transform: translateX(330%); }
+}
+@keyframes evolu-welcome-arrive {
+  from { opacity: 0; transform: translateY(13px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .evolu-welcome, .evolu-welcome__content, .evolu-welcome__track > span, .evolu-welcome__avatar-pending {
+    animation: none !important;
+    transition: none !important;
+  }
+  .evolu-welcome__track > span { width: 100%; opacity: .6; }
+}
