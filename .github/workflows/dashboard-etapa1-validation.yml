@@ -1,11 +1,20 @@
 name: Dashboard Etapa 1 — validação sem deploy
 
 on:
+  # Validate the isolated feature branch even if GitHub cannot start PR jobs.
+  push:
+    branches: [feat/dashboard-operacional-politicas-etapa1-20261109]
+    paths:
+      - "src/modules/dashboard/**"
+      - "supabase/migrations/*dashboard*"
+      - "docs/tasks/dashboard-operacional-etapa1-politicas.md"
+      - ".github/workflows/dashboard-etapa1-validation.yml"
   pull_request:
     branches: [main]
     paths:
       - "src/modules/dashboard/**"
-      - "docs/tasks/dashboard-operacional-etapa1.md"
+      - "supabase/migrations/*dashboard*"
+      - "docs/tasks/dashboard-operacional-etapa1-politicas.md"
       - ".github/workflows/dashboard-etapa1-validation.yml"
 
 permissions:
