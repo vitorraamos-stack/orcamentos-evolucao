@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { getCurrentUserDisplayName } from "@/shared/users/userDisplay";
 import type { OsOrderLayoutAsset } from "@/features/hubos/types";
 import { fetchOsAssetDownloadUrl } from "@/modules/hub-os/api";
 import { OrderHeader } from "../components/OrderHeader";
@@ -247,7 +248,7 @@ export default function OrderDetailPage() {
       const created = await createOrderComment(detail.order.id, text);
       const author = user ? {
         id: user.id,
-        name: user.user_metadata?.full_name || user.email || "Usuário",
+        name: getCurrentUserDisplayName(user),
         email: user.email ?? null,
       } : undefined;
       setComments(value => ({
@@ -300,7 +301,7 @@ export default function OrderDetailPage() {
       readCoordinator.current.finish(ticket);
     }
   };
-  const actorName=user?.user_metadata?.full_name??user?.email??user?.id??null;
+  const actorName=user ? getCurrentUserDisplayName(user) : null;
   const archive=async(reason:string)=>{try{await archiveOrderSecure({id:detail.order.id,reason,actorName});toast.success("OS arquivada.");navigate("/os");}catch(error){toast.error(message(error));throw error;}};
   const deleted=async(reason:string,confirmation:string)=>deleteOrderPermanently({id:detail.order.id,reason,confirmation,actorName});
   const cleanup=async(result:OrderDeletionResult):Promise<boolean>=>{
