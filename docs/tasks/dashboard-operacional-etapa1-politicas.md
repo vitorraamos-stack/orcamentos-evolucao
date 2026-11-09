@@ -144,3 +144,14 @@
 - `dashboardCalendarRetroServerImpactRepository` rejeita respostas com contagens ou estados de alerta inconsistentes, mantendo `alerts_verified=false`, `approval_allowed=false` e `application_allowed=false`.
 - Por orientação da gestão, **não criar um banco de testes**. A validação nesta etapa utiliza TypeScript, testes pontuais e build no GitHub Actions; **não substitui execução SQL com transações, RLS e concorrência em ambiente apropriado**. O código proposto permanece isolado e indisponível no Supabase real.
 - Nenhum merge, migration aplicada ou deploy realizado. A sincronização integral com a `main` continua pendente.
+
+## Décimo incremento (09/11/2026) — prévia integral de alertas por OS
+
+- A migration **proposta, ainda não aplicada** `20261109153000_dashboard_calendar_retro_approval_preflight_stage1.sql` passou a conter `dashboard_preview_calendar_retro_full_stage_alerts`, RPC somente leitura e acessível via checagem gerencial.
+- Para etapas que atravessam a data retroativa, percorre cada dia da permanência registrada, escolhendo a versão de calendário geral publicada e vigente; compara o expediente original com a proposta no dia específico, sem alterar o histórico.
+- Pausas são contadas por união de intervalos para evitar duplicidades; valores de jornada total, pausas e tempo útil são exibidos antes/depois.
+- Regras de integridade: máximo de 300 OS, 1.200 etapas e 366 dias por etapa; não calcula diante de intervalos inválidos, pausas inconclusivas, revisões históricas não comprovadas, incompatibilidade na entrada ou qualquer calendário setorial vigente no período.
+- Quando houver limites de alerta vigentes e compatíveis com uma etapa **aberta**, a RPC retorna níveis de criticidade **candidatos** com base no total da permanência. Etapas encerradas, limites sem vigência comprovada ou dados insuficientes continuam sem classificação.
+- O painel `DashboardCalendarRetroApprovalPanel` expõe os resultados de forma consultiva. O cliente valida contagens e impede a representação de dados contraditórios como confirmação.
+- **Não há execução SQL verificada no PostgreSQL**: banco de testes separado dispensado pela gestão; CI de TypeScript/testes/build não comprova integridade SQL, RLS ou concorrência. `historical_coverage_verified=false`, `alerts_verified=false`, `approval_allowed=false` e `application_allowed=false` continuam inalterados.
+- Sem aplicação de migrations, merge ou deploy no projeto em produção.
