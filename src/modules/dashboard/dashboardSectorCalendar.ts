@@ -94,14 +94,16 @@ export function selectSectorCalendarRevision(
   baseCalendarId: string, date: string,
 ): SectorCalendarRevision | null {
   if (!isCalendarDate(date)) return null;
-  const eligible = rows.filter(row =>
+  // Select the latest effective revision FIRST, then check its end date.
+  // An expired newer revision must not revive an older superseded snapshot.
+  const latest = rows.filter(row =>
     row.scope === scope && row.base_calendar_version_id === baseCalendarId &&
-    row.effective_from <= date && (row.effective_until === null || date <= row.effective_until)
-  );
-  // Most recently effective revision wins. Same-date ties are prohibited by SQL.
-  return eligible.sort((a,b) =>
+    row.effective_from <= date
+  ).sort((a,b) =>
     b.effective_from.localeCompare(a.effective_from) || b.revision - a.revision
-  )[0] ?? null;
+  )[0];
+  return latest && (latest.effective_until === null || date <= latest.effective_until)
+    ? latest : null;
 }
 
 export type ResolvedSectorDay =
