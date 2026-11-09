@@ -1,5 +1,6 @@
 import type { DashboardOrder } from "./dashboardModel";
 import type { PreparationItem, PreparationOperation } from "./dashboardPreparation";
+import { assessOperationalThreshold } from "./dashboardOperationalPolicy";
 
 /**
  * Dashboard stage 4: read-only analysis from persisted sources. Rules,
@@ -84,7 +85,22 @@ export type WorkCalendarException = {
   ends_local: string | null;
 };
 
+export type PublishedThreshold = {
+  scope: OperationalScope;
+  attention_limit_minutes: number;
+  critical_limit_minutes: number;
+  calendar_version_id: string;
+  revision: number;
+  effective_from: string;
+  updated_at: string;
+};
+export type ThresholdSource =
+  | { state: "unavailable"; rows: [] }
+  | { state: "available"; rows: PublishedThreshold[] };
+
 export type AdvancedSources = {
+  /** Undefined only in existing tests/legacy snapshots: treat as unavailable, never as zero. */
+  thresholds?: ThresholdSource;
   items: PreparationItem[];
   operations: PreparationOperation[];
   assignees: StageAssignee[];
@@ -130,6 +146,10 @@ export type AdvancedOrderAssessment = {
   timing: "unavailable" | "insufficient" | "available";
   timingReason: string;
   elapsedWorkingMinutes: number | null;
+  totalWorkingMinutes: number | null;
+  pauseWorkingMinutes: number | null;
+  thresholdSeverity: "normal" | "attention" | "critical" | null;
+  thresholdReason: string;
   limitMinutes: number | null;
   overLimit: boolean | null;
 };
@@ -394,12 +414,18 @@ type TimingAssessment = {
   state: "unavailable" | "insufficient" | "available";
   reason: string;
   elapsedWorkingMinutes: number | null;
+  totalWorkingMinutes: number | null;
+  pauseWorkingMinutes: number | null;
   limitMinutes: number | null;
   overLimit: boolean | null;
 };
 
 function unavailableTiming(reason: string, state: "unavailable" | "insufficient" = "unavailable"): TimingAssessment {
-  return { state, reason, elapsedWorkingMinutes: null, limitMinutes: null, overLimit: null };
+  return {
+    state, reason, elapsedWorkingMinutes: null,
+    totalWorkingMinutes: null, pauseWorkingMinutes: null,
+    limitMinutes: null, overLimit: null,
+  };
 }
 
 function assessStageTiming(
@@ -500,7 +526,11 @@ function assessStageTiming(
     : overLimit
       ? "Permanência útil atingiu ou ultrapassou o limite publicado. Isso sinaliza excedente de permanência, mas não comprova sozinho a causa."
       : "Permanência útil dentro do limite publicado.";
-  return { state: "available", reason, elapsedWorkingMinutes, limitMinutes, overLimit };
+  return {
+    state: "available", reason, elapsedWorkingMinutes,
+    totalWorkingMinutes: grossMinutes, pauseWorkingMinutes: pauseMinutes,
+    limitMinutes, overLimit,
+  };
 }
 
 /**
@@ -525,6 +555,26 @@ export function buildAdvancedAssessments(
     const scope = orderOperationalScope(order);
     const configuredScopeRule = rules.state === "configured" && rules.rules.some(r => r.scope === scope);
     const timing = assessStageTiming(order, scope, sources, now);
+    const published = sources.thresholds?.state === "available"
+      ? sources.thresholds.rows.find(row => row.scope === scope) : undefined;
+    const currentInterval = sources.stageIntervals.find(interval =>
+      interval.order_id === order.id && interval.scope === scope && interval.left_at === null
+    );
+    const thresholdCanApply = Boolean(
+      published && currentInterval && currentInterval.calendar_version_id === published.calendar_version_id &&
+      Date.parse(published.effective_from) <= Date.parse(currentInterval.entered_at)
+    );
+    const threshold = published && thresholdCanApply
+      ? assessOperationalThreshold(timing.totalWorkingMinutes, {
+          attentionMinutes: published.attention_limit_minutes,
+          criticalMinutes: published.critical_limit_minutes,
+        })
+      : {
+          state: "unavailable" as const, severity: null,
+          reason: published
+            ? "Os novos limites não cobrem a revisão e vigência desta entrada na etapa."
+            : "Limites Atenção/Crítico não publicados ou indisponíveis para este setor.",
+        };
     return {
       order, scope, blocked,
       confirmedBlockCount: blocked.length, dependency,
@@ -533,6 +583,10 @@ export function buildAdvancedAssessments(
       timing: timing.state,
       timingReason: timing.reason,
       elapsedWorkingMinutes: timing.elapsedWorkingMinutes,
+      totalWorkingMinutes: timing.totalWorkingMinutes,
+      pauseWorkingMinutes: timing.pauseWorkingMinutes,
+      thresholdSeverity: threshold.severity,
+      thresholdReason: threshold.reason,
       limitMinutes: timing.limitMinutes,
       overLimit: timing.overLimit,
     };
