@@ -69,13 +69,27 @@ export class OfficialEstimatorFormService {
 
   private async availableInstallments() {
     const result = [1, 2, 3];
-    for (let installments = 4; installments <= 12; installments += 1) {
-      try {
-        await this.pricing.loadPaymentTerm(installments);
-        result.push(installments);
-      } catch (error) {
-        if (!isMissingPricing(error, "PRICING_PAYMENT_TERM_NOT_FOUND"))
-          throw error;
+    // Resolve independent payment terms in small parallel batches to avoid
+    // nine consecutive database round trips during every form opening.
+    for (let first = 4; first <= 12; first += 3) {
+      const candidates = Array.from(
+        { length: Math.min(3, 13 - first) },
+        (_, offset) => first + offset
+      );
+      const available = await Promise.all(
+        candidates.map(async installments => {
+          try {
+            await this.pricing.loadPaymentTerm(installments);
+            return installments;
+          } catch (error) {
+            if (!isMissingPricing(error, "PRICING_PAYMENT_TERM_NOT_FOUND"))
+              throw error;
+            return null;
+          }
+        })
+      );
+      for (const installments of available) {
+        if (installments !== null) result.push(installments);
       }
     }
     return result;
@@ -172,34 +186,48 @@ export class OfficialEstimatorFormService {
 
     const products: EstimatorFormDefinition["products"] = [];
 
-    for (const product of productsResult.data ?? []) {
-      if (!(await this.productHasUsablePricing(product.id))) continue;
+    const activeProducts = (productsResult.data ?? []) as Array<{
+      id: string;
+      code: string;
+      name: string;
+    }>;
 
-      const versionResult = await this.db
-        .from("product_versions")
-        .select("id,version_number,status")
-        .eq("product_id", product.id)
-        .eq("status", "PUBLISHED")
-        .order("version_number", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+    // Each product may require several independent RPCs. Parallelize a
+    // bounded number while retaining the alphabetical order of the catalog.
+    for (let start = 0; start < activeProducts.length; start += 4) {
+      const batch = await Promise.all(
+        activeProducts.slice(start, start + 4).map(async product => {
+          if (!(await this.productHasUsablePricing(product.id))) return null;
 
-      if (versionResult.error)
-        throw new EstimatorFormServiceError(
-          500,
-          "ESTIMATOR_FORM_UNAVAILABLE",
-          "Estimator form configuration is unavailable."
-        );
-      if (!versionResult.data) continue;
+          const versionResult = await this.db
+            .from("product_versions")
+            .select("id,version_number,status")
+            .eq("product_id", product.id)
+            .eq("status", "PUBLISHED")
+            .order("version_number", { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-      products.push(
-        await this.mapProductVersion(
-          product,
-          versionResult.data,
-          additionsConfigured,
-          true
-        )
+          if (versionResult.error)
+            throw new EstimatorFormServiceError(
+              500,
+              "ESTIMATOR_FORM_UNAVAILABLE",
+              "Estimator form configuration is unavailable."
+            );
+          if (!versionResult.data) return null;
+
+          return this.mapProductVersion(
+            product,
+            versionResult.data,
+            additionsConfigured,
+            true
+          );
+        })
       );
+
+      for (const mapped of batch) {
+        if (mapped) products.push(mapped);
+      }
     }
 
     if (
