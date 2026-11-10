@@ -58,7 +58,8 @@ declare
   v_order public.os_orders;
   v_updated public.os_orders;
   v_payload jsonb;
-  v_started_at timestamptz := now();
+  v_transition_at timestamptz := now();
+  v_started_at timestamptz;
   v_delivery_date date;
 begin
   select p.role into v_role from public.profiles p where p.id = v_uid;
@@ -101,7 +102,7 @@ begin
   update public.os_orders o
   set art_status = 'Produzir', prod_status = 'Produção',
       delivery_deadline_started_at = v_started_at,
-      delivery_date = v_delivery_date, updated_by = v_uid, updated_at = v_started_at
+      delivery_date = v_delivery_date, updated_by = v_uid, updated_at = v_transition_at
   where o.id = p_os_id returning * into v_updated;
 
   v_payload := (coalesce(p_event_payload, '{}'::jsonb)
@@ -115,7 +116,7 @@ begin
       'delivery_date', v_delivery_date
     );
   insert into public.os_orders_event (os_id, type, payload, created_by, created_at)
-  values (p_os_id, 'status_change', v_payload, v_uid, v_started_at);
+  values (p_os_id, 'status_change', v_payload, v_uid, v_transition_at);
   return v_updated;
 end;
 $$;
