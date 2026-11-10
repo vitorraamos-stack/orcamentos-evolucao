@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { OrderItem } from "../types/orderDetail";
@@ -33,6 +34,19 @@ describe("OS summary supplemental sections", () => {
     const html = render({ items: Array.from({ length: 8 }, (_, i) => item(String(i))) });
     expect(html).toContain("Mais 3 produto(s)");
     expect(html).not.toContain("Letreiro de acrílico 7");
+  });
+
+  it("keeps only the left blue accent on a neutral products card", () => {
+    const css = readFileSync(new URL("../pages/order-detail-premium.css", import.meta.url), "utf8");
+    const productStyles = css.slice(css.indexOf("/* OS summary: neutral product card"));
+    expect(productStyles).toContain("border-color: var(--detail-border);");
+    expect(productStyles).toContain("border-left: 3px solid #168fce;");
+    expect(productStyles).toContain("background: var(--card);");
+    expect(productStyles).toContain("background: transparent;");
+    expect(productStyles).toContain("border-bottom: 1px solid var(--detail-border);");
+    expect(productStyles).toContain("border-left-color: #35a6dc;");
+    expect(productStyles).toContain("border-bottom-color: var(--border);");
+    expect(productStyles).not.toContain("color-mix");
   });
   it("removes the unused visual reference card while retaining products", () => {
     const html = render();
