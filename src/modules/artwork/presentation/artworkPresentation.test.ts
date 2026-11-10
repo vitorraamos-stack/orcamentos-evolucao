@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { BoardCardModel, BoardFiltersState } from "@/shared/kanban/types";
 import { EMPTY_BOARD_FILTERS } from "@/shared/kanban/types";
-import { countArtworkAdvancedFilters, formatArtworkDeadline, getArtworkQueuePositions, sortArtworkCards } from "./artworkPresentation";
+import { countArtworkAdvancedFilters, formatArtworkDeadline, getArtworkQueuePositions, getArtworkStartSla, sortArtworkCards } from "./artworkPresentation";
 
 const card = (id: string, overrides: Record<string, unknown> = {}): BoardCardModel => ({
   order: { id, art_status: "Fila de Arte", created_at: `2026-01-0${id}T00:00:00Z`, delivery_date: null, client_name: id, sale_number: id, ...overrides },
@@ -16,6 +16,24 @@ describe("artworkPresentation", () => {
     expect(formatArtworkDeadline("2026-10-03", now)).toBe("Amanhã");
     expect(formatArtworkDeadline("2026-10-01", now)).toBe("Atrasado há 1 dia");
     expect(formatArtworkDeadline("2026-10-10", now)).toBe("10/10/2026");
+  });
+
+  it("calcula o SLA de edição em dias úteis incluindo fim de semana", () => {
+    const order = { created_at: "2026-11-06T13:00:00Z", art_direction_tag: "ARTE_PRONTA_EDICAO", art_status: "Caixa de Entrada" } as const;
+    expect(getArtworkStartSla(order, new Date("2026-11-09T15:00:00Z"))).toEqual({
+      dueDate: "2026-11-10", rule: "2 dias úteis", state: "PENDING",
+    });
+    expect(getArtworkStartSla(order, new Date("2026-11-10T15:00:00Z"))?.state).toBe("TODAY");
+    expect(getArtworkStartSla(order, new Date("2026-11-11T15:00:00Z"))?.state).toBe("OVERDUE");
+    expect(getArtworkStartSla({ ...order, art_status: "Em Criação" }, new Date("2026-11-11T15:00:00Z"))?.state).toBe("STARTED");
+  });
+
+  it("calcula SLA de criação em três dias corridos sem somar à entrega", () => {
+    const order = { created_at: "2026-11-06T13:00:00Z", art_direction_tag: "CRIACAO_ARTE", art_status: "Fila de Arte" } as const;
+    expect(getArtworkStartSla(order, new Date("2026-11-08T12:00:00Z"))).toEqual({
+      dueDate: "2026-11-09", rule: "3 dias corridos", state: "PENDING",
+    });
+    expect(getArtworkStartSla({ ...order, art_direction_tag: null })).toBeNull();
   });
 
   it("mantém posição real da fila antes dos filtros visuais", () => {
