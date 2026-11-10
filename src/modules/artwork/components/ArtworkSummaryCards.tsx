@@ -1,4 +1,4 @@
-import { Clock3, Palette, Pencil, TriangleAlert, Zap } from "lucide-react";
+import { Clock3, Inbox, Palette, TriangleAlert, Zap } from "lucide-react";
 import type { BoardStatus } from "@/shared/kanban/types";
 
 export function ArtworkSummaryCards({
@@ -20,7 +20,13 @@ export function ArtworkSummaryCards({
 }) {
   const config = [
     {
-      label: "Em Arte",
+      label: "Caixa de Entrada",
+      icon: Inbox,
+      active: focusedColumn === "Caixa de Entrada",
+      click: () => onFocus("Caixa de Entrada"),
+    },
+    {
+      label: "Arte em andamento",
       icon: Palette,
       active: focusedColumn === "Em Criação",
       click: () => onFocus("Em Criação"),
@@ -30,12 +36,6 @@ export function ArtworkSummaryCards({
       icon: Clock3,
       active: focusedColumn === "Para Aprovação",
       click: () => onFocus("Para Aprovação"),
-    },
-    {
-      label: "Ajustes",
-      icon: Pencil,
-      active: focusedColumn === "Ajustes",
-      click: () => onFocus("Ajustes"),
     },
     { label: "Urgentes", icon: Zap, active: urgent, click: onUrgent },
     {
