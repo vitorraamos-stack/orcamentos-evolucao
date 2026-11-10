@@ -18,6 +18,27 @@ describe("New order sticky summary layout", () => {
     expect(source).toContain('isOrderDetailPage && "evolu-shell--order-detail h-dvh overflow-hidden"');
   });
 
+  it("uses the available viewport width only for new OS pages", () => {
+    const source = read("src/components/Layout.tsx");
+    expect(source).toContain('isCreateOrderPage && "evolu-shell--create-order"');
+    expect(source).toMatch(/isOrdersCentralPage\s*\|\|\s*isCreateOrderPage\s*\|\|/);
+    expect(source).toContain('isCreateOrderPage ? "h-auto" : "h-full"');
+  });
+
+  it("pins the desktop sidebar account within the viewport while the page scrolls", () => {
+    const source = read("src/components/Layout.tsx");
+    const css = read("src/components/evolusystem-shell.css");
+    const sidebarStyles = css.slice(css.indexOf("/* New OS:"));
+    expect(source).toContain("evolu-shell__navigation min-h-0 flex-1 overflow-y-auto");
+    expect(sidebarStyles).toContain("@media (min-width: 768px)");
+    expect(sidebarStyles).toContain(".evolu-shell--create-order .evolu-shell__sidebar");
+    expect(sidebarStyles).toContain("position: sticky;");
+    expect(sidebarStyles).toContain("align-self: flex-start;");
+    expect(sidebarStyles).toContain("height: 100dvh;");
+    expect(sidebarStyles).toContain(".evolu-shell--create-order .evolu-shell__account");
+    expect(sidebarStyles).toContain("flex-shrink: 0;");
+  });
+
   it("keeps the summary in flow and makes only its desktop wrapper sticky", () => {
     const source = read(
       "src/features/hubos/components/CreateOrderForm.tsx"
