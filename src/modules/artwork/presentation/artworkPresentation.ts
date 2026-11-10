@@ -76,7 +76,7 @@ export function getArtworkStartSla(
   const today = dateKey(now);
   return {
     dueDate,
-    rule: businessDays ? `${days} dia${days === 1 ? "" : "s"} útil${days === 1 ? "" : "eis"}` : `${days} dias corridos`,
+    rule: businessDays ? (days === 1 ? "1 dia útil" : `${days} dias úteis`) : `${days} dias corridos`,
     state: started ? "STARTED" : dueDate < today ? "OVERDUE" : dueDate === today ? "TODAY" : "PENDING",
   };
 }
