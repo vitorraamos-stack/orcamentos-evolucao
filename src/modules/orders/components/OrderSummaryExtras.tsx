@@ -14,7 +14,7 @@ type Props = {
 /** Summary shows products only; attachments remain available in the Arquivos tab. */
 export function OrderSummaryExtras({ items, itemsLoaded, itemsError, onGoItems, onGoItem }: Props) {
   return <div className="min-w-0">
-    <Card className="min-w-0">
+    <Card className="evolu-detail__products-card min-w-0">
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
         <CardTitle>Produtos da OS</CardTitle>
         {itemsLoaded && !itemsError && <span className="text-sm text-muted-foreground">{items.length} item(ns)</span>}
