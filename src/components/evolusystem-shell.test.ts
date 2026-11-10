@@ -24,7 +24,7 @@ describe("EvoluSystem premium shell", () => {
     expect(shellStyles).toContain("evolu-shell__brand-logo");
     expect(shellStyles).not.toContain("evolu-shell__company-logo");
     expect(login).toContain('src="/evolusystem-logo-dark.svg"');
-    expect(login).toContain('src="/evolusystem-logo.svg"');
+    expect(login).not.toContain('src="/evolusystem-logo.svg"');
     expect(login).not.toContain('src="/logo-branca.png"');
   });
 

@@ -15,7 +15,7 @@ describe("Marca oficial EvoluSystem", () => {
 
   it("usa os logos no login, sem a marca antiga da Evolução", () => {
     expect(login).toContain('src="/evolusystem-logo-dark.svg"');
-    expect(login).toContain('src="/evolusystem-logo.svg"');
+    expect(login).not.toContain('src="/evolusystem-logo.svg"');
     expect(login).not.toContain("/logo-branca.png");
     expect(login).not.toContain("/logo.png");
   });
