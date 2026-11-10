@@ -18,7 +18,7 @@ export function usePwaExperience(): PwaContextValue {
 }
 
 function isStandalone(): boolean {
-  return window.matchMedia("(display-mode: standalone)").matches ||
+  return (typeof window.matchMedia === "function" && window.matchMedia("(display-mode: standalone)").matches) ||
     (navigator as Navigator & { standalone?: boolean }).standalone === true;
 }
 
@@ -48,14 +48,14 @@ export function PwaExperienceProvider({ children }: { children: ReactNode }) {
       setInstallGuideOpen(false);
     };
     const syncDisplayMode = () => setInstalled(isStandalone());
-    const displayMode = window.matchMedia("(display-mode: standalone)");
+    const displayMode = typeof window.matchMedia === "function" ? window.matchMedia("(display-mode: standalone)") : null;
     window.addEventListener("beforeinstallprompt", onInstallPrompt);
     window.addEventListener("appinstalled", onInstalled);
-    displayMode.addEventListener?.("change", syncDisplayMode);
+    displayMode?.addEventListener?.("change", syncDisplayMode);
     return () => {
       window.removeEventListener("beforeinstallprompt", onInstallPrompt);
       window.removeEventListener("appinstalled", onInstalled);
-      displayMode.removeEventListener?.("change", syncDisplayMode);
+      displayMode?.removeEventListener?.("change", syncDisplayMode);
     };
   }, []);
 
