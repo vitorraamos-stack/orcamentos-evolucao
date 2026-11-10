@@ -4,6 +4,7 @@ import {
   applyArtworkPreset,
   applyProductionPreset,
   filterBoardCards,
+  getVisibleArtworkStatus,
   groupBoardCards,
   sortBoardCards,
 } from "./boardDomain";
@@ -54,13 +55,14 @@ const card = (
 });
 
 describe("board domain", () => {
-  it("groups by the persisted column and keeps Ajustes separate", () => {
-    const grouped = groupBoardCards([card({ art_status: "Ajustes" })], "art", [
-      "Caixa de Entrada",
-      "Ajustes",
-    ]);
-    expect(grouped.get("Ajustes")).toHaveLength(1);
-    expect(grouped.get("Caixa de Entrada")).toHaveLength(0);
+  it("agrupa estados legados nas etapas visíveis, sem esconder pedidos", () => {
+    const grouped = groupBoardCards([
+      card({ art_status: "Fila de Arte" }),
+      card({ art_status: "Ajustes" }),
+    ], "art", ["Caixa de Entrada", "Em Criação"]);
+    expect(grouped.get("Caixa de Entrada")).toHaveLength(1);
+    expect(grouped.get("Em Criação")).toHaveLength(1);
+    expect(getVisibleArtworkStatus("Para Aprovação")).toBe("Para Aprovação");
   });
   it("sorts critical, urgent, nearest deadline and oldest", () => {
     const critical = { ...card(), risk: "CRITICO" as const };
@@ -124,13 +126,11 @@ describe("Fase 3.2 board contract", () => {
       await import("./statusLabels");
     expect(ART_BOARD_COLUMNS).toEqual([
       "Caixa de Entrada",
-      "Fila de Arte",
       "Em Criação",
       "Para Aprovação",
-      "Ajustes",
       "Produzir",
     ]);
-    expect(ART_STATUS_LABELS["Em Criação"]).toBe("Em Arte");
+    expect(ART_STATUS_LABELS["Em Criação"]).toBe("Arte em andamento");
     expect(ART_STATUS_LABELS["Para Aprovação"]).toBe("Aguardando Aprovação");
     expect(ART_STATUS_LABELS.Produzir).toBe("Liberado para Produção");
     expect(PRODUCTION_BOARD_COLUMNS).toEqual([
