@@ -3,20 +3,37 @@ import { describe, expect, it } from "vitest";
 
 const file = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 
-describe("Seletor de aparência do EvoluSystem", () => {
-  it("ativa o controle apenas dentro do provedor da aplicação", () => {
+describe("Aparência escura obrigatória do EvoluSystem", () => {
+  it("mantém o provedor global sem permitir seleção de tema", () => {
     const app = file("../App.tsx");
-    expect(app).toContain('<ThemeProvider defaultTheme="light" switchable>');
+    expect(app).toContain("<ThemeProvider>");
+    expect(app).not.toContain("defaultTheme");
+    expect(app).not.toContain("switchable");
+    const context = file("./ThemeContext.tsx");
+    expect(context).toContain('resolvedTheme: "dark"');
+    expect(context).toContain('classList.add("dark")');
   });
-  it("mostra o seletor nos menus desktop e móvel, sem nova tela ou permissão", () => {
+  it("não exibe o seletor de aparência nos menus desktop e móvel", () => {
     const layout = file("../components/Layout.tsx");
-    expect(layout.match(/<ThemeSwitcher \/>/g)).toHaveLength(2);
+    expect(layout).not.toContain("ThemeSwitcher");
     expect(layout).toContain('className="evolu-shell__account');
   });
-  it("garante o tema salvo antes da primeira renderização", () => {
+  it("inicia em escuro antes da renderização, sem consultar preferências antigas", () => {
     const html = file("../../index.html");
-    expect(html).toContain('localStorage.getItem("evolusystem-theme")');
-    expect(html).toContain('document.documentElement.classList.toggle("dark", dark)');
+    expect(html).toContain('class="dark" style="color-scheme: dark;"');
+    expect(html).not.toContain("evolusystem-theme");
+    expect(html).not.toContain("prefers-color-scheme");
+  });
+  it("usa superfícies escuras no login e na recuperação da senha", () => {
+    const login = file("../pages/Login.tsx");
+    const reset = file("../pages/ResetPassword.tsx");
+    const loginCss = file("../pages/login-layout.css");
+    expect(login).toContain('bg-[#17283D]');
+    expect(reset).toContain('bg-[#17283D]');
+    expect(login).toContain('evolusystem-logo-dark.svg');
+    expect(reset).toContain('evolusystem-logo-dark.svg');
+    expect(loginCss).toContain("color-scheme: dark");
+    expect(loginCss).not.toContain("color-scheme: light");
   });
 
   it("mantém fundos de artes e prévias intactos, sem override global", () => {
