@@ -9,15 +9,18 @@ describe("Compact OS header", () => {
     expect(header).toContain('className="evolu-detail__identity"');
     expect(header).toContain("formatOfficialOsLabel(order.sale_number)");
     expect(header).toContain('className="evolu-detail__client break-words"');
-    expect(header).toContain('className="evolu-detail__hero-secondary"');
+    expect(header).toContain('className="evolu-detail__badges flex flex-wrap items-center gap-2"');
+    expect(header).not.toContain("evolu-detail__hero-secondary");
+    expect(header).not.toContain("evolu-detail__service");
+    expect(styles).toContain("font-size: 17px;");
     expect(header).toContain('className="sr-only">Ordem de serviço');
     expect(styles).toContain(".evolu-detail__identity {");
     expect(styles).toContain("flex-wrap: wrap;");
   });
 
-  it("keeps the service, stage, risk, actions and operational quick-info visible", () => {
+  it("keeps stage, risk, actions and operational quick-info visible", () => {
     for (const content of [
-      "order.title || order.description", "getOperationalStatusLabel",
+      "getOperationalStatusLabel",
       "isOrderUrgent(order)", "OrderRiskBadge", "transitions.length > 0",
       "canEdit &&", "canManage && onArchive && onDelete &&",
       "Prazo final", "Responsável geral", "Logística",
@@ -28,7 +31,7 @@ describe("Compact OS header", () => {
 
   it("avoids a fixed height and retains responsive wrapping for long content", () => {
     expect(styles).toContain(".evolu-detail__hero-copy { min-width: 0;");
-    expect(styles).toContain("flex: 1 1 320px;");
+    expect(styles).toContain(".evolu-detail__identity .evolu-detail__badges {");
     expect(styles).toContain("@media (max-width: 850px)");
     expect(styles).not.toMatch(/\.evolu-detail__hero\s*\{[^}]*height:\s*[0-9]+px/);
   });

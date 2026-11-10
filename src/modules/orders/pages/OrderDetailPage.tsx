@@ -174,7 +174,6 @@ export default function OrderDetailPage() {
     // Summary queries remain independently retriable within their own tabs.
     summaryPrefetched.current = orderId;
     void loadTab("items");
-    void loadTab("files");
   }, [orderId, detail?.order.id, loadTab]);
 
   const selectTab = (tab: string) => {
@@ -341,9 +340,7 @@ export default function OrderDetailPage() {
         <div className="min-w-0 space-y-4">
           <OrderSummaryTab order={detail.order} />
           <OrderSummaryExtras items={items.data} itemsLoaded={items.loaded} itemsError={items.error}
-            files={files.data} filesLoaded={files.loaded} filesError={files.error}
             onGoItems={() => goToItems()} onGoItem={id => goToItems(id)}
-            onFetchReference={asset => fetchOsAssetDownloadUrl(asset.object_path, asset.original_name ?? undefined)}
           />
         </div>
       <section aria-label="Responsáveis e prazos" className="evolu-detail__management-grid grid gap-4 xl:grid-cols-2"><OrderAssigneesCard assignees={detail.assignees} users={users} canEdit={canManageAssignees} onChange={updateAssignee} /><OrderDeadlinesCard order={detail.order} deadlines={detail.deadlines} canEdit={canManageDeadlines} onChange={updateDeadline} onComplete={(scope, version) => deadlineAction(scope, "complete", version)} onReopen={(scope, version) => deadlineAction(scope, "reopen", version)} onRemove={(scope, version) => deadlineAction(scope, "remove", version)} /></section></div></TabsContent><TabsContent forceMount className="evolu-detail__tab-content" value="items"><OrderItemsTab
