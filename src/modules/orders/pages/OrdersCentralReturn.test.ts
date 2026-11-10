@@ -10,6 +10,8 @@ describe("Central de OS — one-shot intelligent return", () => {
   it("captures origin only from direct same-tab OS links", () => {
     expect(table).toContain("isSameTabOrderActivation(event.nativeEvent)");
     expect(table).toContain("onOpenOrder?.(orderId)");
+    expect(table).toContain("openOrderFromRow(orderId)");
+    expect(table).toContain("navigate(`/os/${orderId}`)");
     expect(table).toContain('data-central-order-id={order.id}');
     expect(page).toContain("saveCentralReturn(centralSessionStorage()");
     expect(detail).toContain("markCentralDetailEntered(centralSessionStorage()");
