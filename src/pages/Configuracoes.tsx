@@ -15,7 +15,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Edit, KeyRound, Power, UserPlus } from 'lucide-react';
+import { ChevronDown, Edit, KeyRound, Power, Search, UserPlus } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -36,7 +37,7 @@ type AdminUser = {
 
 const formatDate = (value: string | null) => {
   if (!value) return '—';
-  return new Date(value).toLocaleString('pt-BR');
+  return new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 };
 
 const moduleLabelByKey = APP_MODULES.reduce<Record<string, string>>((acc, module) => {
@@ -293,6 +294,81 @@ export default function Configuracoes() {
     }
   };
 
+
+  const renderModuleAccess = (user: AdminUser) => {
+    const modules = user.modules || [];
+    if (!modules.length) {
+      return <span className="text-xs text-muted-foreground">Sem permissão</span>;
+    }
+
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 max-w-full gap-1.5 px-2.5 font-normal"
+            aria-label={`Ver os ${modules.length} módulos de ${user.name || user.email || 'usuário'}`}
+          >
+            {modules.length} {modules.length === 1 ? 'módulo' : 'módulos'}
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-[min(320px,calc(100vw-2rem))] space-y-3">
+          <p className="text-sm font-semibold">Módulos permitidos</p>
+          <div className="flex flex-wrap gap-1.5">
+            {modules.map((moduleKey) => (
+              <Badge key={moduleKey} variant="outline" className="whitespace-normal text-left leading-5">
+                {getModuleLabel(moduleKey)}
+              </Badge>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  };
+
+  const renderUserActions = (user: AdminUser) => (
+    <div className="flex items-center justify-end gap-1.5">
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-9 w-9 shrink-0"
+        aria-label={`Editar ${user.name || user.email || 'usuário'}`}
+        title="Editar usuário"
+        onClick={() => {
+          setEditingUser(user);
+          setEditName(user.name || '');
+          setEditRole(user.role);
+          setEditModules(user.modules || []);
+        }}
+      >
+        <Edit className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-9 w-9 shrink-0"
+        aria-label={`Redefinir senha de ${user.name || user.email || 'usuário'}`}
+        title="Redefinir senha"
+        onClick={() => setPasswordUser(user)}
+      >
+        <KeyRound className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-9 w-9 shrink-0"
+        aria-label={`${user.status === 'ativo' ? 'Desativar' : 'Reativar'} ${user.name || user.email || 'usuário'}`}
+        title={user.status === 'ativo' ? 'Desativar usuário' : 'Reativar usuário'}
+        disabled={togglingId === user.id}
+        onClick={() => handleToggleStatus(user)}
+      >
+        <Power className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
   if (!hubPermissions.canManageUsers) {
     return (
       <div className="space-y-2">
@@ -306,9 +382,9 @@ export default function Configuracoes() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gestão de Usuários (Hub OS)</h1>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Gestão de Usuários (Hub OS)</h1>
           <p className="text-sm text-muted-foreground">Gerencie papéis, senha e status dos usuários do Hub OS.</p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -386,97 +462,117 @@ export default function Configuracoes() {
         </Dialog>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Usuários</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Input
-            placeholder="Buscar por nome ou e-mail"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Papel</TableHead>
-                <TableHead>Módulos</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Último login</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loadingUsers ? (
+      <Card className="min-w-0">
+        <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <CardTitle>Usuários</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              {filteredUsers.length} de {users.length} cadastrados
+            </p>
+          </div>
+          <div className="relative w-full sm:max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <Input
+              aria-label="Buscar usuários por nome ou e-mail"
+              className="pl-9"
+              placeholder="Buscar por nome ou e-mail"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
+        </CardHeader>
+        <CardContent className="min-w-0">
+          <div className="hidden lg:block">
+            <Table className="table-fixed">
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
-                    Carregando usuários...
-                  </TableCell>
+                  <TableHead className="w-[29%]">Usuário</TableHead>
+                  <TableHead className="w-[19%]">Papel</TableHead>
+                  <TableHead className="w-[16%]">Módulos</TableHead>
+                  <TableHead className="w-[9%]">Status</TableHead>
+                  <TableHead className="w-[16%]">Último login</TableHead>
+                  <TableHead className="w-[11%] text-right">Ações</TableHead>
                 </TableRow>
-              ) : filteredUsers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
-                    Nenhum usuário encontrado.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>{user.name || '—'}</TableCell>
-                    <TableCell>{user.email || '—'}</TableCell>
-                    <TableCell>{HUB_ROLE_LABEL[user.role]}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-2">
-                        {user.modules?.length ? (
-                          user.modules.map((moduleKey) => (
-                            <Badge key={moduleKey} variant="outline">
-                              {getModuleLabel(moduleKey)}
-                            </Badge>
-                          ))
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Sem permissão</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={user.status === 'ativo' ? 'default' : 'secondary'}>{user.status}</Badge>
-                    </TableCell>
-                    <TableCell>{formatDate(user.last_sign_in_at)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditingUser(user);
-                            setEditName(user.name || '');
-                            setEditRole(user.role);
-                            setEditModules(user.modules || []);
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => setPasswordUser(user)}>
-                          <KeyRound className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={togglingId === user.id}
-                          onClick={() => handleToggleStatus(user)}
-                        >
-                          <Power className="h-4 w-4" />
-                        </Button>
-                      </div>
+              </TableHeader>
+              <TableBody>
+                {loadingUsers ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                      Carregando usuários...
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : filteredUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                      Nenhum usuário encontrado.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell className="min-w-0 py-3">
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="truncate font-medium" title={user.name || undefined}>{user.name || 'Sem nome'}</p>
+                          <p className="truncate text-xs text-muted-foreground" title={user.email || undefined}>
+                            {user.email || '—'}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="whitespace-normal py-3 leading-5">
+                        {HUB_ROLE_LABEL[user.role]}
+                      </TableCell>
+                      <TableCell className="py-3">{renderModuleAccess(user)}</TableCell>
+                      <TableCell className="py-3">
+                        <Badge variant={user.status === 'ativo' ? 'default' : 'secondary'}>{user.status}</Badge>
+                      </TableCell>
+                      <TableCell className="whitespace-normal py-3 text-sm text-muted-foreground">
+                        {formatDate(user.last_sign_in_at)}
+                      </TableCell>
+                      <TableCell className="py-3">{renderUserActions(user)}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="grid gap-3 lg:hidden">
+            {loadingUsers ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">Carregando usuários...</p>
+            ) : filteredUsers.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">Nenhum usuário encontrado.</p>
+            ) : (
+              filteredUsers.map((user) => (
+                <div key={user.id} className="rounded-lg border p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="break-words font-semibold">{user.name || 'Sem nome'}</p>
+                      <p className="break-all text-xs text-muted-foreground">{user.email || '—'}</p>
+                    </div>
+                    <Badge className="shrink-0" variant={user.status === 'ativo' ? 'default' : 'secondary'}>
+                      {user.status}
+                    </Badge>
+                  </div>
+                  <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Papel</dt>
+                      <dd className="mt-1 text-sm">{HUB_ROLE_LABEL[user.role]}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Último login</dt>
+                      <dd className="mt-1 text-sm">{formatDate(user.last_sign_in_at)}</dd>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <dt className="mb-1 text-xs text-muted-foreground">Módulos</dt>
+                      <dd>{renderModuleAccess(user)}</dd>
+                    </div>
+                  </dl>
+                  <div className="mt-4 border-t pt-3">{renderUserActions(user)}</div>
+                </div>
+              ))
+            )}
+          </div>
         </CardContent>
       </Card>
 
