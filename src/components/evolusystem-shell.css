@@ -92,3 +92,99 @@ body:has(.evolu-shell--order-detail) {
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+
+/* PWA v3: atalhos móveis orientados pelas permissões, sem trocar o menu completo. */
+.evolu-shell__mobile-nav { display: none; }
+@media (max-width: 767px) {
+  .evolu-shell__mobile-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+    padding: 6px 8px calc(7px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid #31445d;
+    background: rgba(11, 28, 48, .97);
+    box-shadow: 0 -6px 30px rgba(0, 0, 0, .24);
+  }
+  .evolu-shell__mobile-tab {
+    position: relative;
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+    min-height: 52px;
+    padding: 5px 2px;
+    border-radius: 10px;
+    color: #acc0d5;
+    text-decoration: none;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.15;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .evolu-shell__mobile-tab--active {
+    background: #153b5d;
+    color: #62ccff;
+  }
+  .evolu-shell__mobile-tab:focus-visible {
+    outline: 2px solid #62ccff;
+    outline-offset: -2px;
+  }
+  .evolu-shell__mobile-tab-icon { position: relative; display: inline-flex; }
+  .evolu-shell__mobile-label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .evolu-shell__mobile-badge {
+    position: absolute;
+    top: -6px;
+    right: -12px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 3px;
+    border-radius: 999px;
+    background: #dc625b;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
+  }
+  .evolu-shell__main {
+    padding-bottom: calc(94px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .evolu-shell__offline-notice {
+    padding: 8px 16px;
+    border-bottom: 1px solid #755d34;
+    background: #352d22;
+    color: #ffdfaa;
+    text-align: center;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  /* Libera espaço ao teclado virtual enquanto um campo está sendo editado. */
+  .evolu-shell:has(input:focus, textarea:focus, [contenteditable="true"]:focus) .evolu-shell__mobile-nav {
+    display: none;
+  }
+  .evolu-shell:has(input:focus, textarea:focus, [contenteditable="true"]:focus) .evolu-shell__main {
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+@media (min-width: 768px) {
+  .evolu-shell__mobile-nav { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .evolu-shell__mobile-tab { transition: none; }
+}
