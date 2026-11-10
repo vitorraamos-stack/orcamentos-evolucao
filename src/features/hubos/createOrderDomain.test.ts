@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createOrderItemInputSchema,
   emptyOrderItem,
+  formatOrderItemQuantity,
   getCreateOrderCompletion,
   normalizeCreateOrderItem,
   normalizeMeasurementToCm,
@@ -20,6 +21,18 @@ const valid = {
   address: "",
 };
 describe("create order domain", () => {
+  it.each([
+    [1, "1 un."],
+    [6, "6 un."],
+    ["5.998", "5,998 un."],
+    ["", "—"],
+    [null, "—"],
+    [0, "—"],
+    [-1, "—"],
+    ["invalid", "—"],
+  ])("formats the item quantity %s for the OS summary", (quantity, expected) => {
+    expect(formatOrderItemQuantity(quantity)).toBe(expected);
+  });
   it("creates new items with centimeter input and canonical quantity unit", () => {
     expect(emptyOrderItem()).toMatchObject({
       measurement_unit: "cm",
