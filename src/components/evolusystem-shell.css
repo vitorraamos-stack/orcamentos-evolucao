@@ -64,3 +64,18 @@ body:has(.evolu-shell--order-detail) {
   overscroll-behavior-y: contain;
   scrollbar-gutter: stable;
 }
+
+/* New OS: keep desktop identity/actions anchored while the document scrolls. */
+@media (min-width: 768px) {
+  .evolu-shell--create-order .evolu-shell__sidebar {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+  .evolu-shell--create-order .evolu-shell__branding,
+  .evolu-shell--create-order .evolu-shell__account {
+    flex-shrink: 0;
+  }
+}
