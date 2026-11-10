@@ -23,29 +23,29 @@
   background: linear-gradient(90deg,#00a0e3 0 42%,#ec008c 42% 74%,#fce000 74%);
 }
 /* Primary action styling is shared with the dashboard via .evolu-ui-primary-action. */
-.evolu-orders [aria-label="Resumo das ordens"] { gap: 12px; }
+.evolu-orders [aria-label="Resumo das ordens"] { gap: 10px; }
 .evolu-orders [aria-label="Resumo das ordens"] > [data-slot="card"] {
   min-width: 0; border: 1px solid var(--orders-line); border-radius: 16px;
   background: #fff; box-shadow: 0 12px 30px -26px rgba(24,54,91,.55);
 }
 .evolu-orders [aria-label="Resumo das ordens"] [data-slot="card-content"] {
-  min-height: 95px; padding: 17px;
+  min-height: 68px; padding: 10px 13px;
 }
 .evolu-orders [aria-label="Resumo das ordens"] [data-slot="card-content"] span.rounded-lg {
-  border-radius: 12px; padding: 10px;
+  border-radius: 10px; padding: 7px;
 }
 .evolu-orders [aria-label="Resumo das ordens"] [data-slot="card-content"] p.text-2xl {
-  font-size: 27px; letter-spacing: -.045em; color: #172d46;
+  font-size: 24px; line-height: 1.1; letter-spacing: -.035em; color: #172d46;
 }
-.evolu-orders__quick-filters { padding: 17px 18px 14px; }
+.evolu-orders__quick-filters { padding: 10px 14px; }
 .evolu-orders__quick-label {
   display: flex; justify-content: space-between; align-items: baseline;
-  gap: 12px; margin-bottom: 12px; font-size: 13px;
+  gap: 12px; margin-bottom: 7px; font-size: 13px;
   font-weight: 750; color: #233b58;
 }
 .evolu-orders__quick-hint { color: #8a9aac; font-size: 12px; font-weight: 450; }
 .evolu-orders__quick-scroll {
-  display: flex; gap: 8px; overflow-x: auto; padding-bottom: 3px;
+  display: flex; gap: 7px; overflow-x: auto; padding-bottom: 0;
   scrollbar-width: thin;
 }
 .evolu-orders__quick-button { flex: 0 0 auto; }
@@ -53,15 +53,15 @@
   border-color: var(--orders-blue); background: var(--orders-blue); color: #fff;
 }
 /* Filter cards share the same surface composition as the other operational panels. */
-.evolu-orders__toolbar input { min-height: 42px; }
-.evolu-orders__advanced-button { min-height: 44px; border-radius: 10px; }
+.evolu-orders__toolbar input { min-height: 38px; height: 38px; }
+.evolu-orders__advanced-button { min-height: 38px; height: 38px; border-radius: 10px; }
 .evolu-orders__table { overflow: hidden; }
 .evolu-orders__table-heading {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-  gap: 8px; padding: 19px 20px; border-bottom: 1px solid var(--orders-line);
+  gap: 8px; padding: 15px 18px; border-bottom: 1px solid var(--orders-line);
 }
 .evolu-orders__table-heading h2 {
-  color: #172c46; font-size: 15px; font-weight: 750;
+  color: #172c46; font-size: 20px; line-height: 1.2; font-weight: 750;
 }
 .evolu-orders__table-heading p { margin-top: 4px; color: #7d8fa4; font-size: 12px; }
 .evolu-orders__live-hint { color: #8598aa; font-size: 11px; }
@@ -70,9 +70,9 @@
   background: #f4f7fb; color: #5e7187;
 }
 .evolu-orders__table .evolu-orders__desktop-table th {
-  padding-block: 14px; font-size: 11px;
+  padding-block: 11px; font-size: 11px;
 }
-.evolu-orders__table .evolu-orders__desktop-table td { padding-block: 14px; }
+.evolu-orders__table .evolu-orders__desktop-table td { padding-block: 11px; }
 .evolu-orders__table .evolu-orders__desktop-table tbody tr:hover { background: #f5fafe; }
 .evolu-orders__mobile-list { gap: 10px; padding: 12px; }
 /* Mobile cards and desktop table are mutually exclusive. Without an explicit
@@ -105,10 +105,10 @@
 @media (max-width: 639px) {
   .evolu-orders__heading { align-items: stretch; }
   .evolu-orders__new-button { width: 100%; }
-  .evolu-orders__quick-filters { padding: 14px 12px 11px; }
+  .evolu-orders__quick-filters { padding: 10px 12px; }
   .evolu-orders__quick-hint { display: none; }
   .evolu-orders__table-heading { padding: 15px; }
-  .evolu-orders [aria-label="Resumo das ordens"] [data-slot="card-content"] { min-height: 86px; padding: 13px; gap: 8px; }
+  .evolu-orders [aria-label="Resumo das ordens"] [data-slot="card-content"] { min-height: 68px; padding: 9px; gap: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .evolu-orders__new-button, .evolu-orders__quick-button { transition: none; }
@@ -224,7 +224,7 @@
   background: transparent;
   box-shadow: none;
 }
-.evolu-orders__filter-workspace .evolu-orders__quick-button { min-height: 40px; }
+.evolu-orders__filter-workspace .evolu-orders__quick-button { min-height: 36px; height: 36px; padding-inline: 12px; }
 .evolu-orders__desktop-table tbody td { line-height: 1.45; }
 .evolu-orders__desktop-table tbody tr:nth-child(even) {
   background: color-mix(in srgb, var(--muted) 18%, transparent);
@@ -235,4 +235,31 @@
 .dark .evolu-orders__filter-workspace .evolu-orders__filter-card { border-top-color: var(--border); }
 .dark .evolu-orders__desktop-table tbody tr:nth-child(even) {
   background: color-mix(in srgb, var(--muted) 25%, transparent);
+}
+
+/* Compactação da Central de OS: a tabela é o foco principal da tela. */
+@media (min-width: 420px) {
+  .evolu-orders [aria-label="Resumo das ordens"] [data-slot="card-content"] {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+}
+/* Desktop: título e filtros rápidos na mesma linha. */
+@media (min-width: 1024px) {
+  .evolu-orders__filter-workspace .evolu-orders__quick-filters {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 14px;
+  }
+  .evolu-orders__quick-label { flex: 0 0 auto; margin-bottom: 0; }
+  .evolu-orders__quick-hint { display: none; }
+  .evolu-orders__quick-scroll { flex: 1 1 auto; flex-wrap: wrap; overflow: visible; }
+}
+/* Preserve os alvos de toque e leitura nos celulares. */
+@media (max-width: 767px) {
+  .evolu-orders__filter-workspace .evolu-orders__quick-button { min-height: 44px; height: auto; }
+  .evolu-orders__advanced-button { min-height: 44px; height: 44px; }
+  .evolu-orders__toolbar input { min-height: 44px; height: 44px; }
 }
