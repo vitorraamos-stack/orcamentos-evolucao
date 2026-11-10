@@ -329,7 +329,7 @@ export default function Configuracoes() {
   };
 
   const renderUserActions = (user: AdminUser) => (
-    <div className="flex items-center justify-end gap-1.5">
+    <div className="flex items-center justify-end gap-1">
       <Button
         variant="outline"
         size="icon"
@@ -483,16 +483,16 @@ export default function Configuracoes() {
           </div>
         </CardHeader>
         <CardContent className="min-w-0">
-          <div className="hidden lg:block">
+          <div className="hidden xl:block">
             <Table className="table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[29%]">Usuário</TableHead>
+                  <TableHead className="w-[30%]">Usuário</TableHead>
                   <TableHead className="w-[19%]">Papel</TableHead>
-                  <TableHead className="w-[16%]">Módulos</TableHead>
+                  <TableHead className="w-[15%]">Módulos</TableHead>
                   <TableHead className="w-[9%]">Status</TableHead>
-                  <TableHead className="w-[16%]">Último login</TableHead>
-                  <TableHead className="w-[11%] text-right">Ações</TableHead>
+                  <TableHead className="w-[15%]">Último login</TableHead>
+                  <TableHead className="w-[12%] text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -537,7 +537,7 @@ export default function Configuracoes() {
             </Table>
           </div>
 
-          <div className="grid gap-3 lg:hidden">
+          <div className="grid gap-3 xl:hidden lg:grid-cols-2">
             {loadingUsers ? (
               <p className="py-8 text-center text-sm text-muted-foreground">Carregando usuários...</p>
             ) : filteredUsers.length === 0 ? (
