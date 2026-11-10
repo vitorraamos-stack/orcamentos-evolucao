@@ -29,7 +29,7 @@ const highlights: { title: string; detail: string; Icon: LucideIcon }[] = [
 ];
 
 const fieldClass =
-  'h-12 w-full rounded-xl border border-[#D6DFEB] bg-[#F8FAFD] pl-12 pr-4 text-base text-[#14253B] placeholder:text-[#93A1B5] transition-colors focus:border-[#058BD6] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#058BD6]/10 disabled:opacity-60';
+  'h-12 w-full rounded-xl border border-[#39516A] bg-[#112237] pl-12 pr-4 text-base text-[#F1F7FD] placeholder:text-[#91A8C0] transition-colors focus:border-[#43B6F5] focus:bg-[#152A42] focus:outline-none focus:ring-4 focus:ring-[#43B6F5]/15 disabled:opacity-60';
 
 function BrandPanel() {
   return (
@@ -190,22 +190,22 @@ export default function Login() {
   };
 
   return (
-    <main className="evolu-login bg-[#F4F7FB] text-[#102038] lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)]">
+    <main className="evolu-login bg-[#0C1726] text-[#E6EFF8] lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)]">
       <BrandPanel />
 
       <section className="evolu-login__form-side flex flex-col items-center justify-center px-4 sm:px-8 lg:px-10">
-        <div className="evolu-login__card w-full max-w-[540px] rounded-[28px] border border-[#E8EDF4] bg-white shadow-[0_24px_70px_-32px_rgba(23,49,82,.25)]">
+        <div className="evolu-login__card w-full max-w-[540px] rounded-[28px] border border-[#30445C] bg-[#17283D] shadow-[0_24px_70px_-32px_rgba(0,0,0,.55)]">
           <header className="evolu-login__card-header">
-            <p className="text-[11px] font-bold uppercase tracking-[.36em] text-[#72849B]">
+            <p className="text-[11px] font-bold uppercase tracking-[.36em] text-[#A6BED6]">
               {mode === 'login' ? 'Bem-vindo(a) ao' : 'Recuperação de acesso'}
             </p>
             <div className="evolu-login__card-title mt-2">
-              <img src="/evolusystem-logo.svg" alt="EvoluSystem" className="evolu-login__card-title-logo" />
+              <img src="/evolusystem-logo-dark.svg" alt="EvoluSystem" className="evolu-login__card-title-logo" />
             </div>
-            <p className="mt-1 text-xs font-bold uppercase tracking-[.32em] text-[#687C93]">
+            <p className="mt-1 text-xs font-bold uppercase tracking-[.32em] text-[#A6BDD5]">
               Controle Operacional
             </p>
-            <p className="evolu-login__card-description text-sm leading-relaxed text-[#6B7B91]">
+            <p className="evolu-login__card-description text-sm leading-relaxed text-[#ADBED1]">
               {mode === 'login'
                 ? 'Entre com suas credenciais para acessar o sistema.'
                 : 'Informe seu e-mail para receber instruções de redefinição de senha.'}
@@ -214,13 +214,13 @@ export default function Login() {
 
           {sent && mode === 'recover' ? (
             <div className="space-y-6" role="status">
-              <div className="rounded-xl border border-[#CFE8DB] bg-[#EFFAF3] p-4 text-sm leading-relaxed text-[#216240]">
+              <div className="rounded-xl border border-[#315D50] bg-[#15362D] p-4 text-sm leading-relaxed text-[#B6EFCD]">
                 Se houver uma conta vinculada a este e-mail, você receberá as instruções para redefinir sua senha.
               </div>
               <button
                 type="button"
                 onClick={() => switchMode('login')}
-                className="flex min-h-11 items-center gap-2 text-sm font-semibold text-[#087DC3] hover:underline focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#087DC3]"
+                className="flex min-h-11 items-center gap-2 text-sm font-semibold text-[#73C9FF] hover:underline focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#087DC3]"
               >
                 <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Voltar ao login
               </button>
@@ -228,11 +228,11 @@ export default function Login() {
           ) : (
             <form onSubmit={handleSubmit} className="evolu-login__form">
               <div>
-                <label htmlFor="login-email" className="evolu-login__label block text-sm font-semibold text-[#26374D]">
+                <label htmlFor="login-email" className="evolu-login__label block text-sm font-semibold text-[#E3EEF8]">
                   E-mail
                 </label>
                 <div className="relative">
-                  <Mail className="pointer-events-none absolute left-4 top-3.5 h-5 w-5 text-[#7C90A9]" aria-hidden="true" />
+                  <Mail className="pointer-events-none absolute left-4 top-3.5 h-5 w-5 text-[#8DAAC8]" aria-hidden="true" />
                   <input
                     id="login-email"
                     name="email"
@@ -254,11 +254,11 @@ export default function Login() {
 
               {mode === 'login' && (
                 <div>
-                  <label htmlFor="login-password" className="evolu-login__label block text-sm font-semibold text-[#26374D]">
+                  <label htmlFor="login-password" className="evolu-login__label block text-sm font-semibold text-[#E3EEF8]">
                     Senha
                   </label>
                   <div className="relative">
-                    <LockKeyhole className="pointer-events-none absolute left-4 top-3.5 h-5 w-5 text-[#7C90A9]" aria-hidden="true" />
+                    <LockKeyhole className="pointer-events-none absolute left-4 top-3.5 h-5 w-5 text-[#8DAAC8]" aria-hidden="true" />
                     <input
                       id="login-password"
                       name="password"
@@ -278,7 +278,7 @@ export default function Login() {
                       onClick={() => setShowPassword((current) => !current)}
                       aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                       aria-pressed={showPassword}
-                      className="absolute right-2 top-1 flex h-10 w-10 items-center justify-center rounded-lg text-[#7387A1] hover:bg-[#EAF1F9] hover:text-[#147ABB] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#087DC3]"
+                      className="absolute right-2 top-1 flex h-10 w-10 items-center justify-center rounded-lg text-[#9FB6CF] hover:bg-[#27415D] hover:text-[#92D9FF] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#087DC3]"
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -287,7 +287,7 @@ export default function Login() {
                     <button
                       type="button"
                       onClick={() => switchMode('recover')}
-                      className="min-h-9 text-sm font-semibold text-[#087DC3] hover:underline focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087DC3]"
+                      className="min-h-9 text-sm font-semibold text-[#73C9FF] hover:underline focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087DC3]"
                     >
                       Esqueceu sua senha?
                     </button>
@@ -296,7 +296,7 @@ export default function Login() {
               )}
 
               {feedback && (
-                <p role="alert" className="rounded-lg border border-[#F5D4D4] bg-[#FFF4F4] px-3 py-2 text-sm text-[#A23434]">
+                <p role="alert" className="rounded-lg border border-[#74404A] bg-[#381F2A] px-3 py-2 text-sm text-[#FFC1C7]">
                   {feedback}
                 </p>
               )}
@@ -315,7 +315,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => switchMode('login')}
-                  className="flex min-h-11 w-full items-center justify-center gap-2 text-sm font-semibold text-[#087DC3] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087DC3]"
+                  className="flex min-h-11 w-full items-center justify-center gap-2 text-sm font-semibold text-[#73C9FF] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087DC3]"
                 >
                   <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Voltar ao login
                 </button>
@@ -323,16 +323,16 @@ export default function Login() {
             </form>
           )}
 
-          <div className="evolu-login__card-footer flex items-center justify-between gap-3 border-t border-[#E9EDF4] text-xs text-[#7C8DA3]">
+          <div className="evolu-login__card-footer flex items-center justify-between gap-3 border-t border-[#31465E] text-xs text-[#A2B8CE]">
             <span className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-[#6E8499]" aria-hidden="true" />
+              <ShieldCheck className="h-5 w-5 text-[#93ABC5]" aria-hidden="true" />
               Acesso protegido
             </span>
             <span>Evolução Comunicação Visual</span>
           </div>
         </div>
 
-        <p className="evolu-login__mobile-copyright text-center text-xs text-[#8A9AAE] lg:hidden">
+        <p className="evolu-login__mobile-copyright text-center text-xs text-[#A2B8CE] lg:hidden">
           © {new Date().getFullYear()} Evolução Comunicação Visual
         </p>
       </section>
