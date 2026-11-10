@@ -56,11 +56,6 @@ export function OrderHeader({
             <h1 className="evolu-detail__client break-words">
               {order.client_name || "Cliente não informado"}
             </h1>
-          </div>
-          <div className="evolu-detail__hero-secondary">
-            <p className="evolu-detail__service break-words">
-              {order.title || order.description || "Serviço não informado"}
-            </p>
             <div className="evolu-detail__badges flex flex-wrap items-center gap-2">
               <Badge>{getOperationalStatusLabel(order.prod_status || order.art_status)}</Badge>
               {isOrderUrgent(order) && <Badge variant="destructive">Urgente</Badge>}

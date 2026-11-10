@@ -82,7 +82,7 @@ describe("EvoluSystem — OS detail premium visual contract", () => {
     expect(detail).not.toContain("detail.order.os_number");
     expect(header).not.toContain("order.os_number");
     expect(header).toContain("Cliente não informado");
-    expect(header).toContain("Serviço não informado");
+    expect(header).not.toContain("Serviço não informado");
   });
 
   it("uses canonical operational stages and marks the current one accessibly", () => {

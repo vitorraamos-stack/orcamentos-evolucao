@@ -565,3 +565,19 @@
   .evolu-detail__actions { justify-content: flex-start; }
   .evolu-detail__quick-info-item { padding: 10px 14px; }
 }
+
+/* OS header: emphasize the official number and keep stage badges beside the client. */
+.evolu-detail__identity .evolu-detail__number {
+  font-size: 17px;
+  line-height: 1.35;
+}
+.evolu-detail__identity .evolu-detail__badges {
+  flex: 0 1 auto;
+  align-self: center;
+  margin: 0;
+  gap: 6px;
+}
+.evolu-detail__identity .evolu-detail__badges [data-slot="badge"] {
+  min-height: 24px;
+  padding-inline: 9px;
+}
