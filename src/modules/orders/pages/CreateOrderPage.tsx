@@ -19,7 +19,7 @@ export default function CreateOrderPage() {
   if (!hubPermissions.canCreateOs) return <Redirect to="/os" />;
 
   return (
-    <div className="mx-auto max-w-[1600px] space-y-5 pb-24">
+    <div className="w-full min-w-0 space-y-5 pb-24">
       <header className="space-y-3">
         <Button
           type="button"
