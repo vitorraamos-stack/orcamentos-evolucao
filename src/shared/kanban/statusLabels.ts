@@ -3,10 +3,10 @@ import type { ArtStatus, ProdStatus } from "@/features/hubos/types";
 /** Presentation language for the operational boards; database values stay canonical. */
 export const ART_STATUS_LABELS: Record<ArtStatus, string> = {
   "Caixa de Entrada": "Caixa de Entrada",
-  "Fila de Arte": "Fila de Arte",
-  "Em Criação": "Em Arte",
+  "Fila de Arte": "Caixa de Entrada",
+  "Em Criação": "Arte em andamento",
   "Para Aprovação": "Aguardando Aprovação",
-  Ajustes: "Ajustes",
+  Ajustes: "Arte em andamento",
   Produzir: "Liberado para Produção",
 };
 
