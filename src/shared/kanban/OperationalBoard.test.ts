@@ -26,16 +26,14 @@ describe("OperationalBoard focused views", () => {
     expect(source).toContain("Ver quadro completo");
     expect(source).toContain('board === "art" ? "/os/arte" : "/os/producao"');
   });
-  it("oculta as setas laterais no quadro de Arte e mantém rolagem natural", () => {
-    expect(source).toContain('{board === "production" && (');
-    const scrollControls = source.slice(
-      source.indexOf('aria-label="Rolar quadro para a esquerda"'),
-      source.indexOf('ref={boardScrollRef}')
-    );
-    expect(scrollControls).toContain('aria-label="Rolar quadro para a direita"');
-    expect(scrollControls).toContain('</>');
-    expect(scrollControls).toContain(')}');
+  it("remove as setas laterais dos quadros de Arte e Produção, preservando a rolagem nativa", () => {
+    expect(source).not.toContain('aria-label="Rolar quadro para a esquerda"');
+    expect(source).not.toContain('aria-label="Rolar quadro para a direita"');
+    expect(source).not.toContain('ChevronLeft');
+    expect(source).not.toContain('ChevronRight');
+    expect(source).not.toContain('boardScrollRef');
     expect(source).toContain('className="flex gap-4 overflow-x-auto pb-4"');
+    expect(source).toContain('onDragEnd={event => {');
   });
 
   it("usa componentes especializados e colunas modernas nos dois quadros", () => {

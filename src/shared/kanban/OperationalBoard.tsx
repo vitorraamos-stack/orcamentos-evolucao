@@ -8,8 +8,8 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { ChevronLeft, ChevronRight, RefreshCw, SearchX } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { RefreshCw, SearchX } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -108,7 +108,6 @@ export function OperationalBoard({
   const [dragOverStatus, setDragOverStatus] = useState<BoardStatus | null>(
     null
   );
-  const boardScrollRef = useRef<HTMLDivElement>(null);
   const [tag, setTag] = useState<ProductionTag>("EM_PRODUCAO"),
     [insumos, setInsumos] = useState("");
   const canMove =
@@ -462,39 +461,7 @@ export function OperationalBoard({
         }}
       >
         <div className="relative">
-          {board === "production" && (
-            <>
-              <Button
-                aria-label="Rolar quadro para a esquerda"
-                variant="secondary"
-                size="icon"
-                className="absolute left-1 top-1/2 z-20 hidden rounded-full shadow md:flex"
-                onClick={() =>
-                  boardScrollRef.current?.scrollBy({
-                    left: -320,
-                    behavior: "smooth",
-                  })
-                }
-              >
-                <ChevronLeft />
-              </Button>
-              <Button
-                aria-label="Rolar quadro para a direita"
-                variant="secondary"
-                size="icon"
-                className="absolute right-1 top-1/2 z-20 hidden rounded-full shadow md:flex"
-                onClick={() =>
-                  boardScrollRef.current?.scrollBy({
-                    left: 320,
-                    behavior: "smooth",
-                  })
-                }
-              >
-                <ChevronRight />
-              </Button>
-            </>
-          )}
-          <div ref={boardScrollRef} className="flex gap-4 overflow-x-auto pb-4">
+          <div className="flex gap-4 overflow-x-auto pb-4">
             {columns.map(column => (
               <BoardColumn
                 key={column}
