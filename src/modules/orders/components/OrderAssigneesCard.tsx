@@ -37,7 +37,7 @@ export function OrderAssigneesCard({ assignees, users, canEdit, onChange }: Prop
     }
   };
 
-  return <Card><CardHeader><CardTitle>Responsáveis</CardTitle></CardHeader>
+  return <Card className="evolu-detail__section-card"><CardHeader className="evolu-detail__section-header"><CardTitle>Responsáveis</CardTitle></CardHeader>
     <CardContent className="space-y-3">
       {scopes.map(scope => {
         const assignee = assignees.find(item => item.scope === scope.value);
