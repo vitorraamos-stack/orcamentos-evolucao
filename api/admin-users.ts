@@ -4,10 +4,14 @@ import { createClient } from '@supabase/supabase-js';
 // Fonte canônica permanece em shared/app-modules.ts; alterações aqui devem seguir o mesmo catálogo.
 const APP_MODULE_KEYS = [
   'hub_os',
+  'hub_os_dashboard',
+  'hub_os_arte',
+  'hub_os_producao',
   'hub_os_financeiro',
   'hub_os_insumos',
   'hub_os_producao_externa',
   'hub_os_kiosk',
+  'impressao_estoque',
   'biblioteca_produtos',
   'galeria',
   'calculadora',
@@ -78,6 +82,10 @@ const parseModules = (modules: unknown, allowedModuleKeys: readonly AppModuleKey
   );
   if (invalid.length > 0) {
     return { error: `Módulos inválidos: ${invalid.join(', ')}.` } as const;
+  }
+  const childModules = ['hub_os_dashboard', 'hub_os_arte', 'hub_os_producao'];
+  if (childModules.some((key) => normalized.includes(key)) && !normalized.includes('hub_os')) {
+    return { error: 'Dashboard, Arte e Produção exigem acesso à Central de Ordens de Serviço.' } as const;
   }
   return { value: Array.from(new Set(normalized)) as AppModuleKey[] } as const;
 };

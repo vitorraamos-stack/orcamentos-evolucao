@@ -5,6 +5,7 @@ import {
   canAccessHubAudit,
   canAccessMateriais,
   canAccessHubFinanceiro,
+  canAccessOperationalSection,
 } from '@/lib/authz';
 
 describe('buildAuthorizationSnapshot', () => {
@@ -87,5 +88,38 @@ describe('route authorization helpers', () => {
         permissions: consultantPermissions,
       })
     ).toBe(false);
+  });
+});
+
+
+describe('permissões individuais das áreas operacionais', () => {
+  it('consultora com Central de OS não vê Dashboard, Arte e Produção sem liberação', () => {
+    const context = {
+      hasModuleAccess: (key: string) => key === 'hub_os',
+      permissions: buildAuthorizationSnapshot('consultor_vendas').permissions,
+    };
+    expect(canAccessOperationalSection(context, 'orders')).toBe(true);
+    expect(canAccessOperationalSection(context, 'dashboard')).toBe(false);
+    expect(canAccessOperationalSection(context, 'art')).toBe(false);
+    expect(canAccessOperationalSection(context, 'production')).toBe(false);
+  });
+
+  it('permissão de visualizar um quadro não concede movimentação fora do cargo', () => {
+    const context = {
+      hasModuleAccess: (key: string) => ['hub_os', 'hub_os_arte', 'hub_os_producao'].includes(key),
+      permissions: buildAuthorizationSnapshot('consultor_vendas').permissions,
+    };
+    expect(canAccessOperationalSection(context, 'art')).toBe(true);
+    expect(canAccessOperationalSection(context, 'production')).toBe(true);
+    expect(context.permissions.canMoveArteBoard).toBe(false);
+    expect(context.permissions.canMoveProducaoBoard).toBe(false);
+  });
+
+  it('subáreas exigem a permissão-base da Central', () => {
+    const context = {
+      hasModuleAccess: (key: string) => key === 'hub_os_dashboard',
+      permissions: buildAuthorizationSnapshot('gerente').permissions,
+    };
+    expect(canAccessOperationalSection(context, 'dashboard')).toBe(false);
   });
 });

@@ -92,7 +92,9 @@ function Router() {
       <Route path="/hub-os">
         <Layout>
           <RequireModule moduleKey="hub_os">
-            <OperationalDashboardPage />
+            <HubOsAccessGuard scope="dashboard">
+              <OperationalDashboardPage />
+            </HubOsAccessGuard>
           </RequireModule>
         </Layout>
       </Route>
@@ -100,7 +102,9 @@ function Router() {
       <Route path="/hub-os/kanban">
         <Layout>
           <RequireModule moduleKey="hub_os">
-            <HubOS />
+            <HubOsAccessGuard scope="legacy">
+              <HubOS />
+            </HubOsAccessGuard>
           </RequireModule>
         </Layout>
       </Route>
@@ -371,7 +375,9 @@ function Router() {
       <Route path="/os/novo">
         <Layout>
           <RequireModule moduleKey="hub_os">
-            <CreateOrderPage />
+            <HubOsAccessGuard scope="create">
+              <CreateOrderPage />
+            </HubOsAccessGuard>
           </RequireModule>
         </Layout>
       </Route>

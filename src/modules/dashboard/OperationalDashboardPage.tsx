@@ -7,6 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
+import { canAccessOperationalSection } from "@/lib/authz";
 import { ErrorState, PageHeader } from "@/shared/components/OperationalUi";
 import { buildDashboardOverview, type DashboardOverview, type DashboardOrder } from "./dashboardModel";
 import { listDashboardAssignees, listDashboardOrders, type DashboardAssignee } from "./dashboardRepository";
@@ -151,11 +152,14 @@ function PriorityOrders({
 }
 
 function SectorFlow({ overview }: { overview: DashboardOverview | null }) {
-  const { hubPermissions } = useAuth();
+  const { hubPermissions, hasModuleAccess } = useAuth();
+  const access = { hasModuleAccess, permissions: hubPermissions };
+  const canViewArte = canAccessOperationalSection(access, "art");
+  const canViewProducao = canAccessOperationalSection(access, "production");
   const sectors = [
-    { label: "Arte e aprovação", value: overview?.sectors.artwork, icon: Palette, href: "/os/arte", allowed: hubPermissions.canViewArteBoard },
-    { label: "Produção", value: overview?.sectors.production, icon: Factory, href: "/os/producao", allowed: hubPermissions.canViewProducaoBoard },
-    { label: "Finalização", value: overview?.sectors.finishing, icon: Layers3, href: "/os/producao/acabamento", allowed: hubPermissions.canViewProducaoBoard },
+    { label: "Arte e aprovação", value: overview?.sectors.artwork, icon: Palette, href: "/os/arte", allowed: canViewArte },
+    { label: "Produção", value: overview?.sectors.production, icon: Factory, href: "/os/producao", allowed: canViewProducao },
+    { label: "Finalização", value: overview?.sectors.finishing, icon: Layers3, href: "/os/producao/acabamento", allowed: canViewProducao },
     { label: "Logística", value: overview?.sectors.logistics, icon: Truck, href: hubPermissions.canViewInstallations ? "/instalacoes" : "/entregas", allowed: hubPermissions.canViewInstallations || hubPermissions.canViewDeliveries },
   ] as const;
   return (
@@ -215,7 +219,7 @@ export function OperationalDashboardSections({
 export default function OperationalDashboardPage() {
   const { user, hasModuleAccess, hubPermissions } = useAuth();
   const userId = user?.id ?? null;
-  const authorized = Boolean(userId && hubPermissions.canViewHubOS && hasModuleAccess("hub_os"));
+  const authorized = Boolean(userId && canAccessOperationalSection({ hasModuleAccess, permissions: hubPermissions }, "dashboard"));
   const accessKey = [
     hubPermissions.isManager ? "manager" : "member",
     hubPermissions.canViewInstallations ? "installation" : "no-installation",

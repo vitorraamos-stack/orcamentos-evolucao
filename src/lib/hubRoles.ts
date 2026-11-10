@@ -42,13 +42,10 @@ export const getHubPermissions = (role?: string | null) => {
     isManager,
     canManageUsers: isManager,
     canCreateOs: isManager || normalized === "consultor_vendas",
-    canViewArteBoard:
-      isManager ||
-      normalized === "consultor_vendas" ||
-      normalized === "arte_finalista",
+    // A visualização depende dos módulos do usuário; o papel controla ações.
+    canViewArteBoard: normalized !== null,
     canMoveArteBoard: isManager || normalized === "arte_finalista",
-    canViewProducaoBoard:
-      isManager || normalized === "producao" || normalized === "instalador",
+    canViewProducaoBoard: normalized !== null,
     canMoveProducaoBoard: isManager || normalized === "producao",
     canViewHubOS: normalized !== null,
     canViewAudit: isManager,
