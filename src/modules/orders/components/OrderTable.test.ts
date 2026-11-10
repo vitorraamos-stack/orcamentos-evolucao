@@ -27,6 +27,18 @@ describe("OrderTable responsive sizing", () => {
     expect(source).toContain("Nenhuma OS corresponde à pesquisa ou aos filtros aplicados.");
   });
 
+  it("renders one named item and a small count for additional items", () => {
+    expect(source).toContain("const firstItem = order.items[0]");
+    expect(source).toContain("const remainingItems = order.items.slice(1)");
+    expect(source).toContain("formatOrderItemQuantity(firstItem)");
+    expect(source).toContain('remainingItems.length === 1 ? "item" : "itens"');
+    expect(source).toContain("<PopoverTrigger asChild>");
+    expect(source).toContain("<PopoverContent");
+    expect(source).toContain("OrderServicePreview order={order} mobile");
+    expect(source).toContain("OrderServicePreview order={order} />");
+    expect(source).toContain('order.title || order.description || "Serviço não informado"');
+  });
+
   it("preserves an eight-percent actions column with five primary headings", () => {
     expect(source).toContain('"OS / Cliente", "Serviço", "Etapa", "Prazo", "Ações"');
     expect(source).not.toContain("Sem responsável");
