@@ -10,7 +10,7 @@
 
 ## Ordem de publicação (requer autorizações específicas)
 
-1. Aplicar `20261110161000_operational_module_permissions.sql` no Supabase.
+1. Aplicar `20261110160312_operational_module_permissions.sql` no Supabase.
 2. Fazer merge e publicar o código correspondente, somente com autorização.
 3. Validar perfil comercial (Central sim, Dashboard/Arte/Produção não) e gerência.
 4. Validar menu, URLs diretas e permissões por cargo.
