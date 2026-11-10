@@ -29,10 +29,10 @@ select ok(
   'handoff uses the preset from the locked order'
 );
 select ok(
-  position('v_started_at timestamptz := now()' in pg_get_functiondef(
+  position('v_transition_at timestamptz := now()' in pg_get_functiondef(
     'public.hub_os_send_to_production_secure(uuid,timestamptz,date,text,jsonb)'::regprocedure
   )) > 0,
-  'handoff assigns its timestamp on the server'
+  'handoff event and update receive transition timestamp on the server'
 );
 
 select * from finish();

@@ -6,7 +6,7 @@ const source = readFileSync(new URL("./OrderDeadlinesCard.tsx", import.meta.url)
 
 describe("OrderDeadlinesCard", () => {
   it("formats STANDARD_8_12 before and after production", () => {
-    expect(getContractedDeadlineLabel("STANDARD_8_12")).toBe("8 a 12 dias úteis após a aprovação da arte");
+    expect(getContractedDeadlineLabel("STANDARD_8_12")).toBe("8 a 12 dias úteis a partir da criação da OS (inclui Arte)");
     expect(formatDeadlineDate(null)).toBeNull();
     expect(formatDeadlineDate("2026-09-29T14:30:00.000Z")).toBe("29/09/2026");
     expect(formatDeadlineDate("2026-10-15")).toBe("15/10/2026");

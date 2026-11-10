@@ -871,8 +871,8 @@ export default function CreateOrderForm({
           </Section>
 
           <Section id="os-prazo" step={5}
-            title="Prazo de Produção"
-            subtitle="Definido pelo Comercial/Gerência. A contagem começa após a aprovação da arte."
+            title="Prazo total da OS"
+            subtitle="Começa na criação da OS e inclui criação, edição e aprovação da Arte. A data final usa o prazo máximo selecionado."
           >
             <div role="group" aria-label="Prazo de produção" aria-describedby="deadline-error" aria-invalid={Boolean(errors.deadline)} tabIndex={-1} className="grid gap-3 sm:grid-cols-2">
               {DELIVERY_DEADLINE_PRESETS.map(value => (
