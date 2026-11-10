@@ -35,7 +35,7 @@ function WelcomeOverlay({ info, avatarUrl, avatarReady, exiting }: { info: Welco
               ? <span aria-label={`Inicial de ${info.displayName}`}>{initial}</span>
               : <span className="evolu-welcome__avatar-pending" aria-hidden="true" />}
         </div>
-        <h1 className="evolu-welcome__heading">Bem-vindo, {firstName}!</h1>
+        <h1 className="evolu-welcome__heading">Bem-vindo(a), {firstName}!</h1>
         <p className="evolu-welcome__subtitle">Carregando sistema...</p>
         <div className="evolu-welcome__track" aria-hidden="true"><span /></div>
       </section>
