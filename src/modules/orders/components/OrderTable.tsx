@@ -9,6 +9,7 @@ import {
   Truck,
 } from "lucide-react";
 import type { OsOrder } from "@/features/hubos/types";
+import type { OperationalOrder, OperationalOrderItem } from "../orderRepository";
 import { calculateOrderRisk } from "../risk";
 import { isSameTabOrderActivation } from "../centralReturnContext";
 import {
@@ -31,6 +32,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const date = (value?: string | null) =>
   value
@@ -58,13 +60,92 @@ export function OrderLogisticsCell({
   );
 }
 
+const quantityFormatter = new Intl.NumberFormat("pt-BR", {
+  maximumFractionDigits: 3,
+});
+
+function formatOrderItemQuantity(item: OperationalOrderItem) {
+  const unit = item.unit?.trim() || "un";
+  const normalizedUnit = /^(un|un\.|unid|unidade|unidades)$/i.test(unit) ? "un." : unit;
+  return quantityFormatter.format(Number(item.quantity)) + " " + normalizedUnit;
+}
+
+/** The list stays one item tall; the extras are only revealed on demand. */
+function OrderServicePreview({
+  order,
+  mobile = false,
+}: {
+  order: OperationalOrder;
+  mobile?: boolean;
+}) {
+  const firstItem = order.items[0];
+  const remainingItems = order.items.slice(1);
+  const fallback = order.title || order.description || "Serviço não informado";
+
+  return (
+    <div className="min-w-0">
+      {firstItem ? (
+        <div className="flex min-w-0 items-baseline gap-1.5 font-semibold">
+          <span
+            className={cn("min-w-0", mobile ? "line-clamp-2" : "truncate")}
+            title={firstItem.name}
+          >
+            {firstItem.name}
+          </span>
+          <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+            — {formatOrderItemQuantity(firstItem)}
+          </span>
+        </div>
+      ) : (
+        <p className={cn("font-semibold", mobile ? "line-clamp-2" : "truncate")} title={fallback}>
+          {fallback}
+        </p>
+      )}
+      {!firstItem && !mobile && order.title && order.description && (
+        <p className="mt-1 truncate text-xs text-muted-foreground" title={order.description}>
+          {order.description}
+        </p>
+      )}
+      {remainingItems.length > 0 && (
+        <div className="mt-1.5">
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex rounded-full border border-border/80 bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                aria-label={"Visualizar " + remainingItems.length + (remainingItems.length === 1 ? " outro item do pedido" : " outros itens do pedido")}
+                title={remainingItems.map(item => item.name + " — " + formatOrderItemQuantity(item)).join("\n")}
+              >
+                +{remainingItems.length} {remainingItems.length === 1 ? "item" : "itens"}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" sideOffset={6} className="w-80 max-w-[calc(100vw-2rem)] p-3">
+              <p className="text-xs font-semibold text-muted-foreground">Outros itens do pedido</p>
+              <ul className="mt-2 space-y-2">
+                {remainingItems.map(item => (
+                  <li key={item.id} className="flex items-start gap-3 text-sm">
+                    <span className="min-w-0 flex-1 break-words">{item.name}</span>
+                    <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-muted-foreground">
+                      {formatOrderItemQuantity(item)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </PopoverContent>
+          </Popover>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function OrderTable({
   orders,
   onClearFilters,
   onOpenOrder,
   highlightOrderId,
 }: {
-  orders: OsOrder[];
+  orders: OperationalOrder[];
   onClearFilters?: () => void;
   onOpenOrder?: (orderId: string) => void;
   highlightOrderId?: string | null;
@@ -111,9 +192,9 @@ export function OrderTable({
                 </div>
                 <OrderRiskBadge risk={risk} />
               </div>
-              <p className="mt-3 line-clamp-2 text-sm text-foreground" title={order.title || order.description || "Serviço não informado"}>
-                {order.title || order.description || "Serviço não informado"}
-              </p>
+              <div className="mt-3 text-sm text-foreground">
+                <OrderServicePreview order={order} mobile />
+              </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <OrderStatusBadge status={order.prod_status || order.art_status} />
                 <OrderPriorityBadge urgent={isOrderUrgent(order)} />
@@ -188,14 +269,7 @@ export function OrderTable({
                     </p>
                   </td>
                   <td className="min-w-0 px-4 py-3 align-top">
-                    <p className="truncate font-semibold" title={order.title || order.description || "Serviço não informado"}>
-                      {order.title || order.description || "Serviço não informado"}
-                    </p>
-                    {order.title && order.description && (
-                      <p className="mt-1 truncate text-xs text-muted-foreground" title={order.description}>
-                        {order.description}
-                      </p>
-                    )}
+                    <OrderServicePreview order={order} />
                     <div className="mt-2">
                       <OrderLogisticsCell type={order.logistic_type} />
                     </div>
