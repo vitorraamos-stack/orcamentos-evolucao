@@ -626,23 +626,23 @@
 }
 
 
-/* OS summary: products are the primary work item; keep emphasis subtle in both themes. */
+/* OS summary: neutral product card; reserve blue for the left accent only. */
 .evolu-detail__tab-content .evolu-detail__products-card {
-  border-color: color-mix(in srgb, #168fce 30%, var(--border));
+  border-color: var(--detail-border);
   border-left: 3px solid #168fce;
-  background: color-mix(in srgb, var(--card) 96%, #168fce);
+  background: var(--card);
 }
 .evolu-detail__tab-content .evolu-detail__products-card > [data-slot="card-header"] {
-  background: color-mix(in srgb, var(--card) 90%, #168fce);
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 75%, #168fce);
+  background: transparent;
+  border-bottom: 1px solid var(--detail-border);
   border-radius: 10px 10px 0 0;
 }
 .dark .evolu-detail__tab-content .evolu-detail__products-card {
-  border-color: color-mix(in srgb, #5bb6e8 28%, var(--border));
+  border-color: var(--border);
   border-left-color: #35a6dc;
-  background: color-mix(in srgb, var(--card) 94%, #168fce);
+  background: var(--card);
 }
 .dark .evolu-detail__tab-content .evolu-detail__products-card > [data-slot="card-header"] {
-  background: color-mix(in srgb, var(--card) 86%, #168fce);
-  border-bottom-color: color-mix(in srgb, var(--border) 70%, #168fce);
+  background: transparent;
+  border-bottom-color: var(--border);
 }
