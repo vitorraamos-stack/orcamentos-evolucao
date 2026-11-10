@@ -28,12 +28,22 @@ describe("artworkPresentation", () => {
     expect(getArtworkStartSla({ ...order, art_status: "Em Criação" }, new Date("2026-11-11T15:00:00Z"))?.state).toBe("STARTED");
   });
 
-  it("calcula SLA de criação em três dias corridos sem somar à entrega", () => {
+  it("calcula SLA de criação em três dias úteis sem somar à entrega", () => {
     const order = { created_at: "2026-11-06T13:00:00Z", art_direction_tag: "CRIACAO_ARTE", art_status: "Fila de Arte" } as const;
     expect(getArtworkStartSla(order, new Date("2026-11-08T12:00:00Z"))).toEqual({
-      dueDate: "2026-11-09", rule: "3 dias corridos", state: "PENDING",
+      dueDate: "2026-11-11", rule: "3 dias úteis", state: "PENDING",
     });
+    expect(getArtworkStartSla(order, new Date("2026-11-10T12:00:00Z"))?.state).toBe("PENDING");
+    expect(getArtworkStartSla(order, new Date("2026-11-11T15:00:00Z"))?.state).toBe("TODAY");
+    expect(getArtworkStartSla(order, new Date("2026-11-12T15:00:00Z"))?.state).toBe("OVERDUE");
     expect(getArtworkStartSla({ ...order, art_direction_tag: null })).toBeNull();
+  });
+
+  it("não contabiliza sábado e domingo como dias de SLA de criação", () => {
+    const order = { created_at: "2026-11-07T14:00:00Z", art_direction_tag: "CRIACAO_ARTE", art_status: "Caixa de Entrada" } as const;
+    expect(getArtworkStartSla(order, new Date("2026-11-09T15:00:00Z"))).toEqual({
+      dueDate: "2026-11-11", rule: "3 dias úteis", state: "PENDING",
+    });
   });
 
   it("mantém posição real da fila antes dos filtros visuais", () => {
