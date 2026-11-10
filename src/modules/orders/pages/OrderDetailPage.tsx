@@ -324,7 +324,7 @@ export default function OrderDetailPage() {
       return false;
     }
   };
-  return <main className="evolu-detail mx-auto max-w-[1560px] space-y-4 pb-10">
+  return <main className="evolu-detail w-full min-w-0 space-y-3 pb-8">
     <nav className="evolu-detail__breadcrumb" aria-label="Caminho">
       <Link href="/os" className="evolu-detail__back-link">
         <ArrowLeft className="size-4" aria-hidden="true" /> Voltar à Central de OS
@@ -337,7 +337,7 @@ export default function OrderDetailPage() {
     <OrderOrientationStrip order={detail.order} onGoProduction={() => selectTab("production")} />
     <Tabs className="evolu-detail__tabs" key={orderId} value={activeTab} onValueChange={selectTab}><div className="evolu-detail__tabs-scroll overflow-x-auto"><TabsList aria-label="Seções da ordem de serviço" className="evolu-detail__tabs-list w-max min-w-full justify-start"><TabsTrigger className="evolu-detail__tab" value="summary">Resumo</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="items">Itens</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="production">Produção</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="installation">Instalação / Entrega</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="files">Arquivos</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="comments">Comentários</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="history">Histórico</TabsTrigger></TabsList></div>
       <TabsContent className="evolu-detail__tab-content space-y-4" value="summary">
-      <div className="evolu-detail__summary-columns grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(280px,1fr)] lg:items-start">
+      <div className="evolu-detail__summary-columns grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.85fr)_minmax(320px,1fr)] lg:items-start">
         <div className="min-w-0 space-y-4">
           <OrderSummaryTab order={detail.order} />
           <OrderSummaryExtras items={items.data} itemsLoaded={items.loaded} itemsError={items.error}

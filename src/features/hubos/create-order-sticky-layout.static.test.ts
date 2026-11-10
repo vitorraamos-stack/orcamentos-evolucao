@@ -5,16 +5,17 @@ const read = (path: string) =>
   readFileSync(path, "utf8").replaceAll("\r\n", "\n");
 
 describe("New order sticky summary layout", () => {
-  it("removes the nested scroll context only from new order routes", () => {
+  it("keeps new order scrolling while assigning one scroll container to OS details", () => {
     const source = read("src/components/Layout.tsx");
 
     expect(source).toContain(
       'const isCreateOrderPage = location.startsWith("/os/novo");'
     );
     expect(source).toContain(
-      'isCreateOrderPage ? "overflow-visible" : "overflow-auto"'
+      'isCreateOrderPage ? "overflow-visible" : isOrderDetailPage ? "overflow-y-auto overflow-x-hidden" : "overflow-auto"'
     );
     expect(source).toContain('isCreateOrderPage ? "h-auto" : "h-full"');
+    expect(source).toContain('isOrderDetailPage && "evolu-shell--order-detail h-dvh overflow-hidden"');
   });
 
   it("keeps the summary in flow and makes only its desktop wrapper sticky", () => {

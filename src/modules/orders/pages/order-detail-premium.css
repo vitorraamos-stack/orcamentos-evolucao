@@ -250,9 +250,7 @@
   gap: 13px;
 }
 .evolu-detail__tabs-scroll {
-  position: sticky;
-  z-index: 15;
-  top: 0;
+  position: static;
   overflow-x: auto;
   border: 1px solid var(--detail-border);
   border-radius: 14px;
@@ -444,4 +442,51 @@
 }
 .evolu-detail .bg-primary.text-primary-foreground:hover {
   background-color: #054769;
+}
+
+
+/* Full-width OS workspace: softer grouping and better information density. */
+.evolu-detail { width: 100%; max-width: none; min-width: 0; }
+.evolu-detail__hero-main {
+  gap: 14px;
+  padding: clamp(16px, 1.45vw, 22px);
+}
+.evolu-detail__number { margin-top: 8px; }
+.evolu-detail__client {
+  font-size: clamp(1.55rem, 2vw, 2.1rem);
+  letter-spacing: -.038em;
+}
+.evolu-detail__service { max-width: 92ch; margin-top: 6px; line-height: 1.45; }
+.evolu-detail__badges { margin-top: 11px; }
+.evolu-detail__quick-info-item { padding: 11px clamp(12px, 1.5vw, 20px); }
+.evolu-detail__quick-info-icon {
+  width: 34px; height: 34px; flex-basis: 34px; border-radius: 10px;
+}
+.evolu-detail__quick-info dd { margin-top: 2px; }
+.evolu-detail__flow { padding: 12px 16px 9px; }
+.evolu-detail__section-heading { padding: 0 2px 9px; }
+.evolu-detail__section-heading p { margin-top: 2px; }
+.evolu-detail__flow-scroll { padding: 4px 0 3px; }
+.evolu-detail__stage-bubble { width: 32px; height: 32px; }
+.evolu-detail__stage-line { margin-top: 15px; }
+.evolu-detail__stage-label { margin-top: 6px; }
+.evolu-detail__orientation { gap: 10px; padding: 9px 14px; border-radius: 12px; }
+.evolu-detail__orientation button { min-height: 36px; }
+.evolu-detail__tabs-scroll { border-radius: 12px; padding: 4px; }
+.evolu-detail__tabs-list { height: 40px; }
+.evolu-detail__tab { min-height: 38px; padding: 8px 13px; font-size: 13px; }
+/* Keep unsaved editors mounted without showing inactive Radix forceMount panels. */
+.evolu-detail__tabs [data-slot="tabs-content"][data-state="inactive"] {
+  display: none;
+}
+.evolu-detail__tab-content [data-slot="card"],
+.evolu-detail__management-grid > [data-slot="card"] {
+  border-radius: 13px;
+  box-shadow: none;
+}
+@media (max-width: 639px) {
+  .evolu-detail__hero-main { padding: 16px; }
+  .evolu-detail__flow { padding: 12px 10px 9px; }
+  .evolu-detail__tabs-scroll { padding: 4px; }
+  .evolu-detail__tab { min-height: 44px; }
 }

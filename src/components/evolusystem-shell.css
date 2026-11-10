@@ -47,3 +47,20 @@
 .dark .evolu-shell__main { background: linear-gradient(165deg, #101c2b 0%, #152235 100%); }
 /* Dark surfaces are owned by each module. Avoid globally recoloring white art
    previews, logos or print mockups rendered inside the operational area. */
+
+
+/* OS details: only the workspace scrolls, independently from sidebar navigation. */
+html:has(.evolu-shell--order-detail),
+body:has(.evolu-shell--order-detail) {
+  height: 100%;
+  overflow: hidden;
+}
+.evolu-shell--order-detail {
+  height: 100dvh;
+  overflow: hidden;
+}
+.evolu-shell--order-detail .evolu-shell__main {
+  min-height: 0;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}

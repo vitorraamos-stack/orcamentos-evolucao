@@ -15,7 +15,7 @@ export function OrderOrientationStrip({ order, onGoProduction }: {
 }) {
   const stage = getOrderOperationalStage(order);
   return <section aria-label="Orientação da OS"
-    className="flex min-w-0 flex-wrap items-center gap-3 rounded-xl border bg-card px-4 py-3">
+    className="evolu-detail__orientation flex min-w-0 flex-wrap items-center gap-3 rounded-xl border bg-card px-4 py-3">
     <Info className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
     <div className="min-w-0 flex-1">
       <h2 className="text-sm font-semibold">Acompanhamento operacional</h2>
