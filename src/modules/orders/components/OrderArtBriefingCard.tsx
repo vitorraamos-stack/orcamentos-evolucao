@@ -6,8 +6,8 @@ export function OrderArtBriefingCard({ order }: { order: Pick<OsOrder, "descript
   const briefing = order.description?.trim() ?? "";
 
   return (
-    <Card className="min-w-0" aria-label="Briefing de Arte">
-      <CardHeader>
+    <Card className="evolu-detail__section-card min-w-0" aria-label="Briefing de Arte">
+      <CardHeader className="evolu-detail__section-header">
         <CardTitle>Briefing de Arte</CardTitle>
       </CardHeader>
       <CardContent>

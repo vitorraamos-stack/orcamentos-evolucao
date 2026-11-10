@@ -17,8 +17,8 @@ export function OrderSummaryTab({ order }: { order: OsOrder }) {
     order.logistic_type !== "retirada" || Boolean(order.address?.trim());
 
   return (
-    <Card className="min-w-0">
-      <CardHeader>
+    <Card className="evolu-detail__section-card min-w-0">
+      <CardHeader className="evolu-detail__section-header">
         <CardTitle>Informações complementares</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">

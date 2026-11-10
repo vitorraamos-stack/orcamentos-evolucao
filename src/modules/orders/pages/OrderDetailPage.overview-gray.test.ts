@@ -26,7 +26,10 @@ describe("OS overview: softer dark-theme surfaces", () => {
   it("keeps summary cards and the light-theme palette untouched", () => {
     expect(styles).toContain('.evolu-detail__tab-content [data-slot="card"]');
     expect(styles).toContain(".dark .evolu-detail__tab-content .evolu-detail__products-card");
-    const added = styles.slice(styles.indexOf("/* OS overview only: slightly lighter neutral slate"));
+    const overviewStart = styles.indexOf("/* OS overview only: slightly lighter neutral slate");
+    const nextSection = styles.indexOf("/* OS Resumo: visually sectorized headers", overviewStart);
+    const added = styles.slice(overviewStart, nextSection < 0 ? undefined : nextSection);
+    expect(overviewStart).toBeGreaterThan(-1);
     expect(added).not.toContain(".evolu-detail__management-grid");
     expect(added).not.toContain(".evolu-detail__products-card");
   });
