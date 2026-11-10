@@ -43,8 +43,10 @@ describe("EvoluSystem premium shell", () => {
   });
 
   it("preserves permission gates and operational section routing", () => {
-    expect(layout).toContain('hubPermissions.canViewHubOS');
-    expect(layout).toContain('hasModuleAccess("hub_os")');
+    expect(layout).toContain('canAccessOperationalSection(access, "orders")');
+    expect(layout).toContain('canAccessOperationalSection(access, "dashboard")');
+    expect(layout).toContain('canAccessOperationalSection(access, "art")');
+    expect(layout).toContain('canAccessOperationalSection(access, "production")');
     expect(layout).toContain('hasModuleAccess("calculadora")');
     expect(layout).toContain("getOperationalNavState(location)");
     expect(layout).toContain("isArtworkCentralPage ||");
@@ -52,7 +54,7 @@ describe("EvoluSystem premium shell", () => {
   });
 
   it("keeps dashboard access read-only and preserves login recovery contracts", () => {
-    expect(dashboard).toContain('hasModuleAccess("hub_os")');
+    expect(dashboard).toContain('canAccessOperationalSection({ hasModuleAccess, permissions: hubPermissions }, "dashboard")');
     expect(dashboard).toContain("listDashboardOrders(controller.signal)");
     expect(dashboard).toContain("buildDashboardOverview(rows, now)");
     expect(dashboard).toContain("listDashboardAssignees(");
