@@ -50,7 +50,7 @@ export type ArtworkStartSla = {
 
 /**
  * SLA para INICIAR a Arte, sem somar dias ao prazo final da OS.
- * Edição: 2 dias úteis. Criação: 3 dias corridos, conforme o formulário.
+ * Edição: 2 dias úteis. Criação: 3 dias úteis. Sábados e domingos não contam.
  * Uma OS que já saiu da caixa/fila não é sinalizada como início atrasado.
  */
 export function getArtworkStartSla(
@@ -58,7 +58,6 @@ export function getArtworkStartSla(
   now = new Date()
 ): ArtworkStartSla | null {
   const { art_direction_tag: tag } = order;
-  const businessDays = tag === "ARTE_PRONTA_EDICAO" || tag === "URGENTE";
   const days = tag === "ARTE_PRONTA_EDICAO" ? 2 : tag === "CRIACAO_ARTE" ? 3 : tag === "URGENTE" ? 1 : 0;
   if (!days || !order.created_at) return null;
   const created = new Date(order.created_at);
@@ -69,14 +68,14 @@ export function getArtworkStartSla(
   let left = days;
   while (left > 0) {
     cursor.setUTCDate(cursor.getUTCDate() + 1);
-    if (!businessDays || (cursor.getUTCDay() !== 0 && cursor.getUTCDay() !== 6)) left -= 1;
+    if (cursor.getUTCDay() !== 0 && cursor.getUTCDay() !== 6) left -= 1;
   }
   const dueDate = cursor.toISOString().slice(0, 10);
   const started = !["Caixa de Entrada", "Fila de Arte"].includes(order.art_status);
   const today = dateKey(now);
   return {
     dueDate,
-    rule: businessDays ? (days === 1 ? "1 dia útil" : `${days} dias úteis`) : `${days} dias corridos`,
+    rule: days === 1 ? "1 dia útil" : `${days} dias úteis`,
     state: started ? "STARTED" : dueDate < today ? "OVERDUE" : dueDate === today ? "TODAY" : "PENDING",
   };
 }
