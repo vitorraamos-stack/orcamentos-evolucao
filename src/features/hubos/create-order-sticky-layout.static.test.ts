@@ -23,6 +23,9 @@ describe("New order sticky summary layout", () => {
     expect(source).toContain('isCreateOrderPage && "evolu-shell--create-order"');
     expect(source).toMatch(/isOrdersCentralPage\s*\|\|\s*isCreateOrderPage\s*\|\|/);
     expect(source).toContain('isCreateOrderPage ? "h-auto" : "h-full"');
+    const creationPage = read("src/modules/orders/pages/CreateOrderPage.tsx");
+    expect(creationPage).toContain('className="w-full min-w-0 space-y-5 pb-24"');
+    expect(creationPage).not.toContain("max-w-[1600px]");
   });
 
   it("pins the desktop sidebar account within the viewport while the page scrolls", () => {
