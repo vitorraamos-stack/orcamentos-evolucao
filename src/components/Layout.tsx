@@ -397,7 +397,8 @@ export default function Layout({ children }: LayoutProps) {
                 isDeliveriesCentralPage ||
                 isArtworkCentralPage ||
                 isProductionCentralPage ||
-                location === "/hub-os"
+                location === "/hub-os" ||
+                location === "/configuracoes"
                 ? "max-w-none"
                 : location === "/impressao-estoque"
                   ? "max-w-[1520px]"
