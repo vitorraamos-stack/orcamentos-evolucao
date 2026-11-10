@@ -28,6 +28,18 @@ describe("Central de OS — EvoluSystem Premium", () => {
     expect(page).toContain('Mostrando {orders.length} de {total} {total === 1 ? "ordem" : "ordens"}');
   });
 
+  it("opens the whole desktop row and mobile card without replacing native links or action buttons", () => {
+    expect(table).toContain('import { Link, useLocation } from "wouter"');
+    expect(table).toContain("shouldOpenOrderRow(event,");
+    expect(table).toContain("onOpenOrder?.(orderId);");
+    expect(table).toContain("navigate(`/os/${orderId}`)");
+    expect((table.match(/onClick=\{event => handleOrderRowClick\(event, order.id\)\}/g) ?? []).length).toBe(2);
+    expect((table.match(/onKeyDown=\{event => handleOrderRowKeyDown\(event, order.id\)\}/g) ?? []).length).toBe(2);
+    expect((table.match(/tabIndex=\{0\}/g) ?? []).length).toBe(2);
+    expect(table).toContain('onClick={event => handleOrderLink(event, order.id)}');
+    expect(table).toContain('aria-label={number ? `Ações da OS ${number}` : "Ações da OS sem número informado"}');
+  });
+
   it("renders a mobile-specific OS card and retains the desktop table", () => {
     expect(table).toContain('aria-label="Lista de ordens de serviço"');
     expect(table).toContain('className="evolu-orders__mobile-list lg:hidden"');
