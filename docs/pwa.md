@@ -42,3 +42,7 @@
 3. Com uma OS parcialmente preenchida, disparar uma versão nova e confirmar que o formulário não recarrega até o clique em **Atualizar**.
 4. Com duas abas abertas, testar atualização e preservar autenticação/autorização após recarga.
 5. Inspecionar Cache Storage para verificar que não há dados privados. Sem rede, apenas a página informativa deve aparecer.
+
+### Detecção de novas versões a cada deploy
+
+O build Vite substitui `__EVOLUSYSTEM_BUILD_ID__` dentro do arquivo final `dist/sw.js` usando o commit `VERCEL_GIT_COMMIT_SHA` ou um identificador de build. Isso altera os bytes do worker a cada release e permite a verificação periódica detectar uma versão nova mesmo quando `public/sw.js` não mudou.

@@ -17,6 +17,15 @@ describe("EvoluSystem PWA v2", () => {
     expect(experience).toContain("Salve alterações em andamento");
   });
 
+  it("atribui nova versão ao SW a cada deploy", () => {
+    const sw = read("public/sw.js");
+    const vite = read("vite.config.ts");
+    expect(sw).toContain("__EVOLUSYSTEM_BUILD_ID__");
+    expect(vite).toContain("versionedPwaWorker()");
+    expect(vite).toContain("VERCEL_GIT_COMMIT_SHA");
+    expect(vite).toContain("writeFileSync(swPath");
+  });
+
   it("oferece instalação guiada no menu móvel e respeita áreas seguras", () => {
     const layout = read("src/components/Layout.tsx");
     const app = read("src/App.tsx");

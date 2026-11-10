@@ -1,6 +1,6 @@
 // PWA online-first: guarda somente uma página pública de indisponibilidade.
 // Nunca armazena respostas autenticadas, dados do Supabase, APIs, OS ou arquivos.
-const CACHE_NAME = "evolusystem-offline-v2";
+const CACHE_NAME = "evolusystem-offline-v2-__EVOLUSYSTEM_BUILD_ID__";
 const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", event => {
