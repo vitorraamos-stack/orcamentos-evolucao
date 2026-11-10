@@ -130,7 +130,7 @@ export default function EstimatorPage() {
     setLoadError(null);
 
     void estimatorRepository
-      .loadForm()
+      .loadForm(null, user?.id ?? null)
       .then(loaded => {
         if (cancelled) return;
         setDefinition(loaded);
