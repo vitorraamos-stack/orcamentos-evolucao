@@ -121,6 +121,7 @@ const pricingConfigurationErrors: Record<
 };
 
 export default async function handler(req: any, res: any) {
+  const requestStartedAt = Date.now();
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key)
@@ -308,6 +309,7 @@ export default async function handler(req: any, res: any) {
       log("estimator_form", "form_loaded", {
         products: data.products.length,
         availableInstallments: data.availableInstallments,
+        durationMs: Date.now() - requestStartedAt,
       });
       return send(res, 200, { ok: true, data });
     }
