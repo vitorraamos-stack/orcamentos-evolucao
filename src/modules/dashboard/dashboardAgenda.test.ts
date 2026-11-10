@@ -55,6 +55,43 @@ describe("Dashboard Etapa 2 — agenda e conflitos", () => {
     expect(agenda.events.every(e => e.order.id !== "c")).toBe(true);
   });
 
+  it("lists the exact unscheduled OS, ordered by delivery deadline, without inventing dates", () => {
+    const orders = [
+      order("far", { delivery_date: "2026-11-12" }),
+      order("near", { delivery_date: "2026-11-06" }),
+      order("scheduled", { delivery_date: "2026-11-04" }),
+      order("deliveryPending", { logistic_type: "entrega", delivery_date: "2026-11-08" }),
+      order("deliveryNoTime", { logistic_type: "entrega", delivery_date: "2026-11-07" }),
+    ];
+    const agenda = buildDashboardAgenda(orders, sources([
+      installation("valid", "scheduled"),
+    ], [delivery("no-time", "deliveryNoTime", { scheduled_at: null })]), now);
+    expect(agenda.waitingInstallations).toBe(2);
+    expect(agenda.waitingDeliveries).toBe(1);
+    expect(agenda.deliveriesWithoutTime).toBe(1);
+    expect(agenda.pendingScheduleEntries.map(entry => entry.key)).toEqual([
+      "installation:near",
+      "delivery_missing_time:no-time",
+      "delivery:deliveryPending",
+      "installation:far",
+    ]);
+    expect(agenda.pendingScheduleEntries.some(entry => entry.order.id === "scheduled")).toBe(false);
+    expect(agenda.events.some(entry => entry.key === "delivery:no-time")).toBe(false);
+  });
+
+  it("omits unscheduled installations for team-limited viewers, retaining permitted deliveries", () => {
+    const orders = [
+      order("restricted"),
+      order("permitted", { logistic_type: "entrega" }),
+    ];
+    const result = buildDashboardAgenda(orders, {
+      ...sources([]), canCountWaitingInstallations: false,
+    }, now);
+    expect(result.waitingInstallations).toBeNull();
+    expect(result.pendingScheduleEntries.map(entry => entry.key)).toEqual(["delivery:permitted"]);
+    expect(result.waitingDeliveries).toBe(1);
+  });
+
   it("flags documented overlap by team or responsible but not unknown durations or touching intervals", () => {
     const rows = [
       installation("a", "oa"),
