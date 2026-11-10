@@ -1,5 +1,5 @@
-import type { MouseEvent } from "react";
-import { Link } from "wouter";
+import type { KeyboardEvent, MouseEvent } from "react";
+import { Link, useLocation } from "wouter";
 import {
   CalendarDays,
   Eye,
@@ -12,6 +12,7 @@ import type { OsOrder } from "@/features/hubos/types";
 import type { OperationalOrder, OperationalOrderItem } from "../orderRepository";
 import { calculateOrderRisk } from "../risk";
 import { isSameTabOrderActivation } from "../centralReturnContext";
+import { shouldOpenOrderRow } from "./orderRowActivation";
 import {
   OrderPriorityBadge,
   OrderRiskBadge,
@@ -150,8 +151,23 @@ export function OrderTable({
   onOpenOrder?: (orderId: string) => void;
   highlightOrderId?: string | null;
 }) {
+  const [, navigate] = useLocation();
   const handleOrderLink = (event: MouseEvent<HTMLAnchorElement>, orderId: string) => {
     if (isSameTabOrderActivation(event.nativeEvent)) onOpenOrder?.(orderId);
+  };
+  const openOrderFromRow = (orderId: string) => {
+    onOpenOrder?.(orderId);
+    navigate(`/os/${orderId}`);
+  };
+  const handleOrderRowClick = (event: MouseEvent<HTMLElement>, orderId: string) => {
+    if (!shouldOpenOrderRow(event, typeof window === "undefined" ? "" : window.getSelection()?.toString() ?? "")) return;
+    openOrderFromRow(orderId);
+  };
+  const handleOrderRowKeyDown = (event: KeyboardEvent<HTMLElement>, orderId: string) => {
+    if (event.target !== event.currentTarget || event.defaultPrevented) return;
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    openOrderFromRow(orderId);
   };
   if (!orders.length)
     return (
@@ -180,7 +196,17 @@ export function OrderTable({
           const number = order.sale_number;
           const numberLabel = number ? `#${number}` : "Número não informado";
           return (
-            <article key={order.id} className={cn("evolu-orders__mobile-card", highlightOrderId === order.id && "ring-2 ring-primary/50")}>
+            <article
+              key={order.id}
+              tabIndex={0}
+              aria-label={`Abrir OS ${numberLabel} de ${order.client_name || "cliente não informado"}`}
+              onClick={event => handleOrderRowClick(event, order.id)}
+              onKeyDown={event => handleOrderRowKeyDown(event, order.id)}
+              className={cn(
+                "evolu-orders__mobile-card cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+                highlightOrderId === order.id && "ring-2 ring-primary/50"
+              )}
+            >
               <div className="flex min-w-0 items-start justify-between gap-3">
                 <div className="min-w-0">
                   <Link href={path} data-central-order-id={order.id} onClick={event => handleOrderLink(event, order.id)} className="text-base font-extrabold text-primary hover:underline">
@@ -249,8 +275,12 @@ export function OrderTable({
               return (
                 <tr
                   key={order.id}
+                  tabIndex={0}
+                  aria-label={`Abrir OS ${numberLabel} de ${order.client_name || "cliente não informado"}`}
+                  onClick={event => handleOrderRowClick(event, order.id)}
+                  onKeyDown={event => handleOrderRowKeyDown(event, order.id)}
                   className={cn(
-                    "border-b transition-colors last:border-0 hover:bg-muted/30",
+                    "cursor-pointer border-b transition-colors last:border-0 hover:bg-muted/30 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary",
                     risk === "CRITICO" && "border-l-2 border-l-destructive bg-destructive/[0.025]",
                     highlightOrderId === order.id && "bg-primary/10 ring-2 ring-inset ring-primary/40"
                   )}
