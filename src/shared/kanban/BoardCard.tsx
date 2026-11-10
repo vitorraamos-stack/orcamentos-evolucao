@@ -32,6 +32,7 @@ import { isOrderUrgent } from "@/features/hubos/orderUrgency";
 import {
   formatArtworkDeadline,
   getArtworkCardDeadline,
+  getArtworkStartSla,
 } from "@/modules/artwork/presentation/artworkPresentation";
 
 const TAGS: Record<string, string> = {
@@ -113,6 +114,10 @@ export function BoardCard({
       : ["PRODUCTION", "FINISHING"].includes(item.scope)
   );
   const overdue = isOrderOverdue(card.order);
+  const artworkSla = board === "art" ? getArtworkStartSla(card.order) : null;
+  const artworkStepDeadline = board === "art"
+    ? card.deadlines.find(item => ["ART", "APPROVAL"].includes(item.scope))?.dueDate ?? null
+    : null;
   const badges = [
     isOrderUrgent(card.order) ? "Urgente" : null,
     isOrderOverdue(card.order)
@@ -122,11 +127,7 @@ export function BoardCard({
         : card.risk === "ATENCAO"
           ? "Atenção"
           : null,
-    TAGS[
-      board === "art"
-        ? (card.order.art_direction_tag ?? "")
-        : (card.order.production_tag ?? "")
-    ],
+    board === "production" ? TAGS[card.order.production_tag ?? ""] : null,
     board === "production" && card.order.reproducao ? "Reprodução" : null,
     board === "production" && card.order.letra_caixa ? "Letra Caixa" : null,
   ]
@@ -207,7 +208,19 @@ export function BoardCard({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1.5">
+        {board === "art" && card.order.art_direction_tag && TAGS[card.order.art_direction_tag] && (
+          <Badge
+            variant="outline"
+            className={`px-2.5 py-1 text-xs font-bold leading-4 ${
+              card.order.art_direction_tag === "CRIACAO_ARTE"
+                ? "border-amber-500/60 bg-amber-500/20 text-amber-800 dark:text-amber-200"
+                : "border-sky-500/60 bg-sky-500/20 text-sky-800 dark:text-sky-200"
+            }`}
+          >
+            {TAGS[card.order.art_direction_tag]}
+          </Badge>
+        )}
         {badges.map(badge => (
           <Badge
             key={badge}
@@ -222,6 +235,23 @@ export function BoardCard({
           </Badge>
         ))}
       </div>
+      {artworkSla && (
+        <div className={`space-y-1 rounded-lg border px-2.5 py-2 text-xs ${
+          artworkSla.state === "OVERDUE"
+            ? "border-destructive/40 bg-destructive/5"
+            : artworkSla.state === "TODAY"
+              ? "border-amber-500/40 bg-amber-500/5"
+              : "border-border/70 bg-muted/30"
+        }`}>
+          <div className="flex flex-wrap items-center justify-between gap-1">
+            <span className="font-semibold text-foreground">SLA de início da Arte</span>
+            <Badge variant={artworkSla.state === "OVERDUE" ? "destructive" : "outline"} className="text-[11px]">
+              {artworkSla.state === "STARTED" ? "Iniciada" : artworkSla.state === "OVERDUE" ? "Atrasado" : artworkSla.state === "TODAY" ? "Vence hoje" : "No prazo"}
+            </Badge>
+          </div>
+          <p className="text-foreground">Até {formatDatePtBr(artworkSla.dueDate)} <span className="text-muted-foreground">· {artworkSla.rule}</span></p>
+        </div>
+      )}
       <div className="grid gap-1 text-xs text-muted-foreground">
         {board === "production" &&
           (card.productionOperationsTotal ?? 0) > 0 && (
@@ -255,7 +285,9 @@ export function BoardCard({
         <span className="flex items-center gap-1">
           <CalendarDays className="h-3.5 w-3.5" />
           {board === "art"
-            ? formatArtworkDeadline(getArtworkCardDeadline(card))
+            ? artworkStepDeadline
+              ? `Meta Arte: ${formatArtworkDeadline(artworkStepDeadline)}`
+              : `Entrega: ${formatArtworkDeadline(getArtworkCardDeadline(card))}`
             : deadline
               ? `Etapa ${formatDatePtBr(deadline.dueDate)}`
               : `Prazo ${formatDatePtBr(card.order.delivery_date)}`}
