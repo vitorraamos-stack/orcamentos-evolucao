@@ -18,6 +18,12 @@ export type DashboardDelivery = {
 export type AgendaKind = "installation" | "delivery" | "deadline";
 export type AgendaPeriod = "today" | "week";
 export type AgendaFilter = "all" | AgendaKind | "late" | "conflicts";
+export type PendingScheduleKind = "installation" | "delivery" | "delivery_missing_time";
+export type PendingScheduleEntry = {
+  key: string;
+  kind: PendingScheduleKind;
+  order: DashboardOrder;
+};
 export type AgendaEvent = {
   key: string;
   kind: AgendaKind;
@@ -36,6 +42,8 @@ export type DashboardAgenda = {
   waitingInstallations: number | null;
   waitingDeliveries: number | null;
   deliveriesWithoutTime: number | null;
+  /** Read-only OS drilldown. Unavailable installation visibility never produces entries. */
+  pendingScheduleEntries: PendingScheduleEntry[];
   overdueWithoutCompletion: number;
   conflicts: number;
   missingInformation: number;
@@ -110,6 +118,40 @@ export function buildDashboardAgenda(
   const activeInstallationIds = new Set(activeInstallations.map(i => i.os_id));
   const activeDeliveryIds = new Set(activeDeliveries.map(d => d.os_id));
   const conflicts = findInstallationConflicts(activeInstallations);
+  const activeOrders = Array.from(orderMap.values());
+  const installationWaiting = sources.canViewInstallations &&
+    sources.canCountWaitingInstallations !== false
+    ? activeOrders.filter(o => o.logistic_type === "instalacao" &&
+      (o.prod_status === "Pronto / Avisar Cliente" || o.prod_status === "Instalação Agendada") &&
+      !activeInstallationIds.has(o.id))
+    : null;
+  const deliveryWaiting = sources.canViewDeliveries
+    ? activeOrders.filter(o => o.logistic_type === "entrega" &&
+      (o.prod_status === "Pronto / Avisar Cliente" ||
+        o.prod_status === "Logística (Entrega/Transportadora)") &&
+      !activeDeliveryIds.has(o.id))
+    : null;
+  const deliveryMissingTime = sources.canViewDeliveries
+    ? activeDeliveries.filter(d => orderMap.has(d.os_id) &&
+      validInstant(d.scheduled_at) === null)
+    : null;
+  const pendingScheduleEntries: PendingScheduleEntry[] = [
+    ...(installationWaiting ?? []).map(order => ({
+      key: "installation:" + order.id, kind: "installation" as const, order,
+    })),
+    ...(deliveryWaiting ?? []).map(order => ({
+      key: "delivery:" + order.id, kind: "delivery" as const, order,
+    })),
+    ...(deliveryMissingTime ?? []).map(delivery => ({
+      key: "delivery_missing_time:" + delivery.id,
+      kind: "delivery_missing_time" as const,
+      order: orderMap.get(delivery.os_id)!,
+    })),
+  ].sort((a, b) =>
+    (a.order.delivery_date ?? "9999-12-31").localeCompare(b.order.delivery_date ?? "9999-12-31") ||
+    (a.order.sale_number ?? "").localeCompare(b.order.sale_number ?? "", "pt-BR") ||
+    a.key.localeCompare(b.key)
+  );
   const events: AgendaEvent[] = [];
   for (const row of activeInstallations) {
     const order = orderMap.get(row.os_id);
@@ -160,19 +202,10 @@ export function buildDashboardAgenda(
   );
   return {
     events,
-    waitingInstallations: sources.canViewInstallations && sources.canCountWaitingInstallations !== false
-      ? Array.from(orderMap.values()).filter(o => o.logistic_type === "instalacao" &&
-        (o.prod_status === "Pronto / Avisar Cliente" || o.prod_status === "Instalação Agendada") &&
-        !activeInstallationIds.has(o.id)).length
-      : null,
-    waitingDeliveries: sources.canViewDeliveries
-      ? Array.from(orderMap.values()).filter(o => o.logistic_type === "entrega" &&
-        (o.prod_status === "Pronto / Avisar Cliente" || o.prod_status === "Logística (Entrega/Transportadora)") &&
-        !activeDeliveryIds.has(o.id)).length
-      : null,
-    deliveriesWithoutTime: sources.canViewDeliveries
-      ? activeDeliveries.filter(d => orderMap.has(d.os_id) && validInstant(d.scheduled_at) === null).length
-      : null,
+    waitingInstallations: installationWaiting?.length ?? null,
+    waitingDeliveries: deliveryWaiting?.length ?? null,
+    deliveriesWithoutTime: deliveryMissingTime?.length ?? null,
+    pendingScheduleEntries,
     overdueWithoutCompletion: events.filter(e => e.overdueWithoutCompletion).length,
     conflicts: events.filter(e => e.conflict).length,
     missingInformation: events.filter(e => e.warnings.some(w => /não informado/.test(w))).length,
