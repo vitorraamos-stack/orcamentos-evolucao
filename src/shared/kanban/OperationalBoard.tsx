@@ -466,32 +466,32 @@ export function OperationalBoard({
             <>
               <Button
                 aria-label="Rolar quadro para a esquerda"
-            variant="secondary"
-            size="icon"
-            className="absolute left-1 top-1/2 z-20 hidden rounded-full shadow md:flex"
-            onClick={() =>
-              boardScrollRef.current?.scrollBy({
-                left: -320,
-                behavior: "smooth",
-              })
-            }
-          >
-            <ChevronLeft />
-                  </Button>
-          <Button
-            aria-label="Rolar quadro para a direita"
-            variant="secondary"
-            size="icon"
-            className="absolute right-1 top-1/2 z-20 hidden rounded-full shadow md:flex"
-            onClick={() =>
-              boardScrollRef.current?.scrollBy({
-                left: 320,
-                behavior: "smooth",
-              })
-            }
-          >
-            <ChevronRight />
-          </Button>
+                variant="secondary"
+                size="icon"
+                className="absolute left-1 top-1/2 z-20 hidden rounded-full shadow md:flex"
+                onClick={() =>
+                  boardScrollRef.current?.scrollBy({
+                    left: -320,
+                    behavior: "smooth",
+                  })
+                }
+              >
+                <ChevronLeft />
+              </Button>
+              <Button
+                aria-label="Rolar quadro para a direita"
+                variant="secondary"
+                size="icon"
+                className="absolute right-1 top-1/2 z-20 hidden rounded-full shadow md:flex"
+                onClick={() =>
+                  boardScrollRef.current?.scrollBy({
+                    left: 320,
+                    behavior: "smooth",
+                  })
+                }
+              >
+                <ChevronRight />
+              </Button>
             </>
           )}
           <div ref={boardScrollRef} className="flex gap-4 overflow-x-auto pb-4">
