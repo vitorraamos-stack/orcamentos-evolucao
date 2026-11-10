@@ -646,3 +646,51 @@
   background: transparent;
   border-bottom-color: var(--border);
 }
+
+
+/* OS overview: one card for identification, quick facts and operational flow. */
+.evolu-detail__overview {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--detail-border);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 10px 35px -28px rgba(22, 54, 91, .42);
+}
+.evolu-detail__overview::before {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(to right, #00a6e9 0 64%, #e80087 64% 82%, #f0d400 82% 100%);
+  content: "";
+  pointer-events: none;
+}
+.evolu-detail__overview > .evolu-detail__hero,
+.evolu-detail__overview > .evolu-detail__flow {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.evolu-detail__overview > .evolu-detail__hero::before {
+  content: none;
+}
+.evolu-detail__overview > .evolu-detail__flow {
+  border-top: 1px solid var(--detail-border);
+}
+.dark .evolu-detail__overview {
+  border-color: var(--border);
+  background: var(--card);
+}
+.dark .evolu-detail__overview > .evolu-detail__hero,
+.dark .evolu-detail__overview > .evolu-detail__flow {
+  background: transparent;
+}
+.dark .evolu-detail__overview > .evolu-detail__flow {
+  border-top-color: var(--border);
+}

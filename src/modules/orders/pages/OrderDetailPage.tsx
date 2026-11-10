@@ -331,8 +331,10 @@ export default function OrderDetailPage() {
       <ChevronRight className="size-4" aria-hidden="true" />
       <span aria-current="page">{formatOfficialOsLabel(detail.order.sale_number)}</span>
     </nav>
-    <OrderHeader order={detail.order} assignees={detail.assignees} canEdit={canEditOrder} canManage={hubPermissions.isManager} onArchive={()=>setArchiveOpen(true)} onDelete={()=>setDeleteOpen(true)} transitions={allowed} onTransition={moveStatus} onEdit={() => setEditOpen(true)} />
-    <OrderFlowProgress order={detail.order} />
+    <div className="evolu-detail__overview">
+      <OrderHeader order={detail.order} assignees={detail.assignees} canEdit={canEditOrder} canManage={hubPermissions.isManager} onArchive={()=>setArchiveOpen(true)} onDelete={()=>setDeleteOpen(true)} transitions={allowed} onTransition={moveStatus} onEdit={() => setEditOpen(true)} />
+      <OrderFlowProgress order={detail.order} />
+    </div>
     <OrderOrientationStrip order={detail.order} onGoProduction={() => selectTab("production")} />
     <Tabs className="evolu-detail__tabs" key={orderId} value={activeTab} onValueChange={selectTab}><div className="evolu-detail__tabs-scroll overflow-x-auto"><TabsList aria-label="Seções da ordem de serviço" className="evolu-detail__tabs-list w-max min-w-full justify-start"><TabsTrigger className="evolu-detail__tab" value="summary">Resumo</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="items">Itens</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="production">Produção</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="installation">Instalação / Entrega</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="files">Arquivos</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="comments">Comentários</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="history">Histórico</TabsTrigger></TabsList></div>
       <TabsContent className="evolu-detail__tab-content space-y-4" value="summary">
