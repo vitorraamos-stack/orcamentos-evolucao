@@ -27,6 +27,7 @@ Este incremento adiciona o detalhamento, **sem novas consultas ou escrita**.
 
 Somente `dashboardAgenda.ts`, `DashboardAgendaPanel.tsx`, teste e documentação.
 Sem migrations, alterações do Supabase ou modificações de OS.
-A branch possui preview da Vercel desabilitado enquanto estiver em revisão.
-**Antes de qualquer merge**, remover exclusivamente a entrada da própria branch
-do `vercel.json`, rodar CI e obter nova autorização de publicação.
+A exclusão temporária da branch no `vercel.json` foi retirada após autorização
+expressa de publicação. Os demais bloqueios de deploy de branches antigas
+permanecem inalterados. A liberação exige CI aprovado no commit final do PR,
+merge autorizado e confirmação do deployment da `main` na Vercel.
