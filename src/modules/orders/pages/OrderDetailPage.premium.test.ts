@@ -91,4 +91,26 @@ describe("EvoluSystem — OS detail premium visual contract", () => {
     expect(flow).toContain('aria-current={isCurrent ? "step" : undefined}');
     expect((flow.match(/value: "(ENTRY|ART|APPROVAL|PRODUCTION|FINISHING|READY|LOGISTICS|FINISHED)"/g) ?? []).length).toBe(8);
   });
+
+  it("unifies the header and stage flow under one bounded overview without duplicating either component", () => {
+    const styles = readFileSync(new URL("./order-detail-premium.css", import.meta.url), "utf8");
+    const overview = detail.indexOf('<div className="evolu-detail__overview">');
+    const header = detail.indexOf("<OrderHeader order={detail.order}", overview);
+    const flow = detail.indexOf("<OrderFlowProgress order={detail.order}", header);
+    const end = detail.indexOf("</div>", flow);
+    const orientation = detail.indexOf("<OrderOrientationStrip order={detail.order}", end);
+
+    expect(overview).toBeGreaterThan(0);
+    expect(header).toBeGreaterThan(overview);
+    expect(flow).toBeGreaterThan(header);
+    expect(end).toBeGreaterThan(flow);
+    expect(orientation).toBeGreaterThan(end);
+    expect((detail.match(/className="evolu-detail__overview"/g) ?? [])).toHaveLength(1);
+    expect((detail.match(/<OrderHeader order={detail.order}/g) ?? [])).toHaveLength(1);
+    expect((detail.match(/<OrderFlowProgress order={detail.order}/g) ?? [])).toHaveLength(1);
+    expect(styles).toContain(".evolu-detail__overview > .evolu-detail__flow {");
+    expect(styles).toContain("border-top: 1px solid var(--detail-border);");
+    expect(styles).toContain(".dark .evolu-detail__overview {");
+  });
+
 });
