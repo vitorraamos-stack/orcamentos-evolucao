@@ -23,6 +23,8 @@ import {
   Printer,
   BookOpen,
   Download,
+  MoreHorizontal,
+  type LucideIcon,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import "./evolusystem-shell.css";
@@ -32,10 +34,26 @@ import { canAccessOperationalSection } from "@/lib/authz";
 import { getOperationalNavState } from "./operationalNavState";
 import { useLogisticsPendingCounts } from "./useLogisticsPendingCounts";
 import { usePwaExperience } from "@/components/pwa/PwaExperience";
+import { getMobileShortcuts, isMobileShortcutActive, type MobileShortcutId } from "./mobileOperationalNav";
 
 interface LayoutProps {
   children: React.ReactNode;
 }
+
+const mobileTabIcons: Record<MobileShortcutId, LucideIcon> = {
+  orders: ClipboardList,
+  art: Palette,
+  production: Factory,
+  installations: CalendarDays,
+  deliveries: Truck,
+  estimator: Calculator,
+  dashboard: LayoutDashboard,
+  printing: Printer,
+  library: BookOpen,
+  calculator: Calculator,
+  gallery: Image,
+  finance: BadgeDollarSign,
+};
 
 function PendingNavBadge({ count }: { count: number | null }) {
   if (count === null || count <= 0) return null;
@@ -56,6 +74,18 @@ export default function Layout({ children }: LayoutProps) {
   const { installed, openInstallGuide } = usePwaExperience();
   const [location, setLocation] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+
+  useEffect(() => {
+    const markOnline = () => setIsOnline(true);
+    const markOffline = () => setIsOnline(false);
+    window.addEventListener("online", markOnline);
+    window.addEventListener("offline", markOffline);
+    return () => {
+      window.removeEventListener("online", markOnline);
+      window.removeEventListener("offline", markOffline);
+    };
+  }, []);
 
   // Hooks must run on every render, including loading and signed-out states.
   const avatarUrl = useAvatarPhoto(user?.id);
@@ -122,6 +152,21 @@ export default function Layout({ children }: LayoutProps) {
   const hasCommercialModules = canViewOrcamentista || canViewCalculadora || canViewLibrary;
   const hasResourceModules = canViewGaleria || canViewMateriais;
   const hasManagementModules = canViewFinanceiro || canViewConfiguracoes || canViewOperationalSettings || canManageLibrary || canViewPricing;
+
+  const mobileShortcuts = getMobileShortcuts({
+    orders: canViewHubOs,
+    art: canViewArteBoard,
+    production: canViewProducaoBoard,
+    installations: canViewInstallations,
+    deliveries: canViewDeliveries,
+    estimator: canViewOrcamentista,
+    dashboard: canViewDashboard,
+    printing: canViewPrinting,
+    library: canViewLibrary,
+    calculator: canViewCalculadora,
+    gallery: canViewGaleria,
+    finance: canViewFinanceiro,
+  });
 
   const operationalLinks = [
     ...(canViewDashboard ? [{ href: "/hub-os", label: "Dashboard", Icon: LayoutDashboard, active: location === "/hub-os" }] : []),
@@ -426,6 +471,12 @@ export default function Layout({ children }: LayoutProps) {
           </div>
         </header>
 
+        {!isOnline && (
+          <div className="evolu-shell__offline-notice md:hidden" role="status" aria-live="polite">
+            Sem conexão. Conecte-se à internet para consultar e atualizar as OS.
+          </div>
+        )}
+
         <main
           className={cn(
             "evolu-shell__main min-h-0 flex-1 p-4 md:p-5 xl:p-6",
@@ -454,6 +505,44 @@ export default function Layout({ children }: LayoutProps) {
             {children}
           </div>
         </main>
+        <nav className="evolu-shell__mobile-nav" aria-label="Atalhos do EvoluSystem">
+          {mobileShortcuts.map(({ id, href, label }) => {
+            const Icon = mobileTabIcons[id];
+            const active = isMobileShortcutActive(id, location);
+            const pendingCount = id === "installations"
+              ? pendingCounts.installations
+              : id === "deliveries" ? pendingCounts.deliveries : null;
+            return (
+              <Link
+                key={id}
+                href={href}
+                className={cn("evolu-shell__mobile-tab", active && "evolu-shell__mobile-tab--active")}
+                aria-current={active ? "page" : undefined}
+              >
+                <span className="evolu-shell__mobile-tab-icon">
+                  <Icon className="size-5" aria-hidden="true" />
+                  {pendingCount !== null && pendingCount > 0 && (
+                    <span className="evolu-shell__mobile-badge" aria-label={`${pendingCount} pendências`}>
+                      {pendingCount > 99 ? "99+" : pendingCount}
+                    </span>
+                  )}
+                </span>
+                <span className="evolu-shell__mobile-label">{label}</span>
+              </Link>
+            );
+          })}
+          <button
+            type="button"
+            className={cn("evolu-shell__mobile-tab", mobileOpen && "evolu-shell__mobile-tab--active")}
+            onClick={() => setMobileOpen(true)}
+            aria-label="Abrir menu completo"
+            aria-haspopup="dialog"
+            aria-expanded={mobileOpen}
+          >
+            <MoreHorizontal className="size-5" aria-hidden="true" />
+            <span className="evolu-shell__mobile-label">Mais</span>
+          </button>
+        </nav>
       </div>
     </div>
   );

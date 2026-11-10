@@ -46,3 +46,21 @@
 ### Detecção de novas versões a cada deploy
 
 O build Vite substitui `__EVOLUSYSTEM_BUILD_ID__` dentro do arquivo final `dist/sw.js` usando o commit `VERCEL_GIT_COMMIT_SHA` ou um identificador de build. Isso altera os bytes do worker a cada release e permite a verificação periódica detectar uma versão nova mesmo quando `public/sw.js` não mudou.
+
+
+## Versão 3 — navegação mobile e estado de conexão
+
+- Barra inferior com até **4 atalhos autorizados** e botão **Mais** para abrir o menu lateral integral, mantendo o controle por módulo e os guards existentes.
+- A primeira seleção segue o fluxo operacional **OS → Arte → Produção → Instalações**; consultoras ou instaladores visualizam apenas as opções liberadas para seu acesso.
+- Dentro de uma OS, nos subquadros ou na execução de instalação, o atalho correspondente permanece selecionado.
+- A barra não aparece no desktop, respeita a área segura inferior e se oculta temporariamente durante a edição em inputs para não ocupar espaço do teclado virtual.
+- Quando o dispositivo está sem conexão, o aplicativo apresenta um aviso não bloqueante. **As ordens de serviço não ficam disponíveis offline.**
+- Nenhum módulo, política de acesso ou tabela Supabase foi alterado.
+
+### Validação V3
+
+1. Entrar como consultora, arte-finalista, produção, instalação e gestão; confirmar que os atalhos não revelam módulos sem permissão.
+2. Em celular, validar toque de 44px ou mais, item ativo e botão Mais abrindo a gaveta.
+3. Criar/editar OS com teclado virtual e verificar que a barra inferior não bloqueia campos nem ações.
+4. Desconectar a internet e confirmar aviso visível, sem cache privado.
+5. Confirmar que o menu desktop e a navegação das demais páginas permanecem inalterados.
