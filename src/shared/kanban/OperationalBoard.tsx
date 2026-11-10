@@ -462,8 +462,10 @@ export function OperationalBoard({
         }}
       >
         <div className="relative">
-          <Button
-            aria-label="Rolar quadro para a esquerda"
+          {board === "production" && (
+            <>
+              <Button
+                aria-label="Rolar quadro para a esquerda"
             variant="secondary"
             size="icon"
             className="absolute left-1 top-1/2 z-20 hidden rounded-full shadow md:flex"
@@ -475,7 +477,7 @@ export function OperationalBoard({
             }
           >
             <ChevronLeft />
-          </Button>
+                  </Button>
           <Button
             aria-label="Rolar quadro para a direita"
             variant="secondary"
@@ -490,6 +492,8 @@ export function OperationalBoard({
           >
             <ChevronRight />
           </Button>
+            </>
+          )}
           <div ref={boardScrollRef} className="flex gap-4 overflow-x-auto pb-4">
             {columns.map(column => (
               <BoardColumn
