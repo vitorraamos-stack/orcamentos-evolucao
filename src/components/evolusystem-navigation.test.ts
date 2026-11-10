@@ -43,6 +43,14 @@ describe("EvoluSystem sidebar navigation groups", () => {
     expect(layout).toContain("hasManagementModules &&");
   });
 
+  it("shows counts only for nonzero logistics pending items and preserves module gates", () => {
+    expect(layout).toContain("useLogisticsPendingCounts({");
+    expect(layout).toContain('href === "/instalacoes" && <PendingNavBadge count={pendingCounts.installations} />');
+    expect(layout).toContain('href === "/entregas" && <PendingNavBadge count={pendingCounts.deliveries} />');
+    expect(layout).toContain("if (count === null || count <= 0) return null;");
+    expect(layout).toContain('count > 99 ? "99+" : count');
+  });
+
   it("shares the same NavItems between desktop and mobile menus", () => {
     expect(layout.match(/<NavItems \/>/g)).toHaveLength(2);
     expect(layout).toContain("setMobileOpen(false)");

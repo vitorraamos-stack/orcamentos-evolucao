@@ -29,10 +29,17 @@ import { cn } from "@/lib/utils";
 import { getRoleLabel } from "@/lib/hubRoles";
 import { canAccessOperationalSection } from "@/lib/authz";
 import { getOperationalNavState } from "./operationalNavState";
+import { useLogisticsPendingCounts } from "./useLogisticsPendingCounts";
 
 interface LayoutProps {
   children: React.ReactNode;
 }
+
+function PendingNavBadge({ count }: { count: number | null }) {
+  if (count === null || count <= 0) return null;
+  return <span className="evolu-nav__pending-badge" aria-label={`${count} pendências`}>{count > 99 ? "99+" : count}</span>;
+}
+
 
 export default function Layout({ children }: LayoutProps) {
   const {
@@ -49,6 +56,17 @@ export default function Layout({ children }: LayoutProps) {
 
   // Hooks must run on every render, including loading and signed-out states.
   const avatarUrl = useAvatarPhoto(user?.id);
+  const pendingCounts = useLogisticsPendingCounts({
+    userId: user?.id ?? null,
+    canViewInstallations: Boolean(user) && canAccessOperationalSection(
+      { hasModuleAccess, permissions: hubPermissions }, "installations"
+    ),
+    canViewDeliveries: Boolean(user) && canAccessOperationalSection(
+      { hasModuleAccess, permissions: hubPermissions }, "deliveries"
+    ),
+    isManager: hubPermissions.isManager,
+    agendaOnly: !hubPermissions.canViewInstallations,
+  });
   const isCreateOrderPage = location.startsWith("/os/novo");
   const isOrdersCentralPage = location === "/os";
   const isOrderDetailPage = /^\/os\/[^/]+$/.test(location) &&
@@ -137,6 +155,8 @@ export default function Layout({ children }: LayoutProps) {
               >
                 <Icon className="mr-2 h-4 w-4" />
                 {label}
+                {href === "/instalacoes" && <PendingNavBadge count={pendingCounts.installations} />}
+                {href === "/entregas" && <PendingNavBadge count={pendingCounts.deliveries} />}
               </Button>
             </Link>
           ))}
