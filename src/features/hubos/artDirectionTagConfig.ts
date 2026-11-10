@@ -12,7 +12,7 @@ export const ART_DIRECTION_TAG_CONFIG: Record<
   CRIACAO_ARTE: {
     label: "Criação de Arte",
     color: "#F2B113",
-    text: "Criação de Arte: Até 3 dias para iniciar a criação e aprovação final.",
+    text: "Criação de Arte: Até 3 dias úteis para iniciar a criação e aprovação final.",
   },
   URGENTE: {
     label: "Urgente",
