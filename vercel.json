@@ -65,7 +65,7 @@
       "feat/os-header-compact-20261110": false,
       "feat/os-clean-header-remove-visual-reference-20261110": false,
       "feat/os-summary-products-first-highlight-20261110": false,
-      "fix/os-products-card-only-left-accent-20261110": false
+      "feat/os-summary-deadlines-first-20261110": false
     }
   }
 }
