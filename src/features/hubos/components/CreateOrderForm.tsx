@@ -65,6 +65,7 @@ import {
   emptyOrderItem,
   getCreateOrderCompletion,
   normalizeCreateOrderItem,
+  formatOrderItemQuantity,
   toCreateOrderItemPayload,
   type CreateOrderItemDraft,
 } from "../createOrderDomain";
@@ -527,7 +528,7 @@ export default function CreateOrderForm({
               <Summary
                 sale={saleNumber}
                 client={clientName}
-                items={items.length}
+                items={items}
                 art={artDirection}
                 urgent={isUrgent}
                 deadline={deadline}
@@ -657,9 +658,9 @@ export default function CreateOrderForm({
                     <Input
                       id={`item-${index}-quantity`}
                       type="number"
-                      inputMode="decimal"
-                      min="0.001"
-                      step="0.001"
+                      inputMode="numeric"
+                      min="1"
+                      step="1"
                       value={String(item.quantity)}
                       onChange={e =>
                         updateItem(index, { quantity: e.target.value })
@@ -1045,7 +1046,7 @@ export default function CreateOrderForm({
             <Summary
               sale={saleNumber}
               client={clientName}
-              items={items.length}
+              items={items}
               art={artDirection}
               urgent={isUrgent}
               deadline={deadline}
@@ -1196,7 +1197,7 @@ function Summary({
 }: {
   sale: string;
   client: string;
-  items: number;
+  items: CreateOrderItemDraft[];
   art: ArtDirectionTag | null;
   urgent: boolean;
   deadline: DeliveryDeadlinePreset | null;
@@ -1204,10 +1205,11 @@ function Summary({
   fileCount: number;
   completion: ReturnType<typeof getCreateOrderCompletion>;
 }) {
+  const itemCount = items.length;
   const values = [
     ["Venda", sale || "—"],
     ["Cliente", client || "—"],
-    ["Itens", `${items} ${items === 1 ? "item" : "itens"}`],
+    ["Itens", `${itemCount} ${itemCount === 1 ? "item" : "itens"}`],
     ["Arte", art ? ART_DIRECTION_TAG_CONFIG[art].label : "—"],
     ["Prioridade", urgent ? "URGENTE" : "Normal"],
     ["Prazo", deadline ? DELIVERY_DEADLINE_PRESET_CONFIG[deadline].label : "—"],
@@ -1225,6 +1227,20 @@ function Summary({
             <div key={label}>
               <dt className="text-xs text-muted-foreground">{label}</dt>
               <dd className="font-medium">{value}</dd>
+              {label === "Itens" && (
+                <ul className="mt-2 space-y-1.5" aria-label="Quantidade por produto">
+                  {items.map((item, index) => (
+                    <li key={index} className="flex items-start justify-between gap-2 text-sm">
+                      <span className="min-w-0 flex-1 break-words text-muted-foreground">
+                        {String(item.name).trim() || `Item ${index + 1}`}
+                      </span>
+                      <span className="shrink-0 font-medium tabular-nums">
+                        {formatOrderItemQuantity(item.quantity)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           ))}
         </dl>

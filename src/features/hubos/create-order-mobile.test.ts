@@ -20,7 +20,8 @@ describe("EvoluSystem mobile OS creation", () => {
 
   it("keeps fields readable, with an appropriate numeric keyboard on phones", () => {
     expect(form).toContain("min-[390px]:grid-cols-2 sm:grid-cols-4");
-    expect(form.match(/inputMode="decimal"/g)).toHaveLength(3);
+    expect(form.match(/inputMode="decimal"/g)).toHaveLength(2);
+    expect(form.match(/inputMode="numeric"/g)).toHaveLength(1);
     expect(css).toContain(".evolu-os-form [data-slot=\"input\"]");
     expect(css).toContain("min-height: 44px");
     expect(css).toContain("@media (max-width: 1023px)");

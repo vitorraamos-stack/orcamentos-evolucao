@@ -39,6 +39,17 @@ export const createOrderItemInputSchema = orderItemInputSchema.extend({
 });
 
 export type CreateOrderItemDraft = z.input<typeof createOrderItemInputSchema>;
+
+const quantityFormatter = new Intl.NumberFormat("pt-BR", {
+  maximumFractionDigits: 10,
+});
+
+export const formatOrderItemQuantity = (quantity: unknown): string => {
+  if (quantity === "" || quantity == null) return "—";
+  const value = Number(quantity);
+  if (!Number.isFinite(value) || value <= 0) return "—";
+  return `${quantityFormatter.format(value)} un.`;
+};
 export type CreateOrderPrefill = {
   saleNumber: string;
   clientName: string;

@@ -25,6 +25,26 @@ describe("new order item unit selector", () => {
     );
   });
 
+  it("uses whole-unit increments for the quantity spinner", () => {
+    const quantityField = source.slice(
+      source.indexOf("<Label htmlFor={`item-${index}-quantity`}>"),
+      source.indexOf("<Label htmlFor={`item-${index}-width`}>")
+    );
+
+    expect(quantityField).toContain('inputMode="numeric"');
+    expect(quantityField).toContain('min="1"');
+    expect(quantityField).toContain('step="1"');
+    expect(quantityField).not.toContain('step="0.001"');
+  });
+
+  it("keeps product count and displays each quantity in both summaries", () => {
+    expect(source.match(/items=\{items\}/g)).toHaveLength(2);
+    expect(source).toContain("items: CreateOrderItemDraft[];");
+    expect(source).toContain("const itemCount = items.length;");
+    expect(source).toContain("items.map((item, index) => (");
+    expect(source).toContain("formatOrderItemQuantity(item.quantity)");
+  });
+
   it("normalizes restored legacy draft items", () => {
     expect(source).toContain("draft.items.map(normalizeCreateOrderItem)");
   });
