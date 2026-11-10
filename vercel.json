@@ -60,8 +60,7 @@
     "deploymentEnabled": {
       "feat/os-detail-uxui-integrated-20261030": false,
       "feat/dashboard-inteligencia-avancada-etapa4-20261106": false,
-      "feat/dashboard-operacional-politicas-etapa1-20261109": false,
-      "fix/os-quantity-summary-step-20261110": false
+      "feat/dashboard-operacional-politicas-etapa1-20261109": false
     }
   }
 }
