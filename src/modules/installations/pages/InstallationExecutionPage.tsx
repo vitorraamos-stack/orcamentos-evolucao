@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Redirect, useRoute } from "wouter";
-import { MapPin, Navigation, RefreshCw } from "lucide-react";
+import { FileText, MapPin, Navigation, RefreshCw, Download, Eye, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -11,6 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { MutationInputDialog } from "@/shared/components/MutationInputDialog";
 import { InstallationChecklist } from "../components/InstallationChecklist";
+import { fetchLatestOrderLayout, fetchOrderAssetDownloadUrl } from "@/features/hubos/api";
+import type { OsOrderLayoutAsset } from "@/features/hubos/types";
+import { OsLayoutPreviewDialog } from "@/modules/hub-os/components/OsLayoutPreviewDialog";
 import { InstallationPhotoUploader } from "../components/InstallationPhotoUploader";
 import { InstallationEvidenceGallery } from "../components/InstallationEvidenceGallery";
 import { InstallationCompletionReadiness } from "../components/InstallationCompletionReadiness";
@@ -53,6 +56,12 @@ export default function InstallationExecutionPage() {
   const [installation, setInstallation] = useState<Installation | null>(null);
   const [items, setItems] = useState<InstallationChecklistItem[]>([]);
   const [evidence, setEvidence] = useState<InstallationEvidence[]>([]);
+  const [layoutAsset, setLayoutAsset] = useState<OsOrderLayoutAsset | null>(null);
+  const [layoutLoading, setLayoutLoading] = useState(true);
+  const [layoutLoadError, setLayoutLoadError] = useState(false);
+  const [layoutRefreshKey, setLayoutRefreshKey] = useState(0);
+  const [layoutPreviewOpen, setLayoutPreviewOpen] = useState(false);
+  const [openingLayout, setOpeningLayout] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [savingChecklistItemId, setSavingChecklistItemId] = useState<string | null>(null);
@@ -129,6 +138,53 @@ export default function InstallationExecutionPage() {
       void supabase.removeChannel(channel);
     };
   }, [load, params?.id]);
+  useEffect(() => {
+    const osId = installation?.os_id;
+    if (!osId) return;
+    let active = true;
+    setLayoutLoading(true);
+    setLayoutLoadError(false);
+    setLayoutAsset(null);
+    void fetchLatestOrderLayout(osId)
+      .then(asset => {
+        if (active) setLayoutAsset(asset);
+      })
+      .catch(error => {
+        console.error("Falha ao carregar layout para instalação:", error);
+        if (active) setLayoutLoadError(true);
+      })
+      .finally(() => {
+        if (active) setLayoutLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [installation?.os_id, layoutRefreshKey]);
+
+  const openLayoutFile = async () => {
+    if (!layoutAsset || openingLayout) return;
+    // Preserve o gesto do usuário ao abrir uma aba antes da chamada assíncrona.
+    const tab = window.open("about:blank", "_blank");
+    if (!tab) {
+      toast.error("Autorize a abertura de uma nova aba para acessar o layout.");
+      return;
+    }
+    tab.opener = null;
+    setOpeningLayout(true);
+    try {
+      const signedUrl = await fetchOrderAssetDownloadUrl(
+        layoutAsset.object_path,
+        layoutAsset.original_name ?? undefined
+      );
+      tab.location.replace(signedUrl);
+    } catch (error) {
+      tab.close();
+      toast.error(error instanceof Error ? error.message : "Não foi possível abrir o layout.");
+    } finally {
+      setOpeningLayout(false);
+    }
+  };
+
   if (!hubPermissions.canExecuteInstallations)
     return <Redirect to="/instalacoes" />;
   if (loading)
@@ -204,7 +260,10 @@ export default function InstallationExecutionPage() {
         <Button
           size="icon"
           variant="ghost"
-          onClick={load}
+          onClick={() => {
+            void load();
+            setLayoutRefreshKey(value => value + 1);
+          }}
           aria-label="Atualizar"
         >
           <RefreshCw className="size-4" />
@@ -277,6 +336,51 @@ export default function InstallationExecutionPage() {
               </a>
             </Button>
           </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <FileText className="h-5 w-5 text-primary" />
+            Layout do pedido
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {layoutLoading ? (
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Carregando layout...
+            </p>
+          ) : layoutLoadError ? (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Não foi possível consultar o layout desta OS.
+              </p>
+              <Button size="sm" variant="outline" onClick={() => setLayoutRefreshKey(value => value + 1)}>
+                Tentar novamente
+              </Button>
+            </div>
+          ) : layoutAsset ? (
+            <>
+              <p className="break-all text-sm font-medium">
+                {layoutAsset.original_name || "Layout final da OS"}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" className="h-11" variant="outline" onClick={() => setLayoutPreviewOpen(true)}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  Visualizar
+                </Button>
+                <Button type="button" className="h-11" variant="outline" disabled={openingLayout} onClick={() => void openLayoutFile()}>
+                  {openingLayout ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                  Abrir / baixar
+                </Button>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              O layout final ainda não foi disponibilizado pela Arte.
+            </p>
+          )}
         </CardContent>
       </Card>
       <Card>
@@ -492,6 +596,11 @@ export default function InstallationExecutionPage() {
             </Button>
           </div>
         )}
+      <OsLayoutPreviewDialog
+        open={layoutPreviewOpen}
+        onOpenChange={setLayoutPreviewOpen}
+        layoutAsset={layoutAsset}
+      />
       <MutationInputDialog
         open={override}
         onOpenChange={setOverride}
