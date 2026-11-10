@@ -68,3 +68,13 @@ body:has(.evolu-shell--order-detail) {
     flex-shrink: 0;
   }
 }
+
+/* Counters on Instalações / Entregas: small, circular, and non-intrusive. */
+.evolu-shell__navigation .evolu-nav__pending-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; min-width: 20px; height: 20px; margin-left: 9px;
+  padding: 0 4px; border-radius: 999px;
+  background: #df6558; color: #fff;
+  font-size: 11px; line-height: 1; font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
