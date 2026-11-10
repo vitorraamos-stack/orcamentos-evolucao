@@ -2,6 +2,7 @@ import type { ArtStatus, OsOrder, ProdStatus } from "@/features/hubos/types";
 import { moveOrder, sendOrderToProduction } from "@/features/hubos/api";
 import { canTransitionOrderStatus } from "@/modules/orders/services/orderTransitions";
 import type { HubRole } from "@/lib/hubRoles";
+import type { UploadedLayoutAsset } from "@/features/hubos/assets";
 
 export type MoveBoardOrderInput = {
   order: OsOrder;
@@ -9,6 +10,7 @@ export type MoveBoardOrderInput = {
   to: ArtStatus | ProdStatus;
   role: HubRole | null;
   isManager: boolean;
+  layoutAsset?: UploadedLayoutAsset;
 };
 
 export async function moveBoardOrder(
@@ -30,6 +32,9 @@ export async function moveBoardOrder(
     throw new Error("Movimento não permitido para esta etapa ou papel.");
   }
   if (input.board === "art" && input.to === "Produzir") {
+    if (!input.layoutAsset?.id || !input.layoutAsset.objectPath) {
+      throw new Error("O layout final é obrigatório para liberar a OS para Produção.");
+    }
     const preset = input.order.delivery_deadline_preset;
     if (!preset)
       throw new Error(
@@ -45,6 +50,9 @@ export async function moveBoardOrder(
         board: "art",
         from,
         to: "Produzir",
+        layout_asset_id: input.layoutAsset.id,
+        layout_object_path: input.layoutAsset.objectPath,
+        layout_filename: input.layoutAsset.filename,
       },
     });
   }

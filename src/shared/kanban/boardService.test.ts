@@ -38,6 +38,13 @@ const order = (patch: Partial<OsOrder> = {}): OsOrder => ({
   ...patch,
 });
 
+const uploadedLayout = {
+  id: "22222222-2222-4222-8222-222222222222",
+  objectPath: "os_orders/11111111-1111-4111-8111-111111111111/Arte/Layout/arte.pdf",
+  filename: "arte.pdf",
+  uploadedAt: "2026-11-10T20:00:00Z",
+};
+
 describe("moveBoardOrder", () => {
   it("uses secure normal move for a valid transition", async () => {
     const moveOrder = vi.fn().mockResolvedValue(order());
@@ -66,6 +73,7 @@ describe("moveBoardOrder", () => {
           to: "Produzir",
           role: "arte_finalista",
           isManager: false,
+          layoutAsset: uploadedLayout,
         },
         { moveOrder, sendOrderToProduction }
       )
@@ -82,6 +90,7 @@ describe("moveBoardOrder", () => {
         to: "Produzir",
         role: "arte_finalista",
         isManager: false,
+        layoutAsset: uploadedLayout,
       },
       { moveOrder, sendOrderToProduction }
     );
@@ -91,6 +100,9 @@ describe("moveBoardOrder", () => {
       })
     );
     expect(moveOrder).not.toHaveBeenCalled();
+    expect(sendOrderToProduction).toHaveBeenCalledWith(
+      expect.objectContaining({ eventPayload: expect.objectContaining({ layout_asset_id: uploadedLayout.id }) })
+    );
   });
   it("sends a standard preset directly even before its date is calculated", async () => {
     const sendOrderToProduction = vi.fn().mockResolvedValue(order());
@@ -104,10 +116,27 @@ describe("moveBoardOrder", () => {
         to: "Produzir",
         role: "arte_finalista",
         isManager: false,
+        layoutAsset: uploadedLayout,
       },
       { moveOrder: vi.fn(), sendOrderToProduction }
     );
     expect(sendOrderToProduction).toHaveBeenCalledOnce();
+  });
+  it("refuses a handoff without a layout, leaving status unchanged", async () => {
+    const sendOrderToProduction = vi.fn();
+    await expect(
+      moveBoardOrder(
+        {
+          order: order(),
+          board: "art",
+          to: "Produzir",
+          role: "arte_finalista",
+          isManager: false,
+        },
+        { moveOrder: vi.fn(), sendOrderToProduction }
+      )
+    ).rejects.toThrow("layout final é obrigatório");
+    expect(sendOrderToProduction).not.toHaveBeenCalled();
   });
   it("blocks handoff when the OS has no preset", async () => {
     const sendOrderToProduction = vi.fn();
@@ -119,6 +148,7 @@ describe("moveBoardOrder", () => {
           to: "Produzir",
           role: "arte_finalista",
           isManager: false,
+          layoutAsset: uploadedLayout,
         },
         { moveOrder: vi.fn(), sendOrderToProduction }
       )
@@ -135,6 +165,7 @@ describe("moveBoardOrder", () => {
           to: "Produzir",
           role: "arte_finalista",
           isManager: false,
+          layoutAsset: uploadedLayout,
         },
         { moveOrder: vi.fn(), sendOrderToProduction }
       )
@@ -146,6 +177,7 @@ describe("moveBoardOrder", () => {
         to: "Produzir",
         role: "arte_finalista",
         isManager: false,
+        layoutAsset: uploadedLayout,
       },
       { moveOrder: vi.fn(), sendOrderToProduction }
     );

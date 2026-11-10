@@ -30,6 +30,8 @@ import {
 } from "@/features/hubos/api";
 import type { ProductionTag } from "@/features/hubos/types";
 import { getValidOrderTransitions } from "@/modules/orders/services/orderTransitions";
+import { ArtworkProductionLayoutDialog } from "@/modules/artwork/components/ArtworkProductionLayoutDialog";
+import type { UploadedLayoutAsset } from "@/features/hubos/assets";
 import { BoardCard } from "./BoardCard";
 import { BoardColumn } from "./BoardColumn";
 import {
@@ -102,6 +104,7 @@ export function OperationalBoard({
     [error, setError] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null),
     [tagCard, setTagCard] = useState<BoardCardModel | null>(null);
+  const [pendingLayoutCard, setPendingLayoutCard] = useState<BoardCardModel | null>(null);
   const [focusedColumn, setFocusedColumn] = useState<BoardStatus | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [activeDragCardId, setActiveDragCardId] = useState<string | null>(null);
@@ -206,7 +209,11 @@ export function OperationalBoard({
         })
       );
   };
-  const performMove = async (card: BoardCardModel, to: BoardStatus) => {
+  const performMove = async (
+    card: BoardCardModel,
+    to: BoardStatus,
+    layoutAsset?: UploadedLayoutAsset
+  ): Promise<boolean> => {
     const previous = cards;
     setCards(current =>
       current.map(value =>
@@ -230,11 +237,13 @@ export function OperationalBoard({
         to,
         role: hubRole,
         isManager: hubPermissions.isManager,
+        layoutAsset,
       });
       toast.success(
         to === "Produzir" ? "OS enviada para Produção." : "Etapa atualizada."
       );
       await load(true);
+      return true;
     } catch (cause) {
       setCards(previous);
       toast.error(
@@ -242,6 +251,7 @@ export function OperationalBoard({
           ? cause.message
           : "O banco rejeitou o movimento; o cartão foi restaurado."
       );
+      return false;
     }
   };
   const requestMove = (card: BoardCardModel, to: BoardStatus) => {
@@ -261,6 +271,10 @@ export function OperationalBoard({
         );
         return;
       }
+      // A visão rápida também é um diálogo: feche-a antes de abrir o envio do layout.
+      setSelectedCardId(null);
+      setPendingLayoutCard(card);
+      return;
     }
     void performMove(card, to);
   };
@@ -537,6 +551,25 @@ export function OperationalBoard({
           moves={selectedCard ? boardMoves(selectedCard) : []}
           onOpenChange={open => !open && setSelectedCardId(null)}
           onMove={to => selectedCard && requestMove(selectedCard, to)}
+        />
+      )}
+      {board === "art" && (
+        <ArtworkProductionLayoutDialog
+          key={pendingLayoutCard?.order.id ?? "idle"}
+          order={pendingLayoutCard?.order ?? null}
+          userId={user?.id ?? null}
+          open={Boolean(pendingLayoutCard)}
+          onOpenChange={open => {
+            if (!open) setPendingLayoutCard(null);
+          }}
+          onConfirm={async (order, asset) => {
+            const currentCard = cards.find(value => value.order.id === order.id);
+            if (!currentCard || !boardMoves(currentCard).includes("Produzir")) {
+              toast.error("Esta OS não pode mais ser liberada a partir da etapa atual.");
+              return false;
+            }
+            return performMove(currentCard, "Produzir", asset);
+          }}
         />
       )}
       <ProductionTagDialog
