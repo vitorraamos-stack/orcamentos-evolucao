@@ -10,7 +10,7 @@ describe("OperationalBoard focused views", () => {
   it("provides contextual titles for every art and production preset", () => {
     [
       "Arte · Aguardando aprovação",
-      "Arte · Ajustes",
+      "Arte · Arte em andamento",
       "Produção · Em produção",
       "Produção · Impressão",
       "Produção · Em acabamento",
@@ -37,6 +37,7 @@ describe("OperationalBoard focused views", () => {
     ].forEach(component => expect(source).toContain(component));
     expect(source).toContain('variant="modern"');
     expect(source).toContain('board === "production" && canMove');
-    expect(source).toContain("queuePositions.get(card.order.id)");
+    expect(source).not.toContain("queuePositions.get(card.order.id)");
+    expect(source).toContain('stretch={board === "art"}');
   });
 });
