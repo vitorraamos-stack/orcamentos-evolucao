@@ -58,6 +58,37 @@ const pricing = {
 };
 
 describe("OfficialEstimatorFormService", () => {
+  it("reads optional payment terms concurrently without changing their order", async () => {
+    let inFlight = 0;
+    let peakInFlight = 0;
+    const configuredPricing = {
+      ...pricing,
+      loadPaymentTerm: async (installments: number) => {
+        inFlight += 1;
+        peakInFlight = Math.max(peakInFlight, inFlight);
+        await Promise.resolve();
+        inFlight -= 1;
+        if ([4, 7, 12].includes(installments))
+          return { installments, rate: "0.05" };
+        throw new PricingPersistenceServiceError(
+          404,
+          "PRICING_PAYMENT_TERM_NOT_FOUND",
+          "not found"
+        );
+      },
+    };
+
+    const result = await new OfficialEstimatorFormService(
+      dbWithProduct(),
+      { loadDefinition: async () => definition } as any,
+      { loadProductParameters: async () => [] } as any,
+      configuredPricing as any
+    ).load();
+
+    expect(result.availableInstallments).toEqual([1, 2, 3, 4, 7, 12]);
+    expect(peakInFlight).toBe(3);
+  });
+
   it("exposes only client-editable inputs and configured installments", async () => {
     const productEngineering = {
       loadDefinition: async () => definition,
