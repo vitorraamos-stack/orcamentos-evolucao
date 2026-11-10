@@ -1,4 +1,5 @@
 import { isOrderUrgent } from "@/features/hubos/orderUrgency";
+import type { OsOrder } from "@/features/hubos/types";
 import { isOrderOverdue } from "@/modules/orders/risk";
 import type { BoardCardModel, BoardFiltersState } from "@/shared/kanban/types";
 
@@ -39,6 +40,45 @@ export function formatArtworkDeadline(value: string | null, now = new Date()) {
   }
   const [year, month, day] = key.split("-");
   return `${day}/${month}/${year}`;
+}
+
+export type ArtworkStartSla = {
+  dueDate: string;
+  rule: string;
+  state: "PENDING" | "TODAY" | "OVERDUE" | "STARTED";
+};
+
+/**
+ * SLA para INICIAR a Arte, sem somar dias ao prazo final da OS.
+ * Edição: 2 dias úteis. Criação: 3 dias corridos, conforme o formulário.
+ * Uma OS que já saiu da caixa/fila não é sinalizada como início atrasado.
+ */
+export function getArtworkStartSla(
+  order: Pick<OsOrder, "created_at" | "art_direction_tag" | "art_status">,
+  now = new Date()
+): ArtworkStartSla | null {
+  const { art_direction_tag: tag } = order;
+  const businessDays = tag === "ARTE_PRONTA_EDICAO" || tag === "URGENTE";
+  const days = tag === "ARTE_PRONTA_EDICAO" ? 2 : tag === "CRIACAO_ARTE" ? 3 : tag === "URGENTE" ? 1 : 0;
+  if (!days || !order.created_at) return null;
+  const created = new Date(order.created_at);
+  if (Number.isNaN(created.getTime())) return null;
+  const start = dateKey(created);
+  const [year, month, day] = start.split("-").map(Number);
+  const cursor = new Date(Date.UTC(year, month - 1, day, 12));
+  let left = days;
+  while (left > 0) {
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    if (!businessDays || (cursor.getUTCDay() !== 0 && cursor.getUTCDay() !== 6)) left -= 1;
+  }
+  const dueDate = cursor.toISOString().slice(0, 10);
+  const started = !["Caixa de Entrada", "Fila de Arte"].includes(order.art_status);
+  const today = dateKey(now);
+  return {
+    dueDate,
+    rule: businessDays ? `${days} dia${days === 1 ? "" : "s"} útil${days === 1 ? "" : "eis"}` : `${days} dias corridos`,
+    state: started ? "STARTED" : dueDate < today ? "OVERDUE" : dueDate === today ? "TODAY" : "PENDING",
+  };
 }
 
 export function sortArtworkCards(cards: BoardCardModel[]) {
