@@ -1,0 +1,36 @@
+{
+  "name": "EvoluSystem — Controle Operacional",
+  "short_name": "EvoluSystem",
+  "description": "Sistema operacional interno da Evolução Comunicação Visual.",
+  "lang": "pt-BR",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "standalone"
+  ],
+  "background_color": "#101c2b",
+  "theme_color": "#101c2b",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/evolusystem-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/evolusystem-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/evolusystem-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

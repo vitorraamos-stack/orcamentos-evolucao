@@ -48,6 +48,33 @@
           "value": "public, max-age=31536000, immutable"
         }
       ]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/offline.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
+      ]
     }
   ],
   "rewrites": [
@@ -68,7 +95,8 @@
       "feat/os-summary-deadlines-first-20261110": false,
       "feat/os-overview-subtle-gray-dark-20261110": false,
       "feat/os-summary-art-briefing-card-20261110": false,
-      "feat/os-summary-section-headers-1c2935-20261110": false
+      "feat/os-summary-section-headers-1c2935-20261110": false,
+      "feat/pwa-evolusystem-20261110": false
     }
   }
 }
