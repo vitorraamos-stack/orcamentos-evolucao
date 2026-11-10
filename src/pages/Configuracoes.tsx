@@ -46,12 +46,12 @@ const moduleLabelByKey = APP_MODULES.reduce<Record<string, string>>((acc, module
 }, {});
 
 
-const HUB_OS_CHILD_MODULES: readonly AppModuleKey[] = ['hub_os_dashboard', 'hub_os_arte', 'hub_os_producao'];
+const HUB_OS_CHILD_MODULES: readonly AppModuleKey[] = ['hub_os_dashboard', 'hub_os_arte', 'hub_os_producao', 'hub_os_instalacoes', 'hub_os_entregas', 'regras_operacionais'];
 const MODULE_GROUPS: ReadonlyArray<{ label: string; keys: readonly AppModuleKey[] }> = [
-  { label: 'Operação', keys: ['hub_os', 'hub_os_dashboard', 'hub_os_arte', 'hub_os_producao', 'hub_os_insumos', 'hub_os_producao_externa', 'hub_os_kiosk', 'impressao_estoque'] },
-  { label: 'Comercial', keys: ['biblioteca_produtos', 'calculadora'] },
+  { label: 'Operação', keys: ['hub_os', 'hub_os_dashboard', 'hub_os_arte', 'hub_os_producao', 'hub_os_instalacoes', 'hub_os_entregas', 'hub_os_insumos', 'hub_os_producao_externa', 'hub_os_kiosk', 'impressao_estoque'] },
+  { label: 'Comercial', keys: ['orcamentista', 'calculadora', 'biblioteca_produtos'] },
   { label: 'Recursos', keys: ['galeria', 'materiais'] },
-  { label: 'Administração', keys: ['hub_os_financeiro', 'configuracoes'] },
+  { label: 'Administração', keys: ['hub_os_financeiro', 'biblioteca_gestao', 'precos_custos', 'regras_operacionais', 'configuracoes'] },
 ];
 
 const LEGACY_MODULE_LABELS: Record<string, string> = {
@@ -470,7 +470,7 @@ export default function Configuracoes() {
                     </section>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground">Os quadros exigem acesso à Central de OS. O cargo define quais ações o colaborador pode realizar.</p>
+                <p className="text-xs text-muted-foreground">Dashboard, quadros, Instalações, Entregas e Regras Operacionais exigem acesso à Central de OS. O cargo define as ações permitidas.</p>
               </div>
             </div>
             <DialogFooter>
@@ -660,7 +660,7 @@ export default function Configuracoes() {
                     </section>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground">Os quadros exigem acesso à Central de OS. O cargo define quais ações o colaborador pode realizar.</p>
+                <p className="text-xs text-muted-foreground">Dashboard, quadros, Instalações, Entregas e Regras Operacionais exigem acesso à Central de OS. O cargo define as ações permitidas.</p>
             </div>
           </div>
           <DialogFooter>

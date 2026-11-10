@@ -79,33 +79,37 @@ export default function Layout({ children }: LayoutProps) {
   const canViewDashboard = canAccessOperationalSection(access, "dashboard");
   const canViewArteBoard = canAccessOperationalSection(access, "art");
   const canViewProducaoBoard = canAccessOperationalSection(access, "production");
+  const canViewInstallations = canAccessOperationalSection(access, "installations");
+  const canViewDeliveries = canAccessOperationalSection(access, "deliveries");
   const canViewPrinting = hasModuleAccess("impressao_estoque");
   const canViewGaleria = hasModuleAccess("galeria");
   const canViewCalculadora = hasModuleAccess("calculadora");
   const canViewLibrary = hasModuleAccess("biblioteca_produtos") && hubPermissions.canCreateOs;
-  const canManageLibrary = canViewLibrary && isAdmin;
+  const canManageLibrary = isAdmin && hasModuleAccess("biblioteca_gestao");
   const canViewOrcamentista =
-    hubPermissions.canCreateOs && canViewCalculadora;
+    hubPermissions.canCreateOs && hasModuleAccess("orcamentista");
   const canViewMateriais = isAdmin && hasModuleAccess("materiais");
   const canViewConfiguracoes =
     hubPermissions.canManageUsers && hasModuleAccess("configuracoes");
-  const canViewOperationalSettings = canViewConfiguracoes && hasModuleAccess("hub_os");
+  const canViewOperationalSettings =
+    hubPermissions.canManageUsers && hasModuleAccess("hub_os") && hasModuleAccess("regras_operacionais");
+  const canViewPricing = hubPermissions.canManageUsers && hasModuleAccess("precos_custos");
   const canViewFinanceiro = hasModuleAccess("hub_os_financeiro");
   // Os agrupamentos apenas organizam a navegação; os controles de acesso
   // continuam sendo os mesmos usados nas rotas de cada módulo.
   const hasCommercialModules = canViewOrcamentista || canViewCalculadora || canViewLibrary;
   const hasResourceModules = canViewGaleria || canViewMateriais;
-  const hasManagementModules = canViewFinanceiro || canViewConfiguracoes || canViewOperationalSettings || canManageLibrary;
+  const hasManagementModules = canViewFinanceiro || canViewConfiguracoes || canViewOperationalSettings || canManageLibrary || canViewPricing;
 
   const operationalLinks = [
     ...(canViewDashboard ? [{ href: "/hub-os", label: "Dashboard", Icon: LayoutDashboard, active: location === "/hub-os" }] : []),
     ...(canViewHubOs ? [{ href: "/os", label: "Ordens de Serviço", Icon: ClipboardList, active: operationalNav.orders }] : []),
     ...(canViewArteBoard ? [{ href: "/os/arte", label: "Arte", Icon: Palette, active: operationalNav.art }] : []),
     ...(canViewProducaoBoard ? [{ href: "/os/producao", label: "Produção", Icon: Factory, active: operationalNav.production }] : []),
-    ...(canViewHubOs && hubPermissions.canViewInstallations
+    ...(canViewInstallations
       ? [{ href: "/instalacoes", label: "Instalações", Icon: CalendarDays, active: location.startsWith("/instalacoes") }]
       : []),
-    ...(canViewHubOs && hubPermissions.canViewDeliveries
+    ...(canViewDeliveries
       ? [{ href: "/entregas", label: "Entregas", Icon: Truck, active: location.startsWith("/entregas") }]
       : []),
   ];
@@ -263,9 +267,9 @@ export default function Layout({ children }: LayoutProps) {
             </Link>
           )}
 
-          {canViewConfiguracoes && (
+          {(canViewConfiguracoes || canViewPricing || canViewOperationalSettings) && (
             <>
-              <Link href="/configuracoes/precos">
+              {canViewPricing && <Link href="/configuracoes/precos">
                 <Button
                   variant={location === "/configuracoes/precos" ? "secondary" : "ghost"}
                   className={cn(
@@ -277,7 +281,7 @@ export default function Layout({ children }: LayoutProps) {
                   <SlidersHorizontal className="mr-2 h-4 w-4" />
                   Preços e Custos
                 </Button>
-              </Link>
+              </Link>}
               {canViewOperationalSettings && (
                 <Link href="/configuracoes/regras-operacionais">
                   <Button
@@ -293,7 +297,7 @@ export default function Layout({ children }: LayoutProps) {
                   </Button>
                 </Link>
               )}
-              <Link href="/configuracoes">
+              {canViewConfiguracoes && <Link href="/configuracoes">
                 <Button
                   variant={location === "/configuracoes" ? "secondary" : "ghost"}
                   className={cn(
@@ -305,7 +309,7 @@ export default function Layout({ children }: LayoutProps) {
                   <Settings className="mr-2 h-4 w-4" />
                   Usuários
                 </Button>
-              </Link>
+              </Link>}
             </>
           )}
         </div>

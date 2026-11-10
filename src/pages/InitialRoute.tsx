@@ -43,12 +43,16 @@ export default function InitialRoute() {
       // The Central de OS is the default landing page whenever authorized.
       const target =
         (permissions.canViewHubOS && has("hub_os") && "/os") ||
+        (permissions.canCreateOs && has("orcamentista") && "/orcamentista") ||
         (has("impressao_estoque") && "/impressao-estoque") ||
         (has("calculadora") && "/calculadora") ||
         (permissions.canCreateOs && has("biblioteca_produtos") && "/biblioteca") ||
         (has("galeria") && "/galeria") ||
         (has("hub_os_financeiro") && "/financeiro") ||
         (permissions.canManageUsers && has("configuracoes") && "/configuracoes") ||
+        (permissions.canManageUsers && has("precos_custos") && "/configuracoes/precos") ||
+        (permissions.canManageUsers && has("biblioteca_gestao") && "/biblioteca/gestao") ||
+        (permissions.canManageUsers && has("regras_operacionais") && has("hub_os") && "/configuracoes/regras-operacionais") ||
         (permissions.isManager && has("materiais") && "/materiais") ||
         null;
 

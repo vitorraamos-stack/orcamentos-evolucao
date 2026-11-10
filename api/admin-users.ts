@@ -7,11 +7,17 @@ const APP_MODULE_KEYS = [
   'hub_os_dashboard',
   'hub_os_arte',
   'hub_os_producao',
+  'hub_os_instalacoes',
+  'hub_os_entregas',
   'hub_os_financeiro',
   'hub_os_insumos',
   'hub_os_producao_externa',
   'hub_os_kiosk',
   'impressao_estoque',
+  'orcamentista',
+  'biblioteca_gestao',
+  'precos_custos',
+  'regras_operacionais',
   'biblioteca_produtos',
   'galeria',
   'calculadora',
@@ -83,9 +89,9 @@ const parseModules = (modules: unknown, allowedModuleKeys: readonly AppModuleKey
   if (invalid.length > 0) {
     return { error: `Módulos inválidos: ${invalid.join(', ')}.` } as const;
   }
-  const childModules = ['hub_os_dashboard', 'hub_os_arte', 'hub_os_producao'];
+  const childModules = ['hub_os_dashboard', 'hub_os_arte', 'hub_os_producao', 'hub_os_instalacoes', 'hub_os_entregas', 'regras_operacionais'];
   if (childModules.some((key) => normalized.includes(key)) && !normalized.includes('hub_os')) {
-    return { error: 'Dashboard, Arte e Produção exigem acesso à Central de Ordens de Serviço.' } as const;
+    return { error: 'Dashboard, Arte, Produção, Instalações, Entregas e Regras Operacionais exigem acesso à Central de Ordens de Serviço.' } as const;
   }
   return { value: Array.from(new Set(normalized)) as AppModuleKey[] } as const;
 };
