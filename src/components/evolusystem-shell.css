@@ -78,3 +78,17 @@ body:has(.evolu-shell--order-detail) {
   font-size: 11px; line-height: 1; font-weight: 750;
   font-variant-numeric: tabular-nums;
 }
+
+/* PWA v2: respeita a câmera/entalhe e o indicador de início quando instalado. */
+@media (max-width: 767px) and (display-mode: standalone) {
+  .evolu-shell__topbar {
+    height: calc(56px + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .evolu-shell__main {
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+  [data-slot="sheet-content"]:has(.evolu-shell__branding) .evolu-shell__account {
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+}

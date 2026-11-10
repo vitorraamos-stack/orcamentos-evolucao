@@ -22,6 +22,7 @@ import {
   BadgeDollarSign,
   Printer,
   BookOpen,
+  Download,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import "./evolusystem-shell.css";
@@ -30,6 +31,7 @@ import { getRoleLabel } from "@/lib/hubRoles";
 import { canAccessOperationalSection } from "@/lib/authz";
 import { getOperationalNavState } from "./operationalNavState";
 import { useLogisticsPendingCounts } from "./useLogisticsPendingCounts";
+import { usePwaExperience } from "@/components/pwa/PwaExperience";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -51,6 +53,7 @@ export default function Layout({ children }: LayoutProps) {
     hubPermissions,
     hasModuleAccess,
   } = useAuth();
+  const { installed, openInstallGuide } = usePwaExperience();
   const [location, setLocation] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -398,6 +401,16 @@ export default function Layout({ children }: LayoutProps) {
                 </nav>
                 <div className="evolu-shell__account shrink-0 px-3 py-4">
                   <p className="mb-3 truncate px-2 text-xs text-[#C2D2E5]">{displayName}</p>
+                  {!installed && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="mb-2 h-11 w-full justify-start border-[#42678A] bg-[#11365D] text-white hover:bg-[#1B4A75] hover:text-white"
+                      onClick={() => { setMobileOpen(false); openInstallGuide(); }}
+                    >
+                      <Download className="mr-2 size-4" aria-hidden="true" /> Instalar aplicativo
+                    </Button>
+                  )}
                   <Button variant="ghost" className="evolu-shell__signout w-full justify-start" onClick={() => { setMobileOpen(false); void signOut(); }}>
                     <LogOut className="mr-2 h-4 w-4" aria-hidden="true" /> Sair do sistema
                   </Button>
