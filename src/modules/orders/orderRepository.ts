@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { OsOrder } from "@/features/hubos/types";
+import type { OrderItem } from "./types/orderDetail";
 import { addLocalDays, formatLocalDate } from "@/shared/lib/date";
 import type { QuickOrderFilter } from "./orderFilters";
 import { getConsultantFinancePendingSummary } from "@/features/hubos/financePending";
@@ -17,6 +18,15 @@ export type OrderListQuery = {
   now?: Date;
   locateOrderId?: string;
   signal?: AbortSignal;
+};
+
+/** Only the item fields required by the Central de OS quick preview. */
+export type OperationalOrderItem = Pick<OrderItem, "id" | "name" | "quantity" | "unit">;
+export type OperationalOrder = OsOrder & { items: OperationalOrderItem[] };
+
+type EmbeddedOperationalOrder = OsOrder & {
+  os_order_items?: Array<Pick<OrderItem,
+    "id" | "name" | "quantity" | "unit" | "sort_order" | "status" | "deleted_at">>;
 };
 
 export type DashboardPeriod = {
@@ -208,7 +218,7 @@ async function readOperationalOrderPage(input: OrderListQuery, now: Date) {
     ? Math.floor(locatedIndex / safeSize) + 1
     : Math.min(safePage, pageCount);
   if (total === 0) {
-    return { orders: [] as OsOrder[], total, page: 1, pageSize: safeSize,
+    return { orders: [] as OperationalOrder[], total, page: 1, pageSize: safeSize,
       locatedOrderId: null };
   }
   const ids = ordered
@@ -216,18 +226,25 @@ async function readOperationalOrderPage(input: OrderListQuery, now: Date) {
     .map(row => row.id);
   let detailsQuery = supabase
     .from("os_orders")
-    .select("*")
+    .select("*,os_order_items(id,name,quantity,unit,sort_order,status,deleted_at)")
     .in("id", ids);
   if (input.signal) detailsQuery = detailsQuery.abortSignal(input.signal);
   const { data, error } = await detailsQuery;
   if (error) throw new Error(error.message);
-  const byId = new Map(((data ?? []) as OsOrder[]).map(row => [row.id, row]));
+  const byId = new Map(((data ?? []) as unknown as EmbeddedOperationalOrder[]).map(row => [row.id, row]));
   if (byId.size !== ids.length ||
       ids.some(id => byId.get(id)?.updated_at !== matches.find(row => row.id === id)?.updated_at)) {
     throw new OrderSnapshotChanged();
   }
   return {
-    orders: ids.map(id => byId.get(id)!),
+    orders: ids.map(id => {
+      const { os_order_items = [], ...order } = byId.get(id)!;
+      const items: OperationalOrderItem[] = os_order_items
+        .filter(item => item.deleted_at === null && item.status !== "CANCELLED")
+        .sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id))
+        .map(({ id, name, quantity, unit }) => ({ id, name, quantity, unit }));
+      return { ...order, items };
+    }),
     total,
     page: validPage,
     pageSize: safeSize,
