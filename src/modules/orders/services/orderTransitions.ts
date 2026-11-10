@@ -24,11 +24,12 @@ export function getOrderOperationalStage(
 }
 
 const ART_TRANSITIONS: Record<string, string[]> = {
-  // The legacy Hub's direct Caixa -> Em Criação edge remains server-side only.
-  "Caixa de Entrada": ["Fila de Arte"],
+  "Caixa de Entrada": ["Em Criação"],
+  // Compatibilidade com OS antigas; não se criam novos cartões nessa etapa.
   "Fila de Arte": ["Em Criação"],
   "Em Criação": ["Para Aprovação"],
-  "Para Aprovação": ["Ajustes", "Produzir"],
+  "Para Aprovação": ["Em Criação", "Produzir"],
+  // Compatibilidade com OS antigas; não se criam novos cartões nessa etapa.
   Ajustes: ["Em Criação", "Para Aprovação"],
   Produzir: [],
 };
