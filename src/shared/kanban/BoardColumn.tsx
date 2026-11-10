@@ -11,6 +11,7 @@ export function BoardColumn({
   count,
   children,
   variant = "default",
+  stretch = false,
   focused = false,
   dropAllowed,
 }: {
@@ -18,6 +19,7 @@ export function BoardColumn({
   count: number;
   children: ReactNode;
   variant?: "default" | "modern";
+  stretch?: boolean;
   focused?: boolean;
   dropAllowed?: boolean | null;
 }) {
@@ -26,7 +28,7 @@ export function BoardColumn({
     <section
       id={variant === "modern" ? getBoardColumnDomId(status) : undefined}
       ref={drop.setNodeRef}
-      className={`w-[300px] shrink-0 rounded-xl bg-muted/45 p-3 ${variant === "modern" ? "border transition md:w-[288px]" : ""} ${focused ? "bg-primary/5 ring-1 ring-primary/30" : ""} ${drop.isOver ? (dropAllowed === false ? "ring-2 ring-destructive/40" : "ring-2 ring-primary/40") : ""}`}
+      className={`w-[300px] shrink-0 rounded-xl bg-muted/45 p-3 ${variant === "modern" ? "border transition md:w-[288px]" : ""} ${stretch ? "md:w-auto md:min-w-[260px] md:flex-1" : ""} ${focused ? "bg-primary/5 ring-1 ring-primary/30" : ""} ${drop.isOver ? (dropAllowed === false ? "ring-2 ring-destructive/40" : "ring-2 ring-primary/40") : ""}`}
     >
       <header
         className={

@@ -44,6 +44,16 @@ const card = (
 });
 
 describe("board metrics overdue semantics", () => {
+  it("conta etapas legadas sem exibir métricas de Ajustes", () => {
+    const inbox = card("2099-01-01", "NORMAL");
+    const revisions = card("2099-01-01", "NORMAL");
+    inbox.order.art_status = "Fila de Arte";
+    revisions.order.art_status = "Ajustes";
+    const metrics = calculateBoardMetrics([inbox, revisions], "art");
+    expect(metrics.find(metric => metric.label === "Caixa de Entrada")?.count).toBe(1);
+    expect(metrics.find(metric => metric.label === "Arte em andamento")?.count).toBe(1);
+    expect(metrics.some(metric => metric.label === "Ajustes")).toBe(false);
+  });
   it("counts yesterday as overdue", () => {
     const value = card("2000-01-01", "CRITICO");
     expect(

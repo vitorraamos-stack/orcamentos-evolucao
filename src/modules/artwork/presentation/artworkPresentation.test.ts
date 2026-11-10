@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { BoardCardModel, BoardFiltersState } from "@/shared/kanban/types";
 import { EMPTY_BOARD_FILTERS } from "@/shared/kanban/types";
-import { countArtworkAdvancedFilters, formatArtworkDeadline, getArtworkQueuePositions, getArtworkStartSla, sortArtworkCards } from "./artworkPresentation";
+import { countArtworkAdvancedFilters, formatArtworkDeadline, getArtworkStartSla, sortArtworkCards } from "./artworkPresentation";
 
 const card = (id: string, overrides: Record<string, unknown> = {}): BoardCardModel => ({
   order: { id, art_status: "Fila de Arte", created_at: `2026-01-0${id}T00:00:00Z`, delivery_date: null, client_name: id, sale_number: id, ...overrides },
@@ -44,11 +44,6 @@ describe("artworkPresentation", () => {
     expect(getArtworkStartSla(order, new Date("2026-11-09T15:00:00Z"))).toEqual({
       dueDate: "2026-11-11", rule: "3 dias úteis", state: "PENDING",
     });
-  });
-
-  it("mantém posição real da fila antes dos filtros visuais", () => {
-    const positions = getArtworkQueuePositions([card("1"), card("2"), card("3")]);
-    expect(positions.get("3")).toBe(3);
   });
 
   it("ordena atrasada, urgente, futura e sem prazo", () => {

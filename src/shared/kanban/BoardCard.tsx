@@ -86,7 +86,6 @@ export function BoardCard({
   onTag,
   onReturn,
   onOpenDetails,
-  queuePosition,
 }: {
   card: BoardCardModel;
   board: BoardKind;
@@ -97,7 +96,6 @@ export function BoardCard({
   onTag?: () => void;
   onReturn?: () => void;
   onOpenDetails?: () => void;
-  queuePosition?: number;
 }) {
   const drag = useDraggable({
     id: card.order.id,
@@ -160,11 +158,6 @@ export function BoardCard({
         <div className="min-w-0">
           <p className="text-xs font-medium text-muted-foreground">
             OS #{card.order.os_number ?? card.order.sale_number}
-            {board === "art" && queuePosition && (
-              <span className="ml-2 font-semibold text-primary">
-                #{queuePosition} na fila
-              </span>
-            )}
           </p>
           <Link href={`/os/${card.order.id}`}>
             <a className="block truncate font-semibold hover:underline">

@@ -16,7 +16,8 @@ describe("order operational flow", () => {
     expect(getOrderOperationalStage({ art_status: art as never, prod_status: prod as never, archived })).toBe(expected);
   });
   it("allows the art feedback loop and blocks jumps", () => {
-    expect(canTransitionArtStatus("Para Aprovação", "Ajustes", context)).toBe(true);
+    expect(canTransitionArtStatus("Para Aprovação", "Em Criação", context)).toBe(true);
+    expect(canTransitionArtStatus("Para Aprovação", "Ajustes", context)).toBe(false);
     expect(canTransitionArtStatus("Ajustes", "Em Criação", context)).toBe(true);
     expect(canTransitionArtStatus("Caixa de Entrada", "Produzir", context)).toBe(false);
   });
@@ -40,11 +41,11 @@ describe("order operational flow", () => {
 });
 
 describe("Fase 3.2 art queue", () => {
-  it("requires the new board to pass through Fila de Arte", () => {
+  it("allows direct start without Fila de Arte and preserves legacy exit", () => {
     const context = { role: "arte_finalista" as const, isManager: false };
-    expect(canTransitionArtStatus("Caixa de Entrada", "Fila de Arte", context)).toBe(true);
+    expect(canTransitionArtStatus("Caixa de Entrada", "Fila de Arte", context)).toBe(false);
     expect(canTransitionArtStatus("Fila de Arte", "Em Criação", context)).toBe(true);
     expect(canTransitionArtStatus("Fila de Arte", "Para Aprovação", context)).toBe(false);
-    expect(canTransitionArtStatus("Caixa de Entrada", "Em Criação", context)).toBe(false);
+    expect(canTransitionArtStatus("Caixa de Entrada", "Em Criação", context)).toBe(true);
   });
 });

@@ -5,12 +5,17 @@ import { isOrderUrgent } from "@/features/hubos/orderUrgency";
 
 export const ART_BOARD_COLUMNS: ArtStatus[] = [
   "Caixa de Entrada",
-  "Fila de Arte",
   "Em Criação",
   "Para Aprovação",
-  "Ajustes",
   "Produzir",
 ];
+
+/** Estados históricos permanecem legíveis sem recriar etapas descartadas. */
+export function getVisibleArtworkStatus(status: ArtStatus): ArtStatus {
+  if (status === "Fila de Arte") return "Caixa de Entrada";
+  if (status === "Ajustes") return "Em Criação";
+  return status;
+}
 export const PRODUCTION_BOARD_COLUMNS: ProdStatus[] = [
   "Produção",
   "Em Acabamento",
@@ -22,7 +27,7 @@ export function cardStatus(
   board: "art" | "production"
 ): BoardStatus {
   return board === "art"
-    ? card.order.art_status
+    ? getVisibleArtworkStatus(card.order.art_status)
     : (card.order.prod_status ?? "Produção");
 }
 
@@ -95,8 +100,9 @@ export function filterBoardCards(
 export function applyArtworkPreset(cards: BoardCardModel[], preset: string) {
   if (preset === "approvals")
     return cards.filter(card => card.order.art_status === "Para Aprovação");
+  // Rotas antigas de "Ajustes" apontam para o trabalho em andamento.
   if (preset === "revisions")
-    return cards.filter(card => card.order.art_status === "Ajustes");
+    return cards.filter(card => getVisibleArtworkStatus(card.order.art_status) === "Em Criação");
   return cards;
 }
 

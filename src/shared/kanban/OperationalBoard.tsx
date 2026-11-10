@@ -59,7 +59,6 @@ import {
 import { ArtworkSummaryCards } from "@/modules/artwork/components/ArtworkSummaryCards";
 import { ArtworkQuickView } from "@/modules/artwork/components/ArtworkQuickView";
 import {
-  getArtworkQueuePositions,
   sortArtworkCards,
 } from "@/modules/artwork/presentation/artworkPresentation";
 import {
@@ -82,7 +81,7 @@ export function OperationalBoard({
       ? {
           all: "Arte",
           approvals: "Arte · Aguardando aprovação",
-          revisions: "Arte · Ajustes",
+          revisions: "Arte · Arte em andamento",
         }
       : {
           all: "Produção",
@@ -183,14 +182,13 @@ export function OperationalBoard({
       from: cardStatus(card, board),
       role: hubRole,
       isManager: hubPermissions.isManager,
-    }).filter(move => (columns as BoardStatus[]).includes(move));
+    }).filter(move =>
+      (columns as BoardStatus[]).includes(move) &&
+      move !== cardStatus(card, board)
+    );
   const metrics = useMemo(
     () => calculateBoardMetrics(cards, board),
     [cards, board]
-  );
-  const queuePositions = useMemo(
-    () => getArtworkQueuePositions(presetCards),
-    [presetCards]
   );
   const selectedCard =
     cards.find(card => card.order.id === selectedCardId) ?? null;
@@ -356,7 +354,7 @@ export function OperationalBoard({
           </h1>
           <p className="text-sm text-muted-foreground">
             {board === "art"
-              ? "Acompanhe criação, ajustes e aprovações do setor."
+              ? "Acompanhe a criação e a aprovação das artes do setor."
               : "Acompanhe produção, acabamento, bloqueios e materiais prontos."}
           </p>
         </div>
@@ -499,6 +497,7 @@ export function OperationalBoard({
                 status={column}
                 count={grouped.get(column)?.length ?? 0}
                 variant="modern"
+                stretch={board === "art"}
                 focused={focusedColumn === column}
                 dropAllowed={
                   dragOverStatus === column
@@ -516,11 +515,6 @@ export function OperationalBoard({
                     moves={boardMoves(card)}
                     onMove={to => requestMove(card, to)}
                     onOpenDetails={() => setSelectedCardId(card.order.id)}
-                    queuePosition={
-                      board === "art"
-                        ? queuePositions.get(card.order.id)
-                        : undefined
-                    }
                     onTag={
                       board === "production" && canMove
                         ? () => {
