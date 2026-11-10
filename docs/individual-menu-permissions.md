@@ -16,7 +16,7 @@ Conceder **Ordens de Serviço** + **Instalações** à consultora. Ela terá som
 Os módulos Dashboard, Arte, Produção, Instalações, Entregas e Regras Operacionais exigem `hub_os`. Ao desmarcar a Central de OS, o formulário remove essas permissões relacionadas. O servidor também rejeita combinações inconsistentes.
 
 ## Migração e autorização
-1. Com aprovação específica, aplicar `supabase/migrations/20261110192000_individual_menu_modules.sql`.
+1. Com aprovação específica, aplicar `supabase/migrations/20261110163326_individual_menu_modules.sql`.
 2. Conferir os módulos no catálogo e a migração de permissões dos usuários existentes.
 3. Depois de nova autorização, fazer merge e publicar o código.
 4. Ativar Instalações especificamente no perfil da consultora comercial (não atribuir a todos os comerciais automaticamente).
