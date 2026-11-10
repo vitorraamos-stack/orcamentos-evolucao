@@ -26,6 +26,18 @@ describe("OperationalBoard focused views", () => {
     expect(source).toContain("Ver quadro completo");
     expect(source).toContain('board === "art" ? "/os/arte" : "/os/producao"');
   });
+  it("oculta as setas laterais no quadro de Arte e mantém rolagem natural", () => {
+    expect(source).toContain('{board === "production" && (');
+    const scrollControls = source.slice(
+      source.indexOf('aria-label="Rolar quadro para a esquerda"'),
+      source.indexOf('ref={boardScrollRef}')
+    );
+    expect(scrollControls).toContain('aria-label="Rolar quadro para a direita"');
+    expect(scrollControls).toContain('</>');
+    expect(scrollControls).toContain(')}');
+    expect(source).toContain('className="flex gap-4 overflow-x-auto pb-4"');
+  });
+
   it("usa componentes especializados e colunas modernas nos dois quadros", () => {
     [
       "ArtworkSummaryCards",
