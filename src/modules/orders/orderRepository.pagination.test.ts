@@ -82,6 +82,51 @@ describe("order repository pagination stability", () => {
     expect(mocks.in).toHaveBeenCalledWith("id", rows.slice(25).map(row => row.id));
   });
 
+  it("previews only active, non-deleted items in their configured order", async () => {
+    const row = {
+      id: "order-1",
+      delivery_date: "2026-11-30",
+      updated_at: "2026-11-10T13:00:00Z",
+      prod_status: "Produção",
+      logistic_type: "instalacao",
+      archived: false,
+      is_urgent: false,
+      art_direction_tag: null,
+    };
+    const query = {
+      select: vi.fn(),
+      order: mocks.order,
+      eq: mocks.eq,
+      or: mocks.or,
+      in: mocks.in,
+      range: mocks.range,
+    };
+    Object.values(query).forEach(mock => mock.mockReturnValue(query));
+    mocks.from.mockReturnValue(query);
+    mocks.range.mockResolvedValue({ data: [row], count: 1, error: null });
+    mocks.in.mockResolvedValue({
+      data: [{
+        ...row,
+        os_order_items: [
+          { id: "b", name: "Adesivo", quantity: 2, unit: "un", sort_order: 2, status: "PENDING", deleted_at: null },
+          { id: "deleted", name: "Removido", quantity: 1, unit: "un", sort_order: 0, status: "PENDING", deleted_at: "2026-11-10T14:00:00Z" },
+          { id: "cancelled", name: "Cancelado", quantity: 1, unit: "un", sort_order: 0, status: "CANCELLED", deleted_at: null },
+          { id: "a", name: "Placa ACM", quantity: 6, unit: "un", sort_order: 1, status: "IN_PROGRESS", deleted_at: null },
+        ],
+      }],
+      error: null,
+    });
+
+    const result = await listOperationalOrders({ page: 1, pageSize: 25 });
+    expect(query.select).toHaveBeenCalledWith(
+      "*,os_order_items(id,name,quantity,unit,sort_order,status,deleted_at)"
+    );
+    expect(result.orders[0].items).toEqual([
+      { id: "a", name: "Placa ACM", quantity: 6, unit: "un" },
+      { id: "b", name: "Adesivo", quantity: 2, unit: "un" },
+    ]);
+  });
+
   it("separates a confirmed empty result from a missing page", async () => {
     const query = {
       select: vi.fn(),
