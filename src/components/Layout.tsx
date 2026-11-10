@@ -326,6 +326,7 @@ export default function Layout({ children }: LayoutProps) {
     <div className={cn(
       "evolu-shell flex min-h-dvh bg-[#F4F7FB] text-foreground dark:bg-background",
       isCreateOrderPage ? "md:h-auto md:overflow-visible" : "md:h-dvh md:overflow-hidden",
+      isCreateOrderPage && "evolu-shell--create-order",
       isOrderDetailPage && "evolu-shell--order-detail h-dvh overflow-hidden"
     )}>
       <aside className="evolu-shell__sidebar hidden w-[264px] shrink-0 flex-col text-white md:flex" aria-label="Menu lateral">
@@ -405,6 +406,7 @@ export default function Layout({ children }: LayoutProps) {
             className={cn(
               "mx-auto flex w-full min-h-0 flex-col",
               isOrdersCentralPage ||
+                isCreateOrderPage ||
                 isOrderDetailPage ||
                 isInstallationsCentralPage ||
                 isDeliveriesCentralPage ||
