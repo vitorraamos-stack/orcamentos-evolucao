@@ -33,6 +33,7 @@ import {
 import {
   listOperationalOrders,
   listOperationalOrderSummaryRows,
+  type OperationalOrder,
 } from "../orderRepository";
 import type { QuickOrderFilter } from "../orderFilters";
 import { parseQuickFilterFromSearch } from "../quickFilterSearch";
@@ -102,7 +103,7 @@ export default function OrdersCentralPage() {
   );
   const isMobile = useIsMobile();
   const [, setLocation] = useLocation();
-  const [orders, setOrders] = useState<OsOrder[]>([]);
+  const [orders, setOrders] = useState<OperationalOrder[]>([]);
   const [summaryOrders, setSummaryOrders] = useState<OsOrder[]>([]);
   const [summaryTotal, setSummaryTotal] = useState<number | null>(null);
   const [summaryStatus, setSummaryStatus] = useState<"loading" | "ready" | "error">("loading");
