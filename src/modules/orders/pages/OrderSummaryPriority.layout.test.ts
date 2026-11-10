@@ -9,11 +9,13 @@ describe("OS summary hierarchy", () => {
   it("shows products before complementary information within the same summary column", () => {
     const tab = page.indexOf('value="summary">');
     const products = page.indexOf("<OrderSummaryExtras ", tab);
+    const briefing = page.indexOf("<OrderArtBriefingCard order={detail.order} />", tab);
     const complementary = page.indexOf("<OrderSummaryTab order={detail.order} />", tab);
     const assignments = page.indexOf('aria-label="Responsáveis e prazos"', tab);
     expect(tab).toBeGreaterThan(-1);
     expect(products).toBeGreaterThan(tab);
-    expect(complementary).toBeGreaterThan(products);
+    expect(briefing).toBeGreaterThan(products);
+    expect(complementary).toBeGreaterThan(briefing);
     expect(assignments).toBeGreaterThan(complementary);
   });
 

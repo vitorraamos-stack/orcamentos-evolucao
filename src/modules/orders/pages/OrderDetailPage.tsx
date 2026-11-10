@@ -18,6 +18,7 @@ import { OrderSummaryExtras } from "../components/OrderSummaryExtras";
 import { OrderAssigneesCard } from "../components/OrderAssigneesCard";
 import { OrderDeadlinesCard } from "../components/OrderDeadlinesCard";
 import { OrderSummaryTab } from "../components/OrderSummaryTab";
+import { OrderArtBriefingCard } from "../components/OrderArtBriefingCard";
 import { OrderItemsTab, type ItemDraft } from "../components/OrderItemsTab";
 import { OrderCommentsTab } from "../components/OrderCommentsTab";
 import { prependPublishedComment } from "../services/publishedComment";
@@ -343,6 +344,7 @@ export default function OrderDetailPage() {
           <OrderSummaryExtras items={items.data} itemsLoaded={items.loaded} itemsError={items.error}
             onGoItems={() => goToItems()} onGoItem={id => goToItems(id)}
           />
+          <OrderArtBriefingCard order={detail.order} />
           <OrderSummaryTab order={detail.order} />
         </div>
       <section aria-label="Responsáveis e prazos" className="evolu-detail__management-grid grid gap-4 xl:grid-cols-2"><OrderDeadlinesCard order={detail.order} deadlines={detail.deadlines} canEdit={canManageDeadlines} onChange={updateDeadline} onComplete={(scope, version) => deadlineAction(scope, "complete", version)} onReopen={(scope, version) => deadlineAction(scope, "reopen", version)} onRemove={(scope, version) => deadlineAction(scope, "remove", version)} /><OrderAssigneesCard assignees={detail.assignees} users={users} canEdit={canManageAssignees} onChange={updateAssignee} /></section></div></TabsContent><TabsContent forceMount className="evolu-detail__tab-content" value="items"><OrderItemsTab

@@ -10,6 +10,7 @@ import type { OrderActivity, OrderComment, OrderItem, UserOption } from "../type
 // Render the list without mounting the editing dialog or accessing Supabase.
 vi.mock("../components/OrderItemDialog", () => ({ OrderItemDialog: () => null }));
 import { OrderSummaryTab } from "../components/OrderSummaryTab";
+import { OrderArtBriefingCard } from "../components/OrderArtBriefingCard";
 import { OrderFlowProgress } from "../components/OrderFlowProgress";
 import { OrderItemsTab } from "../components/OrderItemsTab";
 import { OrderProductionTab, canConfirmOperationBlock } from "../components/OrderProductionTab";
@@ -107,9 +108,12 @@ describe("EvoluSystem — OS seven-tab fixture-based functional smoke", () => {
     expect(page).toContain("config.current.loaded && !config.current.error");
   });
 
-  it("Resumo: renders briefing and correct data without duplicating header fields", () => {
+  it("Resumo: renders briefing in dedicated card and metadata without duplication", () => {
+    const briefingHtml = renderToStaticMarkup(<OrderArtBriefingCard order={order} />);
+    expect(briefingHtml).toContain("Briefing de Arte");
+    expect(briefingHtml).toContain("Conferir a fixação antes de instalar.");
     const html = renderToStaticMarkup(<OrderSummaryTab order={order} />);
-    expect(html).toContain("Conferir a fixação antes de instalar.");
+    expect(html).not.toContain("Conferir a fixação antes de instalar.");
     expect(html).toContain("V-721");
     expect(html).toContain("Rua do Teste, 100");
     expect(html).not.toContain("Cliente Fictício");
