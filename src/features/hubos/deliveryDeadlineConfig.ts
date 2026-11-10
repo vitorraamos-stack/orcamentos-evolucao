@@ -11,18 +11,18 @@ export const DELIVERY_DEADLINE_PRESET_CONFIG: Record<
   DeliveryDeadlinePresetConfig
 > = {
   FAST_5_8: {
-    label: "De 5 à 8 dias úteis, após a aprovação da arte",
+    label: "De 5 a 8 dias úteis a partir da criação da OS (inclui Arte)",
     tooltip: "Produção rápida (adesivos simples, banner simples).",
     upperBusinessDays: 8,
   },
   STANDARD_8_12: {
-    label: "De 8 à 12 dias úteis, após a aprovação da arte",
+    label: "De 8 a 12 dias úteis a partir da criação da OS (inclui Arte)",
     tooltip:
       "Produção demorada (Adesivos grandes, Lonas, Plotagens, PVC, Acrílicos).",
     upperBusinessDays: 12,
   },
   STRUCTURE_INSTALL_15_25: {
-    label: "De 15 à 25 dias úteis, após a aprovação da arte",
+    label: "De 15 a 25 dias úteis a partir da criação da OS (inclui Arte)",
     tooltip: "Placas com estruturas e instalação.",
     upperBusinessDays: 25,
   },
