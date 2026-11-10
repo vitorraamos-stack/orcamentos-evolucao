@@ -47,24 +47,25 @@ export function OrderHeader({
   return (
     <header className="evolu-detail__hero">
       <div className="evolu-detail__hero-main">
-        <div className="min-w-0 flex-1">
-          <p className="evolu-detail__eyebrow">
-            <span className="evolu-detail__eyebrow-line" aria-hidden="true" />
-            Ordem de serviço
-          </p>
-          <p className="evolu-detail__number">
-            {formatOfficialOsLabel(order.sale_number)}
-          </p>
-          <h1 className="evolu-detail__client break-words">
-            {order.client_name || "Cliente não informado"}
-          </h1>
-          <p className="evolu-detail__service break-words">
-            {order.title || order.description || "Serviço não informado"}
-          </p>
-          <div className="evolu-detail__badges flex flex-wrap items-center gap-2">
-            <Badge>{getOperationalStatusLabel(order.prod_status || order.art_status)}</Badge>
-            {isOrderUrgent(order) && <Badge variant="destructive">Urgente</Badge>}
-            <OrderRiskBadge risk={calculateOrderRisk(order)} />
+        <div className="evolu-detail__hero-copy min-w-0 flex-1">
+          <p className="sr-only">Ordem de serviço</p>
+          <div className="evolu-detail__identity">
+            <p className="evolu-detail__number">
+              {formatOfficialOsLabel(order.sale_number)}
+            </p>
+            <h1 className="evolu-detail__client break-words">
+              {order.client_name || "Cliente não informado"}
+            </h1>
+          </div>
+          <div className="evolu-detail__hero-secondary">
+            <p className="evolu-detail__service break-words">
+              {order.title || order.description || "Serviço não informado"}
+            </p>
+            <div className="evolu-detail__badges flex flex-wrap items-center gap-2">
+              <Badge>{getOperationalStatusLabel(order.prod_status || order.art_status)}</Badge>
+              {isOrderUrgent(order) && <Badge variant="destructive">Urgente</Badge>}
+              <OrderRiskBadge risk={calculateOrderRisk(order)} />
+            </div>
           </div>
         </div>
         <div className="evolu-detail__actions flex flex-wrap items-center gap-2">
