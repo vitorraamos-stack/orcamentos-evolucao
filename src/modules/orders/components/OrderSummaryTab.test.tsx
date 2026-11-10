@@ -24,12 +24,12 @@ function order(overrides: Partial<OsOrder> = {}): OsOrder {
 }
 
 describe("EvoluSystem OS detail summary without duplicated information", () => {
-  it("displays the complementary briefing and metadata without repeating the header", () => {
+  it("displays complementary metadata without repeating briefing or header fields", () => {
     const html = renderToStaticMarkup(<OrderSummaryTab order={order()} />);
     expect(html).toContain("Informações complementares");
-    expect(html).toContain("Briefing e orientações");
-    expect(html).toContain("Produzir letreiro");
-    expect(html).toContain("com iluminação uniforme.");
+    expect(html).not.toContain("Briefing e orientações");
+    expect(html).not.toContain("Produzir letreiro");
+    expect(html).not.toContain("com iluminação uniforme.");
     expect(html).toContain("Número da venda");
     expect(html).toContain("V-124");
     expect(html).toContain("Criada em");
@@ -50,7 +50,7 @@ describe("EvoluSystem OS detail summary without duplicated information", () => {
     ]) expect(html).toContain(value);
   });
 
-  it("does not repeat description if it is already the header fallback", () => {
+  it("never repeats briefing in complementary information, including title-less orders", () => {
     const html = renderToStaticMarkup(
       <OrderSummaryTab order={order({
         title: null, description: "Texto exibido pelo cabeçalho",
