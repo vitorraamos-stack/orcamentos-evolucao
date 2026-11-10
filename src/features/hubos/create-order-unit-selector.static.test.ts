@@ -43,6 +43,15 @@ describe("new order item unit selector", () => {
     expect(source).toContain("const itemCount = items.length;");
     expect(source).toContain("items.map((item, index) => (");
     expect(source).toContain("formatOrderItemQuantity(item.quantity)");
+    const summaryItems = source.slice(
+      source.indexOf('aria-label="Quantidade por produto"'),
+      source.indexOf("</ul>", source.indexOf('aria-label="Quantidade por produto"'))
+    );
+    expect(summaryItems).toContain('className="break-words text-sm leading-5 text-muted-foreground"');
+    expect(summaryItems).toContain('{" - "}');
+    expect(summaryItems).not.toContain("justify-between");
+    expect(summaryItems).not.toContain("shrink-0");
+
   });
 
   it("normalizes restored legacy draft items", () => {
