@@ -24,3 +24,21 @@
 6. Conferir que Cache Storage contém somente `/offline.html` e não possui dados de clientes.
 
 **Não** habilitar armazenamento offline de OS sem planejamento separado de criptografia, validade, revogação e controle de acesso.
+
+## Versão 2 — instalação guiada e atualização segura
+
+- Usuários no navegador móvel podem abrir o menu lateral e tocar em **Instalar aplicativo**.
+- No Android, quando disponível, o botão **Instalar agora** usa o prompt nativo do navegador. Caso contrário, exibe instruções manuais.
+- No iOS, a instalação é orientada pelo menu Compartilhar → Adicionar à Tela de Início. A API de prompt nativo não é suportada.
+- Quando um novo service worker termina de instalar e fica aguardando, o usuário recebe aviso para salvar o trabalho antes de atualizar; o PWA **não recarrega automaticamente** um formulário em edição.
+- O botão **Atualizar** envia `SKIP_WAITING` ao service worker, que assume controle e recarrega a página somente após o consentimento. **Depois** fecha o aviso naquela aba.
+- O PWA instalado respeita as áreas seguras superiores/inferiores do celular (notch, barra de gestos).
+- O cache continua limitado à página pública de falta de conexão e ao símbolo oficial; dados do Supabase e arquivos nunca ficam disponíveis offline.
+
+### Verificações V2
+
+1. Android Chrome: abrir menu móvel, instalar pelo botão, abrir pela tela inicial; verificar que o botão desaparece.
+2. iPhone Safari: abrir menu móvel, seguir Compartilhar → Adicionar à Tela de Início; conferir barra superior e área inferior.
+3. Com uma OS parcialmente preenchida, disparar uma versão nova e confirmar que o formulário não recarrega até o clique em **Atualizar**.
+4. Com duas abas abertas, testar atualização e preservar autenticação/autorização após recarga.
+5. Inspecionar Cache Storage para verificar que não há dados privados. Sem rede, apenas a página informativa deve aparecer.

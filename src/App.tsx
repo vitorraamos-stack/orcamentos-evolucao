@@ -36,6 +36,7 @@ import LibraryCommercialPage from "@/modules/library/commercial/LibraryCommercia
 import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { PwaExperienceProvider } from "@/components/pwa/PwaExperience";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import {
   canAccessConfiguracoes,
@@ -414,8 +415,10 @@ function App() {
         <AuthProvider>
           <WelcomeTransitionProvider>
             <TooltipProvider>
-              <Toaster />
-              <Router />
+              <PwaExperienceProvider>
+                <Toaster />
+                <Router />
+              </PwaExperienceProvider>
             </TooltipProvider>
           </WelcomeTransitionProvider>
         </AuthProvider>
