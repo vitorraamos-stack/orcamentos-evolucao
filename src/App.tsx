@@ -42,6 +42,7 @@ import {
   canAccessHubAudit,
   canAccessHubFinanceiro,
   canAccessMateriais,
+  canAccessOperationalSection,
 } from "@/lib/authz";
 import Layout from "./components/Layout";
 import HubOsAccessGuard from "./components/HubOsAccessGuard";
@@ -67,7 +68,7 @@ function Router() {
 
       <Route path="/orcamentista">
         <Layout>
-          <RequireModule moduleKey="calculadora">
+          <RequireModule moduleKey="orcamentista">
             {hubPermissions.canCreateOs ? (
               <EstimatorPage />
             ) : (
@@ -157,7 +158,7 @@ function Router() {
 
       <Route path="/biblioteca/gestao">
         <Layout>
-          <RequireModule moduleKey="biblioteca_produtos">
+          <RequireModule moduleKey="biblioteca_gestao">
             {hubPermissions.isManager ? <LibraryV28Page management /> : <Redirect to="/" />}
           </RequireModule>
         </Layout>
@@ -195,8 +196,8 @@ function Router() {
 
       <Route path="/configuracoes/regras-operacionais">
         <Layout>
-          <RequireModule moduleKey="configuracoes">
-            {canAccessConfiguracoes(authzContext) && hasModuleAccess("hub_os") ? (
+          <RequireModule moduleKey="regras_operacionais">
+            {hubPermissions.canManageUsers && hasModuleAccess("hub_os") ? (
               <DashboardOperationalSettingsPage />
             ) : (
               <Redirect to="/" />
@@ -207,8 +208,8 @@ function Router() {
 
       <Route path="/configuracoes/precos">
         <Layout>
-          <RequireModule moduleKey="configuracoes">
-            {canAccessConfiguracoes(authzContext) ? (
+          <RequireModule moduleKey="precos_custos">
+            {hubPermissions.canManageUsers ? (
               <PricingAdminPage />
             ) : (
               <Redirect to="/" />
@@ -260,7 +261,7 @@ function Router() {
       <Route path="/instalacoes/execucao/:id">
         <Layout>
           <RequireModule moduleKey="hub_os">
-            {hubPermissions.canExecuteInstallations ? (
+            {canAccessOperationalSection(authzContext, "installations") && hubPermissions.canExecuteInstallations ? (
               <InstallationExecutionPage />
             ) : (
               <Redirect to="/instalacoes" />
@@ -271,7 +272,7 @@ function Router() {
       <Route path="/instalacoes">
         <Layout>
           <RequireModule moduleKey="hub_os">
-            {hubPermissions.canViewInstallations ? (
+            {canAccessOperationalSection(authzContext, "installations") ? (
               <InstallationsPage />
             ) : (
               <Redirect to="/" />
@@ -282,7 +283,7 @@ function Router() {
       <Route path="/entregas">
         <Layout>
           <RequireModule moduleKey="hub_os">
-            {hubPermissions.canViewDeliveries ? (
+            {canAccessOperationalSection(authzContext, "deliveries") ? (
               <DeliveriesPage />
             ) : (
               <Redirect to="/" />

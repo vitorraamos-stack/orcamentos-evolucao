@@ -20,6 +20,16 @@ export const APP_MODULES = [
     routePrefixes: ['/os/producao'],
   },
   {
+    key: 'hub_os_instalacoes',
+    label: 'Instalações',
+    routePrefixes: ['/instalacoes'],
+  },
+  {
+    key: 'hub_os_entregas',
+    label: 'Entregas',
+    routePrefixes: ['/entregas'],
+  },
+  {
     key: 'hub_os_financeiro',
     label: 'Financeiro',
     routePrefixes: ['/hub-os/financeiro', '/financeiro'],
@@ -45,6 +55,26 @@ export const APP_MODULES = [
     routePrefixes: ['/impressao-estoque'],
   },
   {
+    key: 'orcamentista',
+    label: 'Orçamentista',
+    routePrefixes: ['/orcamentista'],
+  },
+  {
+    key: 'biblioteca_gestao',
+    label: 'Gestão da Biblioteca',
+    routePrefixes: ['/biblioteca/gestao'],
+  },
+  {
+    key: 'precos_custos',
+    label: 'Preços e Custos',
+    routePrefixes: ['/configuracoes/precos'],
+  },
+  {
+    key: 'regras_operacionais',
+    label: 'Regras Operacionais',
+    routePrefixes: ['/configuracoes/regras-operacionais'],
+  },
+  {
     key: 'biblioteca_produtos',
     label: 'Biblioteca de Produtos',
     routePrefixes: ['/biblioteca'],
@@ -66,7 +96,7 @@ export const APP_MODULES = [
   },
   {
     key: 'configuracoes',
-    label: 'Configurações',
+    label: 'Usuários',
     routePrefixes: ['/configuracoes'],
   },
 ] as const;

@@ -133,6 +133,9 @@ const Select = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
 
 export default function InstallationsPage() {
   const { user, hubPermissions } = useAuth();
+  // Quem recebe somente consulta por módulo vê a agenda completa,
+  // sem ações de agendamento, execução ou gestão operacional.
+  const agendaOnly = !hubPermissions.canViewInstallations;
   const [data, setData] = useState<{
     installations: Installation[];
     teams: InstallationTeam[];
@@ -229,6 +232,7 @@ export default function InstallationsPage() {
     .filter(m => m.user_id === user?.id)
     .map(m => m.team_id);
   const visible = (i: Installation) =>
+    agendaOnly ||
     !hubPermissions.normalizedRole ||
     hubPermissions.isManager ||
     isMyInstallation(i, user?.id ?? "", teamIds);
@@ -433,7 +437,7 @@ export default function InstallationsPage() {
           )}
         </div>
       </header>
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+      {!agendaOnly && <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         {summaryCards.map(card => (
           <button
             key={card.key}
@@ -453,7 +457,7 @@ export default function InstallationsPage() {
             <strong className="mt-1 block text-2xl">{card.value}</strong>
           </button>
         ))}
-      </section>
+      </section>}
       <Tabs
         value={activeTab}
         onValueChange={v => setActiveTab(v as InstallationTab)}
@@ -461,15 +465,15 @@ export default function InstallationsPage() {
         <div className="overflow-x-auto border-b">
           <TabsList className="h-auto w-max bg-transparent">
             <TabsTrigger value="agenda">Agenda</TabsTrigger>
-            <TabsTrigger value="waiting">
+            {!agendaOnly && <TabsTrigger value="waiting">
               Aguardando agendamento{" "}
               <Badge variant="secondary" className="ml-2">
                 {summary.waiting}
               </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="teams">Equipes</TabsTrigger>
-            <TabsTrigger value="routes">Rotas</TabsTrigger>
-            <TabsTrigger value="history">Histórico</TabsTrigger>
+            </TabsTrigger>}
+            {!agendaOnly && <TabsTrigger value="teams">Equipes</TabsTrigger>}
+            {!agendaOnly && <TabsTrigger value="routes">Rotas</TabsTrigger>}
+            {!agendaOnly && <TabsTrigger value="history">Histórico</TabsTrigger>}
           </TabsList>
         </div>
         <TabsContent value="agenda" className="space-y-4">

@@ -37,7 +37,7 @@ export const canAccessHubAudit = (context: RouteAccessContext) =>
 export const canAccessHubFinanceiro = (context: RouteAccessContext) =>
   context.hasModuleAccess('hub_os_financeiro');
 
-export type OperationalSection = 'orders' | 'dashboard' | 'art' | 'production';
+export type OperationalSection = 'orders' | 'dashboard' | 'art' | 'production' | 'installations' | 'deliveries';
 
 // A Central de OS é a permissão-base; Dashboard e quadros exigem módulos próprios.
 export const canAccessOperationalSection = (
@@ -50,5 +50,7 @@ export const canAccessOperationalSection = (
     case 'dashboard': return context.hasModuleAccess('hub_os_dashboard');
     case 'art': return context.permissions.canViewArteBoard && context.hasModuleAccess('hub_os_arte');
     case 'production': return context.permissions.canViewProducaoBoard && context.hasModuleAccess('hub_os_producao');
+    case 'installations': return context.hasModuleAccess('hub_os_instalacoes');
+    case 'deliveries': return context.hasModuleAccess('hub_os_entregas');
   }
 };

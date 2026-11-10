@@ -123,3 +123,31 @@ describe('permissões individuais das áreas operacionais', () => {
     expect(canAccessOperationalSection(context, 'dashboard')).toBe(false);
   });
 });
+
+
+describe('acessos individuais de Instalações e Entregas', () => {
+  const permissions = buildAuthorizationSnapshot('consultor_vendas').permissions;
+  it('permite consulta da agenda sem execução nem agendamento', () => {
+    const context = {
+      hasModuleAccess: (key: string) => ['hub_os', 'hub_os_instalacoes'].includes(key),
+      permissions,
+    };
+    expect(canAccessOperationalSection(context, 'installations')).toBe(true);
+    expect(canAccessOperationalSection(context, 'deliveries')).toBe(false);
+    expect(permissions.canManageInstallations).toBe(false);
+    expect(permissions.canExecuteInstallations).toBe(false);
+  });
+  it('exige a Central de OS para acessar instalações', () => {
+    expect(canAccessOperationalSection({
+      hasModuleAccess: (key: string) => key === 'hub_os_instalacoes',
+      permissions,
+    }, 'installations')).toBe(false);
+  });
+  it('entregas não conferem permissões de movimentação', () => {
+    expect(canAccessOperationalSection({
+      hasModuleAccess: (key: string) => ['hub_os', 'hub_os_entregas'].includes(key),
+      permissions,
+    }, 'deliveries')).toBe(true);
+    expect(permissions.canManageDeliveries).toBe(false);
+  });
+});
