@@ -5,7 +5,7 @@ const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.add(OFFLINE_URL)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then(cache => cache.addAll([OFFLINE_URL, "/evolusystem-icon.svg"])).then(() => self.skipWaiting())
   );
 });
 
