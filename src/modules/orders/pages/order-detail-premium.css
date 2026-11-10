@@ -694,3 +694,21 @@
 .dark .evolu-detail__overview > .evolu-detail__flow {
   border-top-color: var(--border);
 }
+
+/* OS overview only: slightly lighter neutral slate for the highlighted header area.
+   Do not recolor the summary cards, status indicators or the light theme. */
+.dark .evolu-detail {
+  --os-overview-surface: #1c2935;
+  --os-overview-band: #192632;
+}
+.dark .evolu-detail__overview,
+.dark .evolu-detail__orientation,
+.dark .evolu-detail__tabs-scroll {
+  background: var(--os-overview-surface);
+}
+.dark .evolu-detail__overview .evolu-detail__hero-main {
+  background: transparent;
+}
+.dark .evolu-detail__overview .evolu-detail__quick-info {
+  background: var(--os-overview-band);
+}
