@@ -95,14 +95,6 @@ export function sortArtworkCards(cards: BoardCardModel[]) {
   });
 }
 
-export function getArtworkQueuePositions(cards: BoardCardModel[]) {
-  return new Map(
-    sortArtworkCards(
-      cards.filter(card => card.order.art_status === "Fila de Arte")
-    ).map((card, index) => [card.order.id, index + 1])
-  );
-}
-
 export function countArtworkAdvancedFilters(filters: BoardFiltersState) {
   return (
     Number(filters.assigneeId !== "all") +
