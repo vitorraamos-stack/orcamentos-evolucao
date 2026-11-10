@@ -24,7 +24,13 @@ describe("EvoluSystem sidebar navigation groups", () => {
   });
 
   it("keeps permission gates for every group and module", () => {
-    expect(layout).toContain("hubPermissions.canViewHubOS && hasModuleAccess(\"hub_os\")");
+    expect(layout).toContain('canAccessOperationalSection(access, "orders")');
+    expect(layout).toContain('canAccessOperationalSection(access, "dashboard")');
+    expect(layout).toContain('canAccessOperationalSection(access, "art")');
+    expect(layout).toContain('canAccessOperationalSection(access, "production")');
+    expect(layout).toContain('...(canViewDashboard ?');
+    expect(layout).toContain('...(canViewArteBoard ?');
+    expect(layout).toContain('...(canViewProducaoBoard ?');
     expect(layout).toContain("canViewOrcamentista =");
     expect(layout).toContain("hubPermissions.canCreateOs && canViewCalculadora");
     expect(layout).toContain('isAdmin && hasModuleAccess("materiais")');

@@ -1,8 +1,23 @@
 export const APP_MODULES = [
   {
     key: 'hub_os',
-    label: 'Hub OS',
-    routePrefixes: ['/hub-os', '/os'],
+    label: 'Ordens de Serviço',
+    routePrefixes: ['/os'],
+  },
+  {
+    key: 'hub_os_dashboard',
+    label: 'Dashboard Operacional',
+    routePrefixes: ['/hub-os'],
+  },
+  {
+    key: 'hub_os_arte',
+    label: 'Quadro de Arte',
+    routePrefixes: ['/os/arte'],
+  },
+  {
+    key: 'hub_os_producao',
+    label: 'Quadro de Produção',
+    routePrefixes: ['/os/producao'],
   },
   {
     key: 'hub_os_financeiro',

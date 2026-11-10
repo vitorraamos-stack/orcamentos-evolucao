@@ -46,6 +46,14 @@ const moduleLabelByKey = APP_MODULES.reduce<Record<string, string>>((acc, module
 }, {});
 
 
+const HUB_OS_CHILD_MODULES: readonly AppModuleKey[] = ['hub_os_dashboard', 'hub_os_arte', 'hub_os_producao'];
+const MODULE_GROUPS: ReadonlyArray<{ label: string; keys: readonly AppModuleKey[] }> = [
+  { label: 'Operação', keys: ['hub_os', 'hub_os_dashboard', 'hub_os_arte', 'hub_os_producao', 'hub_os_insumos', 'hub_os_producao_externa', 'hub_os_kiosk', 'impressao_estoque'] },
+  { label: 'Comercial', keys: ['biblioteca_produtos', 'calculadora'] },
+  { label: 'Recursos', keys: ['galeria', 'materiais'] },
+  { label: 'Administração', keys: ['hub_os_financeiro', 'configuracoes'] },
+];
+
 const LEGACY_MODULE_LABELS: Record<string, string> = {
   hub_os_producao_extras: 'Hub OS - Produção (Extras)',
 };
@@ -178,7 +186,8 @@ export default function Configuracoes() {
     setter: Dispatch<SetStateAction<AppModuleKey[]>>
   ) => {
     setter((prev) => {
-      if (checked) return Array.from(new Set([...prev, moduleKey]));
+      if (checked) return Array.from(new Set([...prev, moduleKey, ...(HUB_OS_CHILD_MODULES.includes(moduleKey) ? ['hub_os' as AppModuleKey] : [])]));
+      if (moduleKey === 'hub_os') return prev.filter((key) => key !== 'hub_os' && !HUB_OS_CHILD_MODULES.includes(key));
       return prev.filter((key) => key !== moduleKey);
     });
   };
@@ -394,7 +403,7 @@ export default function Configuracoes() {
               Criar usuário
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-[560px]">
             <DialogHeader>
               <DialogTitle>Novo usuário</DialogTitle>
               <DialogDescription>Crie um novo usuário para o Hub OS.</DialogDescription>
@@ -437,17 +446,31 @@ export default function Configuracoes() {
                     </Button>
                   </div>
                 </div>
-                <div className="grid gap-2 md:grid-cols-2">
-                  {APP_MODULES.map((module) => (
-                    <label key={module.key} className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={newModules.includes(module.key)}
-                        onCheckedChange={(checked) => toggleModule(module.key, Boolean(checked), setNewModules)}
-                      />
-                      {module.label}
-                    </label>
+                <div className="max-h-[340px] space-y-4 overflow-y-auto rounded-lg border p-3">
+                  {MODULE_GROUPS.map((group) => (
+                    <section key={group.label} className="space-y-2">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</h3>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {group.keys.map((key) => {
+                          const module = APP_MODULES.find((entry) => entry.key === key);
+                          if (!module) return null;
+                          const isChild = HUB_OS_CHILD_MODULES.includes(key);
+                          return (
+                            <label key={key} className={`flex items-center gap-2 text-sm ${isChild ? 'pl-2' : ''}`}>
+                              <Checkbox
+                                checked={newModules.includes(key)}
+                                disabled={isChild && !newModules.includes('hub_os')}
+                                onCheckedChange={(checked) => toggleModule(key, Boolean(checked), setNewModules)}
+                              />
+                              {module.label}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </section>
                   ))}
                 </div>
+                <p className="text-xs text-muted-foreground">Os quadros exigem acesso à Central de OS. O cargo define quais ações o colaborador pode realizar.</p>
               </div>
             </div>
             <DialogFooter>
@@ -577,7 +600,7 @@ export default function Configuracoes() {
       </Card>
 
       <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-[560px]">
           <DialogHeader>
             <DialogTitle>Editar usuário</DialogTitle>
           </DialogHeader>
@@ -613,17 +636,31 @@ export default function Configuracoes() {
                   </Button>
                 </div>
               </div>
-              <div className="grid gap-2 md:grid-cols-2">
-                {APP_MODULES.map((module) => (
-                  <label key={module.key} className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={editModules.includes(module.key)}
-                      onCheckedChange={(checked) => toggleModule(module.key, Boolean(checked), setEditModules)}
-                    />
-                    {module.label}
-                  </label>
-                ))}
-              </div>
+              <div className="max-h-[340px] space-y-4 overflow-y-auto rounded-lg border p-3">
+                  {MODULE_GROUPS.map((group) => (
+                    <section key={group.label} className="space-y-2">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</h3>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {group.keys.map((key) => {
+                          const module = APP_MODULES.find((entry) => entry.key === key);
+                          if (!module) return null;
+                          const isChild = HUB_OS_CHILD_MODULES.includes(key);
+                          return (
+                            <label key={key} className={`flex items-center gap-2 text-sm ${isChild ? 'pl-2' : ''}`}>
+                              <Checkbox
+                                checked={editModules.includes(key)}
+                                disabled={isChild && !editModules.includes('hub_os')}
+                                onCheckedChange={(checked) => toggleModule(key, Boolean(checked), setEditModules)}
+                              />
+                              {module.label}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">Os quadros exigem acesso à Central de OS. O cargo define quais ações o colaborador pode realizar.</p>
             </div>
           </div>
           <DialogFooter>

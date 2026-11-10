@@ -5,7 +5,9 @@ import { Router } from "wouter";
 vi.mock("@/lib/supabase", () => ({ supabase: {} }));
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({
+    hasModuleAccess: (key: string) => ["hub_os", "hub_os_dashboard", "hub_os_arte"].includes(key),
     hubPermissions: {
+      canViewHubOS: true,
       canViewArteBoard: true, canViewProducaoBoard: false,
       canViewInstallations: false, canViewDeliveries: false,
     },

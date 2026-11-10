@@ -27,6 +27,7 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/s
 import "./evolusystem-shell.css";
 import { cn } from "@/lib/utils";
 import { getRoleLabel } from "@/lib/hubRoles";
+import { canAccessOperationalSection } from "@/lib/authz";
 import { getOperationalNavState } from "./operationalNavState";
 import ThemeSwitcher from "./ThemeSwitcher";
 
@@ -73,7 +74,11 @@ export default function Layout({ children }: LayoutProps) {
   if (!user) return null;
 
   // Componente de navegação interno com tipos corretos
-  const canViewHubOs = hubPermissions.canViewHubOS && hasModuleAccess("hub_os");
+  const access = { hasModuleAccess, permissions: hubPermissions };
+  const canViewHubOs = canAccessOperationalSection(access, "orders");
+  const canViewDashboard = canAccessOperationalSection(access, "dashboard");
+  const canViewArteBoard = canAccessOperationalSection(access, "art");
+  const canViewProducaoBoard = canAccessOperationalSection(access, "production");
   const canViewPrinting = hasModuleAccess("impressao_estoque");
   const canViewGaleria = hasModuleAccess("galeria");
   const canViewCalculadora = hasModuleAccess("calculadora");
@@ -93,14 +98,14 @@ export default function Layout({ children }: LayoutProps) {
   const hasManagementModules = canViewFinanceiro || canViewConfiguracoes || canViewOperationalSettings || canManageLibrary;
 
   const operationalLinks = [
-    { href: "/hub-os", label: "Dashboard", Icon: LayoutDashboard, active: location === "/hub-os" },
-    { href: "/os", label: "Ordens de Serviço", Icon: ClipboardList, active: operationalNav.orders },
-    { href: "/os/arte", label: "Arte", Icon: Palette, active: operationalNav.art },
-    { href: "/os/producao", label: "Produção", Icon: Factory, active: operationalNav.production },
-    ...(hubPermissions.canViewInstallations
+    ...(canViewDashboard ? [{ href: "/hub-os", label: "Dashboard", Icon: LayoutDashboard, active: location === "/hub-os" }] : []),
+    ...(canViewHubOs ? [{ href: "/os", label: "Ordens de Serviço", Icon: ClipboardList, active: operationalNav.orders }] : []),
+    ...(canViewArteBoard ? [{ href: "/os/arte", label: "Arte", Icon: Palette, active: operationalNav.art }] : []),
+    ...(canViewProducaoBoard ? [{ href: "/os/producao", label: "Produção", Icon: Factory, active: operationalNav.production }] : []),
+    ...(canViewHubOs && hubPermissions.canViewInstallations
       ? [{ href: "/instalacoes", label: "Instalações", Icon: CalendarDays, active: location.startsWith("/instalacoes") }]
       : []),
-    ...(hubPermissions.canViewDeliveries
+    ...(canViewHubOs && hubPermissions.canViewDeliveries
       ? [{ href: "/entregas", label: "Entregas", Icon: Truck, active: location.startsWith("/entregas") }]
       : []),
   ];
@@ -113,10 +118,10 @@ export default function Layout({ children }: LayoutProps) {
 
   const NavItems = () => (
     <div className="space-y-1">
-      {(canViewHubOs || canViewPrinting) && (
+      {(operationalLinks.length > 0 || canViewPrinting) && (
         <>
           <SectionLabel>Operação</SectionLabel>
-          {canViewHubOs && operationalLinks.map(({ href, label, Icon, active }) => (
+          {operationalLinks.map(({ href, label, Icon, active }) => (
             <Link href={href} key={href}>
               <Button
                 variant={active ? "secondary" : "ghost"}
