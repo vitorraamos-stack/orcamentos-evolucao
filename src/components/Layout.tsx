@@ -52,6 +52,8 @@ export default function Layout({ children }: LayoutProps) {
   const avatarUrl = useAvatarPhoto(user?.id);
   const isCreateOrderPage = location.startsWith("/os/novo");
   const isOrdersCentralPage = location === "/os";
+  const isOrderDetailPage = /^\/os\/[^/]+$/.test(location) &&
+    !["/os/novo", "/os/arte", "/os/producao", "/os/insumos", "/os/kiosk"].includes(location);
   const isArtworkCentralPage = location.startsWith("/os/arte");
   const isProductionCentralPage = location.startsWith("/os/producao");
   const isInstallationsCentralPage = location === "/instalacoes";
@@ -323,7 +325,8 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className={cn(
       "evolu-shell flex min-h-dvh bg-[#F4F7FB] text-foreground dark:bg-background",
-      isCreateOrderPage ? "md:h-auto md:overflow-visible" : "md:h-dvh md:overflow-hidden"
+      isCreateOrderPage ? "md:h-auto md:overflow-visible" : "md:h-dvh md:overflow-hidden",
+      isOrderDetailPage && "evolu-shell--order-detail h-dvh overflow-hidden"
     )}>
       <aside className="evolu-shell__sidebar hidden w-[264px] shrink-0 flex-col text-white md:flex" aria-label="Menu lateral">
         <div className="evolu-shell__branding">
@@ -395,13 +398,14 @@ export default function Layout({ children }: LayoutProps) {
         <main
           className={cn(
             "evolu-shell__main min-h-0 flex-1 p-4 md:p-5 xl:p-6",
-            isCreateOrderPage ? "overflow-visible" : "overflow-auto"
+            isCreateOrderPage ? "overflow-visible" : isOrderDetailPage ? "overflow-y-auto overflow-x-hidden" : "overflow-auto"
           )}
         >
           <div
             className={cn(
               "mx-auto flex w-full min-h-0 flex-col",
               isOrdersCentralPage ||
+                isOrderDetailPage ||
                 isInstallationsCentralPage ||
                 isDeliveriesCentralPage ||
                 isArtworkCentralPage ||
