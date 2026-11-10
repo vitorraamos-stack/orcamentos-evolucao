@@ -237,11 +237,11 @@ export function DashboardAgendaPanel({
                       onChange={event => setPendingKind(event.target.value as PendingScheduleKind | "all")}
                       className="h-10 rounded-md border bg-background px-3 text-sm">
                       <option value="all">Todas as pendências disponíveis</option>
-                      {agenda?.waitingInstallations !== null &&
+                      {agenda && agenda.waitingInstallations !== null &&
                         <option value="installation">Instalações sem agendamento</option>}
-                      {agenda?.waitingDeliveries !== null &&
+                      {agenda && agenda.waitingDeliveries !== null &&
                         <option value="delivery">Entregas sem agendamento</option>}
-                      {agenda?.deliveriesWithoutTime !== null &&
+                      {agenda && agenda.deliveriesWithoutTime !== null &&
                         <option value="delivery_missing_time">Entregas sem horário</option>}
                     </select>
                     <Input type="search" aria-label="Buscar pendências de agendamento"
