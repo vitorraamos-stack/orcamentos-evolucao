@@ -271,6 +271,8 @@ export function OperationalBoard({
         );
         return;
       }
+      // A visão rápida também é um diálogo: feche-a antes de abrir o envio do layout.
+      setSelectedCardId(null);
       setPendingLayoutCard(card);
       return;
     }
