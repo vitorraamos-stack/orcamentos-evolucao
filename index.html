@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="dark" style="color-scheme: dark;">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,20 +8,7 @@
       content="EvoluSystem — Controle Operacional da Evolução Comunicação Visual."
     />
     <title>EvoluSystem | Controle Operacional</title>
-    <script>
-      // Apply saved preference before React paints to avoid a light-theme flash.
-      (function () {
-        try {
-          var saved = localStorage.getItem("evolusystem-theme");
-          var dark = saved === "dark" ||
-            (saved === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-          document.documentElement.classList.toggle("dark", dark);
-          document.documentElement.style.colorScheme = dark ? "dark" : "light";
-        } catch (_) {
-          document.documentElement.classList.remove("dark");
-        }
-      })();
-    </script>
+    <meta name="theme-color" content="#101c2b" />
   </head>
   <body>
     <div id="root"></div>
