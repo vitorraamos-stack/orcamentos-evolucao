@@ -581,3 +581,46 @@
   min-height: 24px;
   padding-inline: 9px;
 }
+
+/* OS details: slightly larger reading text with a quieter, shorter stage flow.
+   Keep the eight-stage semantics and current-step highlight unchanged. */
+.evolu-detail__breadcrumb { font-size: 13px; }
+.evolu-detail__hero-secondary .evolu-detail__service { font-size: 15px; }
+.evolu-detail__quick-info dt { font-size: 12px; }
+.evolu-detail__quick-info dd { font-size: 15px; }
+.evolu-detail__orientation h2 { font-size: 16px; }
+.evolu-detail__orientation p { font-size: 14px; line-height: 1.4; }
+.evolu-detail__tab { font-size: 14px; }
+.evolu-detail__management-grid [data-slot="card-title"],
+.evolu-detail__tab-content [data-slot="card-title"] { font-size: 17px; }
+.evolu-detail__tab-content dl > div dt { font-size: 15px; }
+.evolu-detail__tab-content dl > div dd { font-size: 17px; }
+.evolu-detail__flow { padding: 9px 14px 7px; }
+.evolu-detail__flow .evolu-detail__section-heading {
+  gap: 6px 12px;
+  padding: 0 2px 4px;
+}
+.evolu-detail__flow .evolu-detail__section-heading h2 { font-size: 16px; }
+.evolu-detail__flow .evolu-detail__section-heading p {
+  margin-top: 1px;
+  font-size: 13px;
+  line-height: 1.3;
+}
+.evolu-detail__current-stage { padding: 4px 9px; font-size: 12px; }
+.evolu-detail__flow-scroll { padding: 2px 0 2px; }
+.evolu-detail__stage-bubble { width: 28px; height: 28px; }
+.evolu-detail__stage-bubble--current { box-shadow: 0 0 0 3px #e5f4fd; }
+.evolu-detail__stage-line { margin-top: 13px; }
+.evolu-detail__stage-label {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.25;
+}
+.evolu-detail__stage-label.font-bold { color: #086da8; }
+.dark .evolu-detail__stage-label.font-bold { color: #8cdaff; }
+.dark .evolu-detail__stage-bubble--current {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 15%, var(--card));
+}
+@media (max-width: 639px) {
+  .evolu-detail__flow { padding: 10px 10px 7px; }
+}
