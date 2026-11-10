@@ -58,34 +58,31 @@ export default function ResetPassword() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB] px-4 py-10 text-[#102038]">
-      <section className="w-full max-w-md rounded-[28px] border border-[#E8EDF4] bg-white px-6 py-10 shadow-xl sm:px-10">
-        <img src="/logo.png" alt="Evolução Comunicação Visual" className="mx-auto mb-7 h-20 w-auto" />
-        <h1 className="text-center text-3xl font-extrabold tracking-[-.05em]">
-          Evolu<span className="text-[#008DE1]">System</span>
-        </h1>
-        <p className="mt-1 text-center text-xs font-bold uppercase tracking-[.25em] text-[#687C93]">
+    <main className="flex min-h-screen items-center justify-center bg-[#0C1726] px-4 py-10 text-[#E6EFF8]">
+      <section className="w-full max-w-md rounded-[28px] border border-[#30445C] bg-[#17283D] px-6 py-10 shadow-xl sm:px-10">
+        <img src="/evolusystem-logo-dark.svg" alt="EvoluSystem" className="mx-auto mb-7 h-auto w-[250px] max-w-full" />
+        <p className="mt-1 text-center text-xs font-bold uppercase tracking-[.25em] text-[#A6BDD5]">
           Controle Operacional
         </p>
-        <h2 className="mt-9 text-xl font-bold">Redefinir senha</h2>
+        <h1 className="mt-9 text-xl font-bold">Redefinir senha</h1>
         {checking ? (
-          <p role="status" className="mt-5 flex items-center gap-2 text-sm text-[#64788F]">
+          <p role="status" className="mt-5 flex items-center gap-2 text-sm text-[#ADBED1]">
             <Loader2 className="h-4 w-4 animate-spin" /> Verificando o link de recuperação…
           </p>
         ) : !hasSession ? (
-          <div className="mt-5 space-y-5 text-sm text-[#64788F]">
+          <div className="mt-5 space-y-5 text-sm text-[#ADBED1]">
             <p>Este link de recuperação está inválido ou expirou. Solicite um novo pelo formulário de acesso.</p>
-            <a href="/login" className="inline-flex min-h-11 items-center font-semibold text-[#087DC3] hover:underline">
+            <a href="/login" className="inline-flex min-h-11 items-center font-semibold text-[#73C9FF] hover:underline">
               Voltar ao login
             </a>
           </div>
         ) : (
           <form onSubmit={changePassword} className="mt-5 space-y-5">
-            <p className="text-sm text-[#64788F]">Escolha uma nova senha com pelo menos 8 caracteres.</p>
+            <p className="text-sm text-[#ADBED1]">Escolha uma nova senha com pelo menos 8 caracteres.</p>
             <div>
               <label htmlFor="new-password" className="mb-2 block text-sm font-semibold">Nova senha</label>
               <div className="relative">
-                <LockKeyhole className="pointer-events-none absolute left-4 top-3.5 h-5 w-5 text-[#7C90A9]" aria-hidden="true" />
+                <LockKeyhole className="pointer-events-none absolute left-4 top-3.5 h-5 w-5 text-[#8DAAC8]" aria-hidden="true" />
                 <input
                   id="new-password"
                   name="new-password"
@@ -96,13 +93,13 @@ export default function ResetPassword() {
                   required
                   minLength={8}
                   disabled={saving}
-                  className="h-12 w-full rounded-xl border border-[#D6DFEB] bg-[#F8FAFD] pl-12 pr-12 focus:border-[#058BD6] focus:outline-none focus:ring-4 focus:ring-[#058BD6]/10"
+                  className="h-12 w-full rounded-xl border border-[#39516A] bg-[#112237] text-[#F1F7FD] pl-12 pr-12 focus:border-[#43B6F5] focus:outline-none focus:ring-4 focus:ring-[#43B6F5]/15"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((visible) => !visible)}
                   aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                  className="absolute right-2 top-1 flex h-10 w-10 items-center justify-center rounded-lg text-[#7387A1] focus-visible:outline-2 focus-visible:outline-[#087DC3]"
+                  className="absolute right-2 top-1 flex h-10 w-10 items-center justify-center rounded-lg text-[#9FB6CF] focus-visible:outline-2 focus-visible:outline-[#087DC3]"
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
@@ -120,10 +117,10 @@ export default function ResetPassword() {
                 required
                 minLength={8}
                 disabled={saving}
-                className="h-12 w-full rounded-xl border border-[#D6DFEB] bg-[#F8FAFD] px-4 focus:border-[#058BD6] focus:outline-none focus:ring-4 focus:ring-[#058BD6]/10"
+                className="h-12 w-full rounded-xl border border-[#39516A] bg-[#112237] text-[#F1F7FD] px-4 focus:border-[#43B6F5] focus:outline-none focus:ring-4 focus:ring-[#43B6F5]/15"
               />
             </div>
-            {feedback && <p role="alert" className="rounded-lg bg-[#FFF4F4] p-3 text-sm text-[#A23434]">{feedback}</p>}
+            {feedback && <p role="alert" className="rounded-lg border border-[#74404A] bg-[#381F2A] p-3 text-sm text-[#FFC1C7]">{feedback}</p>}
             <button
               type="submit"
               disabled={saving}
@@ -134,7 +131,7 @@ export default function ResetPassword() {
             </button>
           </form>
         )}
-        <p className="mt-8 flex items-center justify-center gap-2 text-xs text-[#8090A5]">
+        <p className="mt-8 flex items-center justify-center gap-2 text-xs text-[#A2B8CE]">
           <ShieldCheck className="h-4 w-4" aria-hidden="true" /> Acesso protegido
         </p>
       </section>
