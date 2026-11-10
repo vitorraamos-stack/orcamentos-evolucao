@@ -8,7 +8,7 @@ const source = readFileSync(
 
 describe("EstimatorPage re-scope 19A", () => {
   it("keeps the official calculation flow and reviewed Conta Azul copy", () => {
-    expect(source).toContain(".loadForm()");
+    expect(source).toContain(".loadForm(null, user?.id ?? null)");
     expect(source).toContain("estimatorRepository.calculate(request)");
     expect(source).toContain("buildTechnicalInputs(");
     expect(source).toContain("availableInstallments");

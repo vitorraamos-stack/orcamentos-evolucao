@@ -44,15 +44,61 @@ async function post(body: unknown) {
   return result.data;
 }
 
+// Only cache the form's public, non-financial metadata, scoped by user.
+// Official prices and permission checks always remain server-side.
+const FORM_CACHE_TTL_MS = 30_000;
+let cachedForm: {
+  userId: string;
+  expiresAt: number;
+  definition: EstimatorFormDefinition;
+} | null = null;
+let pendingForm: {
+  userId: string;
+  promise: Promise<EstimatorFormDefinition>;
+} | null = null;
+
+async function fetchForm(productVersionId: string | null) {
+  const body = estimatorFormApiRequestSchema.parse({
+    action: "GET_ESTIMATOR_FORM",
+    productVersionId,
+  });
+  return estimatorFormDefinitionSchema.parse(await post(body));
+}
+
 export const estimatorRepository = {
-  loadForm: async (
-    productVersionId: string | null = null
+  loadForm: (
+    productVersionId: string | null = null,
+    userId: string | null = null
   ): Promise<EstimatorFormDefinition> => {
-    const body = estimatorFormApiRequestSchema.parse({
-      action: "GET_ESTIMATOR_FORM",
-      productVersionId,
-    });
-    return estimatorFormDefinitionSchema.parse(await post(body));
+    // Historical versions always require a fresh server lookup.
+    if (!userId || productVersionId !== null) return fetchForm(productVersionId);
+
+    if (
+      cachedForm?.userId === userId &&
+      cachedForm.expiresAt > Date.now()
+    ) {
+      return Promise.resolve(cachedForm.definition);
+    }
+
+    if (pendingForm?.userId === userId) return pendingForm.promise;
+
+    // Reopening the module shortly after leaving it can render immediately.
+    // Failed requests are never cached, and cache data is never shared by users.
+    const promise = fetchForm(null)
+      .then(definition => {
+        cachedForm = {
+          userId,
+          definition,
+          expiresAt: Date.now() + FORM_CACHE_TTL_MS,
+        };
+        return definition;
+      })
+      .finally(() => {
+        if (pendingForm?.promise === promise) pendingForm = null;
+      });
+
+    pendingForm = { userId, promise };
+    return promise;
   },
 
   calculate: async (
