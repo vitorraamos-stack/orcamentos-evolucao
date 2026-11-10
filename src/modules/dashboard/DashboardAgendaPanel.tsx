@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import {
   agendaEventTime, filterDashboardAgenda,
   type AgendaEvent, type AgendaFilter, type AgendaPeriod, type DashboardAgenda,
+  type PendingScheduleEntry, type PendingScheduleKind,
 } from "./dashboardAgenda";
 
 const FILTERS: Array<{ value: AgendaFilter; label: string }> = [
@@ -54,6 +55,37 @@ function EventRow({ event, preparations, leadHours, now }: {
   );
 }
 
+function PendingScheduleRow({ entry }: { entry: PendingScheduleEntry }) {
+  const reason = entry.kind === "installation" ? "Instalação aguardando agendamento" :
+    entry.kind === "delivery" ? "Entrega aguardando agendamento" :
+    "Entrega cadastrada sem horário válido";
+  const deadline = entry.order.delivery_date
+    ? entry.order.delivery_date.split("-").reverse().join("/")
+    : "Não informado";
+  return (
+    <div className="evolu-dashboard__agenda-event">
+      <Link href={"/os/" + encodeURIComponent(entry.order.id)}
+        className="evolu-dashboard__agenda-open"
+        aria-label={"Abrir OS " + (entry.order.sale_number || "sem número") + ": " + reason}>
+        <span className="evolu-dashboard__agenda-event-top">
+          <span className="evolu-dashboard__agenda-kind">
+            <AlertTriangle aria-hidden="true" className="h-4 w-4" /> {reason}
+          </span>
+          <ArrowRight aria-hidden="true" className="h-4 w-4" />
+        </span>
+        <span className="evolu-dashboard__agenda-client">
+          {entry.order.sale_number?.trim() ? "OS " + entry.order.sale_number : "OS sem número"}
+          <span aria-hidden="true"> · </span>
+          {entry.order.client_name?.trim() || "Cliente não informado"}
+        </span>
+        <span className="evolu-dashboard__agenda-status">
+          {entry.order.title?.trim() || "Serviço não informado"} · Prazo: {deadline}
+        </span>
+      </Link>
+    </div>
+  );
+}
+
 export function DashboardAgendaPanel({
   agenda, error, preparations = null, preparationError, now = new Date(),
 }: {
@@ -69,6 +101,8 @@ export function DashboardAgendaPanel({
   const [filter, setFilter] = useState<AgendaFilter>("all");
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
+  const [sheetMode, setSheetMode] = useState<"agenda" | "pending">("agenda");
+  const [pendingKind, setPendingKind] = useState<PendingScheduleKind | "all">("all");
   const events = agenda ? filterDashboardAgenda(agenda, period, "all", now) : [];
   const visible = agenda ? filterDashboardAgenda(agenda, period, filter, now).filter(event => {
     const term = search.trim().toLocaleLowerCase("pt-BR");
@@ -77,7 +111,19 @@ export function DashboardAgendaPanel({
     ].join(" ").toLocaleLowerCase("pt-BR").includes(term);
   }) : [];
 
-  const openFiltered = (next: AgendaFilter) => { setFilter(next); setOpen(true); };
+  const openFiltered = (next: AgendaFilter) => {
+    setSheetMode("agenda"); setFilter(next); setOpen(true);
+  };
+  const openPending = (next: PendingScheduleKind) => {
+    setSheetMode("pending"); setPendingKind(next); setSearch(""); setOpen(true);
+  };
+  const pendingEntries = (agenda?.pendingScheduleEntries ?? []).filter(entry => {
+    if (pendingKind !== "all" && entry.kind !== pendingKind) return false;
+    const term = search.trim().toLocaleLowerCase("pt-BR");
+    return !term || [
+      entry.order.sale_number, entry.order.client_name, entry.order.title,
+    ].join(" ").toLocaleLowerCase("pt-BR").includes(term);
+  });
   return (
     <section aria-labelledby="dashboard-agenda-heading" className="min-w-0">
       <Card className="evolu-dashboard__panel h-full">
@@ -130,18 +176,21 @@ export function DashboardAgendaPanel({
                 <p className="text-xs text-muted-foreground">{events.length - 5} registro(s) adicional(is) na agenda completa.</p>}
               <div className="evolu-dashboard__agenda-attention">
                 {agenda.waitingInstallations !== null &&
-                  <Link href="/instalacoes" className="evolu-dashboard__agenda-chip">
+                  <button type="button" className="evolu-dashboard__agenda-chip"
+                    onClick={() => openPending("installation")}>
                     <strong>{agenda.waitingInstallations}</strong> instalação(ões) sem agendamento <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                  </Link>}
+                  </button>}
                 {agenda.waitingDeliveries !== null &&
-                  <Link href="/entregas" className="evolu-dashboard__agenda-chip">
+                  <button type="button" className="evolu-dashboard__agenda-chip"
+                    onClick={() => openPending("delivery")}>
                     <strong>{agenda.waitingDeliveries}</strong> entrega(s) sem agendamento <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                  </Link>}
+                  </button>}
                 {agenda.deliveriesWithoutTime !== null && agenda.deliveriesWithoutTime > 0 &&
-                  <Link href="/entregas" className="evolu-dashboard__agenda-chip">
+                  <button type="button" className="evolu-dashboard__agenda-chip"
+                    onClick={() => openPending("delivery_missing_time")}>
                     <strong>{agenda.deliveriesWithoutTime}</strong> entrega(s) cadastrada(s) sem horário
                     <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                  </Link>}
+                  </button>}
                 {agenda.overdueWithoutCompletion > 0 &&
                   <button type="button" className="evolu-dashboard__agenda-chip" onClick={() => openFiltered("late")}>
                     <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -163,16 +212,55 @@ export function DashboardAgendaPanel({
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
               <Button type="button" variant="outline" className="w-full"
-                onClick={() => { setFilter("all"); setSearch(""); }} disabled={!agenda}>
+                onClick={() => { setSheetMode("agenda"); setFilter("all"); setSearch(""); }} disabled={!agenda}>
                 Agenda completa <ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" />
               </Button>
             </SheetTrigger>
             <SheetContent className="w-full sm:max-w-xl" side="right">
               <SheetHeader>
-                <SheetTitle>Agenda operacional completa</SheetTitle>
-                <SheetDescription>Consulta dos registros existentes, sem edição. O período é preservado ao abrir e fechar.</SheetDescription>
+                <SheetTitle>
+                  {sheetMode === "pending" ? "OS com agendamento pendente" : "Agenda operacional completa"}
+                </SheetTitle>
+                <SheetDescription>
+                  {sheetMode === "pending"
+                    ? "Instalações e entregas sem agendamento ou horário registrado. Consulta sem edição."
+                    : "Consulta dos registros existentes, sem edição. O período é preservado ao abrir e fechar."}
+                </SheetDescription>
               </SheetHeader>
               <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pb-6">
+                {sheetMode === "pending" ? (
+                  <>
+                    <label className="text-sm font-medium" htmlFor="dashboard-pending-filter">
+                      Tipo de pendência
+                    </label>
+                    <select id="dashboard-pending-filter" value={pendingKind}
+                      onChange={event => setPendingKind(event.target.value as PendingScheduleKind | "all")}
+                      className="h-10 rounded-md border bg-background px-3 text-sm">
+                      <option value="all">Todas as pendências disponíveis</option>
+                      {agenda?.waitingInstallations !== null &&
+                        <option value="installation">Instalações sem agendamento</option>}
+                      {agenda?.waitingDeliveries !== null &&
+                        <option value="delivery">Entregas sem agendamento</option>}
+                      {agenda?.deliveriesWithoutTime !== null &&
+                        <option value="delivery_missing_time">Entregas sem horário</option>}
+                    </select>
+                    <Input type="search" aria-label="Buscar pendências de agendamento"
+                      placeholder="Buscar OS, cliente ou serviço" value={search}
+                      onChange={event => setSearch(event.target.value)} />
+                    <p className="text-xs text-muted-foreground" aria-live="polite">
+                      {pendingEntries.length} registro(s) encontrados. Os compromissos sem data
+                      não são inseridos artificialmente no calendário.
+                    </p>
+                    <div className="space-y-2">
+                      {pendingEntries.length
+                        ? pendingEntries.map(entry => <PendingScheduleRow key={entry.key} entry={entry} />)
+                        : <p className="evolu-dashboard__empty">
+                            Nenhuma pendência corresponde aos filtros ou às suas permissões.
+                          </p>}
+                    </div>
+                  </>
+                ) : (
+                  <>
                 <div className="evolu-dashboard__agenda-period" role="group" aria-label="Período da agenda completa">
                   <Button type="button" size="sm" variant={period === "today" ? "default" : "outline"}
                     onClick={() => setPeriod("today")}>Hoje</Button>
@@ -196,6 +284,8 @@ export function DashboardAgendaPanel({
                       preparations={preparations} leadHours={leadHours} now={now} />)
                     : <p className="evolu-dashboard__empty">Nenhum registro corresponde aos filtros.</p>}
                 </div>
+                  </>
+                )}
               </div>
             </SheetContent>
           </Sheet>
