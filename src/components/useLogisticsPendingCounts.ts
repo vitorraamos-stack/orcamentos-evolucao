@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { listOrderFlowState } from "@/modules/hub-os/order-flow-api";
 import {
   countOpenDeliveries,
-  countOpenInstallations,
+  countWaitingInstallations,
   type PendingDelivery,
   type PendingInstallation,
   type PendingOrder,
@@ -35,35 +35,25 @@ async function readAll<T>(
 }
 
 async function readInstallations(access: Access): Promise<number> {
-  const activePromise = readAll<PendingInstallation>((from, to) =>
-    supabase.from("os_installations")
-      .select("os_id,team_id,responsible_id")
-      .in("status", ["SCHEDULED", "IN_PROGRESS"])
-      .order("os_id").range(from, to)
-  );
-  const ordersPromise = access.agendaOnly
-    ? Promise.resolve([] as PendingOrder[])
-    : readAll<PendingOrder>((from, to) =>
+  // O perfil com acesso somente à agenda não possui a fila de agendamento.
+  if (access.agendaOnly) return 0;
+
+  const [active, orders] = await Promise.all([
+    readAll<PendingInstallation>((from, to) =>
+      supabase.from("os_installations")
+        .select("os_id")
+        .in("status", ["SCHEDULED", "IN_PROGRESS"])
+        .order("os_id").range(from, to)
+    ),
+    readAll<PendingOrder>((from, to) =>
       supabase.from("os_orders")
         .select("id,logistic_type,prod_status,archived")
         .eq("logistic_type", "instalacao").eq("archived", false)
         .in("prod_status", ["Pronto / Avisar Cliente", "Instalação Agendada"])
         .order("id").range(from, to)
-    );
-  const membershipsPromise = access.isManager || access.agendaOnly
-    ? Promise.resolve([] as Array<{ team_id: string }>)
-    : readAll<{ team_id: string }>((from, to) =>
-      supabase.from("os_installation_team_members")
-        .select("team_id").eq("user_id", access.userId!)
-        .order("team_id").range(from, to)
-    );
-  const [active, orders, memberships] = await Promise.all([
-    activePromise, ordersPromise, membershipsPromise,
+    ),
   ]);
-  return countOpenInstallations({
-    active, orders, userId: access.userId!, isManager: access.isManager,
-    agendaOnly: access.agendaOnly, teamIds: new Set(memberships.map(row => row.team_id)),
-  });
+  return countWaitingInstallations({ active, orders });
 }
 
 async function readDeliveries(): Promise<number> {

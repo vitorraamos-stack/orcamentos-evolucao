@@ -5,11 +5,7 @@ export type PendingOrder = {
   prod_status: string | null;
   archived: boolean;
 };
-export type PendingInstallation = {
-  os_id: string;
-  team_id: string | null;
-  responsible_id: string | null;
-};
+export type PendingInstallation = { os_id: string };
 export type PendingDelivery = { os_id: string };
 export type PendingPickupFlow = {
   source_type: string;
@@ -17,31 +13,21 @@ export type PendingPickupFlow = {
   retirado_at: string | null;
 };
 
-export function countOpenInstallations(input: {
+/** Badge de Instalações: somente a fila "Aguardando agendamento".
+ * Instalações agendadas ou em execução pertencem à Agenda, não são pendências
+ * de agendamento. Os status seguem as mesmas regras da Central.
+ */
+export function countWaitingInstallations(input: {
   orders: readonly PendingOrder[];
   active: readonly PendingInstallation[];
-  teamIds: ReadonlySet<string>;
-  userId: string;
-  isManager: boolean;
-  agendaOnly: boolean;
 }): number {
-  const activeIds = new Set(input.active.map(row => row.os_id));
-  // A consultora com acesso somente à agenda pode consultar todas as equipes,
-  // mas não a aba "Aguardando agendamento".
-  const visibleActive = input.active.filter(row =>
-    input.agendaOnly || input.isManager ||
-    row.responsible_id === input.userId ||
-    Boolean(row.team_id && input.teamIds.has(row.team_id))
-  ).length;
-  if (input.agendaOnly) return visibleActive;
-
-  const waiting = input.orders.filter(order =>
+  const scheduledOrderIds = new Set(input.active.map(row => row.os_id));
+  return input.orders.filter(order =>
     !order.archived &&
     order.logistic_type === "instalacao" &&
     ["Pronto / Avisar Cliente", "Instalação Agendada"].includes(order.prod_status ?? "") &&
-    !activeIds.has(order.id)
+    !scheduledOrderIds.has(order.id)
   ).length;
-  return visibleActive + waiting;
 }
 
 export function countOpenDeliveries(input: {
