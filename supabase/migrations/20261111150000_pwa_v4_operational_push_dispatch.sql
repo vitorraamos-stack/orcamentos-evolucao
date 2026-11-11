@@ -434,7 +434,7 @@ grant execute on function public.push_v4_finish_job(uuid,integer,text,integer) t
 create or replace function public.push_v4_release_readiness()
 returns jsonb
 language sql stable security invoker set search_path=''
-as $
+as $$
   select pg_catalog.jsonb_build_object(
     'generationEnabled',coalesce((select generation_enabled
        from private.push_v4_runtime_settings where singleton),false),
@@ -449,7 +449,7 @@ as $
     'pendingJobs',(select count(*) from private.push_delivery_jobs
        where status in ('pending','processing','retry'))
   )
-$;
+$$;
 revoke all on function public.push_v4_release_readiness()
   from public, anon, authenticated;
 grant execute on function public.push_v4_release_readiness() to service_role;
