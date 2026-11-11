@@ -54,8 +54,9 @@ describe("PWA V4 2E — contrato de isolamento e segurança",()=>{
   });
   it("cria somente RPCs restritas ao service_role e não faz POST a serviços externos via banco",()=>{
     for (const fn of [
-      "push_v4_expand_outbox(integer)","push_v4_job_eligible(uuid)",
-      "push_v4_claim_jobs(integer)","push_v4_finish_job(uuid,text,integer)"
+      "push_v4_expand_outbox(integer)","push_v4_job_eligible(uuid,integer)",
+      "push_v4_claim_jobs(integer)","push_v4_finish_job(uuid,integer,text,integer)",
+      "push_v4_release_readiness()"
     ]){
       expect(sql).toContain("revoke all on function public."+fn);
       expect(sql).toContain("grant execute on function public."+fn+" to service_role");
@@ -68,8 +69,9 @@ describe("PWA V4 2E — contrato de isolamento e segurança",()=>{
   it("não ativa execução no browser ou agendamento no Vercel",()=>{
     expect(handler).toContain('PWA_PUSH_DELIVERY_ENABLED !== "true"');
     expect(handler).toContain('PWA_PUSH_GENERATION_ENABLED !== "true"');
+    expect(handler).toContain('PWA_PUSH_ROLLOUT_ENABLED !== "true"');
     expect(handler).toContain("authorizedCron");
-    expect(handler).toContain("store.eligible(job.job_id)");
+    expect(handler).toContain("store.eligible(job.job_id,job.attempt_number)");
     expect(sender).toContain('"aes-128-gcm"');
     expect(sender).toContain('redirect: "error"');
     expect(sender).toContain("validPushEndpoint");
