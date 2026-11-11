@@ -18,7 +18,7 @@ import {
 
 type DeviceStatus =
   | "checking" | "disabled" | "available" | "active"
-  | "not_synced" | "unsupported" | "install_required" | "permission_denied" | "error";
+  | "not_synced" | "unsupported" | "install_required" | "permission_denied" | "insecure" | "error";
 
 const errorText: Record<string, string> = {
   unauthorized: "Sua sessão expirou. Entre novamente para configurar as notificações.",
@@ -164,6 +164,7 @@ export function PushNotificationPreferences({ userId }: { userId: string }) {
     active: "Este dispositivo está vinculado à sua conta para receber avisos.",
     not_synced: "O navegador possui uma inscrição, mas ela ainda não está vinculada a esta conta.",
     unsupported: "Este navegador não oferece os recursos necessários para notificações Push.",
+    insecure: "Para ativar notificações, acesse o EvoluSystem em uma conexão HTTPS segura.",
     install_required: "No iPhone/iPad, adicione o EvoluSystem à Tela de Início e abra pelo ícone instalado.",
     permission_denied: "A permissão está bloqueada. Libere-a nas configurações do dispositivo.",
     error: "Não foi possível verificar o status do Push agora.",
