@@ -63,7 +63,7 @@ describe("Push V4: backend server-only contract", () => {
     expect(helper).toContain('PWA_PUSH_REGISTRATION_ENABLED === "true"');
     expect(api).toContain("push_registration_disabled");
     expect(vercel.git.deploymentEnabled["feat/pwa-v4-server-subscriptions-20261111"]).toBe(false);
-    expect(vercel.crons ?? []).toEqual([]);
+    expect(vercel.crons).toEqual([{path:"/api/push/dispatch",schedule:"*/2 * * * *"}]);
     expect(sql).not.toContain("PWA_PUSH_REGISTRATION_ENABLED=true");
   });
 });

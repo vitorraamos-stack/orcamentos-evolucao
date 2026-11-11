@@ -260,7 +260,7 @@ $$;
 
 -- Second authorization guard immediately before HTTP dispatch. Losing a
 -- module, assignment, team membership or archiving an OS denies delivery.
-create or replace function public.push_v4_job_eligible(p_job_id uuid)
+create or replace function public.push_v4_job_eligible(p_job_id uuid, p_attempt_number integer)
 returns boolean
 language sql stable security invoker set search_path=''
 as $$
@@ -272,6 +272,7 @@ as $$
     join private.push_subscriptions s on s.id=j.subscription_id
     join public.os_orders o on o.id=n.resource_id
     where j.id=p_job_id
+      and j.attempt_count=p_attempt_number
       and j.status='processing'
       and j.lease_until > pg_catalog.now()
       and j.attempt_count <= 10
@@ -282,6 +283,7 @@ as $$
       and n.expires_at > pg_catalog.now()
       and o.archived=false
       and s.revoked_at is null
+      and s.last_seen_at >= pg_catalog.now()-interval '90 days'
       and public.has_module_access(s.user_id,'hub_os')
       and public.has_module_access(s.user_id,n.required_module)
       and exists (select 1 from private.push_v4_runtime_settings
@@ -331,6 +333,8 @@ as $$
       and (j.status in ('pending','retry') and j.next_attempt_at<=pg_catalog.now()
            or j.status='processing' and j.lease_until<pg_catalog.now())
       and j.attempt_count < 10
+      and exists (select 1 from private.push_subscriptions s
+                  where s.id=j.subscription_id and s.revoked_at is null)
     order by j.next_attempt_at,j.created_at
     for update skip locked
     limit least(greatest(coalesce(p_limit,1),1),15)
@@ -352,6 +356,7 @@ $$;
 
 create or replace function public.push_v4_finish_job(
   p_job_id uuid,
+  p_expected_attempt integer,
   p_outcome text,
   p_http_status integer default null
 )
@@ -361,13 +366,17 @@ as $$
 declare
   v_subscription uuid;
 begin
-  if p_job_id is null or p_outcome not in ('sent','retry','discarded')
+  if p_job_id is null or p_expected_attempt is null or
+     p_expected_attempt not between 1 and 10 or
+     p_outcome is null or p_outcome not in ('sent','retry','discarded')
     or (p_http_status is not null and (p_http_status < 100 or p_http_status > 599))
   then return false; end if;
 
   select subscription_id into v_subscription
   from private.push_delivery_jobs
   where id=p_job_id and status='processing'
+    and attempt_count=p_expected_attempt
+    and lease_until > pg_catalog.now()
   for update;
   if not found then return false; end if;
 
@@ -387,7 +396,7 @@ begin
           secs=>least(7200,30*pg_catalog.power(2,j.attempt_count)::integer))
         else j.next_attempt_at end,
       updated_at=pg_catalog.now()
-  where j.id=p_job_id;
+  where j.id=p_job_id and j.attempt_count=p_expected_attempt;
 
   if p_outcome='sent' then
     update private.push_subscriptions set failure_count=0,last_success_at=pg_catalog.now()
@@ -407,17 +416,43 @@ $$;
 -- Privileged server APIs only; never callable by end-user JWTs or anon.
 revoke all on function public.push_v4_expand_outbox(integer)
 from public, anon, authenticated;
-revoke all on function public.push_v4_job_eligible(uuid)
+revoke all on function public.push_v4_job_eligible(uuid,integer)
 from public, anon, authenticated;
 revoke all on function public.push_v4_claim_jobs(integer)
 from public, anon, authenticated;
-revoke all on function public.push_v4_finish_job(uuid,text,integer)
+revoke all on function public.push_v4_finish_job(uuid,integer,text,integer)
 from public, anon, authenticated;
 
 grant execute on function public.push_v4_expand_outbox(integer) to service_role;
-grant execute on function public.push_v4_job_eligible(uuid) to service_role;
+grant execute on function public.push_v4_job_eligible(uuid,integer) to service_role;
 grant execute on function public.push_v4_claim_jobs(integer) to service_role;
-grant execute on function public.push_v4_finish_job(uuid,text,integer) to service_role;
+grant execute on function public.push_v4_finish_job(uuid,integer,text,integer) to service_role;
 
--- Deliberately no activation step and no Vercel cron declaration.
+
+-- Read-only, privileged go-live preflight. It returns counts and boolean
+-- switches only; no client identifiers, endpoint URLs, VAPID keys or secrets.
+create or replace function public.push_v4_release_readiness()
+returns jsonb
+language sql stable security invoker set search_path=''
+as $
+  select pg_catalog.jsonb_build_object(
+    'generationEnabled',coalesce((select generation_enabled
+       from private.push_v4_runtime_settings where singleton),false),
+    'deliveryEnabled',coalesce((select delivery_enabled
+       from private.push_v4_runtime_settings where singleton),false),
+    'registrationRpcPresent',pg_catalog.to_regprocedure(
+       'public.push_v4_register_subscription(uuid,text,text,text,text)') is not null,
+    'subscriptionsActive',(select count(*) from private.push_subscriptions
+       where revoked_at is null),
+    'pendingEvents',(select count(*) from private.notification_source_outbox
+       where state in ('pending','processing','failed')),
+    'pendingJobs',(select count(*) from private.push_delivery_jobs
+       where status in ('pending','processing','retry'))
+  )
+$;
+revoke all on function public.push_v4_release_readiness()
+  from public, anon, authenticated;
+grant execute on function public.push_v4_release_readiness() to service_role;
+
+-- Deliberately no activation step in the database migration.
 -- DBA-only: flags in private.push_v4_runtime_settings BOTH remain false.

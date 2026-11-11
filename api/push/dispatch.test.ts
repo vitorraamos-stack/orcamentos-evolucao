@@ -10,6 +10,7 @@ const env:NodeJS.ProcessEnv={
   CRON_SECRET:"c".repeat(48),
   PWA_PUSH_GENERATION_ENABLED:"true",
   PWA_PUSH_DELIVERY_ENABLED:"true",
+  PWA_PUSH_ROLLOUT_ENABLED:"true",
   PWA_PUSH_VAPID_SUBJECT:"mailto:push@example.com",
   PWA_PUSH_VAPID_PUBLIC_KEY:pair.getPublicKey().toString("base64url"),
   PWA_PUSH_VAPID_PRIVATE_KEY:pair.getPrivateKey().toString("base64url"),
@@ -35,6 +36,10 @@ function response(){
 }
 function store(jobs:PushJob[]=[]):PushDispatchStore{
   return {
+    readiness:vi.fn().mockResolvedValue({
+      generationEnabled:false,deliveryEnabled:false,registrationRpcPresent:true,
+      subscriptionsActive:0,pendingEvents:0,pendingJobs:0,
+    }),
     expand:vi.fn().mockResolvedValue({expanded:2,jobsCreated:jobs.length}),
     claim:vi.fn().mockResolvedValue(jobs),
     eligible:vi.fn().mockResolvedValue(true),
@@ -78,9 +83,9 @@ describe("PWA V4 2E — dispatch com flags independentes",()=>{
     await handlePushDispatch({method:"GET",headers},res,{env,store:s,sender});
     expect(res.statusCode).toBe(200);
     expect(res.body).toMatchObject({ok:true,expanded:2,claimed:1,sent:1,failed:0,discarded:0});
-    expect(s.eligible).toHaveBeenCalledWith(job.job_id);
+    expect(s.eligible).toHaveBeenCalledWith(job.job_id,job.attempt_number);
     expect(sender).toHaveBeenCalledOnce();
-    expect(s.finish).toHaveBeenCalledWith(job.job_id,{status:201,outcome:"sent"});
+    expect(s.finish).toHaveBeenCalledWith(job.job_id,job.attempt_number,{status:201,outcome:"sent"});
     expect(JSON.stringify(res.body)).not.toContain(job.endpoint);
     expect(res.headers["Cache-Control"]).toBe("no-store");
   });
@@ -89,7 +94,7 @@ describe("PWA V4 2E — dispatch com flags independentes",()=>{
     vi.mocked(s.eligible).mockResolvedValueOnce(false);
     await handlePushDispatch({method:"GET",headers},res,{env,store:s,sender});
     expect(sender).not.toHaveBeenCalled();
-    expect(s.finish).toHaveBeenCalledWith(job.job_id,{status:null,outcome:"discarded"});
+    expect(s.finish).toHaveBeenCalledWith(job.job_id,job.attempt_number,{status:null,outcome:"discarded"});
     expect(res.body).toMatchObject({discarded:1,sent:0});
   });
   it("não vaza erro interno ou segredo se banco falhar",async()=>{
