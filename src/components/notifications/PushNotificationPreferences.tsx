@@ -61,7 +61,7 @@ export function PushNotificationPreferences({ userId }: { userId: string }) {
     const available = getBrowserPushAvailability(installed);
     setSupport(available);
     try {
-      const fetched = await loadPushConfig();
+      const fetched = await loadPushConfig(userId);
       if (generation.current !== current) return;
       setConfig(fetched);
       if (available !== "supported") {
