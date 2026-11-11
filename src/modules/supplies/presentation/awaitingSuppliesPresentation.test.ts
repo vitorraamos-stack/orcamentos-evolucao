@@ -111,15 +111,15 @@ describe("awaiting supplies sorting", () => {
     }),
   ];
 
-  it("orders priority by critical, urgent, overdue, today, future and no deadline", () => {
+  it("orders priority by business-day risk, then urgency, deadline and request age", () => {
     expect(
       sortAwaitingSupplies(values, "priority", now).map(item => item.id)
     ).toEqual([
       "overdue",
-      "critical",
-      "urgent",
       "today",
+      "critical",
       "future",
+      "urgent",
       "no-deadline",
     ]);
   });
