@@ -101,7 +101,8 @@
       "feat/pwa-v3-mobile-navigation-20261110": false,
       "feat/pwa-v4-notificacoes-etapa1-20261110": false,
       "feat/pwa-v4-push-schema-security-20261111": false,
-      "feat/pwa-v4-server-subscriptions-20261111": false
+      "feat/pwa-v4-server-subscriptions-20261111": false,
+      "feat/pwa-v4-consent-ui-20261111": false
     }
   }
 }
