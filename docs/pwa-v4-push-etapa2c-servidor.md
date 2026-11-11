@@ -28,7 +28,7 @@ etapa de UX (2D).
   customizadas nem credenciais na URL; valida chaves criptográficas e
   calcula SHA-256 do endpoint. Aplica limite do corpo e respostas sem
   segredos. Nenhum envio de Push é realizado por essa API.
-- \`supabase/migrations/20261111120000_pwa_v4_push_subscription_rpcs.sql\`:
+- \`supabase/migrations/20261111152913_pwa_v4_push_subscription_rpcs.sql\`:
   três funções em \`public\` (\`register\`, \`revoke\` e \`status\`) que
   usam \`SECURITY INVOKER\` e acesso à tabela \`private.push_subscriptions\`
   via \`service_role\`. Executar essas funções via Supabase REST/RPC é possível

@@ -14,6 +14,7 @@ export interface PushStore {
   getUser(token: string): Promise<string | null>;
   register(userId: string, endpointHash: string, data: SubscriptionPayload): Promise<RegistrationCode>;
   revoke(userId: string, endpointHash: string): Promise<boolean>;
+  status(userId: string, endpointHash: string): Promise<boolean>;
 }
 
 const TRUSTED_PUSH_HOSTS = new Set([
@@ -132,6 +133,14 @@ export function createPushStore(env: PushEnv): PushStore {
       if (!["registered", "forbidden", "endpoint_bound", "device_limit", "invalid"].includes(code))
         throw new Error("push_register_unexpected");
       return code as RegistrationCode;
+    },
+    async status(userId, endpointHash) {
+      const { data, error } = await admin.rpc("push_v4_subscription_status", {
+        p_user_id: userId,
+        p_endpoint_hash: endpointHash,
+      });
+      if (error) throw new Error("push_status_unavailable");
+      return data === true;
     },
     async revoke(userId, endpointHash) {
       const { data, error } = await admin.rpc("push_v4_revoke_subscription", {

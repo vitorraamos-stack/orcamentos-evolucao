@@ -38,6 +38,7 @@ const store = (): PushStore => ({
   getUser: vi.fn().mockResolvedValue("123e4567-e89b-42d3-a456-426614174111"),
   register: vi.fn().mockResolvedValue("registered"),
   revoke: vi.fn().mockResolvedValue(true),
+  status: vi.fn().mockResolvedValue(false),
 });
 const auth = { authorization: "Bearer " + "z".repeat(50) };
 

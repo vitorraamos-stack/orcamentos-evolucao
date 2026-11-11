@@ -8,6 +8,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { useOperationalNotifications } from "./OperationalNotificationsProvider";
+import { PushNotificationPreferences } from "./PushNotificationPreferences";
 
 function timeLabel(value: string): string {
   const date = new Date(value);
@@ -56,6 +57,7 @@ export function NotificationBell({ className = "" }: { className?: string }) {
               Avisos relevantes para sua função. Toque para abrir o pedido ou a agenda.
             </DialogDescription>
           </DialogHeader>
+          <PushNotificationPreferences userId={user!.id} />
           <div className="flex items-center justify-end gap-2">
             <Button
               type="button"
