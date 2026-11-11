@@ -72,7 +72,7 @@ O build Vite substitui `__EVOLUSYSTEM_BUILD_ID__` dentro do arquivo final `dist/
 
 - Central de notificações acessível pelo ícone de sino no mobile e desktop, com contador, histórico dos últimos 14 dias e navegação contextual.
 - Seleção por **permissões do perfil** e leitura autenticada sujeita às políticas RLS do Supabase.
-- Eventos derivados dos registros de auditoria existentes: `assignee_changed` (somente usuário `payload.to`), `create` (setor Arte) e `status_change` de `arte/art` para `Produzir` (setor Produção).
+- Eventos derivados dos registros de auditoria existentes (atribuições cruzadas com responsáveis atuais, criação conferida contra horário real e liberação conferida contra status atual da OS): `assignee_changed` (somente usuário `payload.to`), `create` (setor Arte) e `status_change` de `arte/art` para `Produzir` (setor Produção).
 - Instalações: aviso para responsável, integrante da equipe ou gestor autorizado; reagendamento detectado **enquanto a sessão estiver aberta**, comparando horário/equipe entre consultas.
 - Atualização de 60 em 60 segundos mais gatilhos Realtime das tabelas já publicadas e retorno do aplicativo ao primeiro plano. `os_orders_event` **ainda não integra Realtime**, portanto depende de polling.
 - Apenas IDs de notificações marcadas como lidas e um instante inicial são guardados em `localStorage` por usuário. **Nenhuma descrição, cliente, arquivo, valor, endereço ou payload de OS é persistido no navegador**. As leituras ainda não são sincronizadas entre dispositivos.

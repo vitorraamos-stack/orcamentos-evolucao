@@ -81,7 +81,7 @@ export function NotificationBell({ className = "" }: { className?: string }) {
               Marcar todas como lidas
             </Button>
           </div>
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pb-1" role="list" aria-label="Histórico de avisos">
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pb-1" role="region" aria-label="Histórico de avisos">
             {error && (
               <p role="alert" className="rounded-lg border border-[#785348] bg-[#392D2B] p-3 text-sm text-[#FFD4CA]">
                 Não foi possível atualizar os avisos. Confira sua conexão e tente novamente.
@@ -98,8 +98,7 @@ export function NotificationBell({ className = "" }: { className?: string }) {
                 <button
                   key={notice.id}
                   type="button"
-                  role="listitem"
-                  className={
+                   className={
                     "w-full rounded-xl border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65C5FA] " +
                     (read
                       ? "border-[#31465D] bg-[#1A2D42] hover:bg-[#24405A]"

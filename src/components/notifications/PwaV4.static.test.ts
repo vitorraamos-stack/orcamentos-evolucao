@@ -12,6 +12,8 @@ describe("PWA V4 — integração sem alteração de schema", () => {
     expect(provider).toContain('canAccessOperationalSection(access, "installations")');
     expect(repository).toContain('.from("os_orders_event")');
     expect(repository).toContain('.eq("archived", false)');
+    expect(repository).toContain("ownAssignments.has(event.os_id)");
+    expect(repository).toContain('order.art_status === "Produzir"');
     expect(repository).not.toMatch(/\.insert\(|\.upsert\(|\.delete\(|\.update\(/);
     expect(provider).toContain('table: "os_installations"');
   });
