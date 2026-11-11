@@ -85,6 +85,7 @@
   ],
   "git": {
     "deploymentEnabled": {
+      "fix/sidebar-installations-waiting-only-20261111": false,
       "feat/os-detail-uxui-integrated-20261030": false,
       "feat/dashboard-inteligencia-avancada-etapa4-20261106": false,
       "feat/dashboard-operacional-politicas-etapa1-20261109": false,
