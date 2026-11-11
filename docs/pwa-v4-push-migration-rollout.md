@@ -1,3 +1,5 @@
+> **Atualização de publicação 2026-11-11:** a migration de fundação foi aplicada no Supabase de produção (histórico `20261111105940`), mediante autorização da gestão. Nenhum serviço Push ou cron foi ativado. Os trechos abaixo são o plano original, anterior à aplicação.
+
 # EvoluSystem PWA V4 — Etapa 2B: proposta de migration + segurança
 
 > **APENAS REVISÃO**. Arquivos de migration e testes preparados em branch isolada.
@@ -8,7 +10,7 @@
 
 - Base: branch de V4 Etapa 1 (\`feat/pwa-v4-notificacoes-etapa1-20261110\`), PR #601.
 - Branch desta proposta: \`feat/pwa-v4-push-schema-security-20261111\`.
-- SQL único e atômico: \`supabase/migrations/20261111100016_pwa_v4_push_schema_foundation.sql\`.
+- SQL único e atômico: \`supabase/migrations/20261111105940_pwa_v4_push_schema_foundation.sql\`.
 - Verificações de banco **para ambiente local descartável após aplicar localmente**:
   \`supabase/tests/pwa_v4_push_schema_security.sql\` (43 asserções pgTAP).
 - Contrato estático para CI, sem banco: \`src/modules/notifications/pushSchemaSecurityContract.test.ts\`.

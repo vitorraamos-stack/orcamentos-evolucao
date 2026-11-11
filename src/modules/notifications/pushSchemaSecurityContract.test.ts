@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(
-  "supabase/migrations/20261111100016_pwa_v4_push_schema_foundation.sql",
+  "supabase/migrations/20261111105940_pwa_v4_push_schema_foundation.sql",
   "utf8"
 );
 const pgTap = readFileSync("supabase/tests/pwa_v4_push_schema_security.sql", "utf8");

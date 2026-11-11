@@ -1,3 +1,5 @@
+> **Atualização 2026-11-11:** a estrutura de quatro tabelas já foi aplicada em produção na migration `20261111105940`. O diagnóstico técnico abaixo documenta o estado anterior à aplicação. Os envios Push seguem desligados.
+
 # EvoluSystem PWA v4 — Etapa 2: arquitetura proposta de Push
 
 > **Status: PLANEJAMENTO — NÃO AUTORIZADO PARA APLICAÇÃO.**
