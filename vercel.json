@@ -104,7 +104,8 @@
       "feat/pwa-v4-server-subscriptions-20261111": false,
       "feat/pwa-v4-consent-ui-20261111": false,
       "feat/pwa-v4-event-engine-dispatch-20261111": false,
-      "feat/pwa-v4-release-readiness-20261111": false
+      "feat/pwa-v4-release-readiness-20261111": false,
+      "feat/pwa-v4-canary-registration-20261111": false
     }
   }
 }

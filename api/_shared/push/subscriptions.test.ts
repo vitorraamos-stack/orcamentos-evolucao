@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  getBearer, hashPushEndpoint, isPushRegistrationEnabled,
+  canRegisterPushUser, getBearer, hashPushEndpoint, isPushRegistrationEnabled, pushCanaryUserIds,
   parseEndpointInput, parseJsonBody, parseSubscription, validPushEndpoint,
   type PushEnv, type PushStore,
 } from "./subscriptions";
@@ -13,6 +13,7 @@ const authKey = Buffer.alloc(16, 4).toString("base64url");
 const subscription = { endpoint, keys: { p256dh: publicKey, auth: authKey } };
 const enabledEnv = {
   PWA_PUSH_REGISTRATION_ENABLED: "true",
+  PWA_PUSH_CANARY_USER_IDS: "123e4567-e89b-42d3-a456-426614174111",
   PWA_PUSH_VAPID_PUBLIC_KEY: "A".repeat(87),
   PWA_PUSH_VAPID_PRIVATE_KEY: "B".repeat(43),
   PWA_PUSH_VAPID_SUBJECT: "mailto:push@example.com",
@@ -73,6 +74,12 @@ describe("Push V4: input validation and secrets", () => {
     expect(isPushRegistrationEnabled({})).toBe(false);
     expect(isPushRegistrationEnabled({ PWA_PUSH_REGISTRATION_ENABLED: "true" })).toBe(false);
     expect(isPushRegistrationEnabled(enabledEnv)).toBe(true);
+    expect(isPushRegistrationEnabled({ ...enabledEnv, PWA_PUSH_CANARY_USER_IDS: undefined })).toBe(false);
+    expect(isPushRegistrationEnabled({ ...enabledEnv, PWA_PUSH_CANARY_USER_IDS: "not-a-uuid" })).toBe(false);
+    expect(pushCanaryUserIds({ ...enabledEnv, PWA_PUSH_CANARY_USER_IDS: "123e4567-e89b-42d3-a456-426614174111,123e4567-e89b-42d3-a456-426614174111" }).size).toBe(0);
+    expect(pushCanaryUserIds({ ...enabledEnv, PWA_PUSH_CANARY_USER_IDS: Array(6).fill("123e4567-e89b-42d3-a456-426614174111").join(",") }).size).toBe(0);
+    expect(canRegisterPushUser(enabledEnv, "123e4567-e89b-42d3-a456-426614174111")).toBe(true);
+    expect(canRegisterPushUser(enabledEnv, "123e4567-e89b-42d3-a456-426614174222")).toBe(false);
     expect(isPushRegistrationEnabled({ ...enabledEnv, PWA_PUSH_VAPID_PRIVATE_KEY: undefined })).toBe(false);
   });
 });
@@ -147,13 +154,34 @@ describe("Push V4: server API", () => {
     expect(JSON.stringify(res.body)).not.toContain("secret data");
   });
 
-  it("public config exposes only the public VAPID key when enabled", () => {
-    const disabled = makeRes();
-    handlePushPublicConfig({ method: "GET" }, disabled, {});
+  it("canary config exposes only the public VAPID key to an authenticated allowlisted user", async () => {
+    const disabled = makeRes(), data = store();
+    await handlePushPublicConfig({ method: "GET" }, disabled, {}, data);
     expect(disabled.body).toEqual({ ok: true, enabled: false, publicKey: null });
+    expect(data.getUser).not.toHaveBeenCalled();
+
+    const noAuth = makeRes();
+    await handlePushPublicConfig({ method: "GET" }, noAuth, enabledEnv, data);
+    expect(noAuth.body).toEqual({ ok: true, enabled: false, publicKey: null });
+    expect(data.getUser).not.toHaveBeenCalled();
+
     const ready = makeRes();
-    handlePushPublicConfig({ method: "GET" }, ready, enabledEnv);
+    await handlePushPublicConfig({ method: "GET", headers: auth }, ready, enabledEnv, data);
     expect(ready.body).toEqual({ ok: true, enabled: true, publicKey: "A".repeat(87) });
     expect(JSON.stringify(ready.body)).not.toContain("B".repeat(43));
+
+    const otherUser = store(), denied = makeRes();
+    vi.mocked(otherUser.getUser).mockResolvedValueOnce("123e4567-e89b-42d3-a456-426614174222");
+    await handlePushPublicConfig({ method: "GET", headers: auth }, denied, enabledEnv, otherUser);
+    expect(denied.body).toEqual({ ok: true, enabled: false, publicKey: null });
+  });
+
+  it("prevents registering a non-canary user without altering their subscription", async () => {
+    const data = store(), res = makeRes();
+    vi.mocked(data.getUser).mockResolvedValueOnce("123e4567-e89b-42d3-a456-426614174222");
+    await handlePushSubscriptions({ method: "POST", headers: auth, body: { subscription } }, res, { env: enabledEnv, store: data });
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toEqual({ ok: false, code: "push_canary_only" });
+    expect(data.register).not.toHaveBeenCalled();
   });
 });

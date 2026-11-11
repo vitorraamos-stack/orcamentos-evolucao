@@ -101,8 +101,12 @@ async function requestJson(path: string, init: RequestInit): Promise<Record<stri
   return data;
 }
 
-export async function loadPushConfig(): Promise<PushPublicConfig> {
-  const raw = await requestJson("/api/push/config", { method: "GET" });
+export async function loadPushConfig(expectedUserId: string): Promise<PushPublicConfig> {
+  const token = await pushAuthToken(expectedUserId);
+  const raw = await requestJson("/api/push/config", {
+    method: "GET",
+    headers: { Authorization: "Bearer " + token },
+  });
   const config = parsePushPublicConfig(raw);
   if (!config) throw new PushConsentError("unexpected_response");
   return config;

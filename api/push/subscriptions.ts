@@ -1,4 +1,5 @@
 import {
+  canRegisterPushUser,
   createPushStore,
   getBearer,
   hashPushEndpoint,
@@ -91,6 +92,13 @@ export async function handlePushSubscriptions(
       // Idempotent; does not reveal whether a foreign device exists.
       await store.revoke(userId, endpointHash);
       reply(res, 200, { ok: true, registered: false });
+      return;
+    }
+
+    // The opt-in pilot is server-enforced; no implicit rollout to other users.
+    // Revocation above remains available for any account.
+    if (!canRegisterPushUser(env, userId)) {
+      reply(res, 403, { ok: false, code: "push_canary_only" });
       return;
     }
 

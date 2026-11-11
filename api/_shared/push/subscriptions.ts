@@ -24,8 +24,25 @@ const TRUSTED_PUSH_HOSTS = new Set([
   "web.push.apple.com",
 ]);
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Strict, server-only canary list. Empty or invalid configuration disables registration. */
+export function pushCanaryUserIds(env: PushEnv): ReadonlySet<string> {
+  const raw = env.PWA_PUSH_CANARY_USER_IDS;
+  if (typeof raw !== "string" || raw.length < 36 || raw.length > 380) return new Set();
+  const ids = raw.split(",").map(id => id.trim().toLowerCase());
+  if (ids.length < 1 || ids.length > 5 || ids.some(id => !UUID_PATTERN.test(id)) ||
+      new Set(ids).size !== ids.length) return new Set();
+  return new Set(ids);
+}
+
+export function canRegisterPushUser(env: PushEnv, userId: string): boolean {
+  return pushCanaryUserIds(env).has(userId.toLowerCase());
+}
+
 export function isPushRegistrationEnabled(env: PushEnv): boolean {
   return env.PWA_PUSH_REGISTRATION_ENABLED === "true" &&
+    pushCanaryUserIds(env).size > 0 &&
     typeof env.PWA_PUSH_VAPID_PUBLIC_KEY === "string" &&
     /^[A-Za-z0-9_-]{86,88}$/.test(env.PWA_PUSH_VAPID_PUBLIC_KEY) &&
     typeof env.PWA_PUSH_VAPID_PRIVATE_KEY === "string" &&
