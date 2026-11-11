@@ -1,6 +1,6 @@
 # EvoluSystem PWA V4 — Etapa 2F: preparação de release e ativação
 
-> **Estado: PR EM RASCUNHO / SEM MERGE / SEM MIGRATIONS / SEM DEPLOY.**
+> **Atualização 11/11/2026:** As migrations de inscrição e motor foram aplicadas no Supabase, com as flags de geração e entrega desligadas. PR ainda sem merge ou deploy.
 > O usuário autorizou **preparar a próxima fase**, não ligar o serviço.
 > As alterações deste PR não estão em produção.
 > Histórico: PR #603 (API inscrição) → PR #606 (consentimento) →
@@ -14,7 +14,9 @@ desligado. Permitir medir prontidão sem expor chaves privadas ou dados das OS.
 
 ## Mudanças de preparação
 
-- Agendamento Vercel **somente no código não publicado**:
+- **Cron Vercel adiado:** não será publicado nesta etapa até termos permissão para verificar e configurar o `CRON_SECRET`. O agendamento `*/2 * * * *` permanece apenas como proposta anterior, não como configuração ativa. O trecho abaixo descreve o desenho original:
+
+- Agendamento Vercel **originalmente planejado**:
   \`GET /api/push/dispatch\`, expressão \`*/2 * * * *\` (a cada 2 minutos).
   O Vercel só agenda cron a partir do deployment de produção; esta branch
   desabilita preview. Em eventual publicação autorizada, o cron poderá chamar
@@ -84,8 +86,8 @@ de permissão apropriada para o conector. Não assumir que já existem.
 1. **Revisão final:** inspecionar diffs e concluir CI. PRs #603, #606, #607
    e #608 permanecem rascunho até autorização.
 2. **Banco (nova autorização):** aplicar primeiro migration
-   \`20261111120000_pwa_v4_push_subscription_rpcs.sql\`, depois
-   \`20261111150000_pwa_v4_operational_push_dispatch.sql\`.
+   \`20261111152913_pwa_v4_push_subscription_rpcs.sql\`, depois
+   \`20261111153110_pwa_v4_operational_push_dispatch.sql\`.
    Confirmar histórico, grants das RPCs e flags
    \`generation_enabled=false\`, \`delivery_enabled=false\`.
    Nunca executar SQL de ativação no mesmo passo.
@@ -122,3 +124,10 @@ de permissão apropriada para o conector. Não assumir que já existem.
 - Observabilidade/limites de custo em produção.
 
 **Nenhum envio Push está ativo e nenhuma migration deste PR foi aplicada.**
+
+## Estado atualizado da implantação
+
+- Migration de inscrições: `20261111152913` aplicada, privilégios conferidos.
+- Migration do motor: `20261111153110` aplicada, geração e entrega desativadas (`false`).
+- O agendamento automático foi removido do `vercel.json` enquanto o `CRON_SECRET` não estiver disponível.
+- Variáveis Vercel não foram consultadas ou alteradas: conector retornou 403 para listagem de metadados.

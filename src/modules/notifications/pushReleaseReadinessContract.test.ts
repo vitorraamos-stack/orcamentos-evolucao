@@ -6,14 +6,14 @@ const vercel=JSON.parse(read("vercel.json")) as {
   git:{deploymentEnabled:Record<string,boolean>};
   crons?:Array<{path:string;schedule:string}>;
 };
-const migration=read("supabase/migrations/20261111150000_pwa_v4_operational_push_dispatch.sql");
+const migration=read("supabase/migrations/20261111153110_pwa_v4_operational_push_dispatch.sql");
 const dispatch=read("api/push/dispatch.ts");
 const store=read("api/_shared/push/dispatchStore.ts");
 const readiness=read("api/push/readiness.ts");
 
 describe("PWA V4 — release checklist and hard stop",()=>{
-  it("schedules only a gated 2-minute cron, never an unprotected external route",()=>{
-    expect(vercel.crons).toEqual([{path:"/api/push/dispatch",schedule:"*/2 * * * *"}]);
+  it("defers scheduled dispatch until Vercel secrets are ready",()=>{
+    expect(vercel.crons ?? []).toEqual([]);
     expect(vercel.git.deploymentEnabled["feat/pwa-v4-release-readiness-20261111"]).toBe(false);
     expect(dispatch).toContain("authorizedCron");
     expect(dispatch).toContain('PWA_PUSH_ROLLOUT_ENABLED !== "true"');

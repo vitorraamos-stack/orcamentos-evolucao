@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe,expect,it } from "vitest";
 
 const read=(path:string)=>readFileSync(path,"utf8");
-const sql=read("supabase/migrations/20261111150000_pwa_v4_operational_push_dispatch.sql");
+const sql=read("supabase/migrations/20261111153110_pwa_v4_operational_push_dispatch.sql");
 const handler=read("api/push/dispatch.ts");
 const sender=read("api/_shared/push/webPush.ts");
 const store=read("api/_shared/push/dispatchStore.ts");
@@ -77,6 +77,6 @@ describe("PWA V4 2E — contrato de isolamento e segurança",()=>{
     expect(sender).toContain("validPushEndpoint");
     expect(store).toContain('admin.rpc("push_v4_claim_jobs"');
     expect(vercel.git.deploymentEnabled["feat/pwa-v4-event-engine-dispatch-20261111"]).toBe(false);
-    expect(vercel.crons).toEqual([{path:"/api/push/dispatch",schedule:"*/2 * * * *"}]);
+    expect(vercel.crons ?? []).toEqual([]);
   });
 });

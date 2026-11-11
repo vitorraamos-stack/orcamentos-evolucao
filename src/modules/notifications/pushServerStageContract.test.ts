@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const sql = readFileSync("supabase/migrations/20261111120000_pwa_v4_push_subscription_rpcs.sql", "utf8");
+const sql = readFileSync("supabase/migrations/20261111152913_pwa_v4_push_subscription_rpcs.sql", "utf8");
 const api = readFileSync("api/push/subscriptions.ts", "utf8");
 const config = readFileSync("api/push/config.ts", "utf8");
 const helper = readFileSync("api/_shared/push/subscriptions.ts", "utf8");
@@ -63,7 +63,7 @@ describe("Push V4: backend server-only contract", () => {
     expect(helper).toContain('PWA_PUSH_REGISTRATION_ENABLED === "true"');
     expect(api).toContain("push_registration_disabled");
     expect(vercel.git.deploymentEnabled["feat/pwa-v4-server-subscriptions-20261111"]).toBe(false);
-    expect(vercel.crons).toEqual([{path:"/api/push/dispatch",schedule:"*/2 * * * *"}]);
+    expect(vercel.crons ?? []).toEqual([]);
     expect(sql).not.toContain("PWA_PUSH_REGISTRATION_ENABLED=true");
   });
 });

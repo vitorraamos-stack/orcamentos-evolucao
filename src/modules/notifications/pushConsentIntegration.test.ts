@@ -53,7 +53,7 @@ describe("PWA V4 Etapa 2D — integração segura sem envio", () => {
 
   it("não ativa envios, cron, migrations ou chaves no navegador", () => {
     expect(vercel.git.deploymentEnabled["feat/pwa-v4-consent-ui-20261111"]).toBe(false);
-    expect(vercel.crons).toEqual([{path:"/api/push/dispatch",schedule:"*/2 * * * *"}]);
+    expect(vercel.crons ?? []).toEqual([]);
     expect(consent).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
     expect(view).not.toContain("VAPID_PRIVATE_KEY");
     expect(view).not.toContain("VITE_PUSH");

@@ -6,7 +6,7 @@
 
 ## Entrega da etapa
 
-- Migration proposta \`20261111150000_pwa_v4_operational_push_dispatch.sql\`.
+- Migration proposta \`20261111153110_pwa_v4_operational_push_dispatch.sql\`.
   - Três gatilhos AFTER em \`os_orders\`, \`os_order_assignees\` e \`os_installations\`, somente após transição de dados canônicos.
   - \`private.push_v4_runtime_settings\` com \`generation_enabled=false\` e \`delivery_enabled=false\`. Sem concessões UPDATE ao service_role ou autenticados. **A migration sozinha não registra eventos nem envia mensagens.**
   - Outbox idempotente por (evento/tabela/recurso/transação).
