@@ -37,6 +37,7 @@ import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { PwaExperienceProvider } from "@/components/pwa/PwaExperience";
+import { OperationalNotificationsProvider } from "@/components/notifications/OperationalNotificationsProvider";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import {
   canAccessConfiguracoes,
@@ -416,8 +417,10 @@ function App() {
           <WelcomeTransitionProvider>
             <TooltipProvider>
               <PwaExperienceProvider>
-                <Toaster />
-                <Router />
+                <OperationalNotificationsProvider>
+                  <Toaster />
+                  <Router />
+                </OperationalNotificationsProvider>
               </PwaExperienceProvider>
             </TooltipProvider>
           </WelcomeTransitionProvider>
