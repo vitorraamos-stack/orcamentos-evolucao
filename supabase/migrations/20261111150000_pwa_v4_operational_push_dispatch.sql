@@ -154,7 +154,7 @@ begin
     where e.state='pending' and e.retry_at <= pg_catalog.now()
     order by e.recorded_at, e.id
     for update skip locked
-    limit pg_catalog.least(pg_catalog.greatest(coalesce(p_limit,1),1),25)
+    limit least(greatest(coalesce(p_limit,1),1),25)
   loop
     -- Orders may have been archived or deleted since the source transition.
     if v_evt.required_module is null or not exists (
@@ -333,7 +333,7 @@ as $$
       and j.attempt_count < 10
     order by j.next_attempt_at,j.created_at
     for update skip locked
-    limit pg_catalog.least(pg_catalog.greatest(coalesce(p_limit,1),1),15)
+    limit least(greatest(coalesce(p_limit,1),1),15)
   ), changed as (
     update private.push_delivery_jobs j
     set status='processing',attempt_count=j.attempt_count+1,
@@ -384,7 +384,7 @@ begin
       lease_until=null,
       next_attempt_at=case when p_outcome='retry' then
         pg_catalog.now()+ pg_catalog.make_interval(
-          secs=>pg_catalog.least(7200,30*pg_catalog.power(2,j.attempt_count)::integer))
+          secs=>least(7200,30*pg_catalog.power(2,j.attempt_count)::integer))
         else j.next_attempt_at end,
       updated_at=pg_catalog.now()
   where j.id=p_job_id;
@@ -397,7 +397,7 @@ begin
     where id=v_subscription and revoked_at is null;
   elsif p_outcome='retry' then
     update private.push_subscriptions
-    set failure_count=pg_catalog.least(failure_count+1,100)
+    set failure_count=least(failure_count+1,100)
     where id=v_subscription and revoked_at is null;
   end if;
   return true;
