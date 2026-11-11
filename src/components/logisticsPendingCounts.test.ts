@@ -1,30 +1,36 @@
 import { describe, expect, it } from "vitest";
-import { countOpenDeliveries, countOpenInstallations, type PendingOrder } from "./logisticsPendingCounts";
+import { countOpenDeliveries, countWaitingInstallations, type PendingOrder } from "./logisticsPendingCounts";
 
 const order = (id: string, logistic_type: string, prod_status: string, archived = false): PendingOrder =>
   ({ id, logistic_type, prod_status, archived });
 
 describe("contadores de pendências da navegação", () => {
-  it("conta instalações aguardando e em aberto sem duplicar OS agendada", () => {
-    const active = [
-      { os_id: "a", team_id: "team", responsible_id: null },
-      { os_id: "b", team_id: null, responsible_id: "worker" },
-    ];
+  it("mostra a badge para uma OS aguardando agendamento", () => {
+    const waiting = [order("a", "instalacao", "Pronto / Avisar Cliente")];
+    expect(countWaitingInstallations({ orders: waiting, active: [] })).toBe(1);
+  });
+
+  it("remove a badge imediatamente após agendar, mesmo antes da mudança do status da OS", () => {
+    const orders = [order("a", "instalacao", "Pronto / Avisar Cliente")];
+    expect(countWaitingInstallations({ orders, active: [{ os_id: "a" }] })).toBe(0);
+    orders[0] = order("a", "instalacao", "Instalação Agendada");
+    expect(countWaitingInstallations({ orders, active: [{ os_id: "a" }] })).toBe(0);
+  });
+
+  it("não conta instalação em execução, concluída ou OS arquivada", () => {
     const orders = [
       order("a", "instalacao", "Instalação Agendada"),
-      order("c", "instalacao", "Pronto / Avisar Cliente"),
-      order("d", "instalacao", "Instalação Agendada"),
-      order("e", "instalacao", "Pronto / Avisar Cliente", true),
-      order("f", "entrega", "Pronto / Avisar Cliente"),
+      order("b", "instalacao", "Pronto / Avisar Cliente", true),
+      order("c", "instalacao", "Finalizados"),
+      order("d", "entrega", "Pronto / Avisar Cliente"),
+      order("e", "instalacao", "Instalação Agendada"),
     ];
-    expect(countOpenInstallations({
-      active, orders, teamIds: new Set(["team"]), userId: "worker",
-      isManager: false, agendaOnly: false,
-    })).toBe(4);
-    expect(countOpenInstallations({
-      active, orders, teamIds: new Set(), userId: "worker",
-      isManager: false, agendaOnly: true,
-    })).toBe(2);
+    expect(countWaitingInstallations({
+      orders, active: [{ os_id: "a" }],
+    })).toBe(1);
+    expect(countWaitingInstallations({
+      orders, active: [{ os_id: "a" }, { os_id: "e" }],
+    })).toBe(0);
   });
 
   it("retira entregas concluídas e retiradas registradas e não duplica cadastros", () => {
