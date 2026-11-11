@@ -1,8 +1,4 @@
-import {
-  addLocalDays,
-  formatLocalDate,
-  startOfLocalDay,
-} from "@/shared/lib/date";
+import { formatLocalDate } from "@/shared/lib/date";
 
 export type OrderRisk = "NORMAL" | "ATENCAO" | "CRITICO";
 
@@ -25,42 +21,47 @@ export const isOrderOverdue = (order: RiskOrder, now = new Date()) =>
   Boolean(order.delivery_date) &&
   order.delivery_date! < formatLocalDate(now);
 
+const DAY_MS = 86_400_000;
+
+/**
+ * Whole workdays remaining in the Santa Catarina operational calendar.
+ * Counts weekdays after today through the delivery date, excluding Sat/Sun.
+ * A past date is -1; an absent or invalid date is null.
+ */
+export function businessDaysUntilDeadline(deliveryDate: string | null | undefined, now = new Date()): number | null {
+  if (!deliveryDate || !/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) return null;
+  const today = formatLocalDate(now);
+  const start = new Date(`${today}T12:00:00Z`);
+  const end = new Date(`${deliveryDate}T12:00:00Z`);
+  if (!Number.isFinite(end.getTime())) return null;
+  if (deliveryDate < today) return -1;
+  const calendarDays = Math.round((end.getTime() - start.getTime()) / DAY_MS);
+  const fullWeeks = Math.floor(calendarDays / 7);
+  let workdays = fullWeeks * 5;
+  for (let offset = 1; offset <= calendarDays % 7; offset++) {
+    const weekday = (start.getUTCDay() + offset) % 7;
+    if (weekday >= 1 && weekday <= 5) workdays++;
+  }
+  return workdays;
+}
+
+/** Inactivity is independent of deadline proximity. */
+export function isOrderStale(order: RiskOrder, now = new Date()): boolean {
+  if (isOrderFinished(order) || !order.updated_at) return false;
+  const lastUpdate = new Date(order.updated_at).getTime();
+  return Number.isFinite(lastUpdate) && now.getTime() - lastUpdate >= 4 * DAY_MS;
+}
+
 export function calculateOrderRisk(
   order: RiskOrder,
   now = new Date()
 ): OrderRisk {
   if (isOrderFinished(order)) return "NORMAL";
+  const businessDays = businessDaysUntilDeadline(order.delivery_date, now);
 
-  const today = startOfLocalDay(now);
-  const deadline = order.delivery_date
-    ? startOfLocalDay(new Date(`${order.delivery_date}T15:00:00Z`))
-    : null;
-  const daysToDeadline = deadline
-    ? (Array.from({ length: 32 }, (_, days) => days).find(
-        days =>
-          formatLocalDate(addLocalDays(today, days)) === order.delivery_date
-      ) ?? (isOrderOverdue(order, now) ? -1 : 32))
-    : null;
-  const productionReady = /pronto|logística|logistica|instalação agendada/.test(
-    normalize(order.prod_status)
-  );
-
-  if (daysToDeadline !== null && daysToDeadline < 0) return "CRITICO";
-  if (daysToDeadline === 0 && !productionReady) return "CRITICO";
-  if (
-    order.logistic_type === "instalacao" &&
-    daysToDeadline !== null &&
-    daysToDeadline <= 1 &&
-    !productionReady
-  ) {
-    return "CRITICO";
-  }
-
-  const updatedAt = order.updated_at ? new Date(order.updated_at) : null;
-  const idleDays = updatedAt
-    ? Math.floor((now.getTime() - updatedAt.getTime()) / 86_400_000)
-    : 0;
-  if ((daysToDeadline !== null && daysToDeadline <= 2) || idleDays >= 4)
+  // A due/overdue OS is critical regardless of production readiness.
+  if (businessDays !== null && businessDays <= 1) return "CRITICO";
+  if ((businessDays !== null && businessDays <= 3) || isOrderStale(order, now))
     return "ATENCAO";
 
   return "NORMAL";

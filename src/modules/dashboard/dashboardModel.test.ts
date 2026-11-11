@@ -21,9 +21,9 @@ describe("Dashboard operacional — indicadores e prioridades", () => {
     const closed = row("closed", { prod_status: "Finalizados", delivery_date: "2026-11-01" });
     const value = buildDashboardOverview([overdue, overdue, today, blocked, noDate, closed], now);
     expect(value).toMatchObject({ active: 4, attention: 3, overdue: 1, dueToday: 1 });
-    expect(value.priorities.map(item => item.order.id)).toEqual(["late", "blocked", "today", "missing"]);
+    expect(value.priorities.map(item => item.order.id)).toEqual(["late", "blocked", "today"]);
     expect(value.priorities.find(item => item.order.id === "blocked")?.reason).toBe("Aguardando insumos");
-    expect(value.priorities.find(item => item.order.id === "missing")?.reason).toBe("Sem prazo informado");
+    expect(value.priorities.find(item => item.order.id === "missing")).toBeUndefined();
   });
 
   it("uses earliest deadline to break equal severity and limits priorities to five", () => {
@@ -35,7 +35,7 @@ describe("Dashboard operacional — indicadores e prioridades", () => {
   });
 
   it("does not consider an absent deadline late", () => {
-    expect(dashboardPriorityReason(row("n", { delivery_date: null, updated_at: "2026-11-05T12:00:00Z" }), now).rank).toBe(5);
+    expect(dashboardPriorityReason(row("n", { delivery_date: null, updated_at: "2026-11-05T12:00:00Z" }), now).rank).toBe(7);
   });
 
   it("counts real parallel sector signals separately without duplicating active OS", () => {
@@ -51,5 +51,43 @@ describe("Dashboard operacional — indicadores e prioridades", () => {
   it("uses São Paulo/Santa Catarina calendar dates regardless of host UTC day", () => {
     const midnight = new Date("2026-11-06T01:00:00Z"); // 05/11, 22:00 in SC
     expect(buildDashboardOverview([row("x", { delivery_date: "2026-11-05" })], midnight).dueToday).toBe(1);
+  });
+
+  it("keeps distant OS outside the priorities and attention count", () => {
+    const reference = new Date("2026-11-11T14:00:00Z");
+    const fresh = "2026-11-11T13:00:00Z";
+    const value = buildDashboardOverview([
+      row("39833", { delivery_date: "2026-12-15", updated_at: fresh }),
+      row("39834", { delivery_date: "2026-12-15", updated_at: fresh }),
+      row("no-date", { delivery_date: null, updated_at: fresh }),
+    ], reference);
+    expect(value).toMatchObject({ active: 3, attention: 0, overdue: 0, dueToday: 0 });
+    expect(value.priorities).toEqual([]);
+    expect(dashboardPriorityReason(row("39833", { delivery_date: "2026-12-15", updated_at: fresh }), reference).reason).toBe("Dentro do prazo");
+  });
+
+  it("labels one, two and three remaining business days without weekend false alerts", () => {
+    const friday = new Date("2026-11-13T14:00:00Z");
+    const fresh = "2026-11-13T13:00:00Z";
+    expect(dashboardPriorityReason(row("critical", { delivery_date: "2026-11-16", updated_at: fresh }), friday).reason).toBe("Prazo crítico");
+    expect(dashboardPriorityReason(row("two", { delivery_date: "2026-11-17", updated_at: fresh }), friday).reason).toBe("Próximo prazo");
+    expect(dashboardPriorityReason(row("three", { delivery_date: "2026-11-18", updated_at: fresh }), friday).reason).toBe("Próximo prazo");
+    const healthy = dashboardPriorityReason(row("four", { delivery_date: "2026-11-19", updated_at: fresh }), friday);
+    expect(healthy.reason).toBe("Dentro do prazo");
+    expect(healthy.rank).toBe(7);
+  });
+
+  it("keeps urgency, blocking and inactivity as independent reasons for attention", () => {
+    const reference = new Date("2026-11-13T14:00:00Z");
+    const updated_at = "2026-11-13T13:00:00Z";
+    const value = buildDashboardOverview([
+      row("normal", { delivery_date: "2026-12-15", updated_at }),
+      row("urgent", { delivery_date: "2026-12-15", updated_at, is_urgent: true }),
+      row("blocked", { delivery_date: "2026-12-15", updated_at, production_tag: "AGUARDANDO_INSUMOS" }),
+      row("stale", { delivery_date: "2026-12-15", updated_at: "2026-11-07T13:00:00Z" }),
+    ], reference);
+    expect(value.attention).toBe(3);
+    expect(value.priorities.map(item => item.order.id)).toEqual(["blocked", "urgent", "stale"]);
+    expect(value.priorities.find(item => item.order.id === "stale")?.reason).toBe("Sem atualização há 4+ dias");
   });
 });

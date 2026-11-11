@@ -102,7 +102,7 @@ function PriorityOrders({
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <div>
             <CardTitle id="dashboard-priority-heading" className="text-base">OS prioritárias</CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">Cinco ordens selecionadas por prazo, bloqueios e urgência.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Até cinco OS com alertas de prazo, bloqueio, urgência ou falta de atualização.</p>
           </div>
           <Link href="/os" className="evolu-dashboard__text-link shrink-0">Todas as OS <ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
         </CardHeader>
@@ -112,7 +112,7 @@ function PriorityOrders({
               {[1, 2, 3].map(item => <div key={item} className="evolu-dashboard__skeleton h-20" />)}
             </div>
           ) : overview.priorities.length === 0 ? (
-            <p className="evolu-dashboard__empty">Nenhuma OS ativa para priorizar.</p>
+            <p className="evolu-dashboard__empty">Nenhuma OS exige atenção no momento.</p>
           ) : overview.priorities.map(({ order, reason, stage }) => (
             <Link
               key={order.id}

@@ -62,12 +62,12 @@ describe("Dashboard Etapa 1 — interface", () => {
     );
     expect(html).toContain("Carregando prioridades");
     expect(html).toContain("—");
-    expect(html).not.toContain("Nenhuma OS ativa para priorizar");
+    expect(html).not.toContain("Nenhuma OS exige atenção no momento.");
   });
 
   it("identifies missing sale numbers and keeps direct links", () => {
     const missing = buildDashboardOverview([
-      { ...sample, sale_number: "", client_name: "", delivery_date: null },
+      { ...sample, sale_number: "", client_name: "", delivery_date: null, is_urgent: true },
     ], new Date("2026-11-05T15:00:00Z"));
     const html = renderToStaticMarkup(
       <Router ssrPath="/hub-os">
