@@ -54,7 +54,8 @@ export async function handlePushDispatch(
   }
   // A separate database flag must ALSO be enabled. Configuring only Vercel
   // flags or only the migration can never activate delivery.
-  if (env.PWA_PUSH_GENERATION_ENABLED !== "true" ||
+  if (env.PWA_PUSH_ROLLOUT_ENABLED !== "true" ||
+      env.PWA_PUSH_GENERATION_ENABLED !== "true" ||
       env.PWA_PUSH_DELIVERY_ENABLED !== "true") {
     json(res,200,{ok:true,enabled:false,expanded:0,claimed:0,sent:0});
     return;
@@ -81,11 +82,11 @@ export async function handlePushDispatch(
     for(let i=0;i<jobs.length;i+=2){
       await Promise.all(jobs.slice(i,i+2).map(async job=>{
         try {
-          const eligible=await store.eligible(job.job_id);
+          const eligible=await store.eligible(job.job_id,job.attempt_number);
           const outcome: PushSendResult=eligible
             ? await sender(job,vapid)
             : {status:null,outcome:"discarded"};
-          await store.finish(job.job_id,outcome);
+          await store.finish(job.job_id,job.attempt_number,outcome);
           if(outcome.outcome==="sent")sent++;
           if(outcome.outcome==="retry")failed++;
           if(outcome.outcome==="discarded")discarded++;

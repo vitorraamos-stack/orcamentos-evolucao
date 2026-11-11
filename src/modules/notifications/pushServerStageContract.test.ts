@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const sql = readFileSync("supabase/migrations/20261111120000_pwa_v4_push_subscription_rpcs.sql", "utf8");
+const sql = readFileSync("supabase/migrations/20261111152913_pwa_v4_push_subscription_rpcs.sql", "utf8");
 const api = readFileSync("api/push/subscriptions.ts", "utf8");
 const config = readFileSync("api/push/config.ts", "utf8");
 const helper = readFileSync("api/_shared/push/subscriptions.ts", "utf8");
