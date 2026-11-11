@@ -64,3 +64,37 @@ O build Vite substitui `__EVOLUSYSTEM_BUILD_ID__` dentro do arquivo final `dist/
 3. Criar/editar OS com teclado virtual e verificar que a barra inferior não bloqueia campos nem ações.
 4. Desconectar a internet e confirmar aviso visível, sem cache privado.
 5. Confirmar que o menu desktop e a navegação das demais páginas permanecem inalterados.
+
+
+## PWA v4 — Etapa 1 (desenvolvimento isolado, sem migrations)
+
+### Implementado nesta branch
+
+- Central de notificações acessível pelo ícone de sino no mobile e desktop, com contador, histórico dos últimos 14 dias e navegação contextual.
+- Seleção por **permissões do perfil** e leitura autenticada sujeita às políticas RLS do Supabase.
+- Eventos derivados dos registros de auditoria existentes: `assignee_changed` (somente usuário `payload.to`), `create` (setor Arte) e `status_change` de `arte/art` para `Produzir` (setor Produção).
+- Instalações: aviso para responsável, integrante da equipe ou gestor autorizado; reagendamento detectado **enquanto a sessão estiver aberta**, comparando horário/equipe entre consultas.
+- Atualização de 60 em 60 segundos mais gatilhos Realtime das tabelas já publicadas e retorno do aplicativo ao primeiro plano. `os_orders_event` **ainda não integra Realtime**, portanto depende de polling.
+- Apenas IDs de notificações marcadas como lidas e um instante inicial são guardados em `localStorage` por usuário. **Nenhuma descrição, cliente, arquivo, valor, endereço ou payload de OS é persistido no navegador**. As leituras ainda não são sincronizadas entre dispositivos.
+- Service worker preparado para receber Web Push e abrir somente rotas internas autorizadas por whitelist, sem aceitar texto livre nem URL externa. Nenhuma assinatura é criada e nenhuma notificação é enviada nesta etapa.
+
+### O que ainda não está ativo
+
+**Push com aplicativo fechado NÃO está funcional.** Para ativar essa capacidade de forma segura são necessários, sob autorização posterior:
+
+1. Tabela de inscrições por **usuário autenticado e dispositivo**, com RLS, revogação, limpeza de inscrições inválidas e nenhuma chave privada no cliente.
+2. Tabela de notificações/outbox com destinatário, evento fonte, estado de leitura, deduplicação idempotente e retenção; autorização por identidade **no servidor** e não pelo payload enviado por clientes.
+3. Gatilho/transação servidor para registrar fatos canônicos (nova atribuição, liberação de Arte para Produção, inclusão/reagendamento real de instalação), evitando eventos forjados, tempestades e notificações para usuários sem permissão.
+4. Configuração de VAPID (chave pública no cliente; **chave privada apenas em servidor**), envio criptografado de Web Push, autenticação de endpoints, limitação de taxa, processamento confiável e retries.
+5. Interface de consentimento explícito em resposta a toque real do usuário, inscrição, desinscrição e revisão das permissões. No iOS o PWA precisa estar adicionado à tela de início.
+6. Testes em dispositivos físicos e auditoria de segurança/RLS e dados no bloqueio de tela.
+
+**Nenhuma migration, SQL de escrita, mudança de schema, nova dependência, segredo, envio de push ou alteração de produção foi realizada nesta branch.**
+
+### Cuidados e verificações
+
+- O estado inicial marca eventos históricos como lidos para não inundar os colaboradores no primeiro acesso.
+- As notificações são apenas um atalho visual, não substituem os guards das rotas. Uma atribuição removida ou OS arquivada continua sujeita à autorização na abertura.
+- Alterações de instalação ocorridas com o PWA fechado não podem ser distinguidas de mudanças de status apenas pela coluna `updated_at`; a detecção histórica fiel dependerá do outbox transacional futuro.
+- Ao fazer logout, as consultas Realtime são canceladas. Na futura etapa Push, a inscrição do dispositivo também deverá ser desvinculada de forma segura ao sair.
+- Revisar o desempenho do polling e validar os perfis comercial, arte, produção, instalador e gestão antes de publicar.

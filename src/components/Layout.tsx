@@ -34,6 +34,7 @@ import { canAccessOperationalSection } from "@/lib/authz";
 import { getOperationalNavState } from "./operationalNavState";
 import { useLogisticsPendingCounts } from "./useLogisticsPendingCounts";
 import { usePwaExperience } from "@/components/pwa/PwaExperience";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getMobileShortcuts, isMobileShortcutActive, type MobileShortcutId } from "./mobileOperationalNav";
 
 interface LayoutProps {
@@ -414,6 +415,7 @@ export default function Layout({ children }: LayoutProps) {
               <p className="truncate text-sm font-semibold text-white">{displayName}</p>
               <p className="truncate text-xs text-[#9BB6D3]">{getRoleLabel(role)}</p>
             </div>
+            <NotificationBell className="ml-auto" />
           </div>
           <Button variant="ghost" className="evolu-shell__signout flex w-full items-center justify-start" onClick={() => signOut()}>
             <LogOut className="mr-2 h-4 w-4" aria-hidden="true" /> Sair do sistema
@@ -469,6 +471,7 @@ export default function Layout({ children }: LayoutProps) {
               </p>
             </div>
           </div>
+          <NotificationBell className="border-[#385775]" />
         </header>
 
         {!isOnline && (
