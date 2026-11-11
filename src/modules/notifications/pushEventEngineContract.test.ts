@@ -47,7 +47,7 @@ describe("PWA V4 2E — contrato de isolamento e segurança",()=>{
     expect(sql).toContain("on conflict (notification_id,subscription_id) do nothing");
     expect(sql).toContain("for update skip locked");
     expect(sql).toContain("interval '90 seconds'");
-    expect(sql).toContain("status='retry'");
+    expect(sql).toContain("when p_outcome='retry' then");
     expect(sql).toContain("p_http_status in (404,410)");
     expect(sql).toContain("attempt_count>=10");
   });

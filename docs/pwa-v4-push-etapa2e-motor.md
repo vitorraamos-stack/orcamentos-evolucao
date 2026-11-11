@@ -26,7 +26,7 @@
   - Além das flags **do banco**, exige **ambas** \`PWA_PUSH_GENERATION_ENABLED=true\` e \`PWA_PUSH_DELIVERY_ENABLED=true\` no ambiente e um par VAPID válido e persistente.
   - Sem chaves/flags, **não acessa o banco nem envia Push**. Reclama no máximo 4 jobs por invocação e envia em pares com rechecagem de elegibilidade.
   - **Sem cron configurado** nesta branch: rota pronta para agendamento futuro, sem execução automática.
-- Testes CI: RSA? **Não**. VAPID real ES256 assinado e verificado; criptografia/decriptação de ponta a ponta no teste Node; endpoint allowlist e HTTP 410/429; cron inválido/desligado; contratos SQL e RLS.
+- Testes CI: assinatura VAPID ES256 gerada e verificada; criptografia/decriptação de ponta a ponta no teste Node; endpoint allowlist e HTTP 410/429; cron inválido/desligado; contratos SQL e RLS.
 
 ## Eventos canônicos
 
