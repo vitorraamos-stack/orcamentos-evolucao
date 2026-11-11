@@ -1,6 +1,6 @@
 import type { OsOrder } from "@/features/hubos/types";
 import { isOrderUrgent } from "@/features/hubos/orderUrgency";
-import { calculateOrderRisk, isOrderFinished } from "@/modules/orders/risk";
+import { businessDaysUntilDeadline, isOrderFinished, isOrderStale } from "@/modules/orders/risk";
 import { formatLocalDate } from "@/shared/lib/date";
 
 /** Projection of RLS-visible os_orders. The Dashboard never changes an OS. */
@@ -39,9 +39,13 @@ export function dashboardOrderStage(order: DashboardOrder): string {
   return order.art_status || "Etapa não informada";
 }
 
-/** Rank only real recorded conditions, with stable due-date/ID tie-breaks. */
+/** Only actual alerts enter the top-five priorities or the attention indicator. */
+const FIRST_NON_ALERT_RANK = 7;
+
+/** Priority labels follow operational weekdays; idleness is a separate signal. */
 export function dashboardPriorityReason(order: DashboardOrder, now: Date) {
   const today = formatLocalDate(now);
+  const businessDays = businessDaysUntilDeadline(order.delivery_date, now);
   if (order.delivery_date && order.delivery_date < today)
     return { rank: 0, reason: "Prazo vencido" };
   if (order.production_tag === "AGUARDANDO_INSUMOS")
@@ -50,11 +54,15 @@ export function dashboardPriorityReason(order: DashboardOrder, now: Date) {
     return { rank: 1, reason: "Ajustes de arte pendentes" };
   if (order.delivery_date === today)
     return { rank: 2, reason: "Vence hoje" };
+  if (businessDays !== null && businessDays <= 1)
+    return { rank: 3, reason: "Prazo crítico" };
   if (isOrderUrgent(order))
-    return { rank: 3, reason: "Marcada como urgente" };
-  if (calculateOrderRisk(order, now) !== "NORMAL")
-    return { rank: 4, reason: "Prazo próximo ou sem atualização" };
-  return { rank: 5, reason: order.delivery_date ? "Próximo prazo" : "Sem prazo informado" };
+    return { rank: 4, reason: "Marcada como urgente" };
+  if (businessDays !== null && businessDays <= 3)
+    return { rank: 5, reason: "Próximo prazo" };
+  if (isOrderStale(order, now))
+    return { rank: 6, reason: "Sem atualização há 4+ dias" };
+  return { rank: FIRST_NON_ALERT_RANK, reason: order.delivery_date ? "Dentro do prazo" : "Sem prazo informado" };
 }
 
 /**
@@ -83,10 +91,10 @@ export function buildDashboardOverview(rows: readonly DashboardOrder[], now: Dat
 
   return {
     active: active.length,
-    attention: ranked.filter(row => row.rank < 5).length,
+    attention: ranked.filter(row => row.rank < FIRST_NON_ALERT_RANK).length,
     overdue: active.filter(order => !!order.delivery_date && order.delivery_date < today).length,
     dueToday: active.filter(order => order.delivery_date === today).length,
-    priorities: ranked.slice(0, 5),
+    priorities: ranked.filter(row => row.rank < FIRST_NON_ALERT_RANK).slice(0, 5),
     sectors: {
       artwork: active.filter(order => order.art_status !== "Produzir").length,
       production: active.filter(order =>
