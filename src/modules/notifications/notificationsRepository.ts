@@ -42,10 +42,10 @@ export async function loadNotificationSnapshot(
   const installations = (installationResult.data ?? []) as InstallationRow[];
   const teamIds = (teamsResult.data ?? []).map(row => String(row.team_id));
 
-  const orderIds = [...new Set([
+  const orderIds = Array.from(new Set([
     ...events.map(row => row.os_id),
     ...installations.map(row => row.os_id),
-  ])].filter(Boolean);
+  ])).filter(Boolean);
 
   if (!orderIds.length) return { events: [], installations: [], teamIds, saleNumbers: {} };
 

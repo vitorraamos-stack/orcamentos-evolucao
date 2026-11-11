@@ -117,7 +117,7 @@ export function OperationalNotificationsProvider({ children }: { children: React
           if (changes.length) {
             const next = new Map(changedInstallations.map(row => [row.id, row]));
             for (const row of changes) next.set(row.id, row);
-            changedInstallations = [...next.values()].slice(-40);
+            changedInstallations = Array.from(next.values()).slice(-40);
           }
         }
         earlierInstallations = currentFingerprints;
@@ -207,7 +207,7 @@ export function OperationalNotificationsProvider({ children }: { children: React
     if (!userId) return;
     setReadState(previous => {
       const state = previous.userId === userId ? previous : loadReadState(userId);
-      const allIds = [...new Set([...state.ids, ...notices.map(notice => notice.id)])].slice(-READ_LIMIT);
+      const allIds = Array.from(new Set([...state.ids, ...notices.map(notice => notice.id)])).slice(-READ_LIMIT);
       const next = { ...state, ids: allIds, baseline: Date.now() };
       persistReadState(next);
       return next;

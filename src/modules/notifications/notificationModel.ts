@@ -138,7 +138,7 @@ export function projectNotices(
       description: orderLabel(row.os_id, saleNumbers) + " incluída na agenda",
     });
   }
-  return [...new Map(notices.map(item => [item.id, item])).values()]
+  return Array.from(new Map(notices.map(item => [item.id, item])).values())
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
     .slice(0, LIMIT);
 }
