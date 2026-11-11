@@ -5,6 +5,7 @@ import { APP_MODULE_KEYS, type AppModuleKey } from '@/constants/modules';
 import { type HubRole } from '@/lib/hubRoles';
 import { buildAuthorizationSnapshot } from '@/lib/authz';
 import { clearAvatarPhotoCache, preloadAvatarPhoto } from '@/shared/users/avatarPhoto';
+import { revokePushOnSignOut } from '@/modules/notifications/pushConsent';
 
 interface AuthContextType {
   user: User | null;
@@ -62,7 +63,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (_event === 'SIGNED_OUT') clearAvatarPhotoCache();
+      if (_event === 'SIGNED_OUT') {
+        clearAvatarPhotoCache();
+        // Also handles sign-out from another tab, where a server request may not be possible.
+        void revokePushOnSignOut(null);
+      }
       if (session?.user && (_event === 'SIGNED_IN' || _event === 'INITIAL_SESSION')) {
         prefetchAvatar(session.user);
       }
@@ -107,6 +112,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    let token: string | null = null;
+    try {
+      const { data } = await supabase.auth.getSession();
+      token = data.session?.access_token ?? null;
+    } catch { /* Logout is still available without an active session. */ }
+    await revokePushOnSignOut(token);
     await supabase.auth.signOut();
     clearAvatarPhotoCache();
   };
