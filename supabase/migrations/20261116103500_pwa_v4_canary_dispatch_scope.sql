@@ -2,8 +2,6 @@
 -- Do not enable generation/delivery flags here; this migration is inert until enabled.
 -- The existing, unrestricted service-role RPCs are intentionally deauthorized
 -- to ensure a stale deployment can never bypass pilot restrictions.
-begin;
-
 create or replace function public.push_v4_expand_canary_outbox(p_limit integer, p_allowed_user_ids uuid[])
 returns table (expanded_events integer, created_jobs integer)
 language plpgsql security invoker set search_path = ''
@@ -212,4 +210,3 @@ grant execute on function public.push_v4_claim_canary_jobs(integer,uuid[]) to se
 -- Safe rollout: no runtime worker may invoke the unrestricted variants.
 revoke execute on function public.push_v4_expand_outbox(integer) from service_role;
 revoke execute on function public.push_v4_claim_jobs(integer) from service_role;
-commit;
