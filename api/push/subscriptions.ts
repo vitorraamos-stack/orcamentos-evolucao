@@ -9,7 +9,7 @@ import {
   parseSubscription,
   type PushEnv,
   type PushStore,
-} from "../_shared/push/subscriptions";
+} from "../_shared/push/subscriptions.js";
 
 type RequestLike = {
   method?: string;
