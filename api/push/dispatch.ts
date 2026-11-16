@@ -1,8 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
-import { createPushDispatchStore, type PushDispatchStore } from "../_shared/push/dispatchStore";
+import { createPushDispatchStore, type PushDispatchStore } from "../_shared/push/dispatchStore.js";
 import {
   sendWebPush, validateVapid, type VapId, type PushJob, type PushSendResult,
-} from "../_shared/push/webPush";
+} from "../_shared/push/webPush.js";
 
 type RequestLike = { method?: string; headers?: Record<string,string|string[]|undefined> };
 type ResponseLike = {
