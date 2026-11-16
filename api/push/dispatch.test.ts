@@ -8,6 +8,7 @@ const pair=createECDH("prime256v1");
 pair.generateKeys();
 const env:NodeJS.ProcessEnv={
   CRON_SECRET:"c".repeat(48),
+  PWA_PUSH_CANARY_USER_IDS:"123e4567-e89b-42d3-a456-426614174009",
   PWA_PUSH_GENERATION_ENABLED:"true",
   PWA_PUSH_DELIVERY_ENABLED:"true",
   PWA_PUSH_ROLLOUT_ENABLED:"true",
@@ -69,6 +70,17 @@ describe("PWA V4 2E — dispatch com flags independentes",()=>{
     expect(s.expand).not.toHaveBeenCalled();
     expect(sender).not.toHaveBeenCalled();
   });
+  it("nunca expande ou reivindica tarefas quando a lista piloto é ausente ou inválida",async()=>{
+    const s=store([job]),res=response(),sender=vi.fn();
+    await handlePushDispatch({method:"GET",headers},res,{
+      env:{...env,PWA_PUSH_CANARY_USER_IDS:undefined},store:s,sender
+    });
+    expect(res.statusCode).toBe(503);
+    expect(res.body).toEqual({ok:false,code:"push_canary_configuration_missing"});
+    expect(s.expand).not.toHaveBeenCalled();
+    expect(s.claim).not.toHaveBeenCalled();
+    expect(sender).not.toHaveBeenCalled();
+  });
   it("recusa VAPID ausente ou inconsistente",async()=>{
     const s=store(),res=response();
     await handlePushDispatch({method:"GET",headers},res,{
@@ -84,6 +96,7 @@ describe("PWA V4 2E — dispatch com flags independentes",()=>{
     expect(res.statusCode).toBe(200);
     expect(res.body).toMatchObject({ok:true,expanded:2,claimed:1,sent:1,failed:0,discarded:0});
     expect(s.eligible).toHaveBeenCalledWith(job.job_id,job.attempt_number);
+    expect(s.claim).toHaveBeenCalledWith(4,["123e4567-e89b-42d3-a456-426614174009"]);
     expect(sender).toHaveBeenCalledOnce();
     expect(s.finish).toHaveBeenCalledWith(job.job_id,job.attempt_number,{status:201,outcome:"sent"});
     expect(JSON.stringify(res.body)).not.toContain(job.endpoint);
