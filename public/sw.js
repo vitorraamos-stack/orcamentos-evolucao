@@ -47,6 +47,9 @@ const SAFE_ORDER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{
 
 function destinationForPush(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  // Fixed text and safe home destination; this event has no order or user data.
+  if (payload.kind === "pilot_test" && Object.keys(payload).length === 1)
+    return { path: "/", text: "Notificação de teste recebida com sucesso.", tag: "evolusystem-pilot-test" };
   const definition = Object.prototype.hasOwnProperty.call(PUSH_NOTICE_KINDS, payload.kind)
     ? PUSH_NOTICE_KINDS[payload.kind]
     : null;
