@@ -23,6 +23,17 @@ describe("Entrega do layout final da Arte para Instalações", () => {
     expect(dialog).not.toContain("handleMoveWithoutLayout");
   });
 
+  it("retira a OS do quadro de Arte somente após confirmar o encaminhamento", () => {
+    const repository = read("src/shared/kanban/boardRepository.ts");
+    const board = read("src/shared/kanban/OperationalBoard.tsx");
+    expect(repository).toContain('.is("prod_status", null).in("art_status", [');
+    expect(repository).not.toContain("and(art_status.eq.Produzir,prod_status.eq.Produção)");
+    expect(board).toContain("await moveBoardOrder(");
+    expect(board).toContain("current.filter(value => value.order.id !== card.order.id)");
+    expect(board).toContain("Layout enviado e OS encaminhada para Produção.");
+    expect(board).toContain("setCards(previous)");
+  });
+
   it("disponibiliza o layout em Instalações com visualização e abertura", () => {
     const installation = read("src/modules/installations/pages/InstallationExecutionPage.tsx");
     expect(installation).toContain("fetchLatestOrderLayout(osId)");

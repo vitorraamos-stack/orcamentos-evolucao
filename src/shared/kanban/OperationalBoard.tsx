@@ -239,9 +239,18 @@ export function OperationalBoard({
         isManager: hubPermissions.isManager,
         layoutAsset,
       });
-      toast.success(
-        to === "Produzir" ? "OS enviada para Produção." : "Etapa atualizada."
-      );
+      if (board === "art" && to === "Produzir") {
+        // O handoff foi confirmado pelo servidor: remova imediatamente o cartão
+        // da Arte, sem depender da próxima atualização ou do Realtime.
+        setCards(current =>
+          current.filter(value => value.order.id !== card.order.id)
+        );
+        toast.success("Layout enviado e OS encaminhada para Produção.", {
+          description: `OS ${card.order.os_number ?? card.order.sale_number} disponível no quadro de Produção.`,
+        });
+      } else {
+        toast.success("Etapa atualizada.");
+      }
       await load(true);
       return true;
     } catch (cause) {
