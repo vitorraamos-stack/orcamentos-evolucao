@@ -26,9 +26,16 @@ export async function listBoardOrders(
       .range(from, to);
     query =
       board === "art"
-        ? query.or(
-            'and(prod_status.is.null,art_status.in.("Caixa de Entrada","Fila de Arte","Em Criação","Para Aprovação",Ajustes)),and(art_status.eq.Produzir,prod_status.eq.Produção)'
-          )
+        // A Arte só exibe OS que ainda não ingressaram no quadro de Produção.
+        // "Produzir" com prod_status nulo permanece visível para casos legados pendentes.
+        ? query.is("prod_status", null).in("art_status", [
+            "Caixa de Entrada",
+            "Fila de Arte",
+            "Em Criação",
+            "Para Aprovação",
+            "Ajustes",
+            "Produzir",
+          ])
         : query.in("prod_status", [
             "Produção",
             "Em Acabamento",
