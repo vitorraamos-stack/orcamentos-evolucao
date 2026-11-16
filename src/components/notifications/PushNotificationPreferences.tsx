@@ -12,6 +12,8 @@ import {
   registerBrowserPush,
   revokeBrowserPush,
   sendPilotPushTest,
+  selectPilotPushTestTarget,
+  sendRemotePilotPushTest,
   type PushAvailability,
   type PushPublicConfig,
   PushConsentError,
@@ -36,6 +38,8 @@ const errorText: Record<string, string> = {
   pilot_rate_limited: "Aguarde pelo menos dois minutos entre os testes (máximo de cinco por dia).",
   device_not_registered: "Este dispositivo não está inscrito. Atualize o cadastro e tente novamente.",
   push_provider_unavailable: "O serviço Push não aceitou o teste. Verifique novamente mais tarde.",
+  target_not_selected: "Selecione primeiro o celular de destino na Central de Notificações do próprio aparelho.",
+  unexpected_payload: "A solicitação de teste não é válida.",
 };
 
 function explainError(error: unknown): string {
@@ -179,6 +183,35 @@ export function PushNotificationPreferences({ userId }: { userId: string }) {
     }
   };
 
+
+  const chooseBackgroundTarget = async () => {
+    if (busy || status!=="active" || !config?.pilotTestEnabled) return;
+    if (!window.confirm("Definir este aparelho como destino do teste com aplicativo fechado?")) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      if (await selectPilotPushTestTarget(userId))
+        toast.success("Este aparelho foi definido como destino. Agora abra sua conta no computador.");
+      else setMessage("O aparelho não foi definido como destino.");
+    } catch (error) {
+      setMessage(explainError(error));
+    } finally { setBusy(false); }
+  };
+
+  const sendBackgroundTest = async () => {
+    if (busy || !config?.enabled || !config.pilotTestEnabled) return;
+    if (!window.confirm("O aparelho de destino já está bloqueado e com o EvoluSystem fechado? Enviar uma notificação de teste só para ele?")) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      if (await sendRemotePilotPushTest(userId))
+        toast.success("O provedor aceitou o envio. Confira a notificação no aparelho bloqueado.");
+      else setMessage("O provedor não confirmou o aceite.");
+    } catch (error) {
+      setMessage(explainError(error));
+    } finally { setBusy(false); }
+  };
+
   const textByStatus: Record<DeviceStatus, string> = {
     checking: "Verificando disponibilidade neste dispositivo...",
     disabled: "Cadastro Push em preparação. Os avisos dentro do EvoluSystem continuam funcionando.",
@@ -228,6 +261,13 @@ export function PushNotificationPreferences({ userId }: { userId: string }) {
                 Enviar teste neste aparelho
               </Button>
             )}
+            {status === "active" && config.pilotTestEnabled && (
+              <Button type="button" variant="outline" size="sm" disabled={busy}
+                className="border-[#59728A] text-[#E6F2FC]" onClick={() => { void chooseBackgroundTarget(); }}>
+                <Smartphone className="size-4" aria-hidden="true" />
+                Escolher este aparelho para teste com app fechado
+              </Button>
+            )}
             {hasBrowserSubscription && (
               <Button type="button" variant="outline" size="sm" disabled={busy}
                 className="border-[#59728A] text-[#E6F2FC]" onClick={() => { void disable(); }}>
@@ -248,9 +288,23 @@ export function PushNotificationPreferences({ userId }: { userId: string }) {
           Tentar novamente
         </Button>
       )}
+      {config?.enabled && config.pilotTestEnabled && status !== "checking" && (
+        <div className="mt-3 rounded-lg border border-[#46627B] bg-[#203B53] p-3">
+          <p className="text-xs font-semibold text-[#ECF7FF]">Teste com o aplicativo fechado</p>
+          <p className="mt-1 text-xs leading-relaxed text-[#B8CDE1]">
+            Primeiro, no celular, escolha esse aparelho como destino. Depois, feche o EvoluSystem,
+            bloqueie a tela e, no computador com a mesma conta, envie o teste abaixo.
+          </p>
+          <Button type="button" variant="outline" size="sm" disabled={busy}
+            className="mt-3 border-[#59728A] text-[#E6F2FC]" onClick={() => { void sendBackgroundTest(); }}>
+            {busy ? <Loader2 className="size-4 animate-spin" /> : <BellRing className="size-4" />}
+            Enviar teste ao aparelho escolhido
+          </Button>
+        </div>
+      )}
       <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-[#96B4CA]">
         <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-        O aplicativo só solicita permissão após você tocar em ativar. O envio com o app fechado depende da próxima etapa de implantação.
+        O aplicativo só solicita permissão após você tocar em ativar. Testes remotos exigem destino escolhido e confirmação; avisos operacionais automáticos continuam desativados.
       </p>
     </section>
   );

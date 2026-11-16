@@ -36,6 +36,8 @@ function makeStore():PilotTestStore {
   return {
     getUser:vi.fn().mockResolvedValue(userId),
     claim:vi.fn().mockResolvedValue({status:"ready",device}),
+    selectTarget:vi.fn().mockResolvedValue("selected"),
+    claimRemote:vi.fn().mockResolvedValue({status:"ready",device}),
   };
 }
 
