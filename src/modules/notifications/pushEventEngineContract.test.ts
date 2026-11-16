@@ -75,7 +75,10 @@ describe("PWA V4 2E — contrato de isolamento e segurança",()=>{
     expect(sender).toContain('"aes-128-gcm"');
     expect(sender).toContain('redirect: "error"');
     expect(sender).toContain("validPushEndpoint");
-    expect(store).toContain('admin.rpc("push_v4_claim_jobs"');
+    expect(store).toContain('admin.rpc("push_v4_claim_canary_jobs"');
+    expect(store).toContain('admin.rpc("push_v4_expand_canary_outbox"');
+    expect(store).not.toContain('admin.rpc("push_v4_claim_jobs"');
+    expect(store).not.toContain('admin.rpc("push_v4_expand_outbox"');
     expect(vercel.git.deploymentEnabled["feat/pwa-v4-event-engine-dispatch-20261111"]).toBe(false);
     expect(vercel.crons ?? []).toEqual([]);
   });
