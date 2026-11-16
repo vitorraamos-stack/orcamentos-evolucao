@@ -17,7 +17,7 @@ Permitir que a conta já cadastrada no piloto solicite, pelo botão **Enviar tes
 
 ## Ordem de implantação futura — exige aprovação distinta
 1. Conferir CI e revisão de segurança deste PR.
-2. Aplicar migration `20261116111000_pwa_v4_manual_pilot_test.sql` no Supabase e conferir grants e contadores; **não aplicar nesta fase de preparação**.
+2. Aplicar migration `20261116150000_pwa_v4_manual_pilot_test.sql` no Supabase e conferir grants e contadores; **não aplicar nesta fase de preparação**.
 3. Fazer merge e publicação, mantendo `PWA_PUSH_PILOT_TEST_ENABLED` ausente ou `false`, e todas as flags operacionais `false`.
 4. Para habilitar o botão apenas na conta piloto, o proprietário deverá cadastrar na Vercel, escopo **Production**, a variável `PWA_PUSH_PILOT_TEST_ENABLED=true`, e realizar novo deploy autorizado. O conector Vercel não tem permissão de env (403); não enviar chaves ou segredos ao chat.
 5. Confirmar inscrição ativa, clicar no botão e confirmar manualmente. Somente então a API tentará um envio; nenhum envio automático será ativado.
