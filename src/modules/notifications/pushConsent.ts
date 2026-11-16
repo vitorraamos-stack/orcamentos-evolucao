@@ -236,3 +236,28 @@ export async function sendPilotPushTest(expectedUserId: string): Promise<boolean
   });
   return result.acceptedByProvider === true;
 }
+
+/** Select the currently open and registered device as the one remote tests can reach. */
+export async function selectPilotPushTestTarget(expectedUserId: string): Promise<boolean> {
+  const token = await pushAuthToken(expectedUserId);
+  const subscription = await getCurrentPushSubscription();
+  if (!subscription) throw new PushConsentError("device_not_registered");
+  const result = await requestJson("/api/push/pilot-target", {
+    method: "POST",
+    headers: { "Content-Type":"application/json", Authorization:"Bearer " + token },
+    body: JSON.stringify({endpoint:subscription.endpoint}),
+  });
+  return result.selected === true;
+}
+
+/** Trigger a confirmed manual test from another authenticated session.
+ * No browser endpoint is sent; the service uses the preselected device only. */
+export async function sendRemotePilotPushTest(expectedUserId: string): Promise<boolean> {
+  const token = await pushAuthToken(expectedUserId);
+  const result = await requestJson("/api/push/pilot-remote-test", {
+    method: "POST",
+    headers: { "Content-Type":"application/json", Authorization:"Bearer " + token },
+    body: "{}",
+  });
+  return result.acceptedByProvider === true;
+}
