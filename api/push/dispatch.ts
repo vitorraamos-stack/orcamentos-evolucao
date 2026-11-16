@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { createPushDispatchStore, type PushDispatchStore } from "../_shared/push/dispatchStore.js";
+import { pushCanaryUserIds } from "../_shared/push/subscriptions.js";
 import {
   sendWebPush, validateVapid, type VapId, type PushJob, type PushSendResult,
 } from "../_shared/push/webPush.js";
@@ -60,6 +61,13 @@ export async function handlePushDispatch(
     json(res,200,{ok:true,enabled:false,expanded:0,claimed:0,sent:0});
     return;
   }
+  // Sending has its own fail-closed pilot gate, independent of the registration gate.
+  // No unallowlisted recipient may be claimed, even if a subscription already exists.
+  const canaryUserIds = Array.from(pushCanaryUserIds(env));
+  if (canaryUserIds.length === 0) {
+    json(res,503,{ok:false,code:"push_canary_configuration_missing"});
+    return;
+  }
   const vapid = environmentVapid(env);
   if (!vapid) {
     json(res,503,{ok:false,code:"push_configuration_missing"});
@@ -73,9 +81,9 @@ export async function handlePushDispatch(
   let discarded=0;
   try {
     const store=options.store ?? createPushDispatchStore(env);
-    const result=await store.expand(15);
+    const result=await store.expand(15,canaryUserIds);
     expanded=result.expanded;
-    const jobs=await store.claim(4);
+    const jobs=await store.claim(4,canaryUserIds);
     claimed=jobs.length;
     // Two concurrent requests can only claim distinct jobs thanks to
     // FOR UPDATE SKIP LOCKED and leases. Limit work per invocation.
