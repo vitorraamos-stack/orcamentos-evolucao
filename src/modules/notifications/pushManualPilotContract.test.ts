@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe,expect,it } from "vitest";
 const read=(path:string)=>readFileSync(path,"utf8");
-const sql=read("supabase/migrations/20261116111000_pwa_v4_manual_pilot_test.sql");
+const sql=read("supabase/migrations/20261116150000_pwa_v4_manual_pilot_test.sql");
 const api=read("api/push/pilot-test.ts");
 const ui=read("src/components/notifications/PushNotificationPreferences.tsx");
 const worker=read("public/sw.js");
