@@ -11,6 +11,7 @@ import {
   pushAuthToken,
   registerBrowserPush,
   revokeBrowserPush,
+  sendPilotPushTest,
   type PushAvailability,
   type PushPublicConfig,
   PushConsentError,
@@ -31,6 +32,10 @@ const errorText: Record<string, string> = {
   push_registration_disabled: "O administrador ainda não ativou o cadastro de dispositivos.",
   browser_unsubscribe_failed: "O navegador não conseguiu desativar a inscrição. Tente novamente.",
   network_error: "Não foi possível conectar ao servidor. Confira a internet e tente novamente.",
+  pilot_test_disabled: "O envio de teste ainda não foi liberado pela administração.",
+  pilot_rate_limited: "Aguarde pelo menos dois minutos entre os testes (máximo de cinco por dia).",
+  device_not_registered: "Este dispositivo não está inscrito. Atualize o cadastro e tente novamente.",
+  push_provider_unavailable: "O serviço Push não aceitou o teste. Verifique novamente mais tarde.",
 };
 
 function explainError(error: unknown): string {
@@ -157,6 +162,23 @@ export function PushNotificationPreferences({ userId }: { userId: string }) {
     }
   };
 
+  const sendManualTest = async () => {
+    if (busy || status !== "active" || !config?.pilotTestEnabled) return;
+    // No request is made until the user explicitly confirms this test.
+    if (!window.confirm("Enviar uma notificação de teste apenas para este aparelho?")) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const accepted = await sendPilotPushTest(userId);
+      if (accepted) toast.success("O serviço Push aceitou o teste. Confirme o recebimento neste aparelho.");
+      else setMessage("O serviço Push não confirmou o aceite do teste.");
+    } catch (error) {
+      setMessage(explainError(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const textByStatus: Record<DeviceStatus, string> = {
     checking: "Verificando disponibilidade neste dispositivo...",
     disabled: "Cadastro Push em preparação. Os avisos dentro do EvoluSystem continuam funcionando.",
@@ -197,6 +219,13 @@ export function PushNotificationPreferences({ userId }: { userId: string }) {
                 className="bg-[#126B9D] text-white hover:bg-[#177DAE]">
                 {busy ? <Loader2 className="size-4 animate-spin" /> : <BellRing className="size-4" />}
                 Ativar notificações
+              </Button>
+            )}
+            {status === "active" && config.pilotTestEnabled && (
+              <Button type="button" variant="outline" size="sm" disabled={busy}
+                className="border-[#59728A] text-[#E6F2FC]" onClick={() => { void sendManualTest(); }}>
+                {busy ? <Loader2 className="size-4 animate-spin" /> : <BellRing className="size-4" />}
+                Enviar teste neste aparelho
               </Button>
             )}
             {hasBrowserSubscription && (

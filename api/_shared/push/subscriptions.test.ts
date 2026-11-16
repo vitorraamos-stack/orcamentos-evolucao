@@ -157,23 +157,29 @@ describe("Push V4: server API", () => {
   it("canary config exposes only the public VAPID key to an authenticated allowlisted user", async () => {
     const disabled = makeRes(), data = store();
     await handlePushPublicConfig({ method: "GET" }, disabled, {}, data);
-    expect(disabled.body).toEqual({ ok: true, enabled: false, publicKey: null });
+    expect(disabled.body).toEqual({ ok: true, enabled: false, publicKey: null, pilotTestEnabled: false });
     expect(data.getUser).not.toHaveBeenCalled();
 
     const noAuth = makeRes();
     await handlePushPublicConfig({ method: "GET" }, noAuth, enabledEnv, data);
-    expect(noAuth.body).toEqual({ ok: true, enabled: false, publicKey: null });
+    expect(noAuth.body).toEqual({ ok: true, enabled: false, publicKey: null, pilotTestEnabled: false });
     expect(data.getUser).not.toHaveBeenCalled();
 
     const ready = makeRes();
     await handlePushPublicConfig({ method: "GET", headers: auth }, ready, enabledEnv, data);
-    expect(ready.body).toEqual({ ok: true, enabled: true, publicKey: "A".repeat(87) });
+    expect(ready.body).toEqual({ ok: true, enabled: true, publicKey: "A".repeat(87), pilotTestEnabled: false });
     expect(JSON.stringify(ready.body)).not.toContain("B".repeat(43));
+    const gated = makeRes();
+    await handlePushPublicConfig({ method: "GET", headers: auth }, gated,
+      { ...enabledEnv, PWA_PUSH_PILOT_TEST_ENABLED: "true" }, data);
+    expect(gated.body).toEqual({
+      ok: true, enabled: true, publicKey: "A".repeat(87), pilotTestEnabled: true,
+    });
 
     const otherUser = store(), denied = makeRes();
     vi.mocked(otherUser.getUser).mockResolvedValueOnce("123e4567-e89b-42d3-a456-426614174222");
     await handlePushPublicConfig({ method: "GET", headers: auth }, denied, enabledEnv, otherUser);
-    expect(denied.body).toEqual({ ok: true, enabled: false, publicKey: null });
+    expect(denied.body).toEqual({ ok: true, enabled: false, publicKey: null, pilotTestEnabled: false });
   });
 
   it("prevents registering a non-canary user without altering their subscription", async () => {

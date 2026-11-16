@@ -3,7 +3,7 @@ import {
 } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import {
-  encryptPushPayload, safePushJob, sendWebPush, validateVapid, vapidJwt,
+  encryptPushPayload, safePushJob, sendWebPush, sendPilotTestPush, validateVapid, vapidJwt,
   type PushJob, type VapId,
 } from "./webPush";
 
@@ -85,6 +85,25 @@ describe("PWA V4 — Web Push RFC8291 + VAPID",()=>{
     expect(JSON.parse(decryptRfc8291(first))).toEqual(data);
     expect(JSON.parse(decryptRfc8291(second))).toEqual(data);
     expect(first.length).toBeLessThan(4096);
+  });
+
+  it("encrypts a real OS-free pilot payload and restricts network destinations",async()=>{
+    const body=encryptPushPayload({kind:"pilot_test"},job.p256dh,job.auth_secret);
+    expect(JSON.parse(decryptRfc8291(body))).toEqual({kind:"pilot_test"});
+    expect(body.toString("utf8")).not.toContain("pilot_test");
+    const fetcher=vi.fn().mockResolvedValue({status:201});
+    const result=await sendPilotTestPush({
+      endpoint:job.endpoint,p256dh:job.p256dh,auth_secret:job.auth_secret,
+    },vapid,fetcher as unknown as typeof fetch);
+    expect(result).toEqual({status:201,outcome:"sent"});
+    const params=fetcher.mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(decryptRfc8291(Buffer.from(params.body as Uint8Array))))
+      .toEqual({kind:"pilot_test"});
+    expect(params.redirect).toBe("error");
+    expect(await sendPilotTestPush({
+      endpoint:"https://evil.example/test",p256dh:job.p256dh,auth_secret:job.auth_secret,
+    },vapid,fetcher as unknown as typeof fetch)).toEqual({status:null,outcome:"discarded"});
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   it("rejects non-allowlisted provider endpoints and malformed subscription keys",()=>{

@@ -96,11 +96,14 @@ export function vapidJwt(endpoint: string, vapid: VapId, now = Date.now()): stri
 }
 
 export function encryptPushPayload(
-  payload: { kind: PushKind; orderId: string },
+  payload: { kind: PushKind; orderId: string } | { kind: "pilot_test" },
   p256dh: string,
   authKey: string
 ): Buffer {
-  if (!KINDS.includes(payload.kind) || !ORDER_UUID.test(payload.orderId))
+  if (payload.kind === "pilot_test") {
+    // A real manual test has no OS ID, client text or dynamic destination.
+    if (Object.keys(payload).length !== 1) throw new Error("push_payload_invalid");
+  } else if (!KINDS.includes(payload.kind) || !ORDER_UUID.test(payload.orderId))
     throw new Error("push_payload_invalid");
   const uaPublic = fromBase64Url(p256dh, 65);
   if (uaPublic[0] !== 4) throw new Error("push_key_invalid");
@@ -168,5 +171,47 @@ export async function sendWebPush(
   } catch {
     // Never log endpoint, encryption keys, VAPID secret or raw provider body.
     return { status: null, outcome: "retry" };
+  }
+}
+
+
+/** Explicit one-device pilot test, independent of OS/event generation and the cron.
+ * No test can use an arbitrary endpoint: the caller must first look up a currently
+ * registered subscription via the service-only, rate-limited Supabase RPC. */
+export type PilotTestDevice = Pick<PushJob,"endpoint"|"p256dh"|"auth_secret">;
+export async function sendPilotTestPush(
+  device: PilotTestDevice,
+  vapid: VapId,
+  fetcher: typeof fetch = fetch
+): Promise<PushSendResult> {
+  if (!validPushEndpoint(device.endpoint) || !validateVapid(vapid))
+    return {status:null,outcome:"discarded"};
+  try {
+    const rawKey = fromBase64Url(device.p256dh,65);
+    if (rawKey[0] !== 4) return {status:null,outcome:"discarded"};
+    fromBase64Url(device.auth_secret,16);
+    const body = encryptPushPayload({kind:"pilot_test"},device.p256dh,device.auth_secret);
+    const jwt = vapidJwt(device.endpoint,vapid);
+    const response = await fetcher(device.endpoint,{
+      method:"POST",
+      headers:{
+        Authorization:"vapid t=" + jwt + ", k=" + vapid.publicKey,
+        "Content-Encoding":"aes128gcm",
+        "Content-Type":"application/octet-stream",
+        TTL:"60",
+        Topic:"evolusystem-pilot-test",
+        Urgency:"normal",
+      },
+      body:new Uint8Array(body),
+      redirect:"error",
+      signal:AbortSignal.timeout(7000),
+    });
+    if(response.status>=200 && response.status<300)
+      return {status:response.status,outcome:"sent"};
+    if(response.status===404 || response.status===410)
+      return {status:response.status,outcome:"discarded"};
+    return {status:response.status,outcome:"retry"};
+  } catch {
+    return {status:null,outcome:"retry"};
   }
 }

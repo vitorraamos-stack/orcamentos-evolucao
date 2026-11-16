@@ -10,6 +10,7 @@ export type PushAvailability =
 export interface PushPublicConfig {
   enabled: boolean;
   publicKey: string | null;
+  pilotTestEnabled: boolean;
 }
 
 export class PushConsentError extends Error {
@@ -55,10 +56,11 @@ export function parsePushPublicConfig(value: unknown): PushPublicConfig | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const obj = value as Record<string, unknown>;
   if (obj.ok !== true || typeof obj.enabled !== "boolean") return null;
-  if (!obj.enabled) return { enabled: false, publicKey: null };
+  if (!obj.enabled) return { enabled: false, publicKey: null, pilotTestEnabled: false };
   if (typeof obj.publicKey !== "string" || !/^[A-Za-z0-9_-]{86,88}$/.test(obj.publicKey))
     return null;
-  return { enabled: true, publicKey: obj.publicKey };
+  return { enabled: true, publicKey: obj.publicKey,
+    pilotTestEnabled: obj.pilotTestEnabled === true };
 }
 
 export function decodeVapidPublicKey(raw: string): Uint8Array {
@@ -219,4 +221,18 @@ export async function revokePushOnSignOut(token: string | null): Promise<void> {
     try { await subscription.unsubscribe(); }
     catch { /* Browser may have already removed it. */ }
   } catch { /* Sign out must remain possible when offline or unsupported. */ }
+}
+
+
+/** Called exclusively after the participant confirms the manual test in the UI. */
+export async function sendPilotPushTest(expectedUserId: string): Promise<boolean> {
+  const token = await pushAuthToken(expectedUserId);
+  const subscription = await getCurrentPushSubscription();
+  if (!subscription) throw new PushConsentError("device_not_registered");
+  const result = await requestJson("/api/push/pilot-test", {
+    method:"POST",
+    headers:{"Content-Type":"application/json", Authorization:"Bearer " + token},
+    body:JSON.stringify({endpoint:subscription.endpoint}),
+  });
+  return result.acceptedByProvider === true;
 }
