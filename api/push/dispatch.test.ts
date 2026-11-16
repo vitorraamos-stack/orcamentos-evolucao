@@ -97,6 +97,7 @@ describe("PWA V4 2E — dispatch com flags independentes",()=>{
     expect(res.body).toMatchObject({ok:true,expanded:2,claimed:1,sent:1,failed:0,discarded:0});
     expect(s.eligible).toHaveBeenCalledWith(job.job_id,job.attempt_number);
     expect(s.claim).toHaveBeenCalledWith(4,["123e4567-e89b-42d3-a456-426614174009"]);
+    expect(s.expand).toHaveBeenCalledWith(15,["123e4567-e89b-42d3-a456-426614174009"]);
     expect(sender).toHaveBeenCalledOnce();
     expect(s.finish).toHaveBeenCalledWith(job.job_id,job.attempt_number,{status:201,outcome:"sent"});
     expect(JSON.stringify(res.body)).not.toContain(job.endpoint);
