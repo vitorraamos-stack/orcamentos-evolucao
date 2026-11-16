@@ -1,7 +1,7 @@
-import { authorizedCron } from "./dispatch";
-import { createPushDispatchStore, type PushDispatchStore } from "../_shared/push/dispatchStore";
-import { validateVapid } from "../_shared/push/webPush";
-import { isPushRegistrationEnabled } from "../_shared/push/subscriptions";
+import { authorizedCron } from "./dispatch.js";
+import { createPushDispatchStore, type PushDispatchStore } from "../_shared/push/dispatchStore.js";
+import { validateVapid } from "../_shared/push/webPush.js";
+import { isPushRegistrationEnabled } from "../_shared/push/subscriptions.js";
 
 type RequestLike = { method?: string; headers?: Record<string, string | string[] | undefined> };
 type ResponseLike = { statusCode: number; setHeader(name:string,value:string):void; end(value:string):void };
