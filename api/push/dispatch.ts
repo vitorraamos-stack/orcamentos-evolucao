@@ -81,7 +81,7 @@ export async function handlePushDispatch(
   let discarded=0;
   try {
     const store=options.store ?? createPushDispatchStore(env);
-    const result=await store.expand(15);
+    const result=await store.expand(15,canaryUserIds);
     expanded=result.expanded;
     const jobs=await store.claim(4,canaryUserIds);
     claimed=jobs.length;
