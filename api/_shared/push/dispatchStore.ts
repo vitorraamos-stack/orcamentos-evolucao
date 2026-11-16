@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { safePushJob, type PushJob, type PushSendResult } from "./webPush";
+import { safePushJob, type PushJob, type PushSendResult } from "./webPush.js";
 
 export type PushReleaseDbStatus = {
   generationEnabled: boolean;

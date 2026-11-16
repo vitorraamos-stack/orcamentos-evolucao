@@ -7,7 +7,7 @@ import {
   createCipheriv, createECDH, createHash, createHmac,
   createPrivateKey, randomBytes, sign, timingSafeEqual,
 } from "node:crypto";
-import { validPushEndpoint } from "./subscriptions";
+import { validPushEndpoint } from "./subscriptions.js";
 
 export type PushKind =
   | "assignment" | "art_inbox" | "production_released"
