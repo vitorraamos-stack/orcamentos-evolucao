@@ -151,7 +151,7 @@ returns table (
   p256dh text, auth_secret text, attempt_number integer
 )
 language plpgsql security invoker set search_path=''
-as $
+as $canary$
 begin
   if p_allowed_user_ids is null
     or pg_catalog.cardinality(p_allowed_user_ids) not between 1 and 5
@@ -197,7 +197,7 @@ begin
     and s.user_id = any(p_allowed_user_ids)
     and n.recipient_id = s.user_id;
 end;
-$;
+$canary$;
 
 
 revoke all on function public.push_v4_expand_canary_outbox(integer,uuid[])
