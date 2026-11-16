@@ -13,7 +13,7 @@ export type PushReleaseDbStatus = {
 export interface PushDispatchStore {
   readiness(): Promise<PushReleaseDbStatus>;
   expand(limit: number): Promise<{ expanded: number; jobsCreated: number }>;
-  claim(limit: number): Promise<PushJob[]>;
+  claim(limit: number, allowedUserIds: readonly string[]): Promise<PushJob[]>;
   eligible(jobId: string, attemptNumber: number): Promise<boolean>;
   finish(jobId: string, attemptNumber: number, result: PushSendResult): Promise<void>;
 }
@@ -50,8 +50,16 @@ export function createPushDispatchStore(env: NodeJS.ProcessEnv): PushDispatchSto
         jobsCreated: Number(row?.created_jobs ?? 0),
       };
     },
-    async claim(limit) {
-      const { data, error } = await admin.rpc("push_v4_claim_jobs", { p_limit: limit });
+    async claim(limit, allowedUserIds) {
+      // The original unrestricted RPC is never used by the pilot dispatcher.
+      // The SQL RPC checks recipient/subscription ownership before leasing jobs.
+      if (allowedUserIds.length < 1 || allowedUserIds.length > 5 ||
+          allowedUserIds.some(id => !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id)) ||
+          new Set(allowedUserIds).size !== allowedUserIds.length)
+        throw new Error("push_canary_configuration_missing");
+      const { data, error } = await admin.rpc("push_v4_claim_canary_jobs", {
+        p_limit: limit, p_allowed_user_ids: allowedUserIds,
+      });
       if (error || !Array.isArray(data)) throw new Error("push_claim_failed");
       // Refuse unsafe outbound requests; return only known-safe records.
       // A malformed lease still remains recoverable; it will be discarded
