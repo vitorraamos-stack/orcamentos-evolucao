@@ -17,12 +17,12 @@ type ResponseLike = {
   end(value: string): void;
 };
 
-function reply(res: ResponseLike, status: number, enabled: boolean, publicKey: string | null): void {
+function reply(res: ResponseLike, status: number, enabled: boolean, publicKey: string | null, pilotTestEnabled = false): void {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Vary", "Authorization");
-  res.end(JSON.stringify({ ok: true, enabled, publicKey }));
+  res.end(JSON.stringify({ ok: true, enabled, publicKey, pilotTestEnabled }));
 }
 
 /**
@@ -57,7 +57,8 @@ export async function handlePushPublicConfig(
   try {
     const userId = await (store ?? createPushStore(env)).getUser(bearer);
     const enabled = Boolean(userId && canRegisterPushUser(env, userId));
-    reply(res, 200, enabled, enabled ? env.PWA_PUSH_VAPID_PUBLIC_KEY ?? null : null);
+    reply(res, 200, enabled, enabled ? env.PWA_PUSH_VAPID_PUBLIC_KEY ?? null : null,
+      enabled && env.PWA_PUSH_PILOT_TEST_ENABLED === "true");
   } catch {
     res.statusCode = 503;
     res.setHeader("Cache-Control", "no-store");
