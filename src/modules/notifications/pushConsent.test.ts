@@ -45,7 +45,7 @@ describe("PWA V4 2D: consentimento explícito e disponibilidade", () => {
     expect(parsePushPublicConfig({ ok: true, enabled: false, publicKey: null }))
       .toEqual({ enabled: false, publicKey: null, pilotTestEnabled: false });
     expect(parsePushPublicConfig({ ok: true, enabled: false, publicKey: "private" }))
-      .toEqual({ enabled: false, publicKey: null });
+      .toEqual({ enabled: false, publicKey: null, pilotTestEnabled: false });
     const valid = Buffer.concat([Buffer.from([4]), Buffer.alloc(64, 7)]).toString("base64url");
     expect(parsePushPublicConfig({ ok: true, enabled: true, publicKey: valid }))
       .toEqual({ enabled: true, publicKey: valid, pilotTestEnabled: false });
