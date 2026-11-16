@@ -88,6 +88,10 @@ export async function handlePilotTest(
       reply(res,404,{ok:false,code:"device_not_registered"});
       return;
     }
+    if(claim.status!=="ready") {
+      reply(res,503,{ok:false,code:"push_pilot_unavailable"});
+      return;
+    }
     const outcome=await (options.sender??sendPilotTestPush)(claim.device,vapid);
     if(outcome.outcome!=="sent") {
       reply(res,502,{ok:false,code:"push_provider_unavailable"});
