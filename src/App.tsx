@@ -22,6 +22,7 @@ import OsAuditPage from "@/modules/hub-os/pages/OsAuditPage";
 import OsPendentesPage from "@/modules/hub-os/pages/OsPendentesPage";
 import FinanceiroPortalPage from "@/modules/hub-os/pages/FinanceiroPortalPage";
 import OperationalDashboardPage from "@/modules/dashboard/OperationalDashboardPage";
+import MyQueuePage from "@/modules/my-queue/MyQueuePage";
 import DashboardOperationalSettingsPage from "@/modules/dashboard/DashboardOperationalSettingsPage";
 import OrdersCentralPage from "@/modules/orders/pages/OrdersCentralPage";
 import CreateOrderPage from "@/modules/orders/pages/CreateOrderPage";
@@ -88,6 +89,14 @@ function Router() {
         <Layout>
           <RequireModule moduleKey="calculadora">
             <Home />
+          </RequireModule>
+        </Layout>
+      </Route>
+
+      <Route path="/minha-fila">
+        <Layout>
+          <RequireModule moduleKey="hub_os">
+            {canAccessOperationalSection(authzContext, "orders") ? <MyQueuePage /> : <Redirect to="/" />}
           </RequireModule>
         </Layout>
       </Route>

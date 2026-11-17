@@ -1,6 +1,7 @@
 import { getOperationalNavState } from "./operationalNavState";
 
 export type MobileShortcutId =
+  | "myQueue"
   | "orders"
   | "art"
   | "production"
@@ -14,9 +15,10 @@ export type MobileShortcutId =
   | "gallery"
   | "finance";
 
-export type MobileShortcutAccess = Record<MobileShortcutId, boolean>;
+export type MobileShortcutAccess = Record<Exclude<MobileShortcutId, "myQueue">, boolean> & { myQueue?: boolean };
 
 const SHORTCUTS: ReadonlyArray<{ id: MobileShortcutId; href: string; label: string }> = [
+  { id: "myQueue", href: "/minha-fila", label: "Minha Fila" },
   { id: "orders", href: "/os", label: "OS" },
   { id: "art", href: "/os/arte", label: "Arte" },
   { id: "production", href: "/os/producao", label: "Produção" },
@@ -42,6 +44,7 @@ export function getMobileShortcuts(access: MobileShortcutAccess) {
 export function isMobileShortcutActive(id: MobileShortcutId, location: string): boolean {
   const nav = getOperationalNavState(location);
   switch (id) {
+    case "myQueue": return location === "/minha-fila";
     case "orders": return nav.orders;
     case "art": return nav.art;
     case "production": return nav.production;

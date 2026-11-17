@@ -4,14 +4,15 @@ import { describe, expect, it } from "vitest";
 const layout = readFileSync(new URL("./Layout.tsx", import.meta.url), "utf8");
 
 describe("EvoluSystem sidebar navigation groups", () => {
-  it("presents operational stages in the same order as work progresses", () => {
-    const orderedRoutes = ["/hub-os", "/os", "/os/arte", "/os/producao", "/instalacoes", "/entregas"];
+  it("presents the personal queue before management and OS modules", () => {
+    const orderedRoutes = ["/minha-fila", "/hub-os", "/os", "/instalacoes", "/entregas"];
     const positions = orderedRoutes.map(route => layout.indexOf(`href: "${route}"`));
     expect(positions.every(position => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
     expect(layout).toContain("active: operationalNav.orders");
-    expect(layout).toContain("active: operationalNav.art");
-    expect(layout).toContain("active: operationalNav.production");
+    expect(layout).toContain('active: location === "/minha-fila"');
+    expect(layout).not.toContain('href: "/os/arte", label: "Arte"');
+    expect(layout).not.toContain('href: "/os/producao", label: "Produção"');
   });
 
   it("groups links by their purpose rather than using an unspecific module group", () => {
@@ -29,8 +30,7 @@ describe("EvoluSystem sidebar navigation groups", () => {
     expect(layout).toContain('canAccessOperationalSection(access, "art")');
     expect(layout).toContain('canAccessOperationalSection(access, "production")');
     expect(layout).toContain('...(canViewDashboard ?');
-    expect(layout).toContain('...(canViewArteBoard ?');
-    expect(layout).toContain('...(canViewProducaoBoard ?');
+    expect(layout).toContain('...(canViewHubOs ? [{ href: "/minha-fila"');
     expect(layout).toContain("canViewOrcamentista =");
     expect(layout).toContain('hubPermissions.canCreateOs && hasModuleAccess("orcamentista")');
     expect(layout).toContain('isAdmin && hasModuleAccess("materiais")');

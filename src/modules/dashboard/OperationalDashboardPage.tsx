@@ -157,9 +157,9 @@ function SectorFlow({ overview }: { overview: DashboardOverview | null }) {
   const canViewArte = canAccessOperationalSection(access, "art");
   const canViewProducao = canAccessOperationalSection(access, "production");
   const sectors = [
-    { label: "Arte e aprovação", value: overview?.sectors.artwork, icon: Palette, href: "/os/arte", allowed: canViewArte },
-    { label: "Produção", value: overview?.sectors.production, icon: Factory, href: "/os/producao", allowed: canViewProducao },
-    { label: "Finalização", value: overview?.sectors.finishing, icon: Layers3, href: "/os/producao/acabamento", allowed: canViewProducao },
+    { label: "Arte e aprovação", value: overview?.sectors.artwork, icon: Palette, href: "/os", allowed: canViewArte },
+    { label: "Produção", value: overview?.sectors.production, icon: Factory, href: "/os", allowed: canViewProducao },
+    { label: "Finalização", value: overview?.sectors.finishing, icon: Layers3, href: "/os", allowed: canViewProducao },
     { label: "Logística", value: overview?.sectors.logistics, icon: Truck, href: hubPermissions.canViewInstallations ? "/instalacoes" : "/entregas", allowed: hubPermissions.canViewInstallations || hubPermissions.canViewDeliveries },
   ] as const;
   return (
