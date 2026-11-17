@@ -161,7 +161,9 @@ export default function MyQueueReferenceView(props: Props) {
         {cards.map(card =>
           <button key={card.kind} type="button" onClick={card.onClick}
             className={"myq-stat myq-stat--" + card.kind}
-            aria-label={card.title + ": " + card.value}>
+            aria-label={card.title + ": " + card.value}
+            title={card.kind === "late" && orderRisk > 0 ?
+              orderRisk + " atividade(s) possuem também prazo final da OS vencido (não contam como atraso da etapa)." : undefined}>
             <span className="myq-stat__label"><i aria-hidden="true" />{card.title}</span>
             <span className="myq-stat__bottom">
               <strong>{card.value}</strong><small>{card.description}</small>
@@ -170,9 +172,6 @@ export default function MyQueueReferenceView(props: Props) {
         )}
       </div>
 
-      {orderRisk > 0 && <p className="myq-page__risk" role="status">
-        {orderRisk} atividade(s) ligadas a OS com prazo final vencido. O prazo da OS não é contabilizado como atraso individual sem prazo da etapa.
-      </p>}
       {error && <div className="myq-page__error" role="alert">
         <span>Não foi possível atualizar a fila: {error}</span>
         <button type="button" onClick={onRefresh}>Tentar novamente</button>
