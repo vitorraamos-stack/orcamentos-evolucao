@@ -122,13 +122,13 @@ export default function MyQueueContent(props: Props) {
 
   const cards = [
     { title: "Minhas tarefas", value: metrics.pending, description: "Atribuídas à etapa atual",
-      kind: "tasks", onClick: () => { onView("action"); onPeriod("all"); } },
+      kind: "tasks", onClick: () => { onSector("all"); onView("action"); onPeriod("all"); } },
     { title: "Atrasadas", value: metrics.overdue, description: "Precisam de atenção",
-      kind: "late", onClick: () => { onView("action"); onPeriod("overdue"); } },
+      kind: "late", onClick: () => { onSector("all"); onView("action"); onPeriod("overdue"); } },
     { title: "Vencem hoje", value: dueToday, description: "Prazo de execução",
-      kind: "today", onClick: () => { onView("action"); onPeriod("today"); } },
+      kind: "today", onClick: () => { onSector("all"); onView("action"); onPeriod("today"); } },
     { title: "Em espera", value: metrics.waiting, description: "Aguardando terceiros",
-      kind: "waiting", onClick: () => { onView("waiting"); onPeriod("all"); } },
+      kind: "waiting", onClick: () => { onSector("all"); onView("waiting"); onPeriod("all"); } },
   ];
 
   function selectStage(next: string) {
