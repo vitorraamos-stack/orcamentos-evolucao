@@ -103,7 +103,8 @@ export default function OrderDetailPage() {
     const coordinator = readCoordinator.current;
     coordinator.activate(orderId ?? null);
     setViewOrderId(orderId);
-    setActiveTab("summary");
+    const requestedTab = new URLSearchParams(window.location.search).get("tab");
+    setActiveTab(requestedTab === "production" || requestedTab === "installation" ? requestedTab : "summary");
     setTargetItemId(null);
     setTargetItemRevision(0);
     summaryPrefetched.current = null;
@@ -176,6 +177,11 @@ export default function OrderDetailPage() {
     summaryPrefetched.current = orderId;
     void loadTab("items");
   }, [orderId, detail?.order.id, loadTab]);
+
+  // Links da Minha Fila podem abrir diretamente a seção de execução.
+  useEffect(() => {
+    if (detail?.order.id === orderId && activeTab !== "summary") void loadTab(activeTab);
+  }, [activeTab, detail?.order.id, orderId, loadTab]);
 
   const selectTab = (tab: string) => {
     setActiveTab(tab);
