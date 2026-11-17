@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import "./evolusystem-shell.css";
-import QueueReferenceShell from "./QueueReferenceShell";
 import { cn } from "@/lib/utils";
 import { getRoleLabel } from "@/lib/hubRoles";
 import { canAccessOperationalSection } from "@/lib/authz";
@@ -392,9 +391,6 @@ export default function Layout({ children }: LayoutProps) {
 
   const displayName = getCurrentUserDisplayName(user);
   const initial = displayName.charAt(0).toUpperCase();
-
-  // A fila usa o shell integral da referência; os demais módulos não mudam.
-  if (location === "/minha-fila") return <QueueReferenceShell>{children}</QueueReferenceShell>;
 
   return (
     <div className={cn(
