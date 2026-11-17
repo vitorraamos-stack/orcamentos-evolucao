@@ -7,9 +7,9 @@ const table = readFileSync(new URL("../../modules/orders/components/OrderTable.t
 const css = readFileSync(new URL("../../modules/orders/pages/orders-central.css", import.meta.url), "utf8");
 
 describe("EvoluSystem OS table and status indicators", () => {
-  it("keeps the existing risk wording while exposing a semantic tone", () => {
+  it("shows clear risk labels while exposing a semantic tone", () => {
     const cases = [
-      { risk: "NORMAL" as const, tone: "success", label: "NORMAL" },
+      { risk: "NORMAL" as const, tone: "success", label: "Dentro do prazo" },
       { risk: "ATENCAO" as const, tone: "warning", label: "ATENÇÃO" },
       { risk: "CRITICO" as const, tone: "danger", label: "CRITICO" },
     ];
