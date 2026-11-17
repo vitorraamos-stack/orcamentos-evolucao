@@ -8,8 +8,9 @@ describe("PWA v3 mobile navigation integration", () => {
     const layout = read("src/components/Layout.tsx");
     expect(layout).toContain("getMobileShortcuts({");
     expect(layout).toContain("orders: canViewHubOs");
-    expect(layout).toContain("art: canViewArteBoard");
-    expect(layout).toContain("production: canViewProducaoBoard");
+    expect(layout).toContain("myQueue: canViewHubOs");
+    expect(layout).toContain("art: false");
+    expect(layout).toContain("production: false");
     expect(layout).toContain("installations: canViewInstallations");
     expect(layout).toContain("<NavItems />");
     expect(layout).toContain("setMobileOpen(true)");
