@@ -19,7 +19,7 @@ async function allRows<T>(getPage: (start: number, end: number) => Promise<T[]>)
 }
 
 async function chunks<T>(ids: string[], fetch: (ids: string[]) => Promise<T[]>): Promise<T[]> {
-  const unique = [...new Set(ids)];
+  const unique = Array.from(new Set(ids));
   if (!unique.length) return [];
   const output: T[] = [];
   for (let i = 0; i < unique.length; i += 100) {
