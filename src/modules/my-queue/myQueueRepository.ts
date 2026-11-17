@@ -11,7 +11,7 @@ type Assignee = { order_id: string; user_id: string; scope: AssigneeScope };
 type Item = Pick<OrderItem, "id" | "order_id" | "name" | "quantity" | "unit" | "status" | "sort_order">;
 type Deadline = Pick<OrderDeadline, "order_id" | "scope" | "due_date" | "completed_at">;
 type TeamMember = { team_id: string; user_id: string };
-const scopes: AssigneeScope[] = ["ART", "PRODUCTION", "FINISHING", "INSTALLATION"];
+const scopes: AssigneeScope[] = ["GENERAL", "ART", "PRODUCTION", "FINISHING", "INSTALLATION"];
 const recentDays = 30;
 
 async function allRows<T>(getPage: (start: number, end: number) => Promise<T[]>) {
@@ -51,14 +51,14 @@ export async function listMyQueue(userId: string, allowInstallations: boolean): 
     allRows<Assignee>(async (start, end) => {
       const { data, error } = await supabase.from("os_order_assignees")
         .select("order_id,user_id,scope").eq("user_id", userId).in("scope", scopes)
-        .range(start, end);
+        .order("order_id").order("scope").range(start, end);
       if (error) throw error;
       return (data ?? []) as Assignee[];
     }),
     allRows<ItemOperation>(async (start, end) => {
       const { data, error } = await supabase.from("os_order_item_operations")
         .select("id,item_id,work_center,status,assigned_to,is_required,notes,blocked_reason,sort_order,started_at,completed_at,created_at,updated_at")
-        .eq("assigned_to", userId).is("deleted_at", null).range(start, end);
+        .eq("assigned_to", userId).is("deleted_at", null).order("id").range(start, end);
       if (error) throw error;
       return (data ?? []) as ItemOperation[];
     }),
@@ -67,7 +67,7 @@ export async function listMyQueue(userId: string, allowInstallations: boolean): 
       : Promise.resolve([] as TeamMember[]),
     allowInstallations ? allRows<Installation>(async (start, end) => {
       const { data, error } = await supabase.from("os_installations")
-        .select("*").eq("responsible_id", userId).range(start, end);
+        .select("*").eq("responsible_id", userId).order("id").range(start, end);
       if (error) throw error;
       return (data ?? []) as Installation[];
     }) : Promise.resolve([] as Installation[]),
@@ -126,7 +126,7 @@ export async function listMyQueue(userId: string, allowInstallations: boolean): 
     if (!item || !order || item.status === "CANCELLED" || !operation.is_required) continue;
     if (!order.prod_status || order.prod_status === "Finalizados") continue;
     if (operation.status === "COMPLETED" && !after(operation.completed_at, cutoff)) continue;
-    operationOrders.add(order.id);
+    if (operation.status !== "COMPLETED") operationOrders.add(order.id);
     const waiting = order.production_tag === "PRODUCAO_EXTERNA";
     const blocked = operation.status === "BLOCKED" || order.production_tag === "AGUARDANDO_INSUMOS";
     const status: QueueStatus = operation.status === "COMPLETED" ? "DONE" :
@@ -166,16 +166,25 @@ export async function listMyQueue(userId: string, allowInstallations: boolean): 
           artStatus === "Ajustes" ? "Realizar ajustes" : "Criar / preparar arte",
         status, action, ...activityDeadline(order, deadlinesForOrder, "ART") });
     }
+    if (assignee.scope === "GENERAL" && !order.prod_status && order.art_status === "Para Aprovação") {
+      output.push({ ...base, id: "general-approval:" + order.id, kind: "ART", sector: "Comercial",
+        activity: "Acompanhar aprovação do cliente", status: "WAITING", action: "OPEN_OS",
+        ...activityDeadline(order, deadlinesForOrder, "APPROVAL") });
+    }
     if ((assignee.scope === "PRODUCTION" || assignee.scope === "FINISHING") && !operationOrders.has(order.id)) {
       const finishing = assignee.scope === "FINISHING";
-      if (finishing ? order.prod_status !== "Em Acabamento" : order.prod_status !== "Produção") continue;
+      if (finishing ? order.prod_status !== "Em Acabamento" :
+        order.prod_status !== "Produção" && order.prod_status !== "Pronto / Avisar Cliente") continue;
       const blocked = order.production_tag === "AGUARDANDO_INSUMOS";
       const waiting = order.production_tag === "PRODUCAO_EXTERNA";
+      const materialReady = order.prod_status === "Pronto / Avisar Cliente";
       output.push({ ...base, id: assignee.scope.toLowerCase() + ":" + order.id,
         kind: assignee.scope, sector: finishing ? "Acabamento" : "Produção",
-        activity: finishing ? "Executar acabamento / conferência" : "Acompanhar produção",
+        activity: materialReady ? "Avisar cliente / encaminhar logística" :
+          finishing ? "Executar acabamento / conferência" : "Acompanhar produção",
         status: blocked ? "BLOCKED" : waiting ? "WAITING" : "TODO",
-        action: "OPEN_PRODUCTION", ...activityDeadline(order, deadlinesForOrder, assignee.scope) });
+        action: materialReady ? "OPEN_OS" : "OPEN_PRODUCTION",
+        ...activityDeadline(order, deadlinesForOrder, assignee.scope) });
     }
   }
 
