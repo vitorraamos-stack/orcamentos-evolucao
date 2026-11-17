@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
@@ -53,6 +54,27 @@ describe("Dashboard Etapa 1 — interface", () => {
     expect(html).toContain('href="/os"');
     expect(html).not.toContain('href="/os/arte"');
     expect(html).not.toContain('href="/os/producao"');
+  });
+
+  it("keeps four interactive icons while matching the Minha Fila card palette", () => {
+    const css = readFileSync(new URL("./operational-dashboard.css", import.meta.url), "utf8");
+    const html = renderToStaticMarkup(
+      <Router ssrPath="/hub-os">
+        <OperationalDashboardSections overview={overview} assignments={[]} />
+      </Router>
+    );
+
+    expect(html.match(/evolu-dashboard__indicator-label"><svg/g)).toHaveLength(4);
+    expect(html).toContain("evolu-dashboard__indicator--today");
+    for (const target of ["/os?quick=active", "/os?quick=overdue", "/os?quick=today"]) {
+      expect(html).toContain('href="' + target + '"');
+    }
+    expect(css).toContain("background: var(--evolu-panel);");
+    expect(css).toContain("border: 1px solid var(--evolu-border);");
+    expect(css).toContain("border-radius: 13px;");
+    expect(css).toContain(".evolu-dashboard__indicator-label svg");
+    expect(css).toContain("--today .evolu-dashboard__indicator-value");
+    expect(css).not.toContain("border-left: 4px solid");
   });
 
   it("does not misreport unavailable values as zero", () => {

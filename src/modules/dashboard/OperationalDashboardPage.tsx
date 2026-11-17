@@ -68,7 +68,7 @@ function SummaryIndicators({ overview }: { overview: DashboardOverview | null })
     { label: "OS ativas", value: overview?.active, href: "/os?quick=active", icon: ClipboardList, tone: "primary" },
     { label: "Exigem atenção", value: overview?.attention, href: "/os", icon: AlertTriangle, tone: "warning" },
     { label: "Atrasadas", value: overview?.overdue, href: "/os?quick=overdue", icon: CalendarClock, tone: "danger" },
-    { label: "Vencem hoje", value: overview?.dueToday, href: "/os?quick=today", icon: CalendarClock, tone: "primary" },
+    { label: "Vencem hoje", value: overview?.dueToday, href: "/os?quick=today", icon: CalendarClock, tone: "today" },
   ] as const;
   return (
     <section className="evolu-dashboard__indicators" aria-label="Indicadores operacionais">
