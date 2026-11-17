@@ -146,7 +146,7 @@ export default function MyQueuePage() {
     [rows, today]);
   const upcoming = useMemo(() => sortQueueRows(rows.filter(row =>
     row.status !== "DONE" && row.dueDate && row.dueDate >= today), today).slice(0, 4), [rows, today]);
-  const displayName = getCurrentUserDisplayName()?.split(" ")[0] ?? "você";
+  const displayName = getCurrentUserDisplayName(user)?.split(" ")[0] ?? "você";
 
   function changeView(next: QueueView) { setView(next); setPage(1); }
   function changePeriod(next: QueuePeriod) { setPeriod(next); setPage(1); changeView("action"); }
