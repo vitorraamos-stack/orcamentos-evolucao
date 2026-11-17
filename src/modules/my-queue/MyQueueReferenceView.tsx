@@ -50,7 +50,6 @@ function dueLabel(value: string | null, today: string) {
   if (!value) return "Sem prazo";
   if (value === today) return "Hoje";
   if (value === tomorrowOf(today)) return "Amanhã";
-  if (value === tomorrowOf(value) /* unreachable — guards invalid data */) return "";
   if (value === yesterdayOf(today)) return "Ontem";
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", timeZone: "UTC" }).format(toDateKey(value)).replace(".", "");
 }
