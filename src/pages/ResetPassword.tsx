@@ -58,21 +58,21 @@ export default function ResetPassword() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#0C1726] px-4 py-10 text-[#E6EFF8]">
-      <section className="w-full max-w-md rounded-[28px] border border-[#30445C] bg-[#17283D] px-6 py-10 shadow-xl sm:px-10">
+    <main className="flex min-h-screen items-center justify-center bg-[#0B1219] px-4 py-10 text-[#EDF4FA]">
+      <section className="w-full max-w-md rounded-[28px] border border-[#2B4555] bg-[#162631] px-6 py-10 shadow-xl sm:px-10">
         <img src="/evolusystem-logo-dark.svg" alt="EvoluSystem" className="mx-auto mb-7 h-auto w-[250px] max-w-full" />
-        <p className="mt-1 text-center text-xs font-bold uppercase tracking-[.25em] text-[#A6BDD5]">
+        <p className="mt-1 text-center text-xs font-bold uppercase tracking-[.25em] text-[#9BB4C5]">
           Controle Operacional
         </p>
         <h1 className="mt-9 text-xl font-bold">Redefinir senha</h1>
         {checking ? (
-          <p role="status" className="mt-5 flex items-center gap-2 text-sm text-[#ADBED1]">
+          <p role="status" className="mt-5 flex items-center gap-2 text-sm text-[#9BB4C5]">
             <Loader2 className="h-4 w-4 animate-spin" /> Verificando o link de recuperação…
           </p>
         ) : !hasSession ? (
           <div className="mt-5 space-y-5 text-sm text-[#ADBED1]">
             <p>Este link de recuperação está inválido ou expirou. Solicite um novo pelo formulário de acesso.</p>
-            <a href="/login" className="inline-flex min-h-11 items-center font-semibold text-[#73C9FF] hover:underline">
+            <a href="/login" className="inline-flex min-h-11 items-center font-semibold text-[#65D1E9] hover:underline">
               Voltar ao login
             </a>
           </div>
@@ -93,13 +93,13 @@ export default function ResetPassword() {
                   required
                   minLength={8}
                   disabled={saving}
-                  className="h-12 w-full rounded-xl border border-[#39516A] bg-[#112237] text-[#F1F7FD] pl-12 pr-12 focus:border-[#43B6F5] focus:outline-none focus:ring-4 focus:ring-[#43B6F5]/15"
+                  className="h-12 w-full rounded-xl border border-[#2B4555] bg-[#10212C] text-[#EDF4FA] pl-12 pr-12 focus:border-[#65D1E9] focus:outline-none focus:ring-4 focus:ring-[#65D1E9]/15"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((visible) => !visible)}
                   aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                  className="absolute right-2 top-1 flex h-10 w-10 items-center justify-center rounded-lg text-[#9FB6CF] focus-visible:outline-2 focus-visible:outline-[#087DC3]"
+                  className="absolute right-2 top-1 flex h-10 w-10 items-center justify-center rounded-lg text-[#9FB6CF] focus-visible:outline-2 focus-visible:outline-[#65D1E9]"
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
@@ -124,14 +124,14 @@ export default function ResetPassword() {
             <button
               type="submit"
               disabled={saving}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#067DD1] font-bold text-white hover:bg-[#006DB9] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#087DC3] disabled:opacity-60"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#254D62] font-bold text-[#C9EDF8] hover:bg-[#346781] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#087DC3] disabled:opacity-60"
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               Salvar nova senha
             </button>
           </form>
         )}
-        <p className="mt-8 flex items-center justify-center gap-2 text-xs text-[#A2B8CE]">
+        <p className="mt-8 flex items-center justify-center gap-2 text-xs text-[#9BB4C5]">
           <ShieldCheck className="h-4 w-4" aria-hidden="true" /> Acesso protegido
         </p>
       </section>
