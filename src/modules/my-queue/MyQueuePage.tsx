@@ -138,7 +138,7 @@ export default function MyQueuePage() {
   const metrics = useMemo(() => queueMetrics(rows, today), [rows, today]);
   const filtered = useMemo(() => filterQueueRows(rows, { view, search, sector, period, today }),
     [rows, view, search, sector, period, today]);
-  const sectors = useMemo(() => [...new Set(rows.map(row => row.sector))].sort((a, b) =>
+  const sectors = useMemo(() => Array.from(new Set(rows.map(row => row.sector))).sort((a, b) =>
     a.localeCompare(b, "pt-BR")), [rows]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const shown = filtered.slice((Math.min(page, pageCount) - 1) * PAGE_SIZE, Math.min(page, pageCount) * PAGE_SIZE);
