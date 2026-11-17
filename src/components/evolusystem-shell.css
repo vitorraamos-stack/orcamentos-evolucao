@@ -26,8 +26,24 @@
 .evolu-shell__main { background:var(--evolu-page); }
 .dark .evolu-shell__main { background:var(--background); }
 @media(max-width:767px) {
-  .evolu-shell__topbar { height:56px; }
-  .evolu-shell__main { padding:16px; }
+  /* A única rolagem vertical acontece no conteúdo, nunca atrás do menu inferior. */
+  .evolu-shell { height: 100dvh; min-height: 0; overflow: hidden; }
+  .evolu-shell__content { min-height: 0; }
+  .evolu-shell__topbar {
+    height: calc(60px + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+    background: var(--evolu-page);
+    border-bottom-color: var(--evolu-border);
+  }
+  .evolu-shell__main {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px;
+  }
   .evolu-shell__branding { padding-top:22px; padding-bottom:18px; }
 }
 @media(prefers-reduced-motion:reduce) { .evolu-shell__navigation .evolu-nav__item { transition:none; } }
@@ -79,15 +95,9 @@ body:has(.evolu-shell--order-detail) {
   font-variant-numeric: tabular-nums;
 }
 
-/* PWA v2: respeita a câmera/entalhe e o indicador de início quando instalado. */
+/* PWA v2: o cabeçalho e o dock respeitam safe-area tanto no app quanto no navegador.
+   O menu lateral instalado também precisa ficar acima do indicador de início. */
 @media (max-width: 767px) and (display-mode: standalone) {
-  .evolu-shell__topbar {
-    height: calc(56px + env(safe-area-inset-top, 0px));
-    padding-top: env(safe-area-inset-top, 0px);
-  }
-  .evolu-shell__main {
-    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  }
   [data-slot="sheet-content"]:has(.evolu-shell__branding) .evolu-shell__account {
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
@@ -98,10 +108,10 @@ body:has(.evolu-shell--order-detail) {
 .evolu-shell__mobile-nav { display: none; }
 @media (max-width: 767px) {
   .evolu-shell__mobile-nav {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    /* Participa do fluxo do shell; não cobre mais o rodapé dos módulos. */
+    position: relative;
+    flex: 0 0 auto;
+    width: 100%;
     z-index: 40;
     display: flex;
     align-items: stretch;
@@ -163,7 +173,8 @@ body:has(.evolu-shell--order-detail) {
     font-variant-numeric: tabular-nums;
   }
   .evolu-shell__main {
-    padding-bottom: calc(94px + env(safe-area-inset-bottom, 0px)) !important;
+    /* O espaço do dock já é reservado pela coluna flex. */
+    padding-bottom: 16px !important;
   }
   .evolu-shell__offline-notice {
     padding: 8px 16px;
@@ -179,7 +190,7 @@ body:has(.evolu-shell--order-detail) {
     display: none;
   }
   .evolu-shell:has(input:focus, textarea:focus, [contenteditable="true"]:focus) .evolu-shell__main {
-    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: 16px !important;
   }
 }
 @media (min-width: 768px) {
