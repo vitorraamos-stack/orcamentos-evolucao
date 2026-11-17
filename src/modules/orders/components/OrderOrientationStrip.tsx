@@ -20,8 +20,8 @@ export function OrderOrientationStrip({ order, onGoProduction }: {
     <div className="min-w-0 flex-1">
       <h2 className="text-sm font-semibold">Acompanhamento operacional</h2>
       <p className="mt-1 break-words text-xs text-muted-foreground">
-        {labels[stage] ? "Etapa atual registrada: " + labels[stage] + ". " : "Etapa atual não informada. "}
-        Consulte as operações de Produção para verificar tarefas e responsáveis. Nenhuma tarefa foi presumida.
+        {labels[stage] ? "Etapa registrada: " + labels[stage] + ". " : "Etapa atual não informada. "}
+        <span className="evolu-detail__orientation-extra">Consulte as operações de Produção para verificar tarefas e responsáveis. Nenhuma tarefa foi presumida.</span>
       </p>
     </div>
     <Button type="button" variant="outline" className="min-h-11" onClick={onGoProduction}>
