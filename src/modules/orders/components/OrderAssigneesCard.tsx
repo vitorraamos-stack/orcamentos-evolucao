@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { UsersRound } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AssigneeScope, OrderAssignee, UserOption } from "../types/orderDetail";
@@ -37,7 +38,7 @@ export function OrderAssigneesCard({ assignees, users, canEdit, onChange }: Prop
     }
   };
 
-  return <Card className="evolu-detail__section-card"><CardHeader className="evolu-detail__section-header"><CardTitle>Responsáveis</CardTitle></CardHeader>
+  return <Card className="evolu-detail__section-card"><CardHeader className="evolu-detail__section-header"><div className="evolu-detail__card-heading"><UsersRound className="size-5" aria-hidden="true" /><CardTitle>Responsáveis</CardTitle></div></CardHeader>
     <CardContent className="space-y-3">
       {scopes.map(scope => {
         const assignee = assignees.find(item => item.scope === scope.value);
