@@ -83,6 +83,9 @@
       "destination": "/index.html"
     }
   ],
+  "crons": [
+    { "path": "/api/push/dispatch", "schedule": "*/2 * * * *" }
+  ],
   "git": {
     "deploymentEnabled": {
       "feat/os-detail-uxui-integrated-20261030": false,
@@ -107,7 +110,8 @@
       "feat/pwa-v4-release-readiness-20261111": false,
       "feat/pwa-v4-canary-registration-20261111": false,
       "feat/pwa-v4-manual-pilot-test-20261116": false,
-      "feat/pwa-v4-background-remote-pilot-20261116": false
+      "feat/pwa-v4-background-remote-pilot-20261116": false,
+      "feat/pwa-v4-operational-canary-scheduler-20261117": false
     }
   }
 }

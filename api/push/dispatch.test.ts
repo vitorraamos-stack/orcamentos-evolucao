@@ -111,6 +111,19 @@ describe("PWA V4 2E — dispatch com flags independentes",()=>{
     expect(s.finish).toHaveBeenCalledWith(job.job_id,job.attempt_number,{status:null,outcome:"discarded"});
     expect(res.body).toMatchObject({discarded:1,sent:0});
   });
+  it("não envia caixa de Arte ou reagendamentos no piloto inicial",async()=>{
+    const skipped:PushJob[]=[
+      {...job,kind:"art_inbox",job_id:"123e4567-e89b-42d3-a456-426614174004"},
+      {...job,kind:"installation_rescheduled",job_id:"123e4567-e89b-42d3-a456-426614174005"},
+    ];
+    const s=store(skipped),res=response(),sender=vi.fn();
+    await handlePushDispatch({method:"GET",headers},res,{env,store:s,sender});
+    expect(sender).not.toHaveBeenCalled();
+    expect(res.body).toMatchObject({claimed:2,sent:0,discarded:2});
+    expect(s.finish).toHaveBeenCalledTimes(2);
+    expect(s.finish).toHaveBeenCalledWith(skipped[0].job_id,1,{status:null,outcome:"discarded"});
+    expect(s.finish).toHaveBeenCalledWith(skipped[1].job_id,1,{status:null,outcome:"discarded"});
+  });
   it("não vaza erro interno ou segredo se banco falhar",async()=>{
     const s=store([job]),res=response();
     vi.mocked(s.expand).mockRejectedValueOnce(new Error("service-role-secret"));
