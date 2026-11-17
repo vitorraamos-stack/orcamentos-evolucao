@@ -111,6 +111,6 @@ describe("EvoluSystem — OS detail premium visual contract", () => {
     expect(styles).toContain(".dark .evolu-detail__flow-panel {");
     expect(styles).toContain(".dark .evolu-detail__flow-panel > .evolu-detail__orientation {");
     expect(styles).toContain("grid-template-columns: repeat(4, minmax(0, 1fr));");
-  });;
+  });
 
 });
