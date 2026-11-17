@@ -1274,3 +1274,45 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+
+/* Small semantic icons aid scanning without additional badge noise. */
+.dark .evolu-detail__card-heading {
+  display: inline-flex;
+  min-width: 0;
+  gap: 10px;
+  align-items: center;
+  color: #66d0ff;
+}
+.dark .evolu-detail__card-heading [data-slot="card-title"] {
+  color: #fff;
+  min-width: 0;
+}
+.dark .evolu-detail__product-icon {
+  display: inline-flex;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #3a5067;
+  color: #e0f3ff;
+}
+.dark .evolu-detail__section-card > [data-slot="card-content"] p {
+  overflow-wrap: anywhere;
+}
+.dark .evolu-detail .evolu-detail__section-card > .evolu-detail__section-header > span {
+  color: #d7e3f1;
+}
+.dark .evolu-detail__section-card [data-slot="select-trigger"]:focus-visible,
+.dark .evolu-detail__orientation button:focus-visible {
+  outline: 2px solid #7dd9ff;
+  outline-offset: 2px;
+}
+@media (max-width: 700px) {
+  .dark .evolu-detail__products-card [data-slot="card-content"] > ol > li {
+    flex-wrap: nowrap;
+  }
+  .dark .evolu-detail__tab { min-height: 44px; }
+}
