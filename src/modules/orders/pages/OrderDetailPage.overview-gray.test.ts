@@ -16,9 +16,9 @@ describe("OS detail: accessible slate visual hierarchy", () => {
   });
 
   it("distinguishes page, cards, interactive elements and semantics", () => {
-    for (const value of ["--os-page: #121d2b;", "--os-card: #1d2b3c;",
-      "--os-card-raised: #27384b;", "--os-text: #f5f8fd;",
-      "--os-muted: #c5d2e0;", "background: #0878c8;",
+    for (const value of ["--os-page: var(--evolu-page);", "--os-card: var(--evolu-panel);",
+      "--os-card-raised: var(--evolu-panel-raised);", "--os-text: var(--evolu-text);",
+      "--os-muted: var(--evolu-text-muted);", "background: var(--evolu-action-bg);",
       '[data-tone="success"]', '[data-tone="warning"]', '[data-tone="danger"]']) {
       expect(styles).toContain(value);
     }
