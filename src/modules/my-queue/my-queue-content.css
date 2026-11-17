@@ -5,6 +5,17 @@
   margin-left: 0;
   margin-right: 0;
 }
+/* O shell utiliza um gradiente e possui padding externo. Na fila pessoal,
+   pintamos também esse espaço com o mesmo fundo da página para evitar o
+   retângulo visível na transição entre os dois backgrounds. O :has limita
+   esta regra à rota que renderiza .myq-page, sem alterar outros módulos. */
+.dark .evolu-shell__main:has(.myq-page),
+.evolu-shell__main:has(.myq-page) {
+  background: #0b1219;
+}
+.evolu-shell__main > div:has(> .myq-page) {
+  background: #0b1219;
+}
 /* Estilos da fila pessoal; nenhum seletor abaixo estiliza a navegação global. */
 .myq-page {
   display: flex; flex-direction: column; gap: 15px;
