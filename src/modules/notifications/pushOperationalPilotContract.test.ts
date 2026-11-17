@@ -21,6 +21,7 @@ describe("PWA V4: operating pilot boundaries",()=>{
   });
   it("cannot materialize or claim jobs for users beyond the canary",()=>{
     expect(dispatch).toContain("pushCanaryUserIds(env)");
+    expect(dispatch).toContain("canaryUserIds.length !== 1");
     expect(store).toContain('admin.rpc("push_v4_expand_canary_outbox"');
     expect(store).toContain('admin.rpc("push_v4_claim_canary_jobs"');
     expect(sql).toContain("and x.user_id = any(p_allowed_user_ids)");

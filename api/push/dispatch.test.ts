@@ -81,6 +81,17 @@ describe("PWA V4 2E — dispatch com flags independentes",()=>{
     expect(s.claim).not.toHaveBeenCalled();
     expect(sender).not.toHaveBeenCalled();
   });
+  it("recusa allowlist com múltiplos usuários para garantir piloto único",async()=>{
+    const s=store([job]),res=response(),sender=vi.fn();
+    await handlePushDispatch({method:"GET",headers},res,{
+      env:{...env,PWA_PUSH_CANARY_USER_IDS:env.PWA_PUSH_CANARY_USER_IDS+",123e4567-e89b-42d3-a456-426614174111"},
+      store:s,sender
+    });
+    expect(res.statusCode).toBe(503);
+    expect(s.expand).not.toHaveBeenCalled();
+    expect(s.claim).not.toHaveBeenCalled();
+    expect(sender).not.toHaveBeenCalled();
+  });
   it("recusa VAPID ausente ou inconsistente",async()=>{
     const s=store(),res=response();
     await handlePushDispatch({method:"GET",headers},res,{

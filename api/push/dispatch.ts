@@ -70,7 +70,7 @@ export async function handlePushDispatch(
   // Sending has its own fail-closed pilot gate, independent of the registration gate.
   // No unallowlisted recipient may be claimed, even if a subscription already exists.
   const canaryUserIds = Array.from(pushCanaryUserIds(env));
-  if (canaryUserIds.length === 0) {
+  if (canaryUserIds.length !== 1) {
     json(res,503,{ok:false,code:"push_canary_configuration_missing"});
     return;
   }
