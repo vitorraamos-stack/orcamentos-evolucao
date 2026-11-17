@@ -40,9 +40,9 @@ export default function InitialRoute() {
       const permissions = buildAuthorizationSnapshot(profileResponse.data?.role ?? null).permissions;
       const has = (key: string) => access.has(key);
 
-      // The Central de OS is the default landing page whenever authorized.
+      // Minha Fila é a entrada padrão para usuários autorizados à Central de OS.
       const target =
-        (permissions.canViewHubOS && has("hub_os") && "/os") ||
+        (permissions.canViewHubOS && has("hub_os") && "/minha-fila") ||
         (permissions.canCreateOs && has("orcamentista") && "/orcamentista") ||
         (has("impressao_estoque") && "/impressao-estoque") ||
         (has("calculadora") && "/calculadora") ||
