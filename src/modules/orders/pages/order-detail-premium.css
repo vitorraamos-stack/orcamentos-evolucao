@@ -754,17 +754,17 @@
    Presentation-only. No changes to domain data, transitions or permissions.
    --------------------------------------------------------------------------- */
 .dark .evolu-detail {
-  --detail-border: #405267;
-  --detail-ink: #f5f8fd;
-  --detail-muted: #c5d2e0;
-  --detail-blue: #59c8fc;
-  --os-page: #121d2b;
-  --os-card: #1d2b3c;
-  --os-card-raised: #27384b;
-  --os-card-deep: #172536;
-  --os-interactive: #087acb;
-  --os-text: #f5f8fd;
-  --os-muted: #c5d2e0;
+  --detail-border: var(--evolu-border);
+  --detail-ink: var(--evolu-text);
+  --detail-muted: var(--evolu-text-muted);
+  --detail-blue: var(--evolu-highlight);
+  --os-page: var(--evolu-page);
+  --os-card: var(--evolu-panel);
+  --os-card-raised: var(--evolu-panel-raised);
+  --os-card-deep: var(--evolu-field);
+  --os-interactive: var(--evolu-action-bg);
+  --os-text: var(--evolu-text);
+  --os-muted: var(--evolu-text-muted);
   color: var(--os-text);
   background: var(--os-page);
   border-radius: 16px;
@@ -781,7 +781,7 @@
   font-weight: 600;
   color: #e4ecf6;
 }
-.dark .evolu-detail__back-link:hover { background: #27394c; }
+.dark .evolu-detail__back-link:hover { background: var(--evolu-panel-raised); }
 .dark .evolu-detail__overview {
   display: grid;
   gap: 14px;
@@ -816,7 +816,7 @@
   width: 4px;
   height: 29px;
   border-radius: 99px;
-  background: #2bb7f4;
+  background: var(--evolu-highlight);
 }
 .dark .evolu-detail__identity { column-gap: 13px; row-gap: 8px; align-items: center; }
 .dark .evolu-detail__identity .evolu-detail__number {
@@ -865,20 +865,20 @@
   border-radius: 9px;
 }
 .dark .evolu-detail__transition-button {
-  color: #f5f8fd;
-  background: #1c2a3a;
-  border: 1px solid #637489;
+  color: var(--evolu-text);
+  background: var(--evolu-panel-raised);
+  border: 1px solid var(--evolu-border);
 }
-.dark .evolu-detail__transition-button:hover { background: #30445a; }
+.dark .evolu-detail__transition-button:hover { background: var(--evolu-action-bg); }
 .dark .evolu-detail__edit-button,
 .dark .evolu-detail .bg-primary.text-primary-foreground {
-  color: #fff;
-  background: #0875bf;
-  border: 1px solid #299be4;
+  color: var(--evolu-action-text);
+  background: var(--evolu-action-bg);
+  border: 1px solid #41738B;
 }
 .dark .evolu-detail__edit-button:hover,
 .dark .evolu-detail .bg-primary.text-primary-foreground:hover {
-  background: #075c98;
+  background: var(--evolu-action-hover);
 }
 .dark .evolu-detail__overview .evolu-detail__quick-info {
   display: grid;
@@ -903,8 +903,8 @@
   width: 40px;
   height: 40px;
   border-radius: 11px;
-  background: #354d61;
-  color: #64d0ff;
+  background: var(--evolu-action-bg);
+  color: var(--evolu-highlight);
 }
 .dark .evolu-detail__quick-info-icon svg { width: 21px; height: 21px; }
 .dark .evolu-detail__quick-info dt { color: #cad7e4; font-size: 12px; font-weight: 500; }
@@ -971,7 +971,7 @@
 }
 .dark .evolu-detail__stage-bubble--current {
   border-color: #a4e4ff;
-  background: #087ecc;
+  background: var(--evolu-action-bg);
   box-shadow: 0 0 0 3px #244965;
   color: #fff;
 }
@@ -1034,7 +1034,7 @@
   flex: 0 0 auto;
   color: #f4faff;
   border: 1px solid #299ddf;
-  background: #254157;
+  background: var(--evolu-action-bg);
   border-radius: 9px;
   font-size: 12px;
   padding-inline: 11px;
@@ -1060,15 +1060,15 @@
   font-weight: 600;
 }
 .dark .evolu-detail__tab[data-state="active"] {
-  color: #fff;
-  background: #0878c8;
-  box-shadow: inset 0 -3px 0 #45c9ff;
+  color: var(--evolu-action-text);
+  background: var(--evolu-action-bg);
+  box-shadow: inset 0 -3px 0 var(--evolu-highlight);
 }
 .dark .evolu-detail__tab:hover:not([data-state="active"]) {
   background: #35495d;
   color: #fff;
 }
-.dark .evolu-detail__tab:focus-visible { outline: 2px solid #7fdfff; outline-offset: 1px; }
+.dark .evolu-detail__tab:focus-visible { outline: 2px solid var(--evolu-highlight); outline-offset: 1px; }
 /* Consistent card surfaces and left-primary/right-management hierarchy. */
 .dark .evolu-detail__tab-content [data-slot="card"],
 .dark .evolu-detail__management-grid > [data-slot="card"] {
@@ -1116,7 +1116,7 @@
   overflow: hidden;
   border-color: #4b5d70;
   border-radius: 10px;
-  background: #27384b;
+  background: var(--evolu-panel-raised);
 }
 .dark .evolu-detail__products-card [data-slot="card-content"] > ol > li {
   align-items: center;
@@ -1163,7 +1163,7 @@
 .dark .evolu-detail__management-grid [data-slot="select-trigger"] {
   min-height: 37px;
   border: 1px solid #5d7186;
-  background: #152233;
+  background: var(--evolu-field);
   color: #f7fbff;
   border-radius: 9px;
 }
@@ -1296,7 +1296,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 10px;
-  background: #3a5067;
+  background: var(--evolu-action-bg);
   color: #e0f3ff;
 }
 .dark .evolu-detail__section-card > [data-slot="card-content"] p {
@@ -1307,7 +1307,7 @@
 }
 .dark .evolu-detail__section-card [data-slot="select-trigger"]:focus-visible,
 .dark .evolu-detail__orientation button:focus-visible {
-  outline: 2px solid #7dd9ff;
+  outline: 2px solid var(--evolu-highlight);
   outline-offset: 2px;
 }
 @media (max-width: 700px) {
