@@ -80,7 +80,7 @@ export async function listMyQueue(userId: string, allowInstallations: boolean): 
     return (data ?? []) as Installation[];
   }) : [];
   const installationMap = new Map([...ownInstallations, ...teamInstallations].map(row => [row.id, row]));
-  const installations = [...installationMap.values()];
+  const installations = Array.from(installationMap.values());
 
   const itemRows = await chunks(operations.map(row => row.item_id), async ids => {
     const { data, error } = await supabase.from("os_order_items")
