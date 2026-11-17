@@ -23,7 +23,8 @@ describe("EvoluSystem readable typography scale", () => {
     expect(shell).toMatch(/\.evolu-shell__navigation \.evolu-nav__section\s*\{[^}]*font-size:13px/);
     expect(shell).toMatch(/\.evolu-shell__navigation \.evolu-nav__item\s*\{[^}]*font-size:15px/s);
     expect(dashboard).toMatch(/\.evolu-dashboard__eyebrow\s*\{[^}]*font-size:\s*13px;\s*font-weight:\s*750/s);
-    expect(dashboard).toMatch(/\.evolu-dashboard__indicator-label\s*\{[^}]*font-size:\s*15px/s);
+    // Os cards de indicadores adotam o título compacto (12px) da Minha Fila.
+    expect(dashboard).toMatch(/\.evolu-dashboard__indicator-label\s*\{[^}]*font-size:\s*12px/s);
     expect(dashboard).toContain(".evolu-dashboard__priority-title");
     expect(dashboard).toContain("font-size: 15px; font-weight: 700");
     expect(primitives).toMatch(/\.evolu-ui-filter-control\s*\{[^}]*font-size: 15px/s);
