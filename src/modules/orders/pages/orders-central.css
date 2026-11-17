@@ -91,6 +91,12 @@
 .evolu-orders__mobile-card:hover { border-color: #c2dcec; }
 .evolu-orders__footer { padding: 5px 2px 0; }
 .dark .evolu-orders { color: var(--foreground); }
+.dark .evolu-orders__eyebrow { color: var(--evolu-highlight); }
+.dark .evolu-orders__heading header p,
+.dark .evolu-orders__table-heading p,
+.dark .evolu-orders__live-hint,
+.dark .evolu-orders__quick-hint { color: var(--muted-foreground); }
+.dark .evolu-orders__toolbar input { background: var(--evolu-field); }
 .dark .evolu-orders__heading h1,
 .dark .evolu-orders__table-heading h2,
 .dark .evolu-orders__quick-label { color: var(--foreground); }
