@@ -8,6 +8,7 @@ import {
   Calculator,
   LayoutDashboard,
   ClipboardList,
+  ListTodo,
   Image,
   Palette,
   Factory,
@@ -42,6 +43,7 @@ interface LayoutProps {
 }
 
 const mobileTabIcons: Record<MobileShortcutId, LucideIcon> = {
+  myQueue: ListTodo,
   orders: ClipboardList,
   art: Palette,
   production: Factory,
@@ -155,9 +157,10 @@ export default function Layout({ children }: LayoutProps) {
   const hasManagementModules = canViewFinanceiro || canViewConfiguracoes || canViewOperationalSettings || canManageLibrary || canViewPricing;
 
   const mobileShortcuts = getMobileShortcuts({
+    myQueue: canViewHubOs,
     orders: canViewHubOs,
-    art: canViewArteBoard,
-    production: canViewProducaoBoard,
+    art: false, // Substituído pela fila pessoal.
+    production: false, // Substituído pela fila pessoal.
     installations: canViewInstallations,
     deliveries: canViewDeliveries,
     estimator: canViewOrcamentista,
@@ -170,10 +173,9 @@ export default function Layout({ children }: LayoutProps) {
   });
 
   const operationalLinks = [
-    ...(canViewDashboard ? [{ href: "/hub-os", label: "Dashboard", Icon: LayoutDashboard, active: location === "/hub-os" }] : []),
+    ...(canViewHubOs ? [{ href: "/minha-fila", label: "Minha Fila", Icon: ListTodo, active: location === "/minha-fila" }] : []),
+    ...(canViewDashboard ? [{ href: "/hub-os", label: "Dashboard Operacional", Icon: LayoutDashboard, active: location === "/hub-os" }] : []),
     ...(canViewHubOs ? [{ href: "/os", label: "Ordens de Serviço", Icon: ClipboardList, active: operationalNav.orders }] : []),
-    ...(canViewArteBoard ? [{ href: "/os/arte", label: "Arte", Icon: Palette, active: operationalNav.art }] : []),
-    ...(canViewProducaoBoard ? [{ href: "/os/producao", label: "Produção", Icon: Factory, active: operationalNav.production }] : []),
     ...(canViewInstallations
       ? [{ href: "/instalacoes", label: "Instalações", Icon: CalendarDays, active: location.startsWith("/instalacoes") }]
       : []),
