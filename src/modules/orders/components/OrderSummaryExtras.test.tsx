@@ -36,17 +36,15 @@ describe("OS summary supplemental sections", () => {
     expect(html).not.toContain("Letreiro de acrílico 7");
   });
 
-  it("keeps only the left blue accent on a neutral products card", () => {
+  it("uses a neutral product surface and a compact item summary", () => {
     const css = readFileSync(new URL("../pages/order-detail-premium.css", import.meta.url), "utf8");
-    const productStyles = css.slice(css.indexOf("/* OS summary: neutral product card"));
-    expect(productStyles).toContain("border-color: var(--detail-border);");
-    expect(productStyles).toContain("border-left: 3px solid #168fce;");
-    expect(productStyles).toContain("background: var(--card);");
-    expect(productStyles).toContain("background: transparent;");
-    expect(productStyles).toContain("border-bottom: 1px solid var(--detail-border);");
-    expect(productStyles).toContain("border-left-color: #35a6dc;");
-    expect(productStyles).toContain("border-bottom-color: var(--border);");
-    expect(productStyles).not.toContain("color-mix");
+    const redesign = css.slice(css.indexOf("OS detail — high-legibility slate workspace"));
+    expect(redesign).toContain(".dark .evolu-detail .evolu-detail__tab-content .evolu-detail__products-card {");
+    expect(redesign).toContain("background: var(--os-card);");
+    expect(redesign).toContain(".dark .evolu-detail__product-icon {");
+    const html = render();
+    expect(html).toContain("1 item");
+    expect(html).toContain("Ver todos os itens");
   });
   it("removes the unused visual reference card while retaining products", () => {
     const html = render();

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Box, ChevronRight, Factory, History, LayoutGrid, MessageCircle, Paperclip, Truck } from "lucide-react";
 import "./order-detail-premium.css";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -334,10 +334,12 @@ export default function OrderDetailPage() {
     </nav>
     <div className="evolu-detail__overview">
       <OrderHeader order={detail.order} assignees={detail.assignees} canEdit={canEditOrder} canManage={hubPermissions.isManager} onArchive={()=>setArchiveOpen(true)} onDelete={()=>setDeleteOpen(true)} transitions={allowed} onTransition={moveStatus} onEdit={() => setEditOpen(true)} />
-      <OrderFlowProgress order={detail.order} />
+      <div className="evolu-detail__flow-panel">
+        <OrderFlowProgress order={detail.order} />
+        <OrderOrientationStrip order={detail.order} onGoProduction={() => selectTab("production")} />
+      </div>
     </div>
-    <OrderOrientationStrip order={detail.order} onGoProduction={() => selectTab("production")} />
-    <Tabs className="evolu-detail__tabs" key={orderId} value={activeTab} onValueChange={selectTab}><div className="evolu-detail__tabs-scroll overflow-x-auto"><TabsList aria-label="Seções da ordem de serviço" className="evolu-detail__tabs-list w-max min-w-full justify-start"><TabsTrigger className="evolu-detail__tab" value="summary">Resumo</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="items">Itens</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="production">Produção</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="installation">Instalação / Entrega</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="files">Arquivos</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="comments">Comentários</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="history">Histórico</TabsTrigger></TabsList></div>
+    <Tabs className="evolu-detail__tabs" key={orderId} value={activeTab} onValueChange={selectTab}><div className="evolu-detail__tabs-scroll overflow-x-auto"><TabsList aria-label="Seções da ordem de serviço" className="evolu-detail__tabs-list w-max min-w-full justify-start"><TabsTrigger className="evolu-detail__tab" value="summary"><LayoutGrid className="size-4 shrink-0" aria-hidden="true" />Resumo</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="items"><Box className="size-4 shrink-0" aria-hidden="true" />Itens</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="production"><Factory className="size-4 shrink-0" aria-hidden="true" />Produção</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="installation"><Truck className="size-4 shrink-0" aria-hidden="true" />Instalação / Entrega</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="files"><Paperclip className="size-4 shrink-0" aria-hidden="true" />Arquivos</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="comments"><MessageCircle className="size-4 shrink-0" aria-hidden="true" />Comentários</TabsTrigger><TabsTrigger className="evolu-detail__tab" value="history"><History className="size-4 shrink-0" aria-hidden="true" />Histórico</TabsTrigger></TabsList></div>
       <TabsContent className="evolu-detail__tab-content space-y-4" value="summary">
       <div className="evolu-detail__summary-columns grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.85fr)_minmax(320px,1fr)] lg:items-start">
         <div className="min-w-0 space-y-4">

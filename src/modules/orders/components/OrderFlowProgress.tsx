@@ -49,7 +49,7 @@ export function OrderFlowProgress({ order }: {
                 >{index + 1}</span>
                 <span className={cn("evolu-detail__stage-label mt-2 text-xs", isCurrent && "font-bold")}>{stage.label}</span>
               </div>
-              {index < stages.length - 1 && <span aria-hidden="true" className="evolu-detail__stage-line mt-[18px] h-0.5 flex-1 bg-border" />}
+              {index < stages.length - 1 && <span aria-hidden="true" className={cn("evolu-detail__stage-line mt-[18px] h-0.5 flex-1 bg-border", isEarlier && "evolu-detail__stage-line--before-current")} />}
             </li>;
           })}
         </ol>

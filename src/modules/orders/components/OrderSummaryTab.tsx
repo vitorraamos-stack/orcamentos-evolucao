@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Info } from "lucide-react";
 import type { OsOrder } from "@/features/hubos/types";
 
 const field = (label: string, value: React.ReactNode) => (
@@ -19,7 +20,7 @@ export function OrderSummaryTab({ order }: { order: OsOrder }) {
   return (
     <Card className="evolu-detail__section-card min-w-0">
       <CardHeader className="evolu-detail__section-header">
-        <CardTitle>Informações complementares</CardTitle>
+        <div className="evolu-detail__card-heading"><Info className="size-5" aria-hidden="true" /><CardTitle>Informações complementares</CardTitle></div>
       </CardHeader>
       <CardContent className="space-y-5">
         <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
