@@ -12,26 +12,96 @@
   background: linear-gradient(to right, #009fe3 45%, #ed008c 45%, #ed008c 75%, #ffda00 75%);
 }
 .evolu-dashboard__updated { font-size: 13px; color: var(--muted-foreground); margin: -8px 0 18px; }
-.evolu-dashboard__indicators { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+/* Cards operacionais seguem o mesmo padrão de superfícies da Minha Fila,
+   preservando ícones, valores e navegação individual de cada indicador. */
+.evolu-dashboard__indicators { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .evolu-dashboard__indicator {
-  min-width: 0; display: flex; flex-direction: column; gap: 12px; padding: 18px;
-  border: 1px solid var(--border); border-left: 4px solid var(--primary);
-  background: var(--card); color: var(--card-foreground); border-radius: 16px;
-  transition: border-color .15s, box-shadow .15s, transform .15s;
+  min-width: 0;
+  min-height: 138px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 15px 16px 13px;
+  border: 1px solid var(--evolu-border);
+  border-radius: 13px;
+  background: var(--evolu-panel);
+  color: var(--evolu-text);
+  text-decoration: none;
+  transition: background-color .15s, border-color .15s;
 }
-.evolu-dashboard__indicator:hover, .evolu-dashboard__priority:hover,
+.evolu-dashboard__indicator:hover {
+  background: #1b3342;
+  border-color: #5bc3e7;
+  box-shadow: none;
+}
+.evolu-dashboard__priority:hover,
 .evolu-dashboard__sector--link:hover { border-color: var(--primary); box-shadow: 0 8px 22px -17px rgba(7, 84, 140, .7); }
 .evolu-dashboard__indicator:focus-visible, .evolu-dashboard__priority:focus-visible,
 .evolu-dashboard__sector--link:focus-visible, .evolu-dashboard__text-link:focus-visible {
   outline: 2px solid var(--ring); outline-offset: 3px;
 }
-.evolu-dashboard__indicator--danger { border-left-color: var(--evolu-danger); }
-.evolu-dashboard__indicator--warning { border-left-color: var(--evolu-warning); }
-.evolu-dashboard__indicator-label { display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 650; }
-.evolu-dashboard__indicator-value { font-size: clamp(2rem, 3vw, 2.6rem); line-height: 1; font-weight: 750; font-variant-numeric: tabular-nums; }
-.evolu-dashboard__indicator-hint, .evolu-dashboard__text-link {
-  display: inline-flex; align-items: center; gap: 6px; font-size: 13px;
-  font-weight: 600; color: var(--primary);
+.evolu-dashboard__indicator-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-width: 0;
+  color: #b2c9d6;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+.evolu-dashboard__indicator-label svg {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  padding: 5px;
+  border-radius: 50%;
+  color: #92def0;
+  background: #2a627a;
+}
+.evolu-dashboard__indicator--warning .evolu-dashboard__indicator-label svg {
+  color: #f7bb70;
+  background: #735b3a;
+}
+.evolu-dashboard__indicator--danger .evolu-dashboard__indicator-label svg {
+  color: #ff8999;
+  background: #70424d;
+}
+.evolu-dashboard__indicator--today .evolu-dashboard__indicator-label svg {
+  color: #f7bb70;
+  background: #735b3a;
+}
+.evolu-dashboard__indicator-value {
+  color: #f2f7fb;
+  font-size: 37px;
+  line-height: 1.13;
+  font-weight: 750;
+  letter-spacing: -.8px;
+  font-variant-numeric: tabular-nums;
+}
+.evolu-dashboard__indicator--warning .evolu-dashboard__indicator-value,
+.evolu-dashboard__indicator--today .evolu-dashboard__indicator-value { color: var(--evolu-warning); }
+.evolu-dashboard__indicator--danger .evolu-dashboard__indicator-value { color: var(--evolu-danger); }
+.evolu-dashboard__indicator-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  color: var(--evolu-highlight);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+.evolu-dashboard__indicator-hint svg { width: 14px; height: 14px; }
+.evolu-dashboard__text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
 }
 .evolu-dashboard__panel { min-width: 0; border-radius: 17px; }
 .evolu-dashboard__panel [data-slot="card-header"] { padding-bottom: 10px; }
@@ -55,8 +125,9 @@
 }
 @media(max-width: 580px) {
   .evolu-dashboard__indicators { gap: 9px; }
-  .evolu-dashboard__indicator { padding: 13px; gap: 9px; }
-  .evolu-dashboard__indicator-label { align-items: flex-start; font-size: 13px; }
+  .evolu-dashboard__indicator { min-height: 126px; padding: 13px; gap: 7px; }
+  .evolu-dashboard__indicator-label { align-items: center; font-size: 12px; }
+  .evolu-dashboard__indicator-label svg { width: 23px; height: 23px; flex-basis: 23px; padding: 4px; }
   .evolu-dashboard__indicator-value { font-size: 31px; }
   .evolu-dashboard__priority-top { flex-direction: column; }
   .evolu-dashboard__priority-reason { max-width: 100%; }
