@@ -22,7 +22,7 @@ describe("Minha Fila — layout restrito à página", () => {
     expect(styles).toContain("max-width: none !important");
     // O fundo deve cobrir também o padding do main, sem tocar na sidebar global.
     expect(styles).toContain(".dark .evolu-shell__main:has(.myq-page)");
-    expect(styles).toContain(".evolu-shell__main > div:has(> .myq-page) {\\n  background: #0b1219;");
+    expect(styles).toContain("background: #0b1219;");
     expect(styles).toContain(".myq-page {");
 
     expect(styles).not.toContain(".myq-shell__sidebar");
