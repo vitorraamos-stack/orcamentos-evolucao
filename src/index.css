@@ -49,81 +49,59 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-:root {
+:root, .dark {
   color-scheme: dark;
-  /* Industrial Precision Theme */
-  /* Base Slate Colors */
-  --background: oklch(0.98 0.005 240); /* Slate-50 ish */
-  --foreground: oklch(0.2 0.02 240); /* Slate-900 */
+  /* Identidade visual única — referência aprovada em Minha Fila de Trabalho. */
+  --evolu-page: #0B1219;
+  --evolu-sidebar-bg: #111E29;
+  --evolu-panel: #162631;
+  --evolu-panel-raised: #1C2935;
+  --evolu-field: #10212C;
+  --evolu-border: #2B4555;
+  --evolu-highlight: #65D1E9;
+  --evolu-text: #EDF4FA;
+  --evolu-text-muted: #9BB4C5;
+  --evolu-action-bg: #254D62;
+  --evolu-action-hover: #346781;
+  --evolu-action-text: #C9EDF8;
+  --evolu-warning: #F7BB70;
+  --evolu-danger: #FF8999;
+  --evolu-success: #6CD8B6;
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.02 240);
-
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.02 240);
-
-  /* Primary Action: Cyan-600 (CMYK Cyan feel) */
-  --primary: oklch(0.6 0.15 230);
-  --primary-foreground: oklch(0.98 0 0);
-
-  --secondary: oklch(0.94 0.01 240); /* Slate-100 */
-  --secondary-foreground: oklch(0.2 0.02 240);
-
-  --muted: oklch(0.94 0.01 240);
-  --muted-foreground: oklch(0.55 0.02 240);
-
-  --accent: oklch(0.94 0.01 240);
-  --accent-foreground: oklch(0.2 0.02 240);
-
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-
-  --border: oklch(0.88 0.01 240); /* Slate-200 */
-  --input: oklch(0.88 0.01 240);
-  --ring: oklch(0.6 0.15 230);
-
-  --radius: 0.3rem; /* Sharper corners for industrial feel */
-
-  /* Sidebar: Dark Slate */
-  --sidebar: oklch(0.2 0.02 240); /* Slate-900 */
-  --sidebar-foreground: oklch(0.98 0.005 240);
-  --sidebar-primary: oklch(0.6 0.15 230);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.25 0.02 240);
-  --sidebar-accent-foreground: oklch(0.98 0.005 240);
-  --sidebar-border: oklch(0.3 0.02 240);
-  --sidebar-ring: oklch(0.6 0.15 230);
-}
-
-.dark {
-  color-scheme: dark;
-  --background: oklch(0.17 0.021 245);
-  --foreground: oklch(0.95 0.008 240);
-  --card: oklch(0.215 0.019 245);
-  --card-foreground: oklch(0.95 0.008 240);
-  --popover: oklch(0.215 0.019 245);
-  --popover-foreground: oklch(0.98 0.005 240);
-  --primary: oklch(0.6 0.15 230);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.25 0.01 240);
-  --secondary-foreground: oklch(0.98 0.005 240);
-  --muted: oklch(0.275 0.014 245);
-  --muted-foreground: oklch(0.735 0.012 245);
-  --accent: oklch(0.25 0.01 240);
-  --accent-foreground: oklch(0.98 0.005 240);
-  --destructive: oklch(0.5 0.2 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.335 0.014 245);
-  --input: oklch(0.335 0.014 245);
-  --ring: oklch(0.6 0.15 230);
-  --sidebar: oklch(0.12 0.01 240);
-  --sidebar-foreground: oklch(0.98 0.005 240);
-  --sidebar-primary: oklch(0.6 0.15 230);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.2 0.01 240);
-  --sidebar-accent-foreground: oklch(0.98 0.005 240);
-  --sidebar-border: oklch(0.25 0.01 240);
-  --sidebar-ring: oklch(0.6 0.15 230);
+  /* Tokens semânticos existentes; layouts e tamanhos não são alterados. */
+  --background: var(--evolu-page);
+  --foreground: var(--evolu-text);
+  --card: var(--evolu-panel);
+  --card-foreground: var(--evolu-text);
+  --popover: var(--evolu-panel);
+  --popover-foreground: var(--evolu-text);
+  --primary: var(--evolu-highlight);
+  --primary-foreground: var(--evolu-page);
+  --secondary: var(--evolu-panel-raised);
+  --secondary-foreground: var(--evolu-text);
+  --muted: var(--evolu-panel-raised);
+  --muted-foreground: var(--evolu-text-muted);
+  --accent: #244B61;
+  --accent-foreground: var(--evolu-text);
+  --destructive: var(--evolu-danger);
+  --destructive-foreground: var(--evolu-page);
+  --border: var(--evolu-border);
+  --input: var(--evolu-border);
+  --ring: var(--evolu-highlight);
+  --radius: 0.3rem;
+  --chart-1: var(--evolu-highlight);
+  --chart-2: var(--evolu-success);
+  --chart-3: var(--evolu-warning);
+  --chart-4: var(--evolu-danger);
+  --chart-5: #BBA3FF;
+  --sidebar: var(--evolu-sidebar-bg);
+  --sidebar-foreground: var(--evolu-text);
+  --sidebar-primary: var(--evolu-action-bg);
+  --sidebar-primary-foreground: var(--evolu-action-text);
+  --sidebar-accent: #1D3A4C;
+  --sidebar-accent-foreground: var(--evolu-text);
+  --sidebar-border: var(--evolu-border);
+  --sidebar-ring: var(--evolu-highlight);
 }
 
 @layer base {
