@@ -8,10 +8,11 @@ import type { OrderAssignee } from "../types/orderDetail";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CalendarDays, ChevronDown, MapPinned, Pencil, UserRound } from "lucide-react";
+import { CalendarDays, ChevronDown, Layers3, Pencil, Truck, UserRound } from "lucide-react";
 import { isOrderUrgent } from "@/features/hubos/orderUrgency";
 import { OrderActionsMenu } from "./OrderActionsMenu";
 import { formatOfficialOsLabel } from "../orderOfficialNumber";
+import { getOrderOperationalStage } from "../services/orderTransitions";
 
 const date = (value: string | null) =>
   value
@@ -43,6 +44,12 @@ export function OrderHeader({
   const general =
     assignees.find(item => item.scope === "GENERAL")?.user?.name ??
     "Não definido";
+  const stage = getOrderOperationalStage(order);
+  const stageNames: Record<string, string> = {
+    ENTRY: "Entrada", ART: "Arte", APPROVAL: "Aprovação",
+    PRODUCTION: "Produção", FINISHING: "Acabamento",
+    READY: "Material pronto", LOGISTICS: "Instalação / Entrega", FINISHED: "Finalizado",
+  };
 
   return (
     <header className="evolu-detail__hero">
@@ -95,31 +102,20 @@ export function OrderHeader({
       </div>
       <dl className="evolu-detail__quick-info">
         <div className="evolu-detail__quick-info-item">
-          <span className="evolu-detail__quick-info-icon" aria-hidden="true">
-            <CalendarDays className="size-5" />
-          </span>
-          <div className="min-w-0">
-            <dt>Prazo final</dt>
-            <dd>{date(order.delivery_date)}</dd>
-          </div>
+          <span className="evolu-detail__quick-info-icon" aria-hidden="true"><CalendarDays className="size-5" /></span>
+          <div className="min-w-0"><dt>Prazo final</dt><dd>{date(order.delivery_date)}</dd></div>
         </div>
         <div className="evolu-detail__quick-info-item">
-          <span className="evolu-detail__quick-info-icon" aria-hidden="true">
-            <UserRound className="size-5" />
-          </span>
-          <div className="min-w-0">
-            <dt>Responsável geral</dt>
-            <dd title={general}>{general}</dd>
-          </div>
+          <span className="evolu-detail__quick-info-icon" aria-hidden="true"><Layers3 className="size-5" /></span>
+          <div className="min-w-0"><dt>Etapa atual</dt><dd>{stageNames[stage] ?? "Não informada"}</dd></div>
         </div>
         <div className="evolu-detail__quick-info-item">
-          <span className="evolu-detail__quick-info-icon" aria-hidden="true">
-            <MapPinned className="size-5" />
-          </span>
-          <div className="min-w-0">
-            <dt>Logística</dt>
-            <dd>{logistics[order.logistic_type]}</dd>
-          </div>
+          <span className="evolu-detail__quick-info-icon" aria-hidden="true"><UserRound className="size-5" /></span>
+          <div className="min-w-0"><dt>Responsável geral</dt><dd title={general}>{general}</dd></div>
+        </div>
+        <div className="evolu-detail__quick-info-item">
+          <span className="evolu-detail__quick-info-icon" aria-hidden="true"><Truck className="size-5" /></span>
+          <div className="min-w-0"><dt>Logística</dt><dd>{logistics[order.logistic_type]}</dd></div>
         </div>
       </dl>
     </header>
