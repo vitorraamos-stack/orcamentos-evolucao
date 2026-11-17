@@ -28,17 +28,10 @@ describe("Fase 3.2 operational navigation", () => {
     expect(app).toContain(`\"${route}\"`);
   });
 
-  it("keeps only the two compact board destinations in the sidebar", () => {
-    // A navegação utiliza objetos nomeados para manter a ordem operacional.
-    // Validamos a presença de cada quadro, sem depender do formato antigo de arrays.
-    expect(layout).toContain('href: "/os/arte", label: "Arte", Icon: Palette');
-    expect(layout).toContain('href: "/os/producao", label: "Produção", Icon: Factory');
-    expect(layout.match(/href: "\/os\/arte"/g)).toHaveLength(1);
-    expect(layout.match(/href: "\/os\/producao"/g)).toHaveLength(1);
-    expect(layout).toContain("active: operationalNav.art");
-    expect(layout).toContain("active: operationalNav.production");
-    expect(layout).not.toContain('"Aprovações"');
-    expect(layout).not.toContain('"Quadro Geral"');
-    expect(layout).not.toContain('"Produção Externa"');
+  it("uses the personal work queue instead of the operational boards in navigation", () => {
+    expect(layout).toContain('href: "/minha-fila", label: "Minha Fila"');
+    expect(layout).not.toContain('href: "/os/arte", label: "Arte"');
+    expect(layout).not.toContain('href: "/os/producao", label: "Produção"');
+    expect(layout).toContain('href: "/os", label: "Ordens de Serviço"');
   });
 });
