@@ -37,7 +37,7 @@ export function OrderRiskBadge({ risk }: { risk: OrderRisk }) {
       data-tone={riskTones[risk]}
       className={cn("evolu-order-indicator font-semibold", riskStyles[risk])}
     >
-      {risk === "ATENCAO" ? "ATENÇÃO" : risk}
+      {risk === "NORMAL" ? "Dentro do prazo" : risk === "ATENCAO" ? "ATENÇÃO" : risk}
     </Badge>
   );
 }
