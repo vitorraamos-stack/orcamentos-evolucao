@@ -15,6 +15,31 @@
   padding-block: clamp(20px, 3vh, 48px);
 }
 
+/* Blend the illustrated left panel into the form background without a hard vertical edge. */
+@media (min-width: 1024px) {
+  .evolu-login__brand::after {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    right: 0;
+    z-index: 0;
+    width: clamp(220px, 44%, 480px);
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(11, 18, 25, 0.12) 28%,
+      rgba(11, 18, 25, 0.55) 68%,
+      var(--evolu-page, #0B1219) 100%
+    );
+  }
+
+  .evolu-login__brand-content,
+  .evolu-login__brand-footer {
+    z-index: 1;
+  }
+}
+
 .evolu-login__brand-title-logo {
   display: block;
   width: min(100%, 520px);
