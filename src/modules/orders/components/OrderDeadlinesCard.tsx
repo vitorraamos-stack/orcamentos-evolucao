@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, MoreHorizontal } from "lucide-react";
+import { CalendarDays, ChevronDown, MoreHorizontal } from "lucide-react";
 import { DELIVERY_DEADLINE_PRESET_CONFIG } from "@/features/hubos/deliveryDeadlineConfig";
 import type { OsOrder } from "@/features/hubos/types";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -99,7 +99,7 @@ export function OrderDeadlinesCard({ order, deadlines, canEdit, onChange, onComp
     if (removed) setRemoving(null);
   };
 
-  return <Card className="evolu-detail__section-card"><CardHeader className="evolu-detail__section-header"><CardTitle>Prazos</CardTitle></CardHeader><CardContent className="space-y-5">
+  return <Card className="evolu-detail__section-card"><CardHeader className="evolu-detail__section-header"><div className="evolu-detail__card-heading"><CalendarDays className="size-5" aria-hidden="true" /><CardTitle>Prazos</CardTitle></div></CardHeader><CardContent className="space-y-5">
     <dl className="grid gap-4 sm:grid-cols-2">
       <div className="sm:col-span-2"><dt className="text-sm text-muted-foreground">Prazo contratado</dt><dd className="mt-1 font-medium">{getContractedDeadlineLabel(order.delivery_deadline_preset)}</dd></div>
       <div><dt className="text-sm text-muted-foreground">Contagem</dt><dd className="mt-1 font-medium">{startedAt ? `Iniciada em ${startedAt}` : "Contagem ainda não iniciada"}</dd></div>
