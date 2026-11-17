@@ -17,7 +17,7 @@ describe("PWA V4 — OS-free manual pilot test contract",()=>{
     expect(api).toContain("hashPushEndpoint(endpoint)");
     expect(api).not.toContain("PWA_PUSH_ROLLOUT_ENABLED");
     expect(sql).not.toMatch(/update\s+private\.push_v4_runtime_settings/i);
-    expect(vercel.crons??[]).toEqual([]);
+    expect(vercel.crons ?? []).toEqual([{path:"/api/push/dispatch",schedule:"*/2 * * * *"}]);
   });
   it("limits attempts atomically and forbids public RPC access",()=>{
     expect(sql).toContain("on conflict (user_id) do update");

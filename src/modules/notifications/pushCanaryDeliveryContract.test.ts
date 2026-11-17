@@ -37,6 +37,6 @@ describe("PWA V4 — fail-closed delivery pilot", () => {
     expect(sql).not.toMatch(/update\s+private\.push_v4_runtime_settings/i);
     expect(store).toContain('admin.rpc("push_v4_expand_canary_outbox"');
     expect(store).toContain('admin.rpc("push_v4_claim_canary_jobs"');
-    expect(vercel.crons ?? []).toEqual([]);
+    expect(vercel.crons ?? []).toEqual([{path:"/api/push/dispatch",schedule:"*/2 * * * *"}]);
   });
 });

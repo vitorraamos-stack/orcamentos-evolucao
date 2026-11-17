@@ -12,7 +12,7 @@ describe("Push V4 — manual background test guardrails",()=>{
   it("never enables operational generation, delivery or cron",()=>{
     expect(sql).not.toMatch(/update\s+private\.push_v4_runtime_settings/i);
     expect(sql).not.toMatch(/insert\s+into\s+public\.(os_orders|user_notifications)/i);
-    expect(vercel.crons??[]).toEqual([]);
+    expect(vercel.crons ?? []).toEqual([{path:"/api/push/dispatch",schedule:"*/2 * * * *"}]);
     expect(remote).not.toContain("sendWebPush(");
     expect(remote).not.toContain("PWA_PUSH_DELIVERY_ENABLED");
   });

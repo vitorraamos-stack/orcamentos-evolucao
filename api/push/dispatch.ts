@@ -34,6 +34,12 @@ function environmentVapid(env: NodeJS.ProcessEnv): VapId | null {
   return validateVapid(vapid) ? vapid : null;
 }
 
+/** First production canary: restrict delivery to three approved operational events.
+ * Events outside this set are discarded before any network request. */
+export const PILOT_OPERATIONAL_KINDS = new Set<PushJob["kind"]>([
+  "assignment", "production_released", "installation_scheduled",
+]);
+
 export async function handlePushDispatch(
   req: RequestLike,
   res: ResponseLike,
@@ -64,7 +70,7 @@ export async function handlePushDispatch(
   // Sending has its own fail-closed pilot gate, independent of the registration gate.
   // No unallowlisted recipient may be claimed, even if a subscription already exists.
   const canaryUserIds = Array.from(pushCanaryUserIds(env));
-  if (canaryUserIds.length === 0) {
+  if (canaryUserIds.length !== 1) {
     json(res,503,{ok:false,code:"push_canary_configuration_missing"});
     return;
   }
@@ -91,7 +97,7 @@ export async function handlePushDispatch(
       await Promise.all(jobs.slice(i,i+2).map(async job=>{
         try {
           const eligible=await store.eligible(job.job_id,job.attempt_number);
-          const outcome: PushSendResult=eligible
+          const outcome: PushSendResult=eligible && PILOT_OPERATIONAL_KINDS.has(job.kind)
             ? await sender(job,vapid)
             : {status:null,outcome:"discarded"};
           await store.finish(job.job_id,job.attempt_number,outcome);

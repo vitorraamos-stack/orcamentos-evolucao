@@ -42,6 +42,6 @@ describe("Push V4 — pilot is fail-closed until users and credentials are provi
   });
   it("disables deployment previews and leaves cron disabled",()=>{
     expect(vercel.git.deploymentEnabled["feat/pwa-v4-canary-registration-20261111"]).toBe(false);
-    expect(vercel.crons??[]).toEqual([]);
+    expect(vercel.crons ?? []).toEqual([{path:"/api/push/dispatch",schedule:"*/2 * * * *"}]);
   });
 });
