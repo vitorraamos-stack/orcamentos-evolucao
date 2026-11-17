@@ -1,4 +1,4 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Box } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { OrderItem } from "../types/orderDetail";
@@ -16,8 +16,8 @@ export function OrderSummaryExtras({ items, itemsLoaded, itemsError, onGoItems, 
   return <div className="min-w-0">
     <Card className="evolu-detail__products-card evolu-detail__section-card min-w-0">
       <CardHeader className="evolu-detail__section-header flex flex-row flex-wrap items-center justify-between gap-2">
-        <CardTitle>Produtos da OS</CardTitle>
-        {itemsLoaded && !itemsError && <span className="text-sm text-muted-foreground">{items.length} item(ns)</span>}
+        <div className="evolu-detail__card-heading"><Box className="size-5" aria-hidden="true" /><CardTitle>Produtos da OS</CardTitle></div>
+        {itemsLoaded && !itemsError && <span className="text-sm text-muted-foreground">{items.length} {items.length === 1 ? "item" : "itens"}</span>}
       </CardHeader>
       <CardContent className="space-y-3">
         {itemsError
@@ -28,6 +28,7 @@ export function OrderSummaryExtras({ items, itemsLoaded, itemsError, onGoItems, 
               ? <p className="text-sm text-muted-foreground">Nenhum item estruturado cadastrado.</p>
               : <ol className="divide-y rounded-lg border">{items.slice(0, 5).map(item => <li key={item.id}
                   className="flex flex-wrap items-start justify-between gap-3 p-3">
+                  <span className="evolu-detail__product-icon" aria-hidden="true"><Box className="size-5" /></span>
                   <div className="min-w-0 flex-1">
                     <button type="button" className="min-h-10 break-words text-left text-sm font-semibold hover:underline"
                       onClick={() => onGoItem(item.id)}>{item.name}</button>
