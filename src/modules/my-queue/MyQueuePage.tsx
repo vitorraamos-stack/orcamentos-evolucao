@@ -16,7 +16,7 @@ import { ArtworkProductionLayoutDialog } from "@/modules/artwork/components/Artw
 import { setItemOperationStatus } from "@/modules/orders/repositories/orderDetailRepository";
 import { listMyQueue } from "./myQueueRepository";
 import {
-  filterQueueRows, isStageOverdue, isStageSoon, isOrderDeadlineRisk, localDateKey,
+  filterQueueRows, isActionable, isStageOverdue, isStageSoon, isOrderDeadlineRisk, localDateKey,
   queueMetrics, sortQueueRows, type MyQueueRow, type QueuePeriod, type QueueView,
 } from "./myQueueModel";
 
@@ -142,6 +142,7 @@ export default function MyQueuePage() {
     a.localeCompare(b, "pt-BR")), [rows]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const shown = filtered.slice((Math.min(page, pageCount) - 1) * PAGE_SIZE, Math.min(page, pageCount) * PAGE_SIZE);
+  const nextTask = useMemo(() => sortQueueRows(rows.filter(isActionable), today)[0] ?? null, [rows, today]);
   const waiting = useMemo(() => sortQueueRows(rows.filter(row => row.status === "WAITING"), today).slice(0, 4),
     [rows, today]);
   const upcoming = useMemo(() => sortQueueRows(rows.filter(row =>
@@ -229,6 +230,19 @@ export default function MyQueuePage() {
           <div className="mt-2 text-3xl font-bold tabular-nums">{card.number}</div>
         </button>)}
       </div>
+      {nextTask && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
+        <div className="flex items-start gap-3">
+          <ListTodo className="mt-1 h-5 w-5 shrink-0 text-primary" />
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">Minha próxima atividade</p>
+            <p className="text-sm font-semibold">{nextTask.activity} · OS #{nextTask.order.sale_number}</p>
+            <p className="text-xs text-muted-foreground">{nextTask.order.client_name} · {formatDue(nextTask.dueDate)}</p>
+          </div>
+        </div>
+        <Button size="sm" onClick={() => void execute(nextTask)} disabled={Boolean(busyId)}>
+          {primaryButton(nextTask)} <ArrowRight className="ml-1 h-4 w-4" />
+        </Button>
+      </div>}
       {metrics.orderRisk > 0 && <div role="status" className="rounded-lg border border-amber-600/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-200">
         {metrics.orderRisk} atividade(s) também estão vinculadas a OS com prazo final vencido. Isso não é contado como atraso individual sem um prazo de etapa definido.
       </div>}
