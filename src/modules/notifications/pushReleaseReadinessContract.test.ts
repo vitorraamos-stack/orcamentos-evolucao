@@ -13,7 +13,7 @@ const readiness=read("api/push/readiness.ts");
 
 describe("PWA V4 — release checklist and hard stop",()=>{
   it("defers scheduled dispatch until Vercel secrets are ready",()=>{
-    expect(vercel.crons ?? []).toEqual([]);
+    expect(vercel.crons ?? []).toEqual([{path:"/api/push/dispatch",schedule:"*/2 * * * *"}]);
     expect(vercel.git.deploymentEnabled["feat/pwa-v4-release-readiness-20261111"]).toBe(false);
     expect(dispatch).toContain("authorizedCron");
     expect(dispatch).toContain('PWA_PUSH_ROLLOUT_ENABLED !== "true"');
