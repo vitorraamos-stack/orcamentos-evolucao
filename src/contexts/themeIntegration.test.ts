@@ -28,8 +28,8 @@ describe("Aparência escura obrigatória do EvoluSystem", () => {
     const login = file("../pages/Login.tsx");
     const reset = file("../pages/ResetPassword.tsx");
     const loginCss = file("../pages/login-layout.css");
-    expect(login).toContain('bg-[#17283D]');
-    expect(reset).toContain('bg-[#17283D]');
+    expect(login).toContain('bg-[#162631]');
+    expect(reset).toContain('bg-[#162631]');
     expect(login).toContain('evolusystem-logo-dark.svg');
     expect(reset).toContain('evolusystem-logo-dark.svg');
     expect(loginCss).toContain("color-scheme: dark");
