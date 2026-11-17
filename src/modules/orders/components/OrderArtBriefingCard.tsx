@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Pencil } from "lucide-react";
 import type { OsOrder } from "@/features/hubos/types";
 
 /** Dedicated, read-only artwork briefing: the same description saved at OS creation. */
@@ -8,7 +9,7 @@ export function OrderArtBriefingCard({ order }: { order: Pick<OsOrder, "descript
   return (
     <Card className="evolu-detail__section-card min-w-0" aria-label="Briefing de Arte">
       <CardHeader className="evolu-detail__section-header">
-        <CardTitle>Briefing de Arte</CardTitle>
+        <div className="evolu-detail__card-heading"><Pencil className="size-5" aria-hidden="true" /><CardTitle>Briefing de Arte</CardTitle></div>
       </CardHeader>
       <CardContent>
         {briefing ? (
