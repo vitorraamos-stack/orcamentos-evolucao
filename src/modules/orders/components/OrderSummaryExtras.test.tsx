@@ -38,7 +38,7 @@ describe("OS summary supplemental sections", () => {
 
   it("uses a neutral product surface and a compact item summary", () => {
     const css = readFileSync(new URL("../pages/order-detail-premium.css", import.meta.url), "utf8");
-    const redesign = css.slice(css.indexOf("/* OS detail — high-legibility slate workspace"));
+    const redesign = css.slice(css.indexOf("OS detail — high-legibility slate workspace"));
     expect(redesign).toContain(".dark .evolu-detail .evolu-detail__tab-content .evolu-detail__products-card {");
     expect(redesign).toContain("background: var(--os-card);");
     expect(redesign).toContain(".dark .evolu-detail__product-icon {");
