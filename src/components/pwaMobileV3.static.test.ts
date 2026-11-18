@@ -21,6 +21,7 @@ describe("PWA v3 mobile navigation integration", () => {
     const css = read("src/components/evolusystem-shell.css");
     expect(css).toContain(".evolu-shell__mobile-nav");
     expect(css).toContain("safe-area-inset-bottom");
+    expect(css).toContain("max(8px, env(safe-area-inset-bottom, 0px))");
     expect(css).toContain("min-height: 52px");
     expect(css).toContain(":has(input:focus");
     expect(css).toContain("@media (min-width: 768px)");
