@@ -116,7 +116,8 @@ body:has(.evolu-shell--order-detail) {
     display: flex;
     align-items: stretch;
     gap: 2px;
-    padding: 6px 8px calc(7px + env(safe-area-inset-bottom, 0px));
+    /* Respeita o indicador de início sem somar um rodapé vazio extra. */
+    padding: 6px 8px max(8px, env(safe-area-inset-bottom, 0px));
     border-top: 1px solid #31445d;
     background: color-mix(in srgb, var(--evolu-sidebar-bg) 97%, transparent);
     box-shadow: 0 -6px 30px rgba(0, 0, 0, .24);
