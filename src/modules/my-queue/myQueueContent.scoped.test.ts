@@ -52,5 +52,10 @@ describe("Minha Fila — layout restrito à página", () => {
     expect(view).toContain('aria-label="Buscar OS, cliente ou tarefa"');
     expect(view).toContain("Ver todas");
     expect(styles).toContain("@media (max-width: 640px)");
+    // A altura dos cartões não pode comprimir o título no PWA do iPhone.
+    expect(styles).toContain(".myq-page__heading { min-height:0; flex:0 0 auto; }");
+    expect(styles).toContain(".myq-page__metrics { flex:0 0 auto; }");
+    expect(styles).toContain(".myq-page__body { flex:0 0 auto; min-height:0; }");
+    expect(styles).toContain(".myq-queue-card { min-height:0; }");
   });
 });
