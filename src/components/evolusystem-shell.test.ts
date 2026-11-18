@@ -14,9 +14,9 @@ describe("EvoluSystem premium shell", () => {
     expect(layout).toContain("setMobileOpen(false)");
   });
 
-  it("shows the official EvoluSystem SVG in desktop and mobile sidebars", () => {
+  it("shows the high-contrast official SVG in desktop sidebar, mobile drawer and header", () => {
     const sidebarBrands = layout.match(/src="\/evolusystem-logo-dark\.svg"/g) ?? [];
-    expect(sidebarBrands).toHaveLength(2);
+    expect(sidebarBrands).toHaveLength(3);
     expect(layout).not.toContain('src="/logo-branca.png"');
     expect(layout).not.toContain("evolu-shell__company-logo");
     expect(layout).not.toContain("evolu-shell__brand-description");

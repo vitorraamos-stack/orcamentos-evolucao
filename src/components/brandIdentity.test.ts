@@ -8,8 +8,8 @@ const darkLogo = readFileSync(new URL("../../public/evolusystem-logo-dark.svg", 
 
 describe("Marca oficial EvoluSystem", () => {
   it("usa o logo vetorial no menu lateral e no cabeçalho móvel", () => {
-    expect(layout.match(/evolusystem-logo-dark\.svg/g)).toHaveLength(2);
-    expect(layout).toContain("/evolusystem-logo.svg");
+    expect(layout.match(/evolusystem-logo-dark\.svg/g)).toHaveLength(3);
+    expect(layout).not.toContain('src="/evolusystem-logo.svg"');
     expect(layout).not.toContain("evolu-shell__brand-name");
   });
 

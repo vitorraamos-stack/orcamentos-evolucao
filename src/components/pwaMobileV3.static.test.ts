@@ -26,6 +26,18 @@ describe("PWA v3 mobile navigation integration", () => {
     expect(css).toContain("@media (min-width: 768px)");
   });
 
+  it("keeps the mobile dock outside the scrolling content and makes the dark header readable", () => {
+    const css = read("src/components/evolusystem-shell.css");
+    const layout = read("src/components/Layout.tsx");
+    expect(layout).toContain('className="evolu-shell__content flex min-w-0 flex-1 flex-col"');
+    expect(layout).toContain('src="/evolusystem-logo-dark.svg" alt="EvoluSystem" className="h-auto w-[180px] max-w-full"');
+    expect(css).toContain(".evolu-shell { height: 100dvh; min-height: 0; overflow: hidden; }");
+    expect(css).toContain(".evolu-shell__content { min-height: 0; }");
+    expect(css).toContain("position: relative;");
+    expect(css).toContain("padding-top: env(safe-area-inset-top, 0px)");
+    expect(css).not.toContain("padding-bottom: calc(94px + env(safe-area-inset-bottom, 0px))");
+  });
+
   it("shows an online-only connection status without caching orders", () => {
     const layout = read("src/components/Layout.tsx");
     expect(layout).toContain("navigator.onLine");

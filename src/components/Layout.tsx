@@ -425,7 +425,7 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="evolu-shell__content flex min-w-0 flex-1 flex-col">
         <header className="evolu-shell__topbar z-30 flex h-14 shrink-0 items-center gap-3 border-b border-[#E5EAF2] bg-white px-4 md:hidden dark:border-border dark:bg-card">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -467,7 +467,7 @@ export default function Layout({ children }: LayoutProps) {
               </SheetContent>
             </Sheet>
             <div className="min-w-0">
-              <img src="/evolusystem-logo.svg" alt="EvoluSystem" className="h-auto w-[180px] max-w-full" />
+              <img src="/evolusystem-logo-dark.svg" alt="EvoluSystem" className="h-auto w-[180px] max-w-full" />
               <p className="truncate text-[10px] font-semibold uppercase tracking-[.14em] text-[#71839A]">
                 Controle Operacional
               </p>
