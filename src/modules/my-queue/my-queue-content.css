@@ -157,12 +157,15 @@
   .myq-page__body { min-height:0; }
 }
 @media (max-width: 640px) {
-  .myq-page { padding:8px 0 20px; gap:14px; }
-  .myq-page__heading { min-height:0; }
+  .myq-page { min-height:0; padding:8px 0 20px; gap:16px; }
+  /* Não permitir que o flex comprima o subtítulo contra os indicadores. */
+  .myq-page__heading { min-height:0; flex:0 0 auto; }
   .myq-page__heading h1 { font-size:23px; }
   .myq-page__eyebrow { font-size:9px; }
-  .myq-page__subtitle { font-size:11px; }
+  .myq-page__subtitle { font-size:11px; margin-top:7px; line-height:1.45; }
   .myq-page__study { display:none; }
+  .myq-page__metrics { flex:0 0 auto; }
+  .myq-page__body { flex:0 0 auto; min-height:0; }
   .myq-stat { height:105px; padding:13px; }
   .myq-stat__bottom strong { font-size:30px; }
   .myq-stat__bottom small { font-size:9px; }
@@ -175,10 +178,12 @@
   .myq-queue-card__heading { padding:16px 13px 0; }
   .myq-queue-card__heading h2 { font-size:14px; }
   .myq-queue-card__count { min-width:77px; }
-  .myq-queue-card__table-wrap { margin:0 8px; }
+  .myq-queue-card__table-wrap { flex:0 0 auto; margin:0 8px; }
+  .myq-queue-card__empty { min-height:112px; padding:28px 12px; text-align:center; }
   .myq-queue-card__footer { padding:16px 12px; }
   .myq-page__sidebar { grid-template-columns:minmax(0,1fr); }
-  .myq-queue-card { min-height:450px; }
+  /* Cartão vazio cresce com o conteúdo, não força 450px e não fica sob o dock. */
+  .myq-queue-card { min-height:0; }
   .myq-side-card { min-height:205px; }
 }
 @media (prefers-reduced-motion:reduce) { .myq-spinner { animation:none; } .myq-stat, .myq-action-button { transition:none; } }
