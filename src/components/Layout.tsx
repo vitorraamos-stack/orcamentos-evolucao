@@ -173,8 +173,8 @@ export default function Layout({ children }: LayoutProps) {
   });
 
   const operationalLinks = [
-    ...(canViewHubOs ? [{ href: "/minha-fila", label: "Minha Fila", Icon: ListTodo, active: location === "/minha-fila" }] : []),
     ...(canViewDashboard ? [{ href: "/hub-os", label: "Dashboard Operacional", Icon: LayoutDashboard, active: location === "/hub-os" }] : []),
+    ...(canViewHubOs ? [{ href: "/minha-fila", label: "Minha Fila", Icon: ListTodo, active: location === "/minha-fila" }] : []),
     ...(canViewHubOs ? [{ href: "/os", label: "Ordens de Serviço", Icon: ClipboardList, active: operationalNav.orders }] : []),
     ...(canViewInstallations
       ? [{ href: "/instalacoes", label: "Instalações", Icon: CalendarDays, active: location.startsWith("/instalacoes") }]
