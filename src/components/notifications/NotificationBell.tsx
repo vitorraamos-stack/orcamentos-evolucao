@@ -33,7 +33,7 @@ export function NotificationBell({ className = "" }: { className?: string }) {
         type="button"
         variant="ghost"
         size="icon"
-        className={"relative h-11 w-11 shrink-0 rounded-xl border border-[#385775] text-[#B9D3EC] hover:bg-[#1E415F] hover:text-white " + className}
+        className={"relative h-11 w-11 shrink-0 rounded-xl border border-[var(--evolu-border)] text-[var(--evolu-text-muted)] hover:bg-[var(--evolu-action-bg)] hover:text-[var(--evolu-action-text)] " + className}
         onClick={() => setOpen(true)}
         aria-label={unreadCount ? "Notificações: " + unreadCount + " não lidas" : "Abrir central de notificações"}
         title="Notificações"
@@ -46,14 +46,14 @@ export function NotificationBell({ className = "" }: { className?: string }) {
         )}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="flex h-[min(90dvh,760px)] max-h-[90dvh] flex-col gap-3 overflow-hidden border-[#36516B] bg-[#15263B] p-4 text-[#F1F7FD] sm:max-w-[540px] sm:p-5">
+        <DialogContent className="flex h-[min(90dvh,760px)] max-h-[90dvh] flex-col gap-3 overflow-hidden border-[var(--evolu-border)] bg-[var(--evolu-panel)] p-4 text-[var(--evolu-text)] sm:max-w-[540px] sm:p-5">
           <DialogHeader className="shrink-0 pr-6">
             <DialogTitle className="flex items-center gap-2 text-xl">
-              <Bell className="size-5 text-[#52C4FA]" aria-hidden="true" />
+              <Bell className="size-5 text-[var(--evolu-highlight)]" aria-hidden="true" />
               Notificações
-              {unreadCount > 0 && <span className="rounded-full bg-[#D95D57] px-2 py-0.5 text-xs text-white">{unreadCount}</span>}
+              {unreadCount > 0 && <span className="rounded-full bg-[var(--evolu-danger)] px-2 py-0.5 text-xs text-[var(--evolu-page)]">{unreadCount}</span>}
             </DialogTitle>
-            <DialogDescription className="text-[#ADC5DC]">
+            <DialogDescription className="text-[var(--evolu-text-muted)]">
               Avisos recentes. Toque em um item para abrir a OS ou a agenda.
             </DialogDescription>
           </DialogHeader>
@@ -62,7 +62,7 @@ export function NotificationBell({ className = "" }: { className?: string }) {
               type="button"
               size="sm"
               variant="ghost"
-              className="text-[#CBDFEF] hover:bg-[#25425C]"
+              className="text-[var(--evolu-action-text)] hover:bg-[var(--evolu-action-bg)]"
               disabled={loading}
               onClick={refresh}
               aria-label="Atualizar notificações"
@@ -74,7 +74,7 @@ export function NotificationBell({ className = "" }: { className?: string }) {
               type="button"
               size="sm"
               variant="ghost"
-              className="text-[#CBDFEF] hover:bg-[#25425C]"
+              className="text-[var(--evolu-action-text)] hover:bg-[var(--evolu-action-bg)]"
               onClick={markAllRead}
               disabled={unreadCount === 0}
             >
@@ -83,14 +83,14 @@ export function NotificationBell({ className = "" }: { className?: string }) {
             </Button>
           </div>
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pb-2" role="region" aria-label="Histórico de avisos" tabIndex={0}>
-            <p className="sticky top-0 z-10 bg-[#15263B] pb-2 text-xs font-semibold uppercase tracking-wide text-[#9FB9D2]">Últimos 14 dias</p>
+            <p className="sticky top-0 z-10 bg-[var(--evolu-panel)] pb-2 text-xs font-semibold uppercase tracking-wide text-[var(--evolu-text-muted)]">Últimos 14 dias</p>
             {error && (
-              <p role="alert" className="rounded-lg border border-[#785348] bg-[#392D2B] p-3 text-sm text-[#FFD4CA]">
+              <p role="alert" className="rounded-lg border border-[var(--evolu-danger)]/40 bg-[var(--evolu-panel-raised)] p-3 text-sm text-[var(--evolu-danger)]">
                 Não foi possível atualizar os avisos. Confira sua conexão e tente novamente.
               </p>
             )}
             {!notices.length && (
-              <p className="rounded-xl border border-[#354D66] bg-[#1C3249] p-5 text-center text-sm text-[#B7CBE0]">
+              <p className="rounded-xl border border-[var(--evolu-border)] bg-[var(--evolu-panel-raised)] p-5 text-center text-sm text-[var(--evolu-text-muted)]">
                 {loading ? "Consultando avisos..." : "Nenhuma notificação operacional nos últimos 14 dias."}
               </p>
             )}
@@ -101,10 +101,10 @@ export function NotificationBell({ className = "" }: { className?: string }) {
                   key={notice.id}
                   type="button"
                    className={
-                    "w-full rounded-xl border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65C5FA] " +
+                    "w-full rounded-xl border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--evolu-highlight)] " +
                     (read
-                      ? "border-[#31465D] bg-[#1A2D42] hover:bg-[#24405A]"
-                      : "border-[#2B6789] bg-[#153852] hover:bg-[#224F70]")
+                      ? "border-[var(--evolu-border)] bg-[var(--evolu-panel)] hover:bg-[var(--evolu-panel-raised)]"
+                      : "border-[var(--evolu-highlight)]/60 bg-[var(--evolu-panel-raised)] hover:bg-[var(--evolu-action-bg)]")
                   }
                   onClick={() => {
                     markRead(notice.id);
@@ -113,13 +113,13 @@ export function NotificationBell({ className = "" }: { className?: string }) {
                   }}
                 >
                   <span className="flex items-start justify-between gap-2">
-                    <span className="flex items-center gap-2 text-sm font-semibold text-[#F1F7FD]">
-                      {!read && <span className="size-2 shrink-0 rounded-full bg-[#55C8FF]" aria-label="Não lida" />}
+                    <span className="flex items-center gap-2 text-sm font-semibold text-[var(--evolu-text)]">
+                      {!read && <span className="size-2 shrink-0 rounded-full bg-[var(--evolu-highlight)]" aria-label="Não lida" />}
                       {notice.title}
                     </span>
-                    <span className="shrink-0 text-xs text-[#9FB9D2]">{timeLabel(notice.createdAt)}</span>
+                    <span className="shrink-0 text-xs text-[var(--evolu-text-muted)]">{timeLabel(notice.createdAt)}</span>
                   </span>
-                  <span className="mt-1 block text-sm text-[#C5D7E9]">{notice.description}</span>
+                  <span className="mt-1 block text-sm text-[var(--evolu-text-muted)]">{notice.description}</span>
                 </button>
               );
             })}
