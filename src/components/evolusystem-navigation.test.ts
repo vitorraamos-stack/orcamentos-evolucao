@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 const layout = readFileSync(new URL("./Layout.tsx", import.meta.url), "utf8");
 
 describe("EvoluSystem sidebar navigation groups", () => {
-  it("presents the personal queue before management and OS modules", () => {
-    const orderedRoutes = ["/minha-fila", "/hub-os", "/os", "/instalacoes", "/entregas"];
+  it("presents the operational dashboard before the personal queue in the sidebar", () => {
+    const orderedRoutes = ["/hub-os", "/minha-fila", "/os", "/instalacoes", "/entregas"];
     const positions = orderedRoutes.map(route => layout.indexOf(`href: "${route}"`));
     expect(positions.every(position => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
