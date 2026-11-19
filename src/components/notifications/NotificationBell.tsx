@@ -46,19 +46,18 @@ export function NotificationBell({ className = "" }: { className?: string }) {
         )}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="flex max-h-[min(85dvh,720px)] flex-col gap-3 overflow-hidden border-[#36516B] bg-[#15263B] p-4 text-[#F1F7FD] sm:max-w-[510px] sm:p-5">
-          <DialogHeader>
+        <DialogContent className="flex h-[min(90dvh,760px)] max-h-[90dvh] flex-col gap-3 overflow-hidden border-[#36516B] bg-[#15263B] p-4 text-[#F1F7FD] sm:max-w-[540px] sm:p-5">
+          <DialogHeader className="shrink-0 pr-6">
             <DialogTitle className="flex items-center gap-2 text-xl">
               <Bell className="size-5 text-[#52C4FA]" aria-hidden="true" />
               Notificações
               {unreadCount > 0 && <span className="rounded-full bg-[#D95D57] px-2 py-0.5 text-xs text-white">{unreadCount}</span>}
             </DialogTitle>
             <DialogDescription className="text-[#ADC5DC]">
-              Avisos relevantes para sua função. Toque para abrir o pedido ou a agenda.
+              Avisos recentes. Toque em um item para abrir a OS ou a agenda.
             </DialogDescription>
           </DialogHeader>
-          <PushNotificationPreferences userId={user!.id} />
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             <Button
               type="button"
               size="sm"
@@ -83,7 +82,8 @@ export function NotificationBell({ className = "" }: { className?: string }) {
               Marcar todas como lidas
             </Button>
           </div>
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pb-1" role="region" aria-label="Histórico de avisos">
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pb-2" role="region" aria-label="Histórico de avisos" tabIndex={0}>
+            <p className="sticky top-0 z-10 bg-[#15263B] pb-2 text-xs font-semibold uppercase tracking-wide text-[#9FB9D2]">Últimos 14 dias</p>
             {error && (
               <p role="alert" className="rounded-lg border border-[#785348] bg-[#392D2B] p-3 text-sm text-[#FFD4CA]">
                 Não foi possível atualizar os avisos. Confira sua conexão e tente novamente.
@@ -124,9 +124,7 @@ export function NotificationBell({ className = "" }: { className?: string }) {
               );
             })}
           </div>
-          <p className="border-t border-[#344C64] pt-3 text-xs leading-relaxed text-[#9FB7CD]">
-            Histórico de 14 dias. Os avisos são atualizados com o sistema aberto. Notificações push com o app fechado estão em preparação.
-          </p>
+          <PushNotificationPreferences userId={user!.id} />
         </DialogContent>
       </Dialog>
     </>
