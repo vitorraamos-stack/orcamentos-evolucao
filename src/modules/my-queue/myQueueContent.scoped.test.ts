@@ -46,6 +46,23 @@ describe("Minha Fila — layout restrito à página", () => {
     expect(view).not.toContain("Demo");
   });
 
+  it("exibe ícones nos quatro indicadores usando a mesma linguagem visual do dashboard", () => {
+    for (const icon of [
+      'kind: "tasks", icon: ClipboardList',
+      'kind: "late", icon: CalendarClock',
+      'kind: "today", icon: CalendarClock',
+      'kind: "waiting", icon: Hourglass',
+    ]) {
+      expect(view).toContain(icon);
+    }
+    expect(view).toContain('<card.icon aria-hidden="true" />');
+    expect(view).not.toContain('<i aria-hidden="true" />');
+    expect(styles).toContain(".myq-stat__label svg");
+    expect(styles).toContain(".myq-stat--late .myq-stat__label svg");
+    expect(styles).toContain(".myq-stat--today .myq-stat__label svg");
+    expect(styles).toContain(".myq-stat--waiting .myq-stat__label svg");
+  });
+
   it("tem filtros e experiência móvel sem afetar o menu principal", () => {
     expect(view).toContain('aria-label="Filtrar etapas"');
     expect(view).toContain('aria-label="Filtrar prazo"');

@@ -43,15 +43,15 @@
 }
 .myq-stat:hover, .myq-stat:focus-visible { background: #1b3342; border-color: #5bc3e7; outline: none; }
 .myq-stat__label { display: flex; align-items: center; gap: 9px; color: #b2c9d6; font-size: 12px; font-weight: 650; white-space: nowrap; }
-.myq-stat__label i { display: inline-block; flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; background: #2a627a; }
+.myq-stat__label svg { display: block; flex: 0 0 26px; width: 26px; height: 26px; padding: 5px; border-radius: 50%; color: #92def0; background: #2a627a; }
 .myq-stat__bottom { display: flex; align-items: baseline; gap: 17px; min-width: 0; }
 .myq-stat__bottom strong { font-size: 37px; line-height: 1.23; font-weight: 750; letter-spacing: -.8px; font-variant-numeric: tabular-nums; color: #f2f7fb; }
 .myq-stat__bottom small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: #9bb3c1; font-weight: 500; }
-.myq-stat--late .myq-stat__label i { background: #70424d; }
+.myq-stat--late .myq-stat__label svg { color: #ff8999; background: #70424d; }
 .myq-stat--late .myq-stat__bottom strong { color: #ff8999; }
-.myq-stat--today .myq-stat__label i { background: #735b3a; }
+.myq-stat--today .myq-stat__label svg { color: #f7bb70; background: #735b3a; }
 .myq-stat--today .myq-stat__bottom strong { color: #f7bb70; }
-.myq-stat--waiting .myq-stat__label i { background: #275e4f; }
+.myq-stat--waiting .myq-stat__label svg { color: #6cd8b6; background: #275e4f; }
 .myq-stat--waiting .myq-stat__bottom strong { color: #6cd8b6; }
 .myq-page__risk { margin: 0; padding: 10px 14px; border: 1px solid #594830; border-radius: 9px; color: #f0bd77; background: #2b261e; font-size: 12px; }
 .myq-page__error { display:flex; align-items:center; justify-content:space-between; gap:15px; padding:12px 14px; border:1px solid #87555b; border-radius:9px; color:#ffb7c2; background:#301f28; font-size:12px; }
@@ -170,7 +170,7 @@
   .myq-stat__bottom strong { font-size:30px; }
   .myq-stat__bottom small { font-size:9px; }
   .myq-stat__label { font-size:10px; }
-  .myq-stat__label i { flex-basis:17px; width:17px; height:17px; }
+  .myq-stat__label svg { flex-basis:22px; width:22px; height:22px; padding:4px; }
   .myq-queue-card__filters { display:flex; flex-wrap:wrap; gap:8px; padding:10px 12px 15px; }
   .myq-queue-card__filters input { flex:1 0 100%; }
   .myq-queue-card__filters select { flex:1 1 120px; }

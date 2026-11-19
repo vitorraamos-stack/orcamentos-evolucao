@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import { ArrowRight, CheckCircle2, LoaderCircle } from "lucide-react";
+import { ArrowRight, CalendarClock, CheckCircle2, ClipboardList, Hourglass, LoaderCircle } from "lucide-react";
 import type { MyQueueRow, QueuePeriod, QueueView } from "./myQueueModel";
 import {
   isActionable, isOrderDeadlineRisk, isStageOverdue, queueMetrics, sortQueueRows,
@@ -122,13 +122,13 @@ export default function MyQueueContent(props: Props) {
 
   const cards = [
     { title: "Minhas tarefas", value: metrics.pending, description: "Atribuídas à etapa atual",
-      kind: "tasks", onClick: () => { onSector("all"); onView("action"); onPeriod("all"); } },
+      kind: "tasks", icon: ClipboardList, onClick: () => { onSector("all"); onView("action"); onPeriod("all"); } },
     { title: "Atrasadas", value: metrics.overdue, description: "Precisam de atenção",
-      kind: "late", onClick: () => { onSector("all"); onView("action"); onPeriod("overdue"); } },
+      kind: "late", icon: CalendarClock, onClick: () => { onSector("all"); onView("action"); onPeriod("overdue"); } },
     { title: "Vencem hoje", value: dueToday, description: "Prazo de execução",
-      kind: "today", onClick: () => { onSector("all"); onView("action"); onPeriod("today"); } },
+      kind: "today", icon: CalendarClock, onClick: () => { onSector("all"); onView("action"); onPeriod("today"); } },
     { title: "Em espera", value: metrics.waiting, description: "Aguardando terceiros",
-      kind: "waiting", onClick: () => { onSector("all"); onView("waiting"); onPeriod("all"); } },
+      kind: "waiting", icon: Hourglass, onClick: () => { onSector("all"); onView("waiting"); onPeriod("all"); } },
   ];
 
   function selectStage(next: string) {
@@ -168,7 +168,7 @@ export default function MyQueueContent(props: Props) {
             aria-label={card.title + ": " + card.value}
             title={card.kind === "late" && orderRisk > 0 ?
               orderRisk + " atividade(s) possuem também prazo final da OS vencido (não contam como atraso da etapa)." : undefined}>
-            <span className="myq-stat__label"><i aria-hidden="true" />{card.title}</span>
+            <span className="myq-stat__label"><card.icon aria-hidden="true" />{card.title}</span>
             <span className="myq-stat__bottom">
               <strong>{card.value}</strong><small>{card.description}</small>
             </span>
