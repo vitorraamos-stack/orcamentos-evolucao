@@ -228,7 +228,7 @@ export function PushNotificationPreferences({ userId }: { userId: string }) {
   };
 
   return (
-    <section className={"shrink-0 rounded-xl border border-[var(--evolu-border)] bg-[var(--evolu-field)] p-3 " + (expanded ? "max-h-[min(38dvh,280px)] overflow-y-auto overscroll-contain" : "")} aria-label="Notificações neste dispositivo">
+    <section className={"shrink-0 rounded-xl border border-[var(--evolu-border)] bg-[var(--evolu-panel-raised)] p-3 " + (expanded ? "max-h-[min(38dvh,280px)] overflow-y-auto overscroll-contain" : "")} aria-label="Notificações neste dispositivo">
       <button
         type="button"
         className="flex w-full items-center gap-3 rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--evolu-highlight)]"
