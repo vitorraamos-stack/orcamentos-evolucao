@@ -152,7 +152,8 @@ export default function Layout({ children }: LayoutProps) {
   const canViewFinanceiro = hasModuleAccess("hub_os_financeiro");
   // Os agrupamentos apenas organizam a navegação; os controles de acesso
   // continuam sendo os mesmos usados nas rotas de cada módulo.
-  const hasCommercialModules = canViewOrcamentista || canViewCalculadora || canViewLibrary;
+  const canViewCommercialBriefing = canViewHubOs && hubPermissions.canCreateOs;
+  const hasCommercialModules = canViewCommercialBriefing || canViewOrcamentista || canViewCalculadora || canViewLibrary;
   const hasResourceModules = canViewGaleria || canViewMateriais;
   const hasManagementModules = canViewFinanceiro || canViewConfiguracoes || canViewOperationalSettings || canManageLibrary || canViewPricing;
 
@@ -229,6 +230,18 @@ export default function Layout({ children }: LayoutProps) {
       )}
 
       {hasCommercialModules && <SectionLabel>Comercial</SectionLabel>}
+
+      {canViewCommercialBriefing && (
+        <Link href="/briefing-comercial">
+          <Button
+            variant={location === "/briefing-comercial" ? "secondary" : "ghost"}
+            className={cn("evolu-nav__item w-full justify-start", location === "/briefing-comercial" && "bg-sidebar-accent text-sidebar-accent-foreground")}
+          >
+            <ClipboardList className="mr-2 h-4 w-4" />
+            Briefing Comercial
+          </Button>
+        </Link>
+      )}
 
       {canViewOrcamentista && (
         <Link href="/orcamentista">
