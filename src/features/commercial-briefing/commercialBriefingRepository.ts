@@ -7,8 +7,8 @@ import {
   type CommercialBriefingRecord,
 } from "./commercialBriefingDomain";
 
-// This adapter is deliberately not wired to any route yet. The candidate
-// database contract must pass SQL tests and be installed in homologation first.
+// The persistence migration is installed in the existing project. The UI uses
+// the authenticated client and never accepts owner or confirmation metadata.
 const revisionSchema = z.number().int().positive();
 const timestamp = z.string().min(1);
 const externalId = z.string().trim().min(1).max(200);
