@@ -26,6 +26,7 @@ import MyQueuePage from "@/modules/my-queue/MyQueuePage";
 import DashboardOperationalSettingsPage from "@/modules/dashboard/DashboardOperationalSettingsPage";
 import OrdersCentralPage from "@/modules/orders/pages/OrdersCentralPage";
 import CreateOrderPage from "@/modules/orders/pages/CreateOrderPage";
+import CommercialBriefingPage from "@/features/commercial-briefing/CommercialBriefingPage";
 import ModulePlaceholderPage from "@/shared/components/ModulePlaceholderPage";
 import InstallationsPage from "@/modules/installations/pages/InstallationsPage";
 import InstallationExecutionPage from "@/modules/installations/pages/InstallationExecutionPage";
@@ -382,6 +383,16 @@ function Router() {
             </HubOsAccessGuard>
           </RequireModule>
         </RequireModule>
+      </Route>
+
+      <Route path="/briefing-comercial">
+        <Layout>
+          <RequireModule moduleKey="hub_os">
+            <HubOsAccessGuard scope="create">
+              <CommercialBriefingPage />
+            </HubOsAccessGuard>
+          </RequireModule>
+        </Layout>
       </Route>
 
       <Route path="/os/novo">
