@@ -26,6 +26,19 @@ describe("Digisac read-only transport", () => {
       headers: { Authorization: "Bearer fixture-not-a-real-token", Accept: "application/json" },
     });
   });
+  it("checks connectivity using a single requested page and a fixed endpoint", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json({ data: [] }));
+    await createDigisacReadClient(config, fetcher).checkConnection();
+    const url = new URL(String(fetcher.mock.calls[0][0]));
+    expect(url.origin + url.pathname).toBe(DIGISAC_INSTANCE_API + "/users");
+    expect(url.searchParams.get("page")).toBe("1");
+    expect(url.searchParams.get("perPage")).toBe("1");
+  });
+  it("reads a single user from the documented endpoint", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json({ id: "user-1" }));
+    await createDigisacReadClient(config, fetcher).getUser("user-1");
+    expect(String(fetcher.mock.calls[0][0])).toBe(DIGISAC_INSTANCE_API + "/users/user-1");
+  });
   it("filters tickets by contact using encoded query parameters", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json([]));
     await createDigisacReadClient(config, fetcher).getContactTickets("contact-1");
