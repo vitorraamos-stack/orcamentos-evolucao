@@ -1,4 +1,4 @@
-import type { ContextDiagnostic, DigisacContext } from "../../../shared/digisac/context.js";
+import type { ContextDiagnostic, DigisacContext, DigisacTicketReference } from "../../../shared/digisac/context.js";
 
 type JsonObject = Record<string, unknown>;
 function object(value: unknown): JsonObject | null {
@@ -19,7 +19,7 @@ function present(value: unknown): boolean | null {
   return typeof value === "string" ? value.trim().length > 0 : null;
 }
 
-function inspectContactAndTicket(refs: DigisacContext, contact: JsonObject | null, ticket: JsonObject | null) {
+function inspectContactAndTicket(refs: DigisacTicketReference, contact: JsonObject | null, ticket: JsonObject | null) {
   return {
     contactId: matches(contact?.id, refs.contactId),
     ticketId: matches(ticket?.id, refs.ticketId),
@@ -28,7 +28,7 @@ function inspectContactAndTicket(refs: DigisacContext, contact: JsonObject | nul
   };
 }
 
-export function inspectDigisacConsultation(refs: DigisacContext, contact: unknown, ticket: unknown) {
+export function inspectDigisacConsultation(refs: DigisacTicketReference, contact: unknown, ticket: unknown) {
   return inspectContactAndTicket(refs, record(contact), record(ticket));
 }
 

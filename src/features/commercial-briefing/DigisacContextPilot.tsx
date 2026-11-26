@@ -1,28 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase";
 import {
   canConsultDigisacBriefing, contextChecks, contextDiagnosticSchema,
-  digisacBriefingStates, digisacContextSchema, readDigisacContext,
-  type ContextDiagnostic, type DigisacContext, type DigisacRequest,
+  digisacBriefingStates, digisacContextSchema, readDigisacContext, readDigisacTicketReference,
+  type ContextDiagnostic, type DigisacContext, type DigisacTicketReference,
 } from "@shared/digisac/context";
 import CommercialBriefingPanel from "./CommercialBriefingPanel";
+import DigisacBriefingCreation from "./DigisacBriefingCreation";
 import { commercialBriefingDraftSchema } from "./commercialBriefingDomain";
-
-const messages: Record<string, string> = {
-  UNAUTHENTICATED: "Entre no EvoluSystem em uma aba própria e tente validar novamente.",
-  FORBIDDEN: "O acesso está restrito à gerência com acesso ao Hub OS.",
-  INVALID_CONTEXT: "O Digisac não enviou referências válidas.",
-  CONTEXT_NOT_VERIFIED: "Não foi possível confirmar que o chamado está aberto e pertence a este contato. Valide o atendimento novamente no Digisac.",
-  DIGISAC_CONFIG: "Confira a configuração da API no servidor.",
-  DIGISAC_UNAUTHORIZED: "A API recusou a credencial.",
-  DIGISAC_REFERENCE_NOT_FOUND: "A API não encontrou uma das referências recebidas.",
-  DIGISAC_RATE_LIMITED: "Limite de consultas atingido. Tente mais tarde.",
-  DIGISAC_UNAVAILABLE: "Não foi possível ler uma das respostas do Digisac.",
-  SERVER_CONFIG: "Configuração do servidor indisponível.",
-  SERVER_UNAVAILABLE: "Não foi possível realizar a verificação.",
-};
+import { messages, readErrorCode, requestDigisacContext, requestTimeout } from "./digisacContextRequest";
 const labels: Record<typeof contextChecks[number], string> = {
   contactId: "Contato encontrado e ID confere",
   ticketId: "Chamado encontrado e ID confere",
@@ -38,30 +25,10 @@ const labels: Record<typeof contextChecks[number], string> = {
 const resultMessage = "evolusystem:digisac-context-result";
 const readyMessage = "evolusystem:digisac-context-ready";
 const requestMessage = "evolusystem:digisac-context-request";
-const requestTimeout = 20000;
 const popupTimeout = 45000;
 const consultationFragment = "#consultar?";
+const creationFragment = "#criar?";
 type DiagnosticResult = { checks: ContextDiagnostic } | { code: string };
-
-async function requestDigisacContext(request: DigisacRequest, signal: AbortSignal) {
-  const { data, error } = await supabase.auth.getSession();
-  if (error || !data.session?.access_token) {
-    return { ok: false, body: { code: "UNAUTHENTICATED" } };
-  }
-  const response = await fetch("/api/digisac-context-check", {
-    method: "POST",
-    cache: "no-store",
-    headers: {
-      Authorization: "Bearer " + data.session.access_token,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(request),
-    signal,
-  });
-  const body = await response.json();
-  return { ok: response.ok, body };
-}
 
 async function runDiagnostic(refs: DigisacContext, signal: AbortSignal): Promise<DiagnosticResult> {
   try {
@@ -74,11 +41,6 @@ async function runDiagnostic(refs: DigisacContext, signal: AbortSignal): Promise
   } catch {
     return { code: "SERVER_UNAVAILABLE" };
   }
-}
-
-function readErrorCode(code: unknown) {
-  return typeof code === "string" && Object.prototype.hasOwnProperty.call(messages, code)
-    ? code : "SERVER_UNAVAILABLE";
 }
 
 const briefingSchema = z.strictObject({
@@ -148,13 +110,13 @@ function BriefingConsultation({ refs }: { refs: DigisacContext | null }) {
   </main>;
 }
 
-function consultationHref(refs: DigisacContext) {
+function briefingHref(fragment: string, refs: DigisacTicketReference | DigisacContext) {
   const params = new URLSearchParams({
     contact_id: refs.contactId,
     ticket_id: refs.ticketId,
-    user_id: refs.userId,
   });
-  return window.location.pathname + consultationFragment + params.toString();
+  if ("userId" in refs) params.set("user_id", refs.userId);
+  return window.location.pathname + fragment + params.toString();
 }
 
 function DiagnosticSessionWindow({ nonce }: { nonce: string }) {
@@ -198,7 +160,11 @@ function DiagnosticSessionWindow({ nonce }: { nonce: string }) {
   </main>;
 }
 
-function DiagnosticPanel({ refs, inFrame }: { refs: DigisacContext | null; inFrame: boolean }) {
+function DiagnosticPanel({ refs, ticketRefs, inFrame }: {
+  refs: DigisacContext | null;
+  ticketRefs: DigisacTicketReference | null;
+  inFrame: boolean;
+}) {
   const [checks, setChecks] = useState<ContextDiagnostic | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -265,16 +231,21 @@ function DiagnosticPanel({ refs, inFrame }: { refs: DigisacContext | null; inFra
   return <main className="mx-auto w-full max-w-lg min-h-screen min-w-0 space-y-4 bg-background p-4 text-foreground">
     <header className="space-y-1">
       <h1 className="text-lg font-semibold">Briefing Comercial</h1>
-      <p className="text-xs text-muted-foreground">EvoluSystem · Diagnóstico de integração</p>
+      <p className="text-xs text-muted-foreground">EvoluSystem · Atendimento Digisac</p>
     </header>
+    {ticketRefs && <a
+      href={briefingHref(creationFragment, ticketRefs)} target="_blank" rel="noopener noreferrer"
+      className={buttonVariants({ className: "w-full" })}>
+      Criar briefing
+    </a>}
     <section className="space-y-2 rounded-lg border p-3">
-      <h2 className="text-sm font-semibold">Teste piloto — gerência</h2>
-      <p className="text-xs text-muted-foreground">Nenhuma negociação será criada ou alterada. O painel mostra somente a disponibilidade e correspondência das referências.</p>
+      <h2 className="text-sm font-semibold">Diagnóstico e consulta — gerência</h2>
+      <p className="text-xs text-muted-foreground">Painel somente leitura. A criação é feita em outra aba do EvoluSystem.</p>
       <p className="text-sm">{inFrame ? "Aberto em iframe" : "Aberto em nova aba"}</p>
       <p role="status" className={refs ? "text-sm text-emerald-600" : "text-sm text-destructive"}>
         {refs ? "Três identificadores recebidos." : "Referências incompletas ou inválidas. Abra pelo menu do atendimento Digisac."}
       </p>
-      <Button type="button" className="w-full" disabled={!refs || busy} onClick={() => void check()}>
+      <Button type="button" variant="outline" className="w-full" disabled={!refs || busy} onClick={() => void check()}>
         {busy ? "Verificando..." : "Validar contexto do atendimento"}
       </Button>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
@@ -289,7 +260,7 @@ function DiagnosticPanel({ refs, inFrame }: { refs: DigisacContext | null; inFra
       </div>)}
       <p className="text-xs text-muted-foreground">A comparação de e-mails é informativa.</p>
       {refs && canConsultDigisacBriefing(checks) && <a
-        href={consultationHref(refs)} target="_blank" rel="noopener noreferrer"
+        href={briefingHref(consultationFragment, refs)} target="_blank" rel="noopener noreferrer"
         className={buttonVariants({ className: "w-full" })}>
         Consultar briefing
       </a>}
@@ -303,6 +274,10 @@ function DiagnosticPanel({ refs, inFrame }: { refs: DigisacContext | null; inFra
 
 export default function DigisacContextPilot() {
   const [refs] = useState(() => readDigisacContext(window.location.search));
+  const [ticketRefs] = useState(() => readDigisacTicketReference(window.location.search));
+  const [creation] = useState(() => window.location.hash.startsWith(creationFragment)
+    ? { refs: readDigisacTicketReference(window.location.hash.slice(creationFragment.length)) }
+    : null);
   const [consultation] = useState(() => window.location.hash.startsWith(consultationFragment)
     ? { refs: readDigisacContext(window.location.hash.slice(consultationFragment.length)) }
     : null);
@@ -310,5 +285,6 @@ export default function DigisacContextPilot() {
   const nonce = /^#sessao=([0-9a-f-]{36})$/.exec(window.location.hash)?.[1];
   if (!inFrame && nonce) return <DiagnosticSessionWindow nonce={nonce} />;
   if (!inFrame && consultation) return <BriefingConsultation refs={consultation.refs} />;
-  return <DiagnosticPanel refs={refs} inFrame={inFrame} />;
+  if (!inFrame && creation) return <DigisacBriefingCreation refs={creation.refs} />;
+  return <DiagnosticPanel refs={refs} ticketRefs={ticketRefs} inFrame={inFrame} />;
 }
