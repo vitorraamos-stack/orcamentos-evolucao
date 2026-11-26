@@ -3,7 +3,7 @@
  * SERVER ONLY: never import from frontend code or expose raw responses.
  * This adapter does not authenticate or authorize a user; callers must
  * validate an EvoluSystem actor and ticket ownership BEFORE returning data.
- * No route invokes this adapter yet.
+ * The connection and context diagnostics use this adapter.
  */
 export const DIGISAC_INSTANCE_ORIGIN = "https://evolucaoimpressos.digisac.chat";
 export const DIGISAC_INSTANCE_API = DIGISAC_INSTANCE_ORIGIN + "/api/v1";
@@ -104,6 +104,9 @@ export function createDigisacReadClient(
     },
     getUser(userId: string) {
       return request(new URL(base + "/users/" + encodeURIComponent(validateId(userId))));
+    },
+    getTicket(ticketId: string) {
+      return request(new URL(base + "/tickets/" + encodeURIComponent(validateId(ticketId))));
     },
     getContact(contactId: string) {
       return request(new URL(base + "/contacts/" + encodeURIComponent(validateId(contactId))));

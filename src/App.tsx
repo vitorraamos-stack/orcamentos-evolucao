@@ -27,6 +27,7 @@ import DashboardOperationalSettingsPage from "@/modules/dashboard/DashboardOpera
 import OrdersCentralPage from "@/modules/orders/pages/OrdersCentralPage";
 import CreateOrderPage from "@/modules/orders/pages/CreateOrderPage";
 import CommercialBriefingPage from "@/features/commercial-briefing/CommercialBriefingPage";
+import DigisacContextPilot from "@/features/commercial-briefing/DigisacContextPilot";
 import ModulePlaceholderPage from "@/shared/components/ModulePlaceholderPage";
 import InstallationsPage from "@/modules/installations/pages/InstallationsPage";
 import InstallationExecutionPage from "@/modules/installations/pages/InstallationExecutionPage";
@@ -430,6 +431,11 @@ function Router() {
 }
 
 function App() {
+  // Dedicated embedded pilot: no navigation, operational providers or
+  // notification prompts inside this document. The API verifies the actor.
+  if (window.location.pathname === "/integracoes/digisac/briefing") {
+    return <ErrorBoundary><ThemeProvider><DigisacContextPilot /></ThemeProvider></ErrorBoundary>;
+  }
   return (
     <ErrorBoundary>
       <ThemeProvider>
