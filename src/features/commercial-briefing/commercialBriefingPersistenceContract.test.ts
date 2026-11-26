@@ -1,5 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { DELIVERY_DEADLINE_PRESETS } from "@/features/hubos/deliveryDeadlineConfig";
+import { ART_DIRECTION_CHOICES } from "@/features/hubos/orderUrgency";
+import { COMMERCIAL_BRIEFING_LOGISTICS } from "./commercialBriefingDomain";
 
 const sql = readFileSync("docs/tasks/briefing-comercial/02-persistence-candidate.sql", "utf8");
 const behavior = readFileSync("docs/tasks/briefing-comercial/02-persistence-behavior-candidate.sql", "utf8");
@@ -44,6 +47,18 @@ describe("commercial briefing SQL candidate (static, not a DB test)", () => {
     expect(sql).not.toMatch(/create\s+trigger|cron\.schedule/i);
     expect(sql).not.toContain("hub_os_create_order_secure");
     expect(vercel.git.deploymentEnabled["feat/briefing-comercial"]).toBe(false);
+  });
+  it("keeps server allowlists aligned with the official OS configuration", () => {
+    for (const [field, choices] of [
+      ["deadlinePreset", DELIVERY_DEADLINE_PRESETS],
+      ["artDirectionTag", ART_DIRECTION_CHOICES],
+      ["logisticType", COMMERCIAL_BRIEFING_LOGISTICS],
+    ] as const) {
+      const line = sql.split("\n").find(value => value.includes("d->>'" + field + "' not in"));
+      expect(line).toBeDefined();
+      const actual = Array.from(line!.matchAll(/'([^']+)'/g), match => match[1]).slice(1);
+      expect(actual.slice().sort()).toEqual([...choices].sort());
+    }
   });
   it("keeps transactional pgTAP tests separate until homologation", () => {
     expect(behavior).toContain("select plan(42);");
