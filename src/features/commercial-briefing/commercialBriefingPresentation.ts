@@ -28,8 +28,9 @@ export const COMMERCIAL_COMPLETION_LABELS = {
 export function sameCommercialDraft(left: CommercialBriefingDraft, right: CommercialBriefingDraft) {
   // Both inputs use the stable field order of the shared schema. JSONB can
   // reorder object keys; parsing the response prevents a false dirty state.
-  return JSON.stringify(commercialBriefingDraftSchema.parse(left)) ===
-    JSON.stringify(commercialBriefingDraftSchema.parse(right));
+  const a = commercialBriefingDraftSchema.safeParse(left);
+  const b = commercialBriefingDraftSchema.safeParse(right);
+  return a.success && b.success && JSON.stringify(a.data) === JSON.stringify(b.data);
 }
 
 const numberPtBr = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 10 });
