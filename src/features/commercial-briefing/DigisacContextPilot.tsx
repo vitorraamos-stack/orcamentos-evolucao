@@ -1,10 +1,10 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
-import { readDigisacContext, contextChecks, contextDiagnosticSchema, type ContextDiagnostic } from "@shared/digisac/context";
+import { readDigisacContext, contextChecks, contextDiagnosticSchema, digisacContextSchema, type ContextDiagnostic, type DigisacContext } from "@shared/digisac/context";
 
 const messages: Record<string, string> = {
-  UNAUTHENTICATED: "Entre no EvoluSystem em uma aba própria e reabra o painel. Se a sessão não for compartilhada pelo navegador, abra o diagnóstico em nova aba.",
+  UNAUTHENTICATED: "Entre no EvoluSystem em uma aba própria e tente validar novamente.",
   FORBIDDEN: "O diagnóstico está restrito à gerência com acesso ao Hub OS.",
   INVALID_CONTEXT: "O Digisac não enviou referências válidas.",
   DIGISAC_CONFIG: "Confira a configuração da API no servidor.",
@@ -27,47 +27,148 @@ const labels: Record<typeof contextChecks[number], string> = {
   contactPhone: "Telefone disponível na resposta",
 };
 
-export default function DigisacContextPilot() {
-  const [refs] = useState(() => readDigisacContext(window.location.search));
+const resultMessage = "evolusystem:digisac-context-result";
+const readyMessage = "evolusystem:digisac-context-ready";
+const requestMessage = "evolusystem:digisac-context-request";
+const requestTimeout = 20000;
+const popupTimeout = 45000;
+type DiagnosticResult = { checks: ContextDiagnostic } | { code: string };
+
+async function runDiagnostic(refs: DigisacContext, signal: AbortSignal): Promise<DiagnosticResult> {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data.session?.access_token) return { code: "UNAUTHENTICATED" };
+
+    const response = await fetch("/api/digisac-context-check", {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        Authorization: "Bearer " + data.session.access_token,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(refs),
+      signal,
+    });
+    const body = await response.json();
+    const parsed = contextDiagnosticSchema.safeParse(body?.checks);
+    if (response.ok && body?.code === "CONTEXT_INSPECTED" && parsed.success) {
+      return { checks: parsed.data };
+    }
+    return { code: readErrorCode(body?.code) };
+  } catch {
+    return { code: "SERVER_UNAVAILABLE" };
+  }
+}
+
+function readErrorCode(code: unknown) {
+  return typeof code === "string" && Object.prototype.hasOwnProperty.call(messages, code)
+    ? code : "SERVER_UNAVAILABLE";
+}
+
+function DiagnosticSessionWindow({ nonce }: { nonce: string }) {
+  const [finished, setFinished] = useState(false);
+  const [connected] = useState(() => Boolean(window.opener));
+
+  useEffect(() => {
+    const opener = window.opener;
+    if (!opener) return;
+    const controller = new AbortController();
+    const origin = window.location.origin;
+    const receive = (event: MessageEvent) => {
+      if (event.origin !== origin || event.source !== opener ||
+          event.data?.type !== requestMessage || event.data?.nonce !== nonce) return;
+      const parsed = digisacContextSchema.safeParse(event.data.refs);
+      if (!parsed.success) return;
+      window.removeEventListener("message", receive);
+      const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(requestTimeout)]);
+      void runDiagnostic(parsed.data, signal).then(result => {
+        if (controller.signal.aborted) return;
+        // Only diagnostic booleans or a known error code reach the opening panel.
+        opener.postMessage({ type: resultMessage, nonce, result }, origin);
+        setFinished(true);
+      });
+    };
+    window.addEventListener("message", receive);
+    opener.postMessage({ type: readyMessage, nonce }, origin);
+    return () => {
+      controller.abort();
+      window.removeEventListener("message", receive);
+    };
+  }, [nonce]);
+
+  return <main className="mx-auto max-w-lg space-y-2 p-4">
+    <h1 className="text-lg font-semibold">Briefing Comercial</h1>
+    <p role="status" className="text-sm">
+      {!connected ? "Volte ao Digisac e reabra o diagnóstico pelo painel."
+        : finished ? "Volte ao painel do Digisac para ver o resultado."
+        : "Validando com a sessão do EvoluSystem…"}
+    </p>
+  </main>;
+}
+
+function DiagnosticPanel({ refs, inFrame }: { refs: DigisacContext | null; inFrame: boolean }) {
   const [checks, setChecks] = useState<ContextDiagnostic | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const pending = useRef(false);
-  const inFrame = window.top !== window.self;
+  const cancel = useRef<(() => void) | null>(null);
+  useEffect(() => () => cancel.current?.(), []);
+
+  const finish = (result: DiagnosticResult) => {
+    cancel.current?.();
+    cancel.current = null;
+    setBusy(false);
+    if ("checks" in result) setChecks(result.checks);
+    else setError(messages[result.code]);
+  };
 
   const check = async () => {
-    if (!refs || pending.current) return;
-    pending.current = true;
+    if (!refs || cancel.current) return;
     setBusy(true);
     setError("");
     setChecks(null);
-    try {
-      const { data, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !data.session?.access_token) {
-        setError(messages.UNAUTHENTICATED);
-        return;
-      }
-      const response = await fetch("/api/digisac-context-check", {
-        method: "POST", cache: "no-store",
-        headers: { Authorization: "Bearer " + data.session.access_token, "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify(refs),
-        signal: AbortSignal.timeout(20000),
-      });
-      const body = await response.json();
-      const parsed = contextDiagnosticSchema.safeParse(body?.checks);
-      if (!response.ok || body?.code !== "CONTEXT_INSPECTED" || !parsed.success) {
-        const code = body?.code;
-        setError(typeof code === "string" && Object.prototype.hasOwnProperty.call(messages, code)
-          ? messages[code] : "Não foi possível verificar o contexto.");
-        return;
-      }
-      setChecks(parsed.data);
-    } catch {
-      setError("Falha de conexão ou sessão indisponível. Abra o diagnóstico em nova aba se necessário.");
-    } finally {
-      pending.current = false;
-      setBusy(false);
+
+    if (!inFrame) {
+      const controller = new AbortController();
+      cancel.current = () => controller.abort();
+      const result = await runDiagnostic(refs, AbortSignal.any([controller.signal, AbortSignal.timeout(requestTimeout)]));
+      if (!controller.signal.aborted) finish(result);
+      return;
     }
+
+    // Open synchronously from the click so Chrome can use the first-party session.
+    const nonce = crypto.randomUUID();
+    const popupUrl = new URL(window.location.pathname, window.location.origin);
+    popupUrl.hash = "sessao=" + nonce;
+    const popup = window.open(popupUrl, "_blank", "popup,width=480,height=320");
+    if (!popup) {
+      setBusy(false);
+      setError("O navegador bloqueou a janela de validação. Permita a abertura ou use o diagnóstico em nova aba.");
+      return;
+    }
+
+    const receive = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.source !== popup ||
+          event.data?.nonce !== nonce) return;
+      if (event.data?.type === readyMessage) {
+        popup.postMessage({ type: requestMessage, nonce, refs }, window.location.origin);
+        return;
+      }
+      if (event.data?.type !== resultMessage) return;
+      const parsed = contextDiagnosticSchema.safeParse(event.data.result?.checks);
+      finish(parsed.success ? { checks: parsed.data } : { code: readErrorCode(event.data.result?.code) });
+    };
+    window.addEventListener("message", receive);
+    const deadline = window.setTimeout(() => finish({ code: "SERVER_UNAVAILABLE" }), popupTimeout);
+    const checkClosed = window.setInterval(() => {
+      if (popup.closed) finish({ code: "SERVER_UNAVAILABLE" });
+    }, 500);
+    cancel.current = () => {
+      window.removeEventListener("message", receive);
+      window.clearTimeout(deadline);
+      window.clearInterval(checkClosed);
+      popup.close();
+    };
   };
 
   return <main className="mx-auto w-full max-w-lg min-h-screen min-w-0 space-y-4 bg-background p-4 text-foreground">
@@ -102,4 +203,12 @@ export default function DigisacContextPilot() {
       {inFrame && refs && <a href={window.location.href} target="_blank" rel="noopener noreferrer" className="block underline">Abrir este diagnóstico em nova aba</a>}
     </div>
   </main>;
+}
+
+export default function DigisacContextPilot() {
+  const [refs] = useState(() => readDigisacContext(window.location.search));
+  const inFrame = window.top !== window.self;
+  const nonce = /^#sessao=([0-9a-f-]{36})$/.exec(window.location.hash)?.[1];
+  if (!inFrame && nonce) return <DiagnosticSessionWindow nonce={nonce} />;
+  return <DiagnosticPanel refs={refs} inFrame={inFrame} />;
 }

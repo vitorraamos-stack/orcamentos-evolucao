@@ -26,8 +26,10 @@ export function inspectDigisacContext(
   const contact = record(responses.contact);
   const ticket = record(responses.ticket);
   const user = record(responses.user);
-  const accountEmail = confirmedEmail && typeof user?.email === "string"
-    ? user.email.trim().toLowerCase() === confirmedEmail.trim().toLowerCase()
+  const digisacEmail = typeof user?.email === "string" ? user.email.trim().toLowerCase() : "";
+  const evoluSystemEmail = confirmedEmail?.trim().toLowerCase();
+  const accountEmail = digisacEmail && evoluSystemEmail
+    ? digisacEmail === evoluSystemEmail
     : null;
   return {
     contactId: matches(contact?.id, refs.contactId),
