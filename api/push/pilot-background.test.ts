@@ -15,7 +15,7 @@ const env:NodeJS.ProcessEnv={
   PWA_PUSH_REGISTRATION_ENABLED:"true",PWA_PUSH_PILOT_TEST_ENABLED:"true",
   PWA_PUSH_CANARY_USER_IDS:userId,
   PWA_PUSH_VAPID_PUBLIC_KEY:pair.getPublicKey().toString("base64url"),
-  PWA_PUSH_VAPID_PRIVATE_KEY:pair.getPrivateKey().toString("base64url"),
+  PWA_PUSH_VAPID_PRIVATE_KEY:Buffer.from(pair.getPrivateKey().toString("hex").padStart(64, "0"), "hex").toString("base64url"),
   PWA_PUSH_VAPID_SUBJECT:"mailto:push@example.com",
   PWA_PUSH_GENERATION_ENABLED:"false",PWA_PUSH_DELIVERY_ENABLED:"false",
 };

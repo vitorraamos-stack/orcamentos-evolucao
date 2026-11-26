@@ -15,7 +15,7 @@ const env:NodeJS.ProcessEnv={
   PWA_PUSH_DELIVERY_ENABLED:"false",
   PWA_PUSH_VAPID_SUBJECT:"mailto:push@example.com",
   PWA_PUSH_VAPID_PUBLIC_KEY:ecdh.getPublicKey().toString("base64url"),
-  PWA_PUSH_VAPID_PRIVATE_KEY:ecdh.getPrivateKey().toString("base64url"),
+  PWA_PUSH_VAPID_PRIVATE_KEY:Buffer.from(ecdh.getPrivateKey().toString("hex").padStart(64, "0"), "hex").toString("base64url"),
 };
 const db={
   generationEnabled:false,deliveryEnabled:false,registrationRpcPresent:true,

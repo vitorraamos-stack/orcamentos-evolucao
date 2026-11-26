@@ -6,7 +6,8 @@ import { createECDH } from "node:crypto";
 const ecdh = createECDH("prime256v1");
 ecdh.generateKeys();
 const publicKey = ecdh.getPublicKey().toString("base64url");
-const privateKey = ecdh.getPrivateKey().toString("base64url");
+// ECDH may omit leading zero bytes; VAPID uses the fixed 32-byte P-256 scalar.
+const privateKey = Buffer.from(ecdh.getPrivateKey().toString("hex").padStart(64, "0"), "hex").toString("base64url");
 if (publicKey.length !== 87 || privateKey.length !== 43) {
   throw new Error("Unexpected VAPID key length");
 }

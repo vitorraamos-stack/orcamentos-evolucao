@@ -13,11 +13,13 @@ const receiver=createECDH("prime256v1");
 receiver.generateKeys();
 const auth=randomBytes(16);
 const senderIdentity=createECDH("prime256v1");
-senderIdentity.generateKeys();
+// Deliberately use a short scalar to reproduce leading-zero serialization.
+// Test-only identity; never use it as a real VAPID key.
+senderIdentity.setPrivateKey(Buffer.from([1]));
 const vapid: VapId={
   subject:"mailto:push@example.com",
   publicKey:senderIdentity.getPublicKey().toString("base64url"),
-  privateKey:senderIdentity.getPrivateKey().toString("base64url"),
+  privateKey:Buffer.from(senderIdentity.getPrivateKey().toString("hex").padStart(64, "0"), "hex").toString("base64url"),
 };
 const job:PushJob={
   job_id:"123e4567-e89b-42d3-a456-426614174001",
@@ -54,7 +56,10 @@ function decryptRfc8291(input:Buffer):string{
 
 describe("PWA V4 — Web Push RFC8291 + VAPID",()=>{
   it("validates matching ES256 public/private VAPID keys",()=>{
+    expect(senderIdentity.getPrivateKey().length).toBeLessThan(32);
+    expect(Buffer.from(vapid.privateKey, "base64url")).toHaveLength(32);
     expect(validateVapid(vapid)).toBe(true);
+    expect(validateVapid({...vapid,privateKey:senderIdentity.getPrivateKey().toString("base64url")})).toBe(false);
     expect(validateVapid({...vapid,subject:"https://localhost"})).toBe(false);
     expect(validateVapid({...vapid,privateKey:randomBytes(32).toString("base64url")})).toBe(false);
   });

@@ -14,7 +14,7 @@ const env:NodeJS.ProcessEnv={
   PWA_PUSH_ROLLOUT_ENABLED:"true",
   PWA_PUSH_VAPID_SUBJECT:"mailto:push@example.com",
   PWA_PUSH_VAPID_PUBLIC_KEY:pair.getPublicKey().toString("base64url"),
-  PWA_PUSH_VAPID_PRIVATE_KEY:pair.getPrivateKey().toString("base64url"),
+  PWA_PUSH_VAPID_PRIVATE_KEY:Buffer.from(pair.getPrivateKey().toString("hex").padStart(64, "0"), "hex").toString("base64url"),
 };
 const headers={authorization:"Bearer "+env.CRON_SECRET};
 const job:PushJob={
