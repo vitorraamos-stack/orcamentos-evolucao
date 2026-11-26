@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { installOrderDraftNavigationGuard } from "@/modules/orders/services/orderNavigationGuard";
 import CommercialBriefingPanel from "./CommercialBriefingPanel";
+import DigisacConnectionCheck from "./DigisacConnectionCheck";
 import { emptyCommercialBriefing } from "./commercialBriefingDomain";
 import {
   cancelCommercialBriefing,
@@ -210,6 +211,7 @@ function CommercialBriefingWorkspace({ actorId }: { actorId: string }) {
           <strong>Modo manual</strong>
           <p className="text-xs text-muted-foreground mt-1">Informe o identificador exato do contato no Digisac. A associação automática e a verificação do atendimento ainda não estão habilitadas. Não use o ID de outro cliente.</p>
         </div>
+        <DigisacConnectionCheck />
         <form onSubmit={search} className="space-y-2">
           <Label htmlFor="briefing-contact-reference">ID do contato Digisac</Label>
           <Input id="briefing-contact-reference" required maxLength={200} value={contactInput} disabled={busy}
