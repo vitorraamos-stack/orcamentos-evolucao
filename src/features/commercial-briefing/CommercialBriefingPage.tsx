@@ -124,21 +124,27 @@ function CommercialBriefingWorkspace({ actorId }: { actorId: string }) {
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState("");
   const inFlight = useRef(false);
+  const alive = useRef(false);
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
   // Preserve an id on retry of the same logical creation request.
   const creation = useRef<{ id: string; contactId: string; ticketId: string | null } | null>(null);
 
   const run = async (action: () => Promise<void>) => {
-    if (inFlight.current) return;
+    if (!alive.current || inFlight.current) return;
     inFlight.current = true;
     setBusy(true);
     setError("");
     try { await action(); }
-    catch (cause) { setError(safeError(cause)); }
-    finally { inFlight.current = false; setBusy(false); }
+    catch (cause) { if (alive.current) setError(safeError(cause)); }
+    finally { inFlight.current = false; if (alive.current) setBusy(false); }
   };
   const load = async (contactId: string, append = false) => {
     const start = append ? offset : 0;
     const result = await listCommercialBriefings({ contactId, offset: start });
+    if (!alive.current) return;
     setRows(current => append
       ? [...current, ...result.filter(row => !current.some(existing => existing.id === row.id))]
       : result);
@@ -153,9 +159,13 @@ function CommercialBriefingWorkspace({ actorId }: { actorId: string }) {
     setRows([]);
     setContact("");
     setHasMore(false);
-    setTicket("");
-    // Do not silently abandon a create retry if its result was lost.
-    if (creation.current?.contactId !== id) creation.current = null;
+    // Preserve the exact retry context if a network response was lost.
+    const pending = creation.current;
+    if (pending?.contactId === id) setTicket(pending.ticketId ?? "");
+    else {
+      setTicket("");
+      creation.current = null;
+    }
     void run(() => load(id));
   };
   const newBriefing = () => {
@@ -167,23 +177,26 @@ function CommercialBriefingWorkspace({ actorId }: { actorId: string }) {
     creation.current = request;
     void run(async () => {
       const result = await createCommercialBriefing({ ...request, draft: emptyCommercialBriefing() });
+      if (!alive.current) return;
       creation.current = null;
       setSelected(result);
     });
   };
   const open = (id: string) => void run(async () => {
     const result = await getCommercialBriefing(id);
+    if (!alive.current) return;
     if (!result || result.digisacContactId !== contact) throw new CommercialBriefingRepositoryError("forbidden");
     setSelected(result);
   });
   const back = () => {
+    if (!alive.current) return;
     setSelected(null);
     setRows([]);
     setHasMore(false);
     if (contact) void run(() => load(contact));
   };
 
-  return <main className="mx-auto w-full max-w-xl min-w-0 space-y-4 pb-8">
+  return <div className="mx-auto w-full max-w-xl min-w-0 space-y-4 pb-8">
     <header className="space-y-1">
       <div className="flex items-center gap-2">
         <ClipboardList className="size-5 shrink-0" aria-hidden="true" />
@@ -211,7 +224,7 @@ function CommercialBriefingWorkspace({ actorId }: { actorId: string }) {
             <div className="rounded-xl border p-3 space-y-2">
               <h2 className="text-sm font-semibold">Nova negociação</h2>
               <Label htmlFor="briefing-ticket-reference">ID do chamado (opcional)</Label>
-              <Input id="briefing-ticket-reference" maxLength={200} value={ticket} disabled={busy}
+              <Input id="briefing-ticket-reference" maxLength={200} value={ticket} disabled={busy || creation.current !== null}
                 autoComplete="off" onChange={e => setTicket(e.target.value)} />
               <Button type="button" className="w-full" disabled={busy} onClick={newBriefing}>
                 <Plus /> {creation.current ? "Tentar criação novamente" : "Criar briefing"}
@@ -231,7 +244,7 @@ function CommercialBriefingWorkspace({ actorId }: { actorId: string }) {
             {hasMore && <Button type="button" variant="outline" className="w-full" disabled={busy} onClick={() => void run(() => load(contact, true))}>Carregar mais</Button>}
           </section>}
       </div>}
-  </main>;
+  </div>;
 }
 
 export default function CommercialBriefingPage() {
