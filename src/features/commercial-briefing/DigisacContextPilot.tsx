@@ -47,13 +47,14 @@ const briefingSchema = z.strictObject({
   draft: commercialBriefingDraftSchema,
   state: z.enum(digisacBriefingStates),
 });
+const briefingRevisionSchema = z.number().int().positive();
 const briefingStateLabels = {
   draft: "Em preenchimento",
   linked: "Vinculado à OS",
   cancelled: "Cancelado",
 };
 type ConsultationResult =
-  | { kind: "found"; briefing: z.infer<typeof briefingSchema> }
+  | { kind: "found"; briefing: z.infer<typeof briefingSchema>; revision: number }
   | { kind: "none" | "multiple" }
   | { kind: "error"; message: string };
 
@@ -64,7 +65,10 @@ async function consultBriefing(refs: DigisacContext, signal: AbortSignal): Promi
     if (body?.code === "BRIEFING_NOT_FOUND") return { kind: "none" };
     if (body?.code === "BRIEFING_AMBIGUOUS") return { kind: "multiple" };
     const parsed = briefingSchema.safeParse(body?.briefing);
-    if (body?.code === "BRIEFING_FOUND" && parsed.success) return { kind: "found", briefing: parsed.data };
+    const revision = briefingRevisionSchema.safeParse(body?.revision);
+    if (body?.code === "BRIEFING_FOUND" && parsed.success && revision.success) {
+      return { kind: "found", briefing: parsed.data, revision: revision.data };
+    }
   } catch {
     // Use the same message for network and malformed server responses.
   }
@@ -81,7 +85,10 @@ export function BriefingConsultationResult({ result }: { result: ConsultationRes
       return <p role="status" className="text-sm">Mais de um briefing encontrado para este contato. Nenhum foi aberto.</p>;
     case "found":
       return <section className="space-y-4" aria-label="Briefing encontrado">
-        <p role="status" className="rounded-lg border p-3 text-sm">Briefing encontrado · {briefingStateLabels[result.briefing.state]}</p>
+        <div role="status" className="flex flex-wrap justify-between gap-2 rounded-lg border p-3 text-sm">
+          <span>Briefing encontrado · {briefingStateLabels[result.briefing.state]}</span>
+          <span className="font-medium">Revisão {result.revision}</span>
+        </div>
         <CommercialBriefingPanel value={result.briefing.draft} readOnly />
       </section>;
   }

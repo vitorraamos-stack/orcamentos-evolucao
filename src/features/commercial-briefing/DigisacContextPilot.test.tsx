@@ -44,9 +44,10 @@ describe("consultation opened from Digisac", () => {
       }],
     };
     const html = renderToStaticMarkup(<BriefingConsultationResult result={{
-      kind: "found", briefing: { state: "draft", draft },
+      kind: "found", briefing: { state: "draft", draft }, revision: 2,
     }} />);
     expect(html).toContain('aria-label="Briefing encontrado"');
+    expect(html).toContain("Revisão 2");
     expect(html).toContain("Cliente de teste");
     expect(html).toContain("Item de teste");
     const fields = html.match(/<(?:input|textarea|select)\b[^>]*>/g) ?? [];

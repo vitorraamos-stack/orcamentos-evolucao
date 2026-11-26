@@ -192,15 +192,15 @@ describe("manager-only Digisac context check", () => {
 describe("manager-only Digisac briefing consultation", () => {
   it("returns a single stored briefing without account or order metadata", async () => {
     mocks.limit.mockResolvedValue({ data: [{
-      draft: storedDraft, cancelled_at: null, os_id: "private-os-id",
+      draft: storedDraft, revision: 2, cancelled_at: null, os_id: "private-os-id",
     }], error: null });
     mocks.getUser.mockResolvedValue({ id: "u-1", email: "another@example.invalid" });
     expect(await invoke(consultation)).toEqual({
-      status: 200, payload: { ok: true, code: "BRIEFING_FOUND", briefing: { draft: storedDraft, state: "linked" } },
+      status: 200, payload: { ok: true, code: "BRIEFING_FOUND", briefing: { draft: storedDraft, state: "linked" }, revision: 2 },
     });
     expect(mocks.readerConfig).toHaveBeenCalledWith("https://example.invalid", "fixture-public-key",
       expect.objectContaining({ global: { headers: { Authorization: "Bearer fixture" } } }));
-    expect(mocks.select).toHaveBeenCalledWith("commercial_briefings", "draft, cancelled_at, os_id");
+    expect(mocks.select).toHaveBeenCalledWith("commercial_briefings", "draft, revision, cancelled_at, os_id");
     expect(mocks.eq).toHaveBeenCalledWith("digisac_contact_id", refs.contactId);
     expect(mocks.limit).toHaveBeenCalledWith(2);
     expect(mocks.getUser).not.toHaveBeenCalled();
