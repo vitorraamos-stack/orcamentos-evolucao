@@ -59,6 +59,15 @@ describe("manager-only Digisac context check", () => {
     expect(mocks.getTicket).not.toHaveBeenCalled();
     expect(mocks.getUser).not.toHaveBeenCalled();
   });
+  it.each([
+    [" PRIVATE@example.invalid ", true],
+    ["another@example.invalid", false],
+    [" ", null],
+    [undefined, null],
+  ])("distinguishes an absent e-mail from a mismatch (%s)", async (email, expected) => {
+    mocks.getUser.mockResolvedValue({ id: "u-1", email });
+    expect((await invoke()).payload.checks.accountEmail).toBe(expected);
+  });
   it("rejects arbitrary fields and invalid references", async () => {
     expect((await invoke({ ...refs, userId: "../users" })).status).toBe(400);
     expect((await invoke({ ...refs, role: "gerente" })).status).toBe(400);
