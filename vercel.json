@@ -5,6 +5,14 @@
   "outputDirectory": "dist",
   "headers": [
     {
+      "source": "/integracoes/digisac/briefing",
+      "headers": [
+        { "key": "Content-Security-Policy", "value": "frame-ancestors https://evolucaoimpressos.digisac.chat" },
+        { "key": "Cache-Control", "value": "private, no-store, max-age=0" },
+        { "key": "Referrer-Policy", "value": "no-referrer" }
+      ]
+    },
+    {
       "source": "/index.html",
       "headers": [
         {
@@ -112,7 +120,8 @@
       "feat/pwa-v4-manual-pilot-test-20261116": false,
       "feat/pwa-v4-background-remote-pilot-20261116": false,
       "feat/pwa-v4-operational-canary-scheduler-20261117": false,
-      "feat/briefing-comercial": false
+      "feat/briefing-comercial": false,
+      "feat/briefing-digisac-context": false
     }
   }
 }

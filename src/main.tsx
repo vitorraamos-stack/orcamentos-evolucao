@@ -4,7 +4,8 @@ import "./index.css";
 
 createRoot(document.getElementById("root")!).render(<App />);
 
-if (import.meta.env.PROD && "serviceWorker" in navigator) {
+if (import.meta.env.PROD && "serviceWorker" in navigator &&
+    window.top === window.self && window.location.pathname !== "/integracoes/digisac/briefing") {
   window.addEventListener("load", () => {
     void navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(error => {
       console.warn("EvoluSystem PWA: service worker indisponível", error);
