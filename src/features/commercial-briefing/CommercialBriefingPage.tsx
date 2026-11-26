@@ -30,10 +30,12 @@ const saveLabels = {
 const safeError = (cause: unknown) => cause instanceof CommercialBriefingRepositoryError
   ? cause.message : "Não foi possível concluir a operação. Tente novamente.";
 
-function BriefingEditor({ initial, actorId, onBack }: {
+export function BriefingEditor({ initial, actorId, onBack, backLabel = "Negociações", allowCancel = true }: {
   initial: PersistedCommercialBriefing;
   actorId: string;
-  onBack: () => void;
+  onBack?: () => void;
+  backLabel?: string;
+  allowCancel?: boolean;
 }) {
   const editor = useCommercialBriefingAutosave(initial, actorId);
   const { record, draft, editable, dirty, status } = editor;
@@ -49,17 +51,17 @@ function BriefingEditor({ initial, actorId, onBack }: {
 
   const back = () => {
     if (busy) return;
-    if (!dirty || window.confirm(EXIT_MESSAGE)) onBack();
+    if (!dirty || window.confirm(EXIT_MESSAGE)) onBack?.();
   };
   const cancel = async () => {
-    if (!editable || dirty || busy || status !== "saved" || cancelInFlight.current) return;
+    if (!allowCancel || !editable || dirty || busy || status !== "saved" || cancelInFlight.current) return;
     if (!window.confirm("Cancelar esta negociação? O histórico será preservado e o briefing não poderá ser editado.")) return;
     cancelInFlight.current = true;
     setCancelling(true);
     setCancelError("");
     try {
       await cancelCommercialBriefing({ id: record.id, expectedRevision: record.revision });
-      onBack();
+      onBack?.();
     } catch (cause) {
       setCancelError(safeError(cause));
     } finally {
@@ -69,9 +71,9 @@ function BriefingEditor({ initial, actorId, onBack }: {
   };
 
   return <div className="min-w-0 space-y-4">
-    <Button type="button" variant="ghost" className="-ml-2" disabled={busy} onClick={back}>
-      <ArrowLeft /> Negociações
-    </Button>
+    {onBack && <Button type="button" variant="ghost" className="-ml-2" disabled={busy} onClick={back}>
+      <ArrowLeft /> {backLabel}
+    </Button>}
     <header className="space-y-1 rounded-xl bg-[#1C2935] p-3 text-white">
       <h2 className="break-words text-base font-semibold">{draft.clientName.trim() || "Nova negociação"}</h2>
       <p className="break-all text-xs text-white/75">Briefing {record.id.slice(0, 8)} · revisão {record.revision}</p>
@@ -105,7 +107,7 @@ function BriefingEditor({ initial, actorId, onBack }: {
       saved={!dirty && status === "saved" && !record.cancelledAt} />
     <div className="space-y-2 border-t pt-3">
       <p className="text-xs text-muted-foreground">Salvamento automático ativo quando houver alterações. Nenhum briefing inicia a contagem do prazo da OS.</p>
-      {editable && <Button type="button" size="sm" variant="ghost" className="text-destructive"
+      {editable && allowCancel && <Button type="button" size="sm" variant="ghost" className="text-destructive"
         disabled={dirty || busy || status !== "saved"} onClick={() => void cancel()}>
         {cancelling ? "Cancelando..." : "Cancelar negociação"}
       </Button>}
