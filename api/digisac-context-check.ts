@@ -100,13 +100,13 @@ export default async function handler(req: any, res: any) {
       }
 
       const { data, error } = await actor.from("commercial_briefings")
-        .select("draft, cancelled_at, os_id").eq("digisac_contact_id", refs.contactId).limit(2);
+        .select("draft, revision, cancelled_at, os_id").eq("digisac_contact_id", refs.contactId).limit(2);
       if (error || !Array.isArray(data)) return reply(503, "SERVER_UNAVAILABLE");
       if (data.length === 0) return reply(200, "BRIEFING_NOT_FOUND");
       if (data.length > 1) return reply(200, "BRIEFING_AMBIGUOUS");
       const row = data[0];
       const state: DigisacBriefingState = row.cancelled_at ? "cancelled" : row.os_id ? "linked" : "draft";
-      return reply(200, "BRIEFING_FOUND", { briefing: { draft: row.draft, state } });
+      return reply(200, "BRIEFING_FOUND", { briefing: { draft: row.draft, state }, revision: row.revision });
     }
 
     const [contact, ticket, user] = await Promise.all([
