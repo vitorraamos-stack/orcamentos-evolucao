@@ -1,12 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { z } from "zod";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
-import { readDigisacContext, contextChecks, contextDiagnosticSchema, digisacContextSchema, type ContextDiagnostic, type DigisacContext } from "@shared/digisac/context";
+import {
+  canConsultDigisacBriefing, contextChecks, contextDiagnosticSchema,
+  digisacBriefingStates, digisacContextSchema, readDigisacContext,
+  type ContextDiagnostic, type DigisacContext, type DigisacRequest,
+} from "@shared/digisac/context";
+import CommercialBriefingPanel from "./CommercialBriefingPanel";
+import { commercialBriefingDraftSchema } from "./commercialBriefingDomain";
 
 const messages: Record<string, string> = {
   UNAUTHENTICATED: "Entre no EvoluSystem em uma aba própria e tente validar novamente.",
-  FORBIDDEN: "O diagnóstico está restrito à gerência com acesso ao Hub OS.",
+  FORBIDDEN: "O acesso está restrito à gerência com acesso ao Hub OS.",
   INVALID_CONTEXT: "O Digisac não enviou referências válidas.",
+  CONTEXT_NOT_VERIFIED: "Não foi possível confirmar que o chamado está aberto e pertence a este contato. Valide o atendimento novamente no Digisac.",
   DIGISAC_CONFIG: "Confira a configuração da API no servidor.",
   DIGISAC_UNAUTHORIZED: "A API recusou a credencial.",
   DIGISAC_REFERENCE_NOT_FOUND: "A API não encontrou uma das referências recebidas.",
@@ -32,27 +40,34 @@ const readyMessage = "evolusystem:digisac-context-ready";
 const requestMessage = "evolusystem:digisac-context-request";
 const requestTimeout = 20000;
 const popupTimeout = 45000;
+const consultationFragment = "#consultar?";
 type DiagnosticResult = { checks: ContextDiagnostic } | { code: string };
+
+async function requestDigisacContext(request: DigisacRequest, signal: AbortSignal) {
+  const { data, error } = await supabase.auth.getSession();
+  if (error || !data.session?.access_token) {
+    return { ok: false, body: { code: "UNAUTHENTICATED" } };
+  }
+  const response = await fetch("/api/digisac-context-check", {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      Authorization: "Bearer " + data.session.access_token,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(request),
+    signal,
+  });
+  const body = await response.json();
+  return { ok: response.ok, body };
+}
 
 async function runDiagnostic(refs: DigisacContext, signal: AbortSignal): Promise<DiagnosticResult> {
   try {
-    const { data, error } = await supabase.auth.getSession();
-    if (error || !data.session?.access_token) return { code: "UNAUTHENTICATED" };
-
-    const response = await fetch("/api/digisac-context-check", {
-      method: "POST",
-      cache: "no-store",
-      headers: {
-        Authorization: "Bearer " + data.session.access_token,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(refs),
-      signal,
-    });
-    const body = await response.json();
+    const { ok, body } = await requestDigisacContext(refs, signal);
     const parsed = contextDiagnosticSchema.safeParse(body?.checks);
-    if (response.ok && body?.code === "CONTEXT_INSPECTED" && parsed.success) {
+    if (ok && body?.code === "CONTEXT_INSPECTED" && parsed.success) {
       return { checks: parsed.data };
     }
     return { code: readErrorCode(body?.code) };
@@ -64,6 +79,82 @@ async function runDiagnostic(refs: DigisacContext, signal: AbortSignal): Promise
 function readErrorCode(code: unknown) {
   return typeof code === "string" && Object.prototype.hasOwnProperty.call(messages, code)
     ? code : "SERVER_UNAVAILABLE";
+}
+
+const briefingSchema = z.strictObject({
+  draft: commercialBriefingDraftSchema,
+  state: z.enum(digisacBriefingStates),
+});
+const briefingStateLabels = {
+  draft: "Em preenchimento",
+  linked: "Vinculado à OS",
+  cancelled: "Cancelado",
+};
+type ConsultationResult =
+  | { kind: "found"; briefing: z.infer<typeof briefingSchema> }
+  | { kind: "none" | "multiple" }
+  | { kind: "error"; message: string };
+
+async function consultBriefing(refs: DigisacContext, signal: AbortSignal): Promise<ConsultationResult> {
+  try {
+    const { ok, body } = await requestDigisacContext({ ...refs, action: "consult" }, signal);
+    if (!ok) return { kind: "error", message: messages[readErrorCode(body?.code)] };
+    if (body?.code === "BRIEFING_NOT_FOUND") return { kind: "none" };
+    if (body?.code === "BRIEFING_AMBIGUOUS") return { kind: "multiple" };
+    const parsed = briefingSchema.safeParse(body?.briefing);
+    if (body?.code === "BRIEFING_FOUND" && parsed.success) return { kind: "found", briefing: parsed.data };
+  } catch {
+    // Use the same message for network and malformed server responses.
+  }
+  return { kind: "error", message: "Não foi possível consultar o briefing comercial." };
+}
+
+export function BriefingConsultationResult({ result }: { result: ConsultationResult }) {
+  switch (result.kind) {
+    case "error":
+      return <p role="alert" className="text-sm text-destructive">{result.message}</p>;
+    case "none":
+      return <p role="status" className="text-sm">Nenhum briefing encontrado para este contato.</p>;
+    case "multiple":
+      return <p role="status" className="text-sm">Mais de um briefing encontrado para este contato. Nenhum foi aberto.</p>;
+    case "found":
+      return <section className="space-y-4" aria-label="Briefing encontrado">
+        <p role="status" className="rounded-lg border p-3 text-sm">Briefing encontrado · {briefingStateLabels[result.briefing.state]}</p>
+        <CommercialBriefingPanel value={result.briefing.draft} readOnly />
+      </section>;
+  }
+}
+
+function BriefingConsultation({ refs }: { refs: DigisacContext | null }) {
+  const [result, setResult] = useState<ConsultationResult | null>(null);
+  useEffect(() => {
+    if (!refs) return;
+    const controller = new AbortController();
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(requestTimeout)]);
+    void consultBriefing(refs, signal).then(outcome => {
+      if (!controller.signal.aborted) setResult(outcome);
+    });
+    return () => controller.abort();
+  }, [refs]);
+
+  return <main className="mx-auto min-h-screen w-full max-w-xl space-y-4 bg-background p-4 text-foreground">
+    <header>
+      <h1 className="text-xl font-semibold">Briefing Comercial</h1>
+      <p className="text-sm text-muted-foreground">Consulta pelo Digisac · Somente leitura</p>
+    </header>
+    {!refs ? <p role="alert" className="text-sm">{messages.INVALID_CONTEXT}</p>
+      : result ? <BriefingConsultationResult result={result} />
+      : <p role="status" className="text-sm">Consultando briefing…</p>}
+  </main>;
+}
+
+function consultationHref(refs: DigisacContext) {
+  const params = new URLSearchParams({
+    contact_id: refs.contactId,
+    ticket_id: refs.ticketId,
+    user_id: refs.userId,
+  });
+  return window.location.pathname + consultationFragment + params.toString();
 }
 
 function DiagnosticSessionWindow({ nonce }: { nonce: string }) {
@@ -196,7 +287,12 @@ function DiagnosticPanel({ refs, inFrame }: { refs: DigisacContext | null; inFra
           {checks[key] === true ? "Sim" : checks[key] === false ? "Não" : "Não identificado"}
         </span>
       </div>)}
-      <p className="text-xs text-muted-foreground">Resultado de diagnóstico, não autorização para acessar ou editar briefings.</p>
+      <p className="text-xs text-muted-foreground">A comparação de e-mails é informativa.</p>
+      {refs && canConsultDigisacBriefing(checks) && <a
+        href={consultationHref(refs)} target="_blank" rel="noopener noreferrer"
+        className={buttonVariants({ className: "w-full" })}>
+        Consultar briefing
+      </a>}
     </section>}
     <div className="space-y-2 text-xs">
       <a href="/login" target="_blank" rel="noopener noreferrer" className="block underline">Entrar no EvoluSystem em uma aba própria</a>
@@ -207,8 +303,12 @@ function DiagnosticPanel({ refs, inFrame }: { refs: DigisacContext | null; inFra
 
 export default function DigisacContextPilot() {
   const [refs] = useState(() => readDigisacContext(window.location.search));
+  const [consultation] = useState(() => window.location.hash.startsWith(consultationFragment)
+    ? { refs: readDigisacContext(window.location.hash.slice(consultationFragment.length)) }
+    : null);
   const inFrame = window.top !== window.self;
   const nonce = /^#sessao=([0-9a-f-]{36})$/.exec(window.location.hash)?.[1];
   if (!inFrame && nonce) return <DiagnosticSessionWindow nonce={nonce} />;
+  if (!inFrame && consultation) return <BriefingConsultation refs={consultation.refs} />;
   return <DiagnosticPanel refs={refs} inFrame={inFrame} />;
 }

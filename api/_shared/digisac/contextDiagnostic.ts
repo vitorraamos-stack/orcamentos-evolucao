@@ -18,6 +18,20 @@ function matches(value: unknown, expected: string): boolean | null {
 function present(value: unknown): boolean | null {
   return typeof value === "string" ? value.trim().length > 0 : null;
 }
+
+function inspectContactAndTicket(refs: DigisacContext, contact: JsonObject | null, ticket: JsonObject | null) {
+  return {
+    contactId: matches(contact?.id, refs.contactId),
+    ticketId: matches(ticket?.id, refs.ticketId),
+    ticketContact: matches(ticket?.contactId, refs.contactId),
+    ticketOpen: typeof ticket?.isOpen === "boolean" ? ticket.isOpen : null,
+  };
+}
+
+export function inspectDigisacConsultation(refs: DigisacContext, contact: unknown, ticket: unknown) {
+  return inspectContactAndTicket(refs, record(contact), record(ticket));
+}
+
 export function inspectDigisacContext(
   refs: DigisacContext,
   responses: { contact: unknown; ticket: unknown; user: unknown },
@@ -32,10 +46,7 @@ export function inspectDigisacContext(
     ? digisacEmail === evoluSystemEmail
     : null;
   return {
-    contactId: matches(contact?.id, refs.contactId),
-    ticketId: matches(ticket?.id, refs.ticketId),
-    ticketContact: matches(ticket?.contactId, refs.contactId),
-    ticketOpen: typeof ticket?.isOpen === "boolean" ? ticket.isOpen : null,
+    ...inspectContactAndTicket(refs, contact, ticket),
     ticketAssignee: matches(ticket?.userId, refs.userId),
     userId: matches(user?.id, refs.userId),
     accountEmail,
