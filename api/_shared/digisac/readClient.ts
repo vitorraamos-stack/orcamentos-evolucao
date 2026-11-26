@@ -94,6 +94,17 @@ export function createDigisacReadClient(
   };
 
   return {
+    // Documented Users list: request a minimal page solely for a server-side
+    // connectivity diagnostic. Never return the provider response to the caller.
+    checkConnection() {
+      const url = new URL(base + "/users");
+      url.searchParams.set("page", "1");
+      url.searchParams.set("perPage", "1");
+      return request(url);
+    },
+    getUser(userId: string) {
+      return request(new URL(base + "/users/" + encodeURIComponent(validateId(userId))));
+    },
     getContact(contactId: string) {
       return request(new URL(base + "/contacts/" + encodeURIComponent(validateId(contactId))));
     },
