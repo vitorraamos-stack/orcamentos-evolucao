@@ -33,24 +33,25 @@ function Field({ label, id, children }: { label: string; id: string; children: R
   return <div className="min-w-0 space-y-1.5"><Label htmlFor={id}>{label}</Label>{children}</div>;
 }
 
+type PanelProps = { value: CommercialBriefingDraft } & (
+  | { onChange: (next: CommercialBriefingDraft) => void; readOnly?: boolean; saved?: boolean }
+  | { onChange?: never; readOnly: true; saved?: never }
+);
+
 export default function CommercialBriefingPanel({
   value, onChange, readOnly = false, saved = false,
-}: {
-  value: CommercialBriefingDraft;
-  onChange: (next: CommercialBriefingDraft) => void;
-  readOnly?: boolean;
-  saved?: boolean;
-}) {
+}: PanelProps) {
   const prefix = useId();
   const [section, setSection] = useState<Section>("items");
   const [copyStatus, setCopyStatus] = useState("");
+  const consultation = !onChange;
   const completion = getCommercialBriefingCompletion(value);
   const total = Object.keys(completion).length;
   const count = Object.values(completion).filter(Boolean).length;
   const summary = buildCommercialSummary(value);
   const patch = (partial: Partial<CommercialBriefingDraft>) => {
     setCopyStatus("");
-    if (!readOnly) onChange({ ...value, ...partial });
+    if (!readOnly) onChange?.({ ...value, ...partial });
   };
   const patchItem = (id: string, partial: Partial<CommercialBriefingItem>) =>
     patch({ items: value.items.map(item => item.id === id ? { ...item, ...partial } : item) });
@@ -68,7 +69,7 @@ export default function CommercialBriefingPanel({
     <div className="min-w-0 space-y-4">
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-muted-foreground">Preparação da OS</span>
+          <span className="text-muted-foreground">{consultation ? "Preenchimento do briefing" : "Preparação da OS"}</span>
           <span className="font-semibold">{count}/{total} etapas</span>
         </div>
         <progress aria-label="Etapas preenchidas" value={count} max={total} className="block h-2 w-full accent-primary" />
@@ -88,18 +89,20 @@ export default function CommercialBriefingPanel({
       </nav>
 
       {section === "items" && <section aria-label="Itens e especificações" className="space-y-3">
-        {value.items.length === 0 && <p className="text-sm text-muted-foreground">Adicione os produtos ou serviços negociados.</p>}
+        {value.items.length === 0 && <p className="text-sm text-muted-foreground">
+          {consultation ? "Nenhum item registrado." : "Adicione os produtos ou serviços negociados."}
+        </p>}
         {value.items.map((item, index) => {
           const id = prefix + "-" + item.id;
           return <article key={item.id} className="min-w-0 space-y-3 rounded-xl border bg-card p-3">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold">Item {index + 1}</h3>
-              <Button type="button" size="icon-sm" variant="ghost" disabled={readOnly}
+              {!consultation && <Button type="button" size="icon-sm" variant="ghost" disabled={readOnly}
                 aria-label={"Remover item " + (index + 1)}
                 onClick={() => {
                   if (window.confirm("Remover este item do briefing?"))
                     patch({ items: value.items.filter(row => row.id !== item.id) });
-                }}><Trash2 /></Button>
+                }}><Trash2 /></Button>}
             </div>
             <Field label="Produto ou serviço" id={id + "-name"}>
               <Input id={id + "-name"} maxLength={160} value={item.name} disabled={readOnly}
@@ -140,10 +143,10 @@ export default function CommercialBriefingPanel({
             </Field>
           </article>;
         })}
-        <Button type="button" variant="outline" className="w-full" disabled={readOnly || value.items.length >= 100}
+        {!consultation && <Button type="button" variant="outline" className="w-full" disabled={readOnly || value.items.length >= 100}
           onClick={() => patch({ items: [...value.items, emptyCommercialBriefingItem(crypto.randomUUID())] })}>
           <Plus /> Adicionar item
-        </Button>
+        </Button>}
       </section>}
 
       {section === "art" && <section aria-label="Arte" className="space-y-3">
@@ -177,8 +180,8 @@ export default function CommercialBriefingPanel({
                 <span className="block text-xs text-muted-foreground">{DELIVERY_DEADLINE_PRESET_CONFIG[preset].tooltip}</span></span>
             </label>
           ))}
-          <Button type="button" size="sm" variant="ghost" disabled={readOnly || value.deadlinePreset === null}
-            onClick={() => patch({ deadlinePreset: null, deliveryDate: "" })}>Marcar prazo a definir</Button>
+          {!consultation && <Button type="button" size="sm" variant="ghost" disabled={readOnly || value.deadlinePreset === null}
+            onClick={() => patch({ deadlinePreset: null, deliveryDate: "" })}>Marcar prazo a definir</Button>}
         </fieldset>
         {value.deadlinePreset === "CUSTOM" && <Field id={prefix + "-date"} label="Data acordada após consultar Produção/Gerência">
           <Input id={prefix + "-date"} type="date" disabled={readOnly} value={value.deliveryDate}
@@ -224,13 +227,15 @@ export default function CommercialBriefingPanel({
           <Field id={prefix + "-preview"} label="Prévia para conferência do cliente">
             <Textarea id={prefix + "-preview"} readOnly value={summary} rows={10} className="text-sm" />
           </Field>
-          <Button type="button" variant="outline" className="w-full" disabled={!saved} onClick={() => void copy()}>
+          {!consultation && <Button type="button" variant="outline" className="w-full" disabled={!saved} onClick={() => void copy()}>
             <Copy /> Copiar resumo
-          </Button>
-          {!saved && <p className="text-xs text-muted-foreground">Aguarde o salvamento antes de copiar a versão comercial.</p>}
+          </Button>}
+          {!consultation && !saved && <p className="text-xs text-muted-foreground">Aguarde o salvamento antes de copiar a versão comercial.</p>}
           {copyStatus && <p role="status" className="text-xs">{copyStatus}</p>}
-        </div> : <p className="rounded-lg border p-3 text-sm text-muted-foreground">Preencha cliente, itens válidos, Arte, prazo e logística para gerar o resumo.</p>}
-        <p className="text-xs text-muted-foreground">A cópia não registra aceite, não envia mensagens e não cria uma OS. A confirmação e a conversão serão habilitadas em uma etapa posterior.</p>
+        </div> : <p className="rounded-lg border p-3 text-sm text-muted-foreground">
+          {consultation ? "O briefing ainda está incompleto para gerar um resumo." : "Preencha cliente, itens válidos, Arte, prazo e logística para gerar o resumo."}
+        </p>}
+        {!consultation && <p className="text-xs text-muted-foreground">A cópia não registra aceite, não envia mensagens e não cria uma OS. A confirmação e a conversão serão habilitadas em uma etapa posterior.</p>}
       </section>}
     </div>
   );

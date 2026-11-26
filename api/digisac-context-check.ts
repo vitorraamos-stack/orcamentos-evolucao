@@ -1,15 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
-import { digisacContextSchema } from "../shared/digisac/context.js";
-import { inspectDigisacContext } from "./_shared/digisac/contextDiagnostic.js";
+import { canConsultDigisacBriefing, digisacRequestSchema, type DigisacBriefingState } from "../shared/digisac/context.js";
+import { inspectDigisacConsultation, inspectDigisacContext } from "./_shared/digisac/contextDiagnostic.js";
 import { DigisacClientError, digisacReadClientFromEnv } from "./_shared/digisac/readClient.js";
 
-// Manager-only diagnostic: no raw Digisac response, credential, contact,
-// email, telephone or identity assertion is returned. No database writes.
+// Both paths are manager-only. The diagnostic only returns checks, while
+// an explicit consultation can return a stored briefing's read-only contents.
 export default async function handler(req: any, res: any) {
   res.setHeader("Cache-Control", "private, no-store, max-age=0");
   res.setHeader("X-Content-Type-Options", "nosniff");
-  const reply = (status: number, code: string, checks?: unknown) =>
-    res.status(status).json({ ok: status === 200, code, ...(checks ? { checks } : {}) });
+  const reply = (status: number, code: string, details?: Record<string, unknown>) =>
+    res.status(status).json({ ok: status === 200, code, ...details });
 
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -41,10 +41,36 @@ export default async function handler(req: any, res: any) {
       if (payload.length > 4096) return reply(400, "INVALID_CONTEXT");
       try { payload = JSON.parse(payload); } catch { return reply(400, "INVALID_CONTEXT"); }
     }
-    const parsed = digisacContextSchema.safeParse(payload);
+    const parsed = digisacRequestSchema.safeParse(payload);
     if (!parsed.success) return reply(400, "INVALID_CONTEXT");
     const refs = parsed.data;
     const client = digisacReadClientFromEnv();
+    if ("action" in refs) {
+      const [contact, ticket] = await Promise.all([
+        client.getContact(refs.contactId),
+        client.getTicket(refs.ticketId),
+      ]);
+      if (!canConsultDigisacBriefing(inspectDigisacConsultation(refs, contact, ticket))) {
+        return reply(422, "CONTEXT_NOT_VERIFIED");
+      }
+
+      const publicKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+      if (!publicKey) return reply(503, "SERVER_CONFIG");
+      // The user's JWT preserves commercial_briefing_read row permissions.
+      const reader = createClient(url, publicKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { headers: { Authorization: authorization } },
+      });
+      const { data, error } = await reader.from("commercial_briefings")
+        .select("draft, cancelled_at, os_id").eq("digisac_contact_id", refs.contactId).limit(2);
+      if (error || !Array.isArray(data)) return reply(503, "SERVER_UNAVAILABLE");
+      if (data.length === 0) return reply(200, "BRIEFING_NOT_FOUND");
+      if (data.length > 1) return reply(200, "BRIEFING_AMBIGUOUS");
+      const row = data[0];
+      const state: DigisacBriefingState = row.cancelled_at ? "cancelled" : row.os_id ? "linked" : "draft";
+      return reply(200, "BRIEFING_FOUND", { briefing: { draft: row.draft, state } });
+    }
+
     const [contact, ticket, user] = await Promise.all([
       client.getContact(refs.contactId),
       client.getTicket(refs.ticketId),
@@ -52,8 +78,9 @@ export default async function handler(req: any, res: any) {
     ]);
     const confirmedEmail = auth.user.email_confirmed_at && typeof auth.user.email === "string"
       ? auth.user.email : null;
-    return reply(200, "CONTEXT_INSPECTED",
-      inspectDigisacContext(refs, { contact, ticket, user }, confirmedEmail));
+    return reply(200, "CONTEXT_INSPECTED", {
+      checks: inspectDigisacContext(refs, { contact, ticket, user }, confirmedEmail),
+    });
   } catch (cause) {
     if (cause instanceof DigisacClientError) {
       switch (cause.code) {

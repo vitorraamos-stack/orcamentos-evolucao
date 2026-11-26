@@ -8,6 +8,13 @@ export const digisacContextSchema = z.object({
   userId: reference,
 }).strict();
 export type DigisacContext = z.infer<typeof digisacContextSchema>;
+const digisacConsultationSchema = digisacContextSchema.extend({
+  action: z.literal("consult"),
+});
+export const digisacRequestSchema = z.union([digisacContextSchema, digisacConsultationSchema]);
+export type DigisacRequest = z.infer<typeof digisacRequestSchema>;
+export const digisacBriefingStates = ["draft", "linked", "cancelled"] as const;
+export type DigisacBriefingState = typeof digisacBriefingStates[number];
 export function readDigisacContext(search: string): DigisacContext | null {
   const params = new URLSearchParams(search);
   const keys = ["contact_id", "ticket_id", "user_id"] as const;
@@ -35,3 +42,10 @@ export const contextDiagnosticSchema = z.object({
   contactPhone: z.boolean().nullable(),
 }).strict();
 export type ContextDiagnostic = z.infer<typeof contextDiagnosticSchema>;
+
+export function canConsultDigisacBriefing(checks: Pick<ContextDiagnostic,
+  "contactId" | "ticketId" | "ticketContact" | "ticketOpen"
+>): boolean {
+  return checks.contactId === true && checks.ticketId === true &&
+    checks.ticketContact === true && checks.ticketOpen === true;
+}
