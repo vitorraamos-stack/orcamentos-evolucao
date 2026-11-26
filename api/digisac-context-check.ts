@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { canConsultDigisacBriefing, digisacRequestSchema, type DigisacBriefingState } from "../shared/digisac/context.js";
+import { canConsultDigisacBriefing, digisacDraftListSchema, digisacRequestSchema, type DigisacBriefingState } from "../shared/digisac/context.js";
 import { inspectDigisacConsultation, inspectDigisacContext } from "./_shared/digisac/contextDiagnostic.js";
 import { DigisacClientError, digisacReadClientFromEnv } from "./_shared/digisac/readClient.js";
 
@@ -58,8 +58,6 @@ export default async function handler(req: any, res: any) {
       if (!canConsultDigisacBriefing(inspectDigisacConsultation(refs, contact, ticket))) {
         return reply(422, "CONTEXT_NOT_VERIFIED");
       }
-      if (refs.action === "prepare_create") return reply(200, "BRIEFING_READY");
-
       const publicKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
       if (!publicKey) return reply(503, "SERVER_CONFIG");
       // The user's JWT applies row permissions and determines the draft owner.
@@ -67,8 +65,27 @@ export default async function handler(req: any, res: any) {
         auth: { persistSession: false, autoRefreshToken: false },
         global: { headers: { Authorization: authorization } },
       });
+      if (refs.action === "prepare_create") {
+        const offset = refs.offset ?? 0;
+        const { data, error } = await actor.from("commercial_briefings")
+          .select("id, client_name:draft->>clientName, updated_at")
+          .eq("consultant_id", auth.user.id)
+          .eq("digisac_contact_id", refs.contactId)
+          .eq("digisac_ticket_id", refs.ticketId)
+          .is("cancelled_at", null)
+          .is("os_id", null)
+          .order("updated_at", { ascending: false })
+          .order("id", { ascending: true })
+          .range(offset, offset + 50);
+        const matches = digisacDraftListSchema.safeParse(data);
+        if (error || !matches.success) return reply(503, "SERVER_UNAVAILABLE");
+        return reply(200, "BRIEFING_READY", {
+          drafts: matches.data.slice(0, 50),
+          hasMore: matches.data.length > 50,
+        });
+      }
       if (refs.action === "create") {
-        const { data, error } = await actor.rpc("commercial_briefing_create", {
+        const { data, error } = await actor.rpc("commercial_briefing_create_for_digisac", {
           p_id: refs.id,
           p_contact_id: refs.contactId,
           p_ticket_id: refs.ticketId,
@@ -76,7 +93,9 @@ export default async function handler(req: any, res: any) {
         });
         if (error?.code === "42501") return reply(403, "FORBIDDEN");
         if (error?.code === "22023") return reply(422, "BRIEFING_INVALID");
-        if (error || !data) return reply(503, "SERVER_UNAVAILABLE");
+        if (error) return reply(503, "SERVER_UNAVAILABLE");
+        if (data === null) return reply(200, "BRIEFING_EXISTS");
+        if (data !== refs.id) return reply(503, "SERVER_UNAVAILABLE");
         return reply(200, "BRIEFING_CREATED");
       }
 

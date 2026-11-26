@@ -15,13 +15,21 @@ const digisacConsultationSchema = digisacContextSchema.extend({
   action: z.literal("consult"),
 });
 const digisacCreationSchema = z.discriminatedUnion("action", [
-  ticketReferenceSchema.extend({ action: z.literal("prepare_create") }),
+  ticketReferenceSchema.extend({
+    action: z.literal("prepare_create"),
+    offset: z.number().int().min(0).max(1_000_000).optional(),
+  }),
   ticketReferenceSchema.extend({
     action: z.literal("create"),
     id: z.uuid(),
     draft: z.record(z.string(), z.unknown()),
   }),
 ]);
+export const digisacDraftListSchema = z.array(z.object({
+  id: z.uuid(),
+  client_name: z.string().nullable(),
+  updated_at: z.string(),
+}));
 export const digisacRequestSchema = z.union([digisacContextSchema, digisacConsultationSchema, digisacCreationSchema]);
 export type DigisacRequest = z.infer<typeof digisacRequestSchema>;
 export const digisacBriefingStates = ["draft", "linked", "cancelled"] as const;

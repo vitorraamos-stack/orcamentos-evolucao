@@ -15,21 +15,21 @@ function setPage({ hash = "", search = "", embedded = false } = {}) {
   });
 }
 
-describe("creation entry from the Digisac panel", () => {
+describe("briefing entry from the Digisac panel", () => {
   it("opens a new tab with contact and ticket references only", () => {
     setPage({ search: "?contact_id=c-1&ticket_id=t-1&user_id=u-1", embedded: true });
     const html = renderToStaticMarkup(<DigisacContextPilot />);
     expect(html).toContain('href="/integracoes/digisac/briefing#criar?contact_id=c-1&amp;ticket_id=t-1" target="_blank" rel="noopener noreferrer"');
-    expect(html).toContain("Criar briefing");
+    expect(html).toContain("Abrir briefing no EvoluSystem");
     expect(html).not.toContain("Salvar briefing");
   });
 
   it("only opens the creation route in a top-level tab", () => {
     const hash = "#criar?contact_id=c-1&ticket_id=t-1";
     setPage({ hash, embedded: true });
-    expect(renderToStaticMarkup(<DigisacContextPilot />)).not.toContain("Criar briefing comercial");
+    expect(renderToStaticMarkup(<DigisacContextPilot />)).not.toContain("Verificando sessão do EvoluSystem");
     setPage({ hash });
-    expect(renderToStaticMarkup(<DigisacContextPilot />)).toContain("Criar briefing comercial");
+    expect(renderToStaticMarkup(<DigisacContextPilot />)).toContain("Verificando sessão do EvoluSystem");
   });
 });
 

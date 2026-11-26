@@ -4,18 +4,20 @@ import handler from "./digisac-context-check";
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(), profile: vi.fn(), access: vi.fn(),
   getContact: vi.fn(), getTicket: vi.fn(), getUser: vi.fn(),
-  readerConfig: vi.fn(), select: vi.fn(), eq: vi.fn(), limit: vi.fn(), actorRpc: vi.fn(),
+  readerConfig: vi.fn(), select: vi.fn(), eq: vi.fn(), is: vi.fn(), order: vi.fn(),
+  range: vi.fn(), limit: vi.fn(), actorRpc: vi.fn(),
 }));
 vi.mock("@supabase/supabase-js", () => ({
   createClient: (url: string, key: string, options: unknown) => {
     if (key === "fixture-public-key") {
       mocks.readerConfig(url, key, options);
+      const query = { eq: mocks.eq, is: mocks.is, order: mocks.order, range: mocks.range, limit: mocks.limit };
+      mocks.eq.mockReturnValue(query);
+      mocks.is.mockReturnValue(query);
+      mocks.order.mockReturnValue(query);
       return { rpc: mocks.actorRpc, from: (table: string) => ({ select: (columns: string) => {
         mocks.select(table, columns);
-        return { eq: (column: string, value: string) => {
-          mocks.eq(column, value);
-          return { limit: mocks.limit };
-        } };
+        return query;
       } }) };
     }
     return {
@@ -60,7 +62,8 @@ beforeEach(() => {
   mocks.getTicket.mockResolvedValue({ id: "t-1", contactId: "c-1", userId: "u-1", isOpen: true });
   mocks.getUser.mockResolvedValue({ id: "u-1", email: "private@example.invalid" });
   mocks.limit.mockResolvedValue({ data: [], error: null });
-  mocks.actorRpc.mockResolvedValue({ data: { id: creation.id }, error: null });
+  mocks.range.mockResolvedValue({ data: [], error: null });
+  mocks.actorRpc.mockResolvedValue({ data: creation.id, error: null });
 });
 
 describe("Digisac briefing creation in the signed-in commercial session", () => {
@@ -70,27 +73,47 @@ describe("Digisac briefing creation in the signed-in commercial session", () => 
 
   it("prepares the first-party form for a consultant without creating a draft", async () => {
     expect(await invoke(prepareCreation)).toEqual({
-      status: 200, payload: { ok: true, code: "BRIEFING_READY" },
+      status: 200, payload: { ok: true, code: "BRIEFING_READY", drafts: [], hasMore: false },
     });
     expect(mocks.getContact).toHaveBeenCalledWith(refs.contactId);
     expect(mocks.getTicket).toHaveBeenCalledWith(refs.ticketId);
     expect(mocks.getUser).not.toHaveBeenCalled();
     expect(mocks.actorRpc).not.toHaveBeenCalled();
-    expect(mocks.select).not.toHaveBeenCalled();
+    expect(mocks.eq.mock.calls).toEqual([
+      ["consultant_id", "manager-fixture"], ["digisac_contact_id", "c-1"], ["digisac_ticket_id", "t-1"],
+    ]);
+    expect(mocks.is.mock.calls).toEqual([["cancelled_at", null], ["os_id", null]]);
+    expect(mocks.range).toHaveBeenCalledWith(0, 50);
   });
 
-  it("creates only through the existing draft RPC with the consultant's JWT and the exact context", async () => {
+  it("returns multiple editable drafts without creating or choosing between them", async () => {
+    const first = { id: creation.id, client_name: "Neste chamado", updated_at: "2026-11-26T00:00:00Z" };
+    const second = { ...first, id: "10000000-0000-4000-8000-000000000002" };
+    mocks.range.mockResolvedValue({ data: [first, second], error: null });
+    expect(await invoke(prepareCreation)).toEqual({
+      status: 200, payload: { ok: true, code: "BRIEFING_READY", drafts: [first, second], hasMore: false },
+    });
+    expect(mocks.actorRpc).not.toHaveBeenCalled();
+  });
+
+  it("creates only through the guarded draft RPC with the consultant's JWT and the exact context", async () => {
     expect(await invoke(creation)).toEqual({ status: 200, payload: { ok: true, code: "BRIEFING_CREATED" } });
     expect(mocks.readerConfig).toHaveBeenCalledWith("https://example.invalid", "fixture-public-key",
       expect.objectContaining({ global: { headers: { Authorization: "Bearer fixture" } } }));
     expect(mocks.actorRpc).toHaveBeenCalledTimes(1);
-    expect(mocks.actorRpc).toHaveBeenCalledWith("commercial_briefing_create", {
+    expect(mocks.actorRpc).toHaveBeenCalledWith("commercial_briefing_create_for_digisac", {
       p_id: creation.id,
       p_contact_id: refs.contactId,
       p_ticket_id: refs.ticketId,
       p_draft: storedDraft,
     });
     expect(mocks.getUser).not.toHaveBeenCalled();
+  });
+
+  it("reports an existing draft instead of creating another when the guarded RPC finds a match", async () => {
+    mocks.actorRpc.mockResolvedValue({ data: null, error: null });
+    expect(await invoke(creation)).toEqual({ status: 200, payload: { ok: true, code: "BRIEFING_EXISTS" } });
+    expect(mocks.actorRpc).toHaveBeenCalledTimes(1);
   });
 
   it("preserves management-only access to the diagnostic and existing briefing consultation", async () => {

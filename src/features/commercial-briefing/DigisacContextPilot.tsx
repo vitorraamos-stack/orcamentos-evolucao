@@ -7,7 +7,7 @@ import {
   type ContextDiagnostic, type DigisacContext, type DigisacTicketReference,
 } from "@shared/digisac/context";
 import CommercialBriefingPanel from "./CommercialBriefingPanel";
-import DigisacBriefingCreation from "./DigisacBriefingCreation";
+import DigisacBriefingWorkspace from "./DigisacBriefingCreation";
 import { commercialBriefingDraftSchema } from "./commercialBriefingDomain";
 import { messages, readErrorCode, requestDigisacContext, requestTimeout } from "./digisacContextRequest";
 const labels: Record<typeof contextChecks[number], string> = {
@@ -236,11 +236,11 @@ function DiagnosticPanel({ refs, ticketRefs, inFrame }: {
     {ticketRefs && <a
       href={briefingHref(creationFragment, ticketRefs)} target="_blank" rel="noopener noreferrer"
       className={buttonVariants({ className: "w-full" })}>
-      Criar briefing
+      Abrir briefing no EvoluSystem
     </a>}
     <section className="space-y-2 rounded-lg border p-3">
       <h2 className="text-sm font-semibold">Diagnóstico e consulta — gerência</h2>
-      <p className="text-xs text-muted-foreground">Painel somente leitura. A criação é feita em outra aba do EvoluSystem.</p>
+      <p className="text-xs text-muted-foreground">Painel somente leitura. O formulário abre em outra aba do EvoluSystem.</p>
       <p className="text-sm">{inFrame ? "Aberto em iframe" : "Aberto em nova aba"}</p>
       <p role="status" className={refs ? "text-sm text-emerald-600" : "text-sm text-destructive"}>
         {refs ? "Três identificadores recebidos." : "Referências incompletas ou inválidas. Abra pelo menu do atendimento Digisac."}
@@ -285,6 +285,6 @@ export default function DigisacContextPilot() {
   const nonce = /^#sessao=([0-9a-f-]{36})$/.exec(window.location.hash)?.[1];
   if (!inFrame && nonce) return <DiagnosticSessionWindow nonce={nonce} />;
   if (!inFrame && consultation) return <BriefingConsultation refs={consultation.refs} />;
-  if (!inFrame && creation) return <DigisacBriefingCreation refs={creation.refs} />;
+  if (!inFrame && creation) return <DigisacBriefingWorkspace refs={creation.refs} />;
   return <DiagnosticPanel refs={refs} ticketRefs={ticketRefs} inFrame={inFrame} />;
 }
