@@ -1,9 +1,37 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { emptyCommercialBriefing, emptyCommercialBriefingItem } from "./commercialBriefingDomain";
-import { BriefingConsultationResult } from "./DigisacContextPilot";
+import DigisacContextPilot, { BriefingConsultationResult } from "./DigisacContextPilot";
 
 vi.mock("@/lib/supabase", () => ({ supabase: {} }));
+afterEach(() => vi.unstubAllGlobals());
+
+function setPage({ hash = "", search = "", embedded = false } = {}) {
+  const self = {};
+  vi.stubGlobal("window", {
+    self,
+    top: embedded ? {} : self,
+    location: { pathname: "/integracoes/digisac/briefing", hash, search, href: "https://fixture.invalid/" },
+  });
+}
+
+describe("creation entry from the Digisac panel", () => {
+  it("opens a new tab with contact and ticket references only", () => {
+    setPage({ search: "?contact_id=c-1&ticket_id=t-1&user_id=u-1", embedded: true });
+    const html = renderToStaticMarkup(<DigisacContextPilot />);
+    expect(html).toContain('href="/integracoes/digisac/briefing#criar?contact_id=c-1&amp;ticket_id=t-1" target="_blank" rel="noopener noreferrer"');
+    expect(html).toContain("Criar briefing");
+    expect(html).not.toContain("Salvar briefing");
+  });
+
+  it("only opens the creation route in a top-level tab", () => {
+    const hash = "#criar?contact_id=c-1&ticket_id=t-1";
+    setPage({ hash, embedded: true });
+    expect(renderToStaticMarkup(<DigisacContextPilot />)).not.toContain("Criar briefing comercial");
+    setPage({ hash });
+    expect(renderToStaticMarkup(<DigisacContextPilot />)).toContain("Criar briefing comercial");
+  });
+});
 
 describe("consultation opened from Digisac", () => {
   it("renders the single briefing with inactive fields and no editing actions", () => {

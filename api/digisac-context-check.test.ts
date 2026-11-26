@@ -4,13 +4,13 @@ import handler from "./digisac-context-check";
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(), profile: vi.fn(), access: vi.fn(),
   getContact: vi.fn(), getTicket: vi.fn(), getUser: vi.fn(),
-  readerConfig: vi.fn(), select: vi.fn(), eq: vi.fn(), limit: vi.fn(),
+  readerConfig: vi.fn(), select: vi.fn(), eq: vi.fn(), limit: vi.fn(), actorRpc: vi.fn(),
 }));
 vi.mock("@supabase/supabase-js", () => ({
   createClient: (url: string, key: string, options: unknown) => {
     if (key === "fixture-public-key") {
       mocks.readerConfig(url, key, options);
-      return { from: (table: string) => ({ select: (columns: string) => {
+      return { rpc: mocks.actorRpc, from: (table: string) => ({ select: (columns: string) => {
         mocks.select(table, columns);
         return { eq: (column: string, value: string) => {
           mocks.eq(column, value);
@@ -33,10 +33,14 @@ vi.mock("./_shared/digisac/readClient.js", async importOriginal => {
 });
 const refs = { contactId: "c-1", ticketId: "t-1", userId: "u-1" };
 const consultation = { ...refs, action: "consult" };
+const prepareCreation = { contactId: refs.contactId, ticketId: refs.ticketId, action: "prepare_create" };
 const storedDraft = {
   saleNumber: "", clientName: "Cliente de teste", items: [], commercialNotes: "",
   artInstructions: "", artDirectionTag: null, isUrgent: false, deadlinePreset: null,
   deliveryDate: "", logisticType: null, address: "",
+};
+const creation = {
+  ...prepareCreation, action: "create", id: "10000000-0000-4000-8000-000000000001", draft: storedDraft,
 };
 async function invoke(body: unknown = refs, authorization = "Bearer fixture", method = "POST") {
   const res = { setHeader: vi.fn(), status: vi.fn(), json: vi.fn() };
@@ -56,6 +60,71 @@ beforeEach(() => {
   mocks.getTicket.mockResolvedValue({ id: "t-1", contactId: "c-1", userId: "u-1", isOpen: true });
   mocks.getUser.mockResolvedValue({ id: "u-1", email: "private@example.invalid" });
   mocks.limit.mockResolvedValue({ data: [], error: null });
+  mocks.actorRpc.mockResolvedValue({ data: { id: creation.id }, error: null });
+});
+
+describe("Digisac briefing creation in the signed-in commercial session", () => {
+  beforeEach(() => {
+    mocks.profile.mockResolvedValue({ data: { role: "consultor_vendas" }, error: null });
+  });
+
+  it("prepares the first-party form for a consultant without creating a draft", async () => {
+    expect(await invoke(prepareCreation)).toEqual({
+      status: 200, payload: { ok: true, code: "BRIEFING_READY" },
+    });
+    expect(mocks.getContact).toHaveBeenCalledWith(refs.contactId);
+    expect(mocks.getTicket).toHaveBeenCalledWith(refs.ticketId);
+    expect(mocks.getUser).not.toHaveBeenCalled();
+    expect(mocks.actorRpc).not.toHaveBeenCalled();
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it("creates only through the existing draft RPC with the consultant's JWT and the exact context", async () => {
+    expect(await invoke(creation)).toEqual({ status: 200, payload: { ok: true, code: "BRIEFING_CREATED" } });
+    expect(mocks.readerConfig).toHaveBeenCalledWith("https://example.invalid", "fixture-public-key",
+      expect.objectContaining({ global: { headers: { Authorization: "Bearer fixture" } } }));
+    expect(mocks.actorRpc).toHaveBeenCalledTimes(1);
+    expect(mocks.actorRpc).toHaveBeenCalledWith("commercial_briefing_create", {
+      p_id: creation.id,
+      p_contact_id: refs.contactId,
+      p_ticket_id: refs.ticketId,
+      p_draft: storedDraft,
+    });
+    expect(mocks.getUser).not.toHaveBeenCalled();
+  });
+
+  it("preserves management-only access to the diagnostic and existing briefing consultation", async () => {
+    expect((await invoke()).status).toBe(403);
+    expect((await invoke(consultation)).status).toBe(403);
+    expect(mocks.getContact).not.toHaveBeenCalled();
+    expect(mocks.actorRpc).not.toHaveBeenCalled();
+  });
+
+  it("blocks unauthenticated, non-commercial and module-restricted actors", async () => {
+    expect((await invoke(creation, "")).status).toBe(401);
+    mocks.access.mockResolvedValueOnce({ data: false, error: null });
+    expect((await invoke(creation)).status).toBe(403);
+    mocks.profile.mockResolvedValue({ data: { role: "arte" }, error: null });
+    expect((await invoke(prepareCreation)).status).toBe(403);
+    expect((await invoke(creation)).status).toBe(403);
+    expect(mocks.getContact).not.toHaveBeenCalled();
+    expect(mocks.actorRpc).not.toHaveBeenCalled();
+  });
+
+  it("revalidates an open, matching ticket before saving and rejects injected actor fields", async () => {
+    expect((await invoke({ ...creation, userId: "u-1" })).status).toBe(400);
+    expect((await invoke({ ...creation, consultantId: "different-actor" })).status).toBe(400);
+    mocks.getTicket.mockResolvedValue({ id: refs.ticketId, contactId: refs.contactId, isOpen: false });
+    expect(await invoke(creation)).toEqual({
+      status: 422, payload: { ok: false, code: "CONTEXT_NOT_VERIFIED" },
+    });
+    expect(mocks.actorRpc).not.toHaveBeenCalled();
+  });
+
+  it("maps a draft validation failure without disclosing database details", async () => {
+    mocks.actorRpc.mockResolvedValue({ data: null, error: { code: "22023", message: "private" } });
+    expect(await invoke(creation)).toEqual({ status: 422, payload: { ok: false, code: "BRIEFING_INVALID" } });
+  });
 });
 afterEach(() => vi.unstubAllEnvs());
 

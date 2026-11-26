@@ -2,19 +2,39 @@ import { z } from "zod";
 
 // The three values passed by Digisac are untrusted references, NOT identity.
 const reference = z.string().regex(/^[a-zA-Z0-9_-]{1,200}$/);
-export const digisacContextSchema = z.object({
+const ticketReferenceSchema = z.object({
   contactId: reference,
   ticketId: reference,
-  userId: reference,
 }).strict();
+export type DigisacTicketReference = z.infer<typeof ticketReferenceSchema>;
+export const digisacContextSchema = ticketReferenceSchema.extend({
+  userId: reference,
+});
 export type DigisacContext = z.infer<typeof digisacContextSchema>;
 const digisacConsultationSchema = digisacContextSchema.extend({
   action: z.literal("consult"),
 });
-export const digisacRequestSchema = z.union([digisacContextSchema, digisacConsultationSchema]);
+const digisacCreationSchema = z.discriminatedUnion("action", [
+  ticketReferenceSchema.extend({ action: z.literal("prepare_create") }),
+  ticketReferenceSchema.extend({
+    action: z.literal("create"),
+    id: z.uuid(),
+    draft: z.record(z.string(), z.unknown()),
+  }),
+]);
+export const digisacRequestSchema = z.union([digisacContextSchema, digisacConsultationSchema, digisacCreationSchema]);
 export type DigisacRequest = z.infer<typeof digisacRequestSchema>;
 export const digisacBriefingStates = ["draft", "linked", "cancelled"] as const;
 export type DigisacBriefingState = typeof digisacBriefingStates[number];
+
+export function readDigisacTicketReference(search: string): DigisacTicketReference | null {
+  const params = new URLSearchParams(search);
+  if (["contact_id", "ticket_id"].some(key => params.getAll(key).length !== 1)) return null;
+  const result = ticketReferenceSchema.safeParse({
+    contactId: params.get("contact_id"), ticketId: params.get("ticket_id"),
+  });
+  return result.success ? result.data : null;
+}
 export function readDigisacContext(search: string): DigisacContext | null {
   const params = new URLSearchParams(search);
   const keys = ["contact_id", "ticket_id", "user_id"] as const;

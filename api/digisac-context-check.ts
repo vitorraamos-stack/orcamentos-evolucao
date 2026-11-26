@@ -3,8 +3,8 @@ import { canConsultDigisacBriefing, digisacRequestSchema, type DigisacBriefingSt
 import { inspectDigisacConsultation, inspectDigisacContext } from "./_shared/digisac/contextDiagnostic.js";
 import { DigisacClientError, digisacReadClientFromEnv } from "./_shared/digisac/readClient.js";
 
-// Both paths are manager-only. The diagnostic only returns checks, while
-// an explicit consultation can return a stored briefing's read-only contents.
+// Diagnostic and consultation are manager-only. Creation uses the commercial
+// role and runs the existing draft RPC under the authenticated user's JWT.
 export default async function handler(req: any, res: any) {
   res.setHeader("Cache-Control", "private, no-store, max-age=0");
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -32,18 +32,23 @@ export default async function handler(req: any, res: any) {
       db.from("profiles").select("role").eq("id", auth.user.id).maybeSingle(),
       db.rpc("has_module_access", { uid: auth.user.id, module_key: "hub_os" }),
     ]);
-    if (profile.error || access.error || access.data !== true ||
-        !["gerente", "admin"].includes(profile.data?.role ?? ""))
+    if (profile.error || access.error || access.data !== true)
       return reply(403, "FORBIDDEN");
 
     let payload: unknown = req.body;
     if (typeof payload === "string") {
-      if (payload.length > 4096) return reply(400, "INVALID_CONTEXT");
+      if (payload.length > 4_400_000) return reply(400, "INVALID_CONTEXT");
       try { payload = JSON.parse(payload); } catch { return reply(400, "INVALID_CONTEXT"); }
     }
     const parsed = digisacRequestSchema.safeParse(payload);
     if (!parsed.success) return reply(400, "INVALID_CONTEXT");
     const refs = parsed.data;
+    const role = profile.data?.role ?? "";
+    const isManager = ["gerente", "admin"].includes(role);
+    const action = "action" in refs ? refs.action : null;
+    const isCreation = action === "prepare_create" || action === "create";
+    const canCreate = isManager || ["consultor", "consultor_vendas"].includes(role);
+    if (isCreation ? !canCreate : !isManager) return reply(403, "FORBIDDEN");
     const client = digisacReadClientFromEnv();
     if ("action" in refs) {
       const [contact, ticket] = await Promise.all([
@@ -53,15 +58,29 @@ export default async function handler(req: any, res: any) {
       if (!canConsultDigisacBriefing(inspectDigisacConsultation(refs, contact, ticket))) {
         return reply(422, "CONTEXT_NOT_VERIFIED");
       }
+      if (refs.action === "prepare_create") return reply(200, "BRIEFING_READY");
 
       const publicKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
       if (!publicKey) return reply(503, "SERVER_CONFIG");
-      // The user's JWT preserves commercial_briefing_read row permissions.
-      const reader = createClient(url, publicKey, {
+      // The user's JWT applies row permissions and determines the draft owner.
+      const actor = createClient(url, publicKey, {
         auth: { persistSession: false, autoRefreshToken: false },
         global: { headers: { Authorization: authorization } },
       });
-      const { data, error } = await reader.from("commercial_briefings")
+      if (refs.action === "create") {
+        const { data, error } = await actor.rpc("commercial_briefing_create", {
+          p_id: refs.id,
+          p_contact_id: refs.contactId,
+          p_ticket_id: refs.ticketId,
+          p_draft: refs.draft,
+        });
+        if (error?.code === "42501") return reply(403, "FORBIDDEN");
+        if (error?.code === "22023") return reply(422, "BRIEFING_INVALID");
+        if (error || !data) return reply(503, "SERVER_UNAVAILABLE");
+        return reply(200, "BRIEFING_CREATED");
+      }
+
+      const { data, error } = await actor.from("commercial_briefings")
         .select("draft, cancelled_at, os_id").eq("digisac_contact_id", refs.contactId).limit(2);
       if (error || !Array.isArray(data)) return reply(503, "SERVER_UNAVAILABLE");
       if (data.length === 0) return reply(200, "BRIEFING_NOT_FOUND");
