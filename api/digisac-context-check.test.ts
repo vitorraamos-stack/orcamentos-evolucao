@@ -5,14 +5,14 @@ const mocks = vi.hoisted(() => ({
   auth: vi.fn(), profile: vi.fn(), access: vi.fn(),
   getContact: vi.fn(), getTicket: vi.fn(), getUser: vi.fn(),
   readerConfig: vi.fn(), select: vi.fn(), eq: vi.fn(), is: vi.fn(), order: vi.fn(),
-  range: vi.fn(), limit: vi.fn(), in: vi.fn(), actorRpc: vi.fn(),
+  range: vi.fn(), limit: vi.fn(), in: vi.fn(), lt: vi.fn(), actorRpc: vi.fn(),
 }));
 vi.mock("@supabase/supabase-js", () => ({
   createClient: (url: string, key: string, options: unknown) => {
     if (key === "fixture-public-key") {
       mocks.readerConfig(url, key, options);
       const query = {
-        eq: mocks.eq, is: mocks.is, order: mocks.order, in: mocks.in, range: mocks.range,
+        eq: mocks.eq, is: mocks.is, order: mocks.order, in: mocks.in, lt: mocks.lt, range: mocks.range,
         limit: (...args: [number, { referencedTable: string }?]) => {
           const result = mocks.limit(...args);
           return args[1] ? query : result;
@@ -22,6 +22,7 @@ vi.mock("@supabase/supabase-js", () => ({
       mocks.is.mockReturnValue(query);
       mocks.order.mockReturnValue(query);
       mocks.in.mockReturnValue(query);
+      mocks.lt.mockReturnValue(query);
       return { rpc: mocks.actorRpc, from: (table: string) => ({ select: (columns: string) => {
         mocks.select(table, columns);
         return query;
@@ -202,28 +203,59 @@ describe("manager-only Digisac briefing consultation", () => {
     mocks.limit.mockResolvedValue({ data: [{
       draft: storedDraft, revision: 3, cancelled_at: "2026-11-27T13:40:00+00:00", os_id: "private-os-id",
       saves: [{ occurred_at: savedAt, actor_id: "last-saving-consultant" }],
+      history: [
+        { revision: 3, occurred_at: "2026-11-27T13:40:00+00:00", event: "CANCELLED", actor_id: "closing-consultant" },
+        { revision: 2, occurred_at: savedAt, event: "SAVED", actor_id: "last-saving-consultant" },
+      ],
     }], error: null });
-    mocks.actorRpc.mockResolvedValue({ data: [{
-      id: "last-saving-consultant", full_name: " Consultora de Teste ", email: "private-author@example.invalid",
-    }], error: null });
+    mocks.actorRpc.mockResolvedValue({ data: [
+      { id: "last-saving-consultant", full_name: " Consultora de Teste ", email: "private-author@example.invalid" },
+      { id: "closing-consultant", full_name: "another-private-author@example.invalid" },
+    ], error: null });
     mocks.getUser.mockResolvedValue({ id: "u-1", email: "another@example.invalid" });
     expect(await invoke(consultation)).toEqual({
       status: 200, payload: {
         ok: true, code: "BRIEFING_FOUND", briefing: { draft: storedDraft, state: "cancelled" },
         revision: 3, lastSavedAt: savedAt, lastSavedBy: "Consultora de Teste",
+        history: { entries: [
+          { revision: 3, occurredAt: "2026-11-27T13:40:00+00:00", event: "CANCELLED", authorName: null },
+          { revision: 2, occurredAt: savedAt, event: "SAVED", authorName: "Consultora de Teste" },
+        ], nextBefore: null },
       },
     });
     expect(mocks.readerConfig).toHaveBeenCalledWith("https://example.invalid", "fixture-public-key",
       expect.objectContaining({ global: { headers: { Authorization: "Bearer fixture" } } }));
     expect(mocks.select).toHaveBeenCalledWith("commercial_briefings",
-      "draft, revision, cancelled_at, os_id, saves:commercial_briefing_revisions(occurred_at, actor_id)");
+      "draft, revision, cancelled_at, os_id, saves:commercial_briefing_revisions(occurred_at, actor_id), history:commercial_briefing_revisions(revision, occurred_at, event, actor_id)");
     expect(mocks.eq).toHaveBeenCalledWith("digisac_contact_id", refs.contactId);
     expect(mocks.in).toHaveBeenCalledWith("saves.event", ["CREATED", "SAVED"]);
     expect(mocks.order).toHaveBeenCalledWith("revision", { ascending: false, referencedTable: "saves" });
     expect(mocks.limit).toHaveBeenCalledWith(1, { referencedTable: "saves" });
     expect(mocks.limit).toHaveBeenCalledWith(2);
-    expect(mocks.actorRpc).toHaveBeenCalledWith("get_user_display_names", { user_ids: ["last-saving-consultant"] });
+    expect(mocks.actorRpc).toHaveBeenCalledWith("get_user_display_names", { user_ids: ["closing-consultant", "last-saving-consultant"] });
+    expect(mocks.actorRpc).toHaveBeenCalledTimes(1);
     expect(mocks.getUser).not.toHaveBeenCalled();
+  });
+
+  it("paginates revision metadata with an exclusive cursor without sending the briefing draft", async () => {
+    const occurredAt = "2026-11-27T13:35:00+00:00";
+    const revisions = Array.from({ length: 21 }, (_, index) => ({
+      revision: 30 - index, occurred_at: occurredAt, event: "SAVED", actor_id: "consultant",
+    }));
+    mocks.limit.mockResolvedValue({ data: [{ history: revisions }], error: null });
+    mocks.actorRpc.mockResolvedValue({ data: [{ id: "consultant", full_name: "Consultora de Teste" }], error: null });
+    expect(await invoke({ ...consultation, historyBefore: 31 })).toEqual({
+      status: 200, payload: {
+        ok: true, code: "BRIEFING_HISTORY",
+        history: { entries: revisions.slice(0, 20).map(({ revision }) => ({
+          revision, occurredAt, event: "SAVED", authorName: "Consultora de Teste",
+        })), nextBefore: 11 },
+      },
+    });
+    expect(mocks.lt).toHaveBeenCalledWith("history.revision", 31);
+    expect(mocks.limit).toHaveBeenCalledWith(21, { referencedTable: "history" });
+    expect(mocks.actorRpc).toHaveBeenCalledWith("get_user_display_names", { user_ids: ["consultant"] });
+    expect(mocks.select).toHaveBeenCalledWith("commercial_briefings", "history:commercial_briefing_revisions(revision, occurred_at, event, actor_id)");
   });
 
   it.each(["private-author@example.invalid", null])(
@@ -240,6 +272,7 @@ describe("manager-only Digisac briefing consultation", () => {
         status: 200, payload: {
           ok: true, code: "BRIEFING_FOUND", briefing: { draft: storedDraft, state: "draft" },
           revision: 2, lastSavedAt: savedAt, lastSavedBy: null,
+          history: { entries: [], nextBefore: null },
         },
       });
     }
@@ -265,6 +298,7 @@ describe("manager-only Digisac briefing consultation", () => {
     expect((await invoke(consultation, "")).status).toBe(401);
     mocks.profile.mockResolvedValue({ data: { role: "consultor_vendas" }, error: null });
     expect((await invoke(consultation)).status).toBe(403);
+    expect((await invoke({ ...consultation, historyBefore: 2 })).status).toBe(403);
     mocks.profile.mockResolvedValue({ data: { role: "gerente" }, error: null });
     mocks.access.mockResolvedValueOnce({ data: false, error: null });
     expect((await invoke(consultation)).status).toBe(403);

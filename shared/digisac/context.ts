@@ -11,8 +11,10 @@ export const digisacContextSchema = ticketReferenceSchema.extend({
   userId: reference,
 });
 export type DigisacContext = z.infer<typeof digisacContextSchema>;
+const briefingRevisionNumber = z.number().int().positive().max(2147483647);
 const digisacConsultationSchema = digisacContextSchema.extend({
   action: z.literal("consult"),
+  historyBefore: briefingRevisionNumber.optional(),
 });
 const digisacCreationSchema = z.discriminatedUnion("action", [
   ticketReferenceSchema.extend({
@@ -34,6 +36,16 @@ export const digisacRequestSchema = z.union([digisacContextSchema, digisacConsul
 export type DigisacRequest = z.infer<typeof digisacRequestSchema>;
 export const digisacBriefingStates = ["draft", "linked", "cancelled"] as const;
 export type DigisacBriefingState = typeof digisacBriefingStates[number];
+export const digisacBriefingHistorySchema = z.object({
+  entries: z.array(z.object({
+    revision: briefingRevisionNumber,
+    occurredAt: z.iso.datetime({ offset: true }),
+    event: z.enum(["CREATED", "SAVED", "CANCELLED"]),
+    authorName: z.string().nullable(),
+  })),
+  nextBefore: briefingRevisionNumber.nullable(),
+});
+export type DigisacBriefingHistory = z.infer<typeof digisacBriefingHistorySchema>;
 
 export function readBriefingAuthorName(value: unknown): string | null {
   if (typeof value !== "string") return null;

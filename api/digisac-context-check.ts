@@ -6,6 +6,9 @@ import {
 import { inspectDigisacConsultation, inspectDigisacContext } from "./_shared/digisac/contextDiagnostic.js";
 import { DigisacClientError, digisacReadClientFromEnv } from "./_shared/digisac/readClient.js";
 
+const historyPageSize = 20;
+const historyColumns = "history:commercial_briefing_revisions(revision, occurred_at, event, actor_id)";
+
 // Diagnostic and consultation are manager-only. Creation uses the commercial
 // role and runs the existing draft RPC under the authenticated user's JWT.
 export default async function handler(req: any, res: any) {
@@ -102,34 +105,66 @@ export default async function handler(req: any, res: any) {
         return reply(200, "BRIEFING_CREATED");
       }
 
-      const { data, error } = await actor.from("commercial_briefings")
-        .select("draft, revision, cancelled_at, os_id, saves:commercial_briefing_revisions(occurred_at, actor_id)")
+      const historyOnly = refs.historyBefore !== undefined;
+      let consultation = actor.from("commercial_briefings")
+        .select(historyOnly ? historyColumns :
+          `draft, revision, cancelled_at, os_id, saves:commercial_briefing_revisions(occurred_at, actor_id), ${historyColumns}`)
         .eq("digisac_contact_id", refs.contactId)
-        // Cancellation updates the briefing without saving its draft.
-        .in("saves.event", ["CREATED", "SAVED"])
-        .order("revision", { ascending: false, referencedTable: "saves" })
-        .limit(1, { referencedTable: "saves" })
-        .limit(2);
+        .order("revision", { ascending: false, referencedTable: "history" })
+        .limit(historyPageSize + 1, { referencedTable: "history" });
+      if (historyOnly) {
+        consultation = consultation.lt("history.revision", refs.historyBefore);
+      } else {
+        // A cancellation is a history event, but does not save the draft.
+        consultation = consultation.in("saves.event", ["CREATED", "SAVED"])
+          .order("revision", { ascending: false, referencedTable: "saves" })
+          .limit(1, { referencedTable: "saves" });
+      }
+      const { data, error } = await consultation.limit(2);
       if (error || !Array.isArray(data)) return reply(503, "SERVER_UNAVAILABLE");
       if (data.length === 0) return reply(200, "BRIEFING_NOT_FOUND");
       if (data.length > 1) return reply(200, "BRIEFING_AMBIGUOUS");
-      const row = data[0];
-      const state: DigisacBriefingState = row.cancelled_at ? "cancelled" : row.os_id ? "linked" : "draft";
+      const row = data[0] as {
+        draft?: unknown;
+        revision?: number;
+        cancelled_at?: string | null;
+        os_id?: string | null;
+        saves?: { actor_id: string; occurred_at: string }[];
+        history?: { actor_id: string; revision: number; occurred_at: string; event: string }[];
+      };
       const lastSave = row.saves?.[0];
-      let lastSavedBy: string | null = null;
-      if (lastSave?.actor_id) {
+      const page = (row.history ?? []).slice(0, historyPageSize);
+      const authorIds = new Set(page.map(event => event.actor_id));
+      if (lastSave?.actor_id) authorIds.add(lastSave.actor_id);
+      const authorNames = new Map<string, string | null>();
+      if (authorIds.size) {
         const { data: authors, error: authorError } = await actor.rpc("get_user_display_names", {
-          user_ids: [lastSave.actor_id],
+          user_ids: Array.from(authorIds),
         });
         if (!authorError && Array.isArray(authors)) {
-          lastSavedBy = readBriefingAuthorName(authors.find(author => author.id === lastSave.actor_id)?.full_name);
+          for (const author of authors) {
+            if (authorIds.has(author.id)) authorNames.set(author.id, readBriefingAuthorName(author.full_name));
+          }
         }
       }
+      const history = {
+        entries: page.map(event => ({
+          revision: event.revision,
+          occurredAt: event.occurred_at,
+          event: event.event,
+          authorName: authorNames.get(event.actor_id) ?? null,
+        })),
+        nextBefore: (row.history?.length ?? 0) > historyPageSize ? page[page.length - 1].revision : null,
+      };
+      if (historyOnly) return reply(200, "BRIEFING_HISTORY", { history });
+
+      const state: DigisacBriefingState = row.cancelled_at ? "cancelled" : row.os_id ? "linked" : "draft";
       return reply(200, "BRIEFING_FOUND", {
         briefing: { draft: row.draft, state },
         revision: row.revision,
         lastSavedAt: lastSave?.occurred_at ?? null,
-        lastSavedBy,
+        lastSavedBy: lastSave ? authorNames.get(lastSave.actor_id) ?? null : null,
+        history,
       });
     }
 

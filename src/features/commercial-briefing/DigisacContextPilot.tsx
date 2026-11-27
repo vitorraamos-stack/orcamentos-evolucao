@@ -3,8 +3,9 @@ import { z } from "zod";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   canConsultDigisacBriefing, contextChecks, contextDiagnosticSchema,
-  digisacBriefingStates, digisacContextSchema, readBriefingAuthorName, readDigisacContext, readDigisacTicketReference,
-  type ContextDiagnostic, type DigisacContext, type DigisacTicketReference,
+  digisacBriefingHistorySchema, digisacBriefingStates, digisacContextSchema,
+  readBriefingAuthorName, readDigisacContext, readDigisacTicketReference,
+  type ContextDiagnostic, type DigisacBriefingHistory, type DigisacContext, type DigisacTicketReference,
 } from "@shared/digisac/context";
 import CommercialBriefingPanel from "./CommercialBriefingPanel";
 import DigisacBriefingWorkspace from "./DigisacBriefingCreation";
@@ -66,6 +67,7 @@ type ConsultationResult =
     revision: number;
     lastSavedAt: string | null;
     lastSavedBy: string | null;
+    history: DigisacBriefingHistory | null;
   }
   | { kind: "none" | "multiple" }
   | { kind: "error"; message: string };
@@ -86,6 +88,7 @@ async function consultBriefing(refs: DigisacContext, signal: AbortSignal): Promi
         revision: revision.data,
         lastSavedAt: timestamp.data ?? null,
         lastSavedBy: readBriefingAuthorName(body?.lastSavedBy),
+        history: digisacBriefingHistorySchema.safeParse(body?.history).data ?? null,
       };
     }
   } catch {
@@ -94,7 +97,78 @@ async function consultBriefing(refs: DigisacContext, signal: AbortSignal): Promi
   return { kind: "error", message: "Não foi possível consultar o briefing comercial." };
 }
 
-export function BriefingConsultationResult({ result }: { result: ConsultationResult }) {
+const revisionEventLabels = { CREATED: "Criação", SAVED: "Salvamento", CANCELLED: "Cancelamento" };
+
+function BriefingRevisionHistory({ initial, refs }: { initial: DigisacBriefingHistory | null; refs?: DigisacContext }) {
+  const [history, setHistory] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  const pending = useRef<AbortController | null>(null);
+  useEffect(() => () => pending.current?.abort(), []);
+
+  const loadEarlier = async () => {
+    const historyBefore = history?.nextBefore;
+    if (!refs || !historyBefore || pending.current) return;
+    const controller = new AbortController();
+    pending.current = controller;
+    setBusy(true);
+    setError(false);
+    try {
+      const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(requestTimeout)]);
+      const { ok, body } = await requestDigisacContext({ ...refs, action: "consult", historyBefore }, signal);
+      if (controller.signal.aborted) return;
+      const page = digisacBriefingHistorySchema.safeParse(body?.history);
+      if (!ok || body?.code !== "BRIEFING_HISTORY" || !page.success) setError(true);
+      else setHistory(current => ({
+        entries: [...(current?.entries ?? []), ...page.data.entries],
+        nextBefore: page.data.nextBefore,
+      }));
+    } catch {
+      if (!controller.signal.aborted) setError(true);
+    } finally {
+      if (!controller.signal.aborted) {
+        pending.current = null;
+        setBusy(false);
+      }
+    }
+  };
+
+  return <section aria-label="Histórico de revisões" className="space-y-3 rounded-lg border p-3">
+    <h2 className="text-base font-semibold">Histórico de revisões</h2>
+    {!history || history.entries.length === 0
+      ? <p className="text-sm text-muted-foreground">{history ? "Nenhuma revisão registrada." : "Histórico indisponível."}</p>
+      : <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead className="text-muted-foreground">
+            <tr>
+              <th scope="col" className="py-2 pr-3 font-medium">Revisão</th>
+              <th scope="col" className="py-2 pr-3 font-medium">Data e hora</th>
+              <th scope="col" className="py-2 font-medium">Responsável</th>
+            </tr>
+          </thead>
+          <tbody>
+            {history.entries.map(item => <tr key={item.revision} className="border-t align-top">
+              <th scope="row" className="py-2 pr-3 font-medium">
+                {item.revision}
+                <span className="block text-xs font-normal text-muted-foreground">{revisionEventLabels[item.event]}</span>
+              </th>
+              <td className="py-2 pr-3">
+                <time dateTime={item.occurredAt}>{briefingSaveTimeFormat.format(new Date(item.occurredAt))}</time>
+              </td>
+              <td className="py-2 break-words">{readBriefingAuthorName(item.authorName) ?? "Autor não identificado"}</td>
+            </tr>)}
+          </tbody>
+        </table>
+      </div>}
+    {error && <p role="alert" className="text-sm text-destructive">Não foi possível carregar as revisões anteriores.</p>}
+    {refs && history?.nextBefore && <Button type="button" variant="outline" size="sm" disabled={busy}
+      onClick={() => void loadEarlier()}>
+      {busy ? "Carregando…" : "Carregar revisões anteriores"}
+    </Button>}
+  </section>;
+}
+
+export function BriefingConsultationResult({ result, refs }: { result: ConsultationResult; refs?: DigisacContext }) {
   switch (result.kind) {
     case "error":
       return <p role="alert" className="text-sm text-destructive">{result.message}</p>;
@@ -119,6 +193,7 @@ export function BriefingConsultationResult({ result }: { result: ConsultationRes
           </div>
         </div>
         <CommercialBriefingPanel value={result.briefing.draft} readOnly />
+        <BriefingRevisionHistory initial={result.history} refs={refs} />
       </section>;
   }
 }
@@ -141,7 +216,7 @@ function BriefingConsultation({ refs }: { refs: DigisacContext | null }) {
       <p className="text-sm text-muted-foreground">Consulta pelo Digisac · Somente leitura</p>
     </header>
     {!refs ? <p role="alert" className="text-sm">{messages.INVALID_CONTEXT}</p>
-      : result ? <BriefingConsultationResult result={result} />
+      : result ? <BriefingConsultationResult result={result} refs={refs} />
       : <p role="status" className="text-sm">Consultando briefing…</p>}
   </main>;
 }
