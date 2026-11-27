@@ -1,5 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
-import { canConsultDigisacBriefing, digisacDraftListSchema, digisacRequestSchema, type DigisacBriefingState } from "../shared/digisac/context.js";
+import {
+  canConsultDigisacBriefing, digisacDraftListSchema, digisacRequestSchema,
+  readBriefingAuthorName, type DigisacBriefingState,
+} from "../shared/digisac/context.js";
 import { inspectDigisacConsultation, inspectDigisacContext } from "./_shared/digisac/contextDiagnostic.js";
 import { DigisacClientError, digisacReadClientFromEnv } from "./_shared/digisac/readClient.js";
 
@@ -100,7 +103,7 @@ export default async function handler(req: any, res: any) {
       }
 
       const { data, error } = await actor.from("commercial_briefings")
-        .select("draft, revision, cancelled_at, os_id, saves:commercial_briefing_revisions(occurred_at)")
+        .select("draft, revision, cancelled_at, os_id, saves:commercial_briefing_revisions(occurred_at, actor_id)")
         .eq("digisac_contact_id", refs.contactId)
         // Cancellation updates the briefing without saving its draft.
         .in("saves.event", ["CREATED", "SAVED"])
@@ -112,10 +115,21 @@ export default async function handler(req: any, res: any) {
       if (data.length > 1) return reply(200, "BRIEFING_AMBIGUOUS");
       const row = data[0];
       const state: DigisacBriefingState = row.cancelled_at ? "cancelled" : row.os_id ? "linked" : "draft";
+      const lastSave = row.saves?.[0];
+      let lastSavedBy: string | null = null;
+      if (lastSave?.actor_id) {
+        const { data: authors, error: authorError } = await actor.rpc("get_user_display_names", {
+          user_ids: [lastSave.actor_id],
+        });
+        if (!authorError && Array.isArray(authors)) {
+          lastSavedBy = readBriefingAuthorName(authors.find(author => author.id === lastSave.actor_id)?.full_name);
+        }
+      }
       return reply(200, "BRIEFING_FOUND", {
         briefing: { draft: row.draft, state },
         revision: row.revision,
-        lastSavedAt: row.saves?.[0]?.occurred_at ?? null,
+        lastSavedAt: lastSave?.occurred_at ?? null,
+        lastSavedBy,
       });
     }
 

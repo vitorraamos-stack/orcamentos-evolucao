@@ -201,26 +201,49 @@ describe("manager-only Digisac briefing consultation", () => {
     const savedAt = "2026-11-27T13:35:00+00:00";
     mocks.limit.mockResolvedValue({ data: [{
       draft: storedDraft, revision: 3, cancelled_at: "2026-11-27T13:40:00+00:00", os_id: "private-os-id",
-      saves: [{ occurred_at: savedAt }],
+      saves: [{ occurred_at: savedAt, actor_id: "last-saving-consultant" }],
+    }], error: null });
+    mocks.actorRpc.mockResolvedValue({ data: [{
+      id: "last-saving-consultant", full_name: " Consultora de Teste ", email: "private-author@example.invalid",
     }], error: null });
     mocks.getUser.mockResolvedValue({ id: "u-1", email: "another@example.invalid" });
     expect(await invoke(consultation)).toEqual({
       status: 200, payload: {
         ok: true, code: "BRIEFING_FOUND", briefing: { draft: storedDraft, state: "cancelled" },
-        revision: 3, lastSavedAt: savedAt,
+        revision: 3, lastSavedAt: savedAt, lastSavedBy: "Consultora de Teste",
       },
     });
     expect(mocks.readerConfig).toHaveBeenCalledWith("https://example.invalid", "fixture-public-key",
       expect.objectContaining({ global: { headers: { Authorization: "Bearer fixture" } } }));
     expect(mocks.select).toHaveBeenCalledWith("commercial_briefings",
-      "draft, revision, cancelled_at, os_id, saves:commercial_briefing_revisions(occurred_at)");
+      "draft, revision, cancelled_at, os_id, saves:commercial_briefing_revisions(occurred_at, actor_id)");
     expect(mocks.eq).toHaveBeenCalledWith("digisac_contact_id", refs.contactId);
     expect(mocks.in).toHaveBeenCalledWith("saves.event", ["CREATED", "SAVED"]);
     expect(mocks.order).toHaveBeenCalledWith("revision", { ascending: false, referencedTable: "saves" });
     expect(mocks.limit).toHaveBeenCalledWith(1, { referencedTable: "saves" });
     expect(mocks.limit).toHaveBeenCalledWith(2);
+    expect(mocks.actorRpc).toHaveBeenCalledWith("get_user_display_names", { user_ids: ["last-saving-consultant"] });
     expect(mocks.getUser).not.toHaveBeenCalled();
   });
+
+  it.each(["private-author@example.invalid", null])(
+    "keeps the last save available without exposing an e-mail or an absent author name", async fullName => {
+      const savedAt = "2026-11-27T13:35:00+00:00";
+      mocks.limit.mockResolvedValue({ data: [{
+        draft: storedDraft, revision: 2, cancelled_at: null, os_id: null,
+        saves: [{ occurred_at: savedAt, actor_id: "last-saving-consultant" }],
+      }], error: null });
+      mocks.actorRpc.mockResolvedValue({ data: [{
+        id: "last-saving-consultant", full_name: fullName, email: "private-author@example.invalid",
+      }], error: null });
+      expect(await invoke(consultation)).toEqual({
+        status: 200, payload: {
+          ok: true, code: "BRIEFING_FOUND", briefing: { draft: storedDraft, state: "draft" },
+          revision: 2, lastSavedAt: savedAt, lastSavedBy: null,
+        },
+      });
+    }
+  );
 
   it("returns only the no-match result for a contact without a briefing", async () => {
     expect(await invoke(consultation)).toEqual({
