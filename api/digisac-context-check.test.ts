@@ -205,7 +205,7 @@ describe("manager-only Digisac briefing consultation", () => {
       saves: [{ occurred_at: savedAt, actor_id: "last-saving-consultant" }],
       history: [
         { revision: 3, occurred_at: "2026-11-27T13:40:00+00:00", event: "CANCELLED", actor_id: "closing-consultant" },
-        { revision: 2, occurred_at: savedAt, event: "SAVED", actor_id: "last-saving-consultant" },
+        { revision: 2, occurred_at: savedAt, event: "SAVED", actor_id: "last-saving-consultant", changed_fields: ["artInstructions"] },
       ],
     }], error: null });
     mocks.actorRpc.mockResolvedValue({ data: [
@@ -218,15 +218,18 @@ describe("manager-only Digisac briefing consultation", () => {
         ok: true, code: "BRIEFING_FOUND", briefing: { draft: storedDraft, state: "cancelled" },
         revision: 3, lastSavedAt: savedAt, lastSavedBy: "Consultora de Teste",
         history: { entries: [
-          { revision: 3, occurredAt: "2026-11-27T13:40:00+00:00", event: "CANCELLED", authorName: null },
-          { revision: 2, occurredAt: savedAt, event: "SAVED", authorName: "Consultora de Teste" },
+          { revision: 3, occurredAt: "2026-11-27T13:40:00+00:00", event: "CANCELLED", authorName: null, changedFields: null },
+          {
+            revision: 2, occurredAt: savedAt, event: "SAVED", authorName: "Consultora de Teste",
+            changedFields: ["artInstructions"],
+          },
         ], nextBefore: null },
       },
     });
     expect(mocks.readerConfig).toHaveBeenCalledWith("https://example.invalid", "fixture-public-key",
       expect.objectContaining({ global: { headers: { Authorization: "Bearer fixture" } } }));
     expect(mocks.select).toHaveBeenCalledWith("commercial_briefings",
-      "draft, revision, cancelled_at, os_id, saves:commercial_briefing_revisions(occurred_at, actor_id), history:commercial_briefing_revisions(revision, occurred_at, event, actor_id)");
+      "draft, revision, cancelled_at, os_id, saves:commercial_briefing_revisions(occurred_at, actor_id), history:commercial_briefing_revisions(revision, occurred_at, event, actor_id, changed_fields)");
     expect(mocks.eq).toHaveBeenCalledWith("digisac_contact_id", refs.contactId);
     expect(mocks.in).toHaveBeenCalledWith("saves.event", ["CREATED", "SAVED"]);
     expect(mocks.order).toHaveBeenCalledWith("revision", { ascending: false, referencedTable: "saves" });
@@ -241,6 +244,7 @@ describe("manager-only Digisac briefing consultation", () => {
     const occurredAt = "2026-11-27T13:35:00+00:00";
     const revisions = Array.from({ length: 21 }, (_, index) => ({
       revision: 30 - index, occurred_at: occurredAt, event: "SAVED", actor_id: "consultant",
+      changed_fields: ["private@example.invalid"],
     }));
     mocks.limit.mockResolvedValue({ data: [{ history: revisions }], error: null });
     mocks.actorRpc.mockResolvedValue({ data: [{ id: "consultant", full_name: "Consultora de Teste" }], error: null });
@@ -248,14 +252,15 @@ describe("manager-only Digisac briefing consultation", () => {
       status: 200, payload: {
         ok: true, code: "BRIEFING_HISTORY",
         history: { entries: revisions.slice(0, 20).map(({ revision }) => ({
-          revision, occurredAt, event: "SAVED", authorName: "Consultora de Teste",
+          revision, occurredAt, event: "SAVED", authorName: "Consultora de Teste", changedFields: null,
         })), nextBefore: 11 },
       },
     });
     expect(mocks.lt).toHaveBeenCalledWith("history.revision", 31);
     expect(mocks.limit).toHaveBeenCalledWith(21, { referencedTable: "history" });
     expect(mocks.actorRpc).toHaveBeenCalledWith("get_user_display_names", { user_ids: ["consultant"] });
-    expect(mocks.select).toHaveBeenCalledWith("commercial_briefings", "history:commercial_briefing_revisions(revision, occurred_at, event, actor_id)");
+    expect(mocks.select).toHaveBeenCalledWith("commercial_briefings",
+      "history:commercial_briefing_revisions(revision, occurred_at, event, actor_id, changed_fields)");
   });
 
   it.each(["private-author@example.invalid", null])(
