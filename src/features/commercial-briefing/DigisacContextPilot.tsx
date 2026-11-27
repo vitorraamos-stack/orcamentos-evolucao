@@ -48,13 +48,19 @@ const briefingSchema = z.strictObject({
   state: z.enum(digisacBriefingStates),
 });
 const briefingRevisionSchema = z.number().int().positive();
+const briefingSaveTimestampSchema = z.iso.datetime({ offset: true }).nullable();
+const briefingSaveTimeFormat = new Intl.DateTimeFormat("pt-BR", {
+  dateStyle: "short",
+  timeStyle: "short",
+  timeZone: "America/Sao_Paulo",
+});
 const briefingStateLabels = {
   draft: "Em preenchimento",
   linked: "Vinculado à OS",
   cancelled: "Cancelado",
 };
 type ConsultationResult =
-  | { kind: "found"; briefing: z.infer<typeof briefingSchema>; revision: number }
+  | { kind: "found"; briefing: z.infer<typeof briefingSchema>; revision: number; lastSavedAt: string | null }
   | { kind: "none" | "multiple" }
   | { kind: "error"; message: string };
 
@@ -67,7 +73,8 @@ async function consultBriefing(refs: DigisacContext, signal: AbortSignal): Promi
     const parsed = briefingSchema.safeParse(body?.briefing);
     const revision = briefingRevisionSchema.safeParse(body?.revision);
     if (body?.code === "BRIEFING_FOUND" && parsed.success && revision.success) {
-      return { kind: "found", briefing: parsed.data, revision: revision.data };
+      const timestamp = briefingSaveTimestampSchema.safeParse(body?.lastSavedAt);
+      return { kind: "found", briefing: parsed.data, revision: revision.data, lastSavedAt: timestamp.data ?? null };
     }
   } catch {
     // Use the same message for network and malformed server responses.
@@ -87,7 +94,15 @@ export function BriefingConsultationResult({ result }: { result: ConsultationRes
       return <section className="space-y-4" aria-label="Briefing encontrado">
         <div role="status" className="flex flex-wrap justify-between gap-2 rounded-lg border p-3 text-sm">
           <span>Briefing encontrado · {briefingStateLabels[result.briefing.state]}</span>
-          <span className="font-medium">Revisão {result.revision}</span>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="font-medium">Revisão {result.revision}</span>
+            <span className="text-muted-foreground">
+              Último salvamento{" "}
+              {result.lastSavedAt
+                ? <time dateTime={result.lastSavedAt}>{briefingSaveTimeFormat.format(new Date(result.lastSavedAt))}</time>
+                : "indisponível"}
+            </span>
+          </div>
         </div>
         <CommercialBriefingPanel value={result.briefing.draft} readOnly />
       </section>;

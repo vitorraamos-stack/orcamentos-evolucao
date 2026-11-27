@@ -5,16 +5,23 @@ const mocks = vi.hoisted(() => ({
   auth: vi.fn(), profile: vi.fn(), access: vi.fn(),
   getContact: vi.fn(), getTicket: vi.fn(), getUser: vi.fn(),
   readerConfig: vi.fn(), select: vi.fn(), eq: vi.fn(), is: vi.fn(), order: vi.fn(),
-  range: vi.fn(), limit: vi.fn(), actorRpc: vi.fn(),
+  range: vi.fn(), limit: vi.fn(), in: vi.fn(), actorRpc: vi.fn(),
 }));
 vi.mock("@supabase/supabase-js", () => ({
   createClient: (url: string, key: string, options: unknown) => {
     if (key === "fixture-public-key") {
       mocks.readerConfig(url, key, options);
-      const query = { eq: mocks.eq, is: mocks.is, order: mocks.order, range: mocks.range, limit: mocks.limit };
+      const query = {
+        eq: mocks.eq, is: mocks.is, order: mocks.order, in: mocks.in, range: mocks.range,
+        limit: (...args: [number, { referencedTable: string }?]) => {
+          const result = mocks.limit(...args);
+          return args[1] ? query : result;
+        },
+      };
       mocks.eq.mockReturnValue(query);
       mocks.is.mockReturnValue(query);
       mocks.order.mockReturnValue(query);
+      mocks.in.mockReturnValue(query);
       return { rpc: mocks.actorRpc, from: (table: string) => ({ select: (columns: string) => {
         mocks.select(table, columns);
         return query;
@@ -190,18 +197,27 @@ describe("manager-only Digisac context check", () => {
 });
 
 describe("manager-only Digisac briefing consultation", () => {
-  it("returns a single stored briefing without account or order metadata", async () => {
+  it("returns the stored revision and last save without treating cancellation as a save", async () => {
+    const savedAt = "2026-11-27T13:35:00+00:00";
     mocks.limit.mockResolvedValue({ data: [{
-      draft: storedDraft, revision: 2, cancelled_at: null, os_id: "private-os-id",
+      draft: storedDraft, revision: 3, cancelled_at: "2026-11-27T13:40:00+00:00", os_id: "private-os-id",
+      saves: [{ occurred_at: savedAt }],
     }], error: null });
     mocks.getUser.mockResolvedValue({ id: "u-1", email: "another@example.invalid" });
     expect(await invoke(consultation)).toEqual({
-      status: 200, payload: { ok: true, code: "BRIEFING_FOUND", briefing: { draft: storedDraft, state: "linked" }, revision: 2 },
+      status: 200, payload: {
+        ok: true, code: "BRIEFING_FOUND", briefing: { draft: storedDraft, state: "cancelled" },
+        revision: 3, lastSavedAt: savedAt,
+      },
     });
     expect(mocks.readerConfig).toHaveBeenCalledWith("https://example.invalid", "fixture-public-key",
       expect.objectContaining({ global: { headers: { Authorization: "Bearer fixture" } } }));
-    expect(mocks.select).toHaveBeenCalledWith("commercial_briefings", "draft, revision, cancelled_at, os_id");
+    expect(mocks.select).toHaveBeenCalledWith("commercial_briefings",
+      "draft, revision, cancelled_at, os_id, saves:commercial_briefing_revisions(occurred_at)");
     expect(mocks.eq).toHaveBeenCalledWith("digisac_contact_id", refs.contactId);
+    expect(mocks.in).toHaveBeenCalledWith("saves.event", ["CREATED", "SAVED"]);
+    expect(mocks.order).toHaveBeenCalledWith("revision", { ascending: false, referencedTable: "saves" });
+    expect(mocks.limit).toHaveBeenCalledWith(1, { referencedTable: "saves" });
     expect(mocks.limit).toHaveBeenCalledWith(2);
     expect(mocks.getUser).not.toHaveBeenCalled();
   });
