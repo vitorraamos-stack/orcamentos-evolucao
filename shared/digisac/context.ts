@@ -35,6 +35,13 @@ export type DigisacRequest = z.infer<typeof digisacRequestSchema>;
 export const digisacBriefingStates = ["draft", "linked", "cancelled"] as const;
 export type DigisacBriefingState = typeof digisacBriefingStates[number];
 
+export function readBriefingAuthorName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const name = value.trim();
+  // The existing directory can use an e-mail address as a display-name fallback.
+  return name && !name.includes("@") ? name : null;
+}
+
 export function readDigisacTicketReference(search: string): DigisacTicketReference | null {
   const params = new URLSearchParams(search);
   if (["contact_id", "ticket_id"].some(key => params.getAll(key).length !== 1)) return null;

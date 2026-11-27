@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   canConsultDigisacBriefing, contextChecks, contextDiagnosticSchema,
-  digisacBriefingStates, digisacContextSchema, readDigisacContext, readDigisacTicketReference,
+  digisacBriefingStates, digisacContextSchema, readBriefingAuthorName, readDigisacContext, readDigisacTicketReference,
   type ContextDiagnostic, type DigisacContext, type DigisacTicketReference,
 } from "@shared/digisac/context";
 import CommercialBriefingPanel from "./CommercialBriefingPanel";
@@ -60,7 +60,13 @@ const briefingStateLabels = {
   cancelled: "Cancelado",
 };
 type ConsultationResult =
-  | { kind: "found"; briefing: z.infer<typeof briefingSchema>; revision: number; lastSavedAt: string | null }
+  | {
+    kind: "found";
+    briefing: z.infer<typeof briefingSchema>;
+    revision: number;
+    lastSavedAt: string | null;
+    lastSavedBy: string | null;
+  }
   | { kind: "none" | "multiple" }
   | { kind: "error"; message: string };
 
@@ -74,7 +80,13 @@ async function consultBriefing(refs: DigisacContext, signal: AbortSignal): Promi
     const revision = briefingRevisionSchema.safeParse(body?.revision);
     if (body?.code === "BRIEFING_FOUND" && parsed.success && revision.success) {
       const timestamp = briefingSaveTimestampSchema.safeParse(body?.lastSavedAt);
-      return { kind: "found", briefing: parsed.data, revision: revision.data, lastSavedAt: timestamp.data ?? null };
+      return {
+        kind: "found",
+        briefing: parsed.data,
+        revision: revision.data,
+        lastSavedAt: timestamp.data ?? null,
+        lastSavedBy: readBriefingAuthorName(body?.lastSavedBy),
+      };
     }
   } catch {
     // Use the same message for network and malformed server responses.
@@ -101,6 +113,8 @@ export function BriefingConsultationResult({ result }: { result: ConsultationRes
               {result.lastSavedAt
                 ? <time dateTime={result.lastSavedAt}>{briefingSaveTimeFormat.format(new Date(result.lastSavedAt))}</time>
                 : "indisponível"}
+              {result.lastSavedBy ? <> por <span className="font-medium">{result.lastSavedBy}</span></>
+                : result.lastSavedAt && " · Autor não identificado"}
             </span>
           </div>
         </div>
