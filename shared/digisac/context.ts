@@ -36,12 +36,20 @@ export const digisacRequestSchema = z.union([digisacContextSchema, digisacConsul
 export type DigisacRequest = z.infer<typeof digisacRequestSchema>;
 export const digisacBriefingStates = ["draft", "linked", "cancelled"] as const;
 export type DigisacBriefingState = typeof digisacBriefingStates[number];
+export const digisacBriefingChangedFieldsSchema = z.array(z.enum([
+  "saleNumber", "clientName", "commercialNotes", "artInstructions", "artDirectionTag",
+  "isUrgent", "deadlinePreset", "deliveryDate", "logisticType", "address",
+  "itemsAdded", "itemsRemoved", "itemOrder", "item.name", "item.quantity",
+  "item.width_cm", "item.height_cm", "item.measurement_unit", "item.description", "item.notes",
+]));
+export type DigisacBriefingChangedField = z.infer<typeof digisacBriefingChangedFieldsSchema>[number];
 export const digisacBriefingHistorySchema = z.object({
   entries: z.array(z.object({
     revision: briefingRevisionNumber,
     occurredAt: z.iso.datetime({ offset: true }),
     event: z.enum(["CREATED", "SAVED", "CANCELLED"]),
     authorName: z.string().nullable(),
+    changedFields: digisacBriefingChangedFieldsSchema.nullable().optional(),
   })),
   nextBefore: briefingRevisionNumber.nullable(),
 });

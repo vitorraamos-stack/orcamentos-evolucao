@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { z } from "zod";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   canConsultDigisacBriefing, contextChecks, contextDiagnosticSchema,
   digisacBriefingHistorySchema, digisacBriefingStates, digisacContextSchema,
   readBriefingAuthorName, readDigisacContext, readDigisacTicketReference,
-  type ContextDiagnostic, type DigisacBriefingHistory, type DigisacContext, type DigisacTicketReference,
+  type ContextDiagnostic, type DigisacBriefingChangedField, type DigisacBriefingHistory,
+  type DigisacContext, type DigisacTicketReference,
 } from "@shared/digisac/context";
 import CommercialBriefingPanel from "./CommercialBriefingPanel";
 import DigisacBriefingWorkspace from "./DigisacBriefingCreation";
@@ -98,11 +99,48 @@ async function consultBriefing(refs: DigisacContext, signal: AbortSignal): Promi
 }
 
 const revisionEventLabels = { CREATED: "Criação", SAVED: "Salvamento", CANCELLED: "Cancelamento" };
+const changedFieldLabels: Record<DigisacBriefingChangedField, string> = {
+  saleNumber: "Número da venda",
+  clientName: "Nome do cliente",
+  commercialNotes: "Observações comerciais",
+  artInstructions: "Orientações internas para Arte",
+  artDirectionTag: "Tipo de Arte",
+  isUrgent: "Prioridade",
+  deadlinePreset: "Prazo previsto",
+  deliveryDate: "Data de entrega",
+  logisticType: "Tipo de logística",
+  address: "Endereço",
+  itemsAdded: "Inclusão de itens",
+  itemsRemoved: "Remoção de itens",
+  itemOrder: "Ordem dos itens",
+  "item.name": "Nome de item",
+  "item.quantity": "Quantidade de item",
+  "item.width_cm": "Largura de item",
+  "item.height_cm": "Altura de item",
+  "item.measurement_unit": "Unidade de medida de item",
+  "item.description": "Descrição de item",
+  "item.notes": "Observações de item",
+};
+
+export function RevisionChangeDetails({ entry }: { entry: DigisacBriefingHistory["entries"][number] }) {
+  if (entry.event === "CREATED") return <p>Criação do briefing. Esta é a primeira revisão.</p>;
+  if (entry.event === "CANCELLED") return <p>O briefing foi cancelado nesta revisão.</p>;
+  if (!entry.changedFields) return <p>Os campos alterados não foram registrados nesta revisão.</p>;
+  if (entry.changedFields.length === 0) return <p>Nenhum campo do briefing foi alterado nesta revisão.</p>;
+  return <div className="space-y-1">
+    <p className="font-medium">Campos alterados desde a revisão {entry.revision - 1}</p>
+    <ul className="list-disc space-y-1 pl-5">
+      {entry.changedFields.map(field => <li key={field}>{changedFieldLabels[field]}</li>)}
+    </ul>
+  </div>;
+}
 
 function BriefingRevisionHistory({ initial, refs }: { initial: DigisacBriefingHistory | null; refs?: DigisacContext }) {
   const [history, setHistory] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  const [expandedRevision, setExpandedRevision] = useState<number | null>(null);
+  const detailsPrefix = useId();
   const pending = useRef<AbortController | null>(null);
   useEffect(() => () => pending.current?.abort(), []);
 
@@ -147,16 +185,32 @@ function BriefingRevisionHistory({ initial, refs }: { initial: DigisacBriefingHi
             </tr>
           </thead>
           <tbody>
-            {history.entries.map(item => <tr key={item.revision} className="border-t align-top">
-              <th scope="row" className="py-2 pr-3 font-medium">
-                {item.revision}
-                <span className="block text-xs font-normal text-muted-foreground">{revisionEventLabels[item.event]}</span>
-              </th>
-              <td className="py-2 pr-3">
-                <time dateTime={item.occurredAt}>{briefingSaveTimeFormat.format(new Date(item.occurredAt))}</time>
-              </td>
-              <td className="py-2 break-words">{readBriefingAuthorName(item.authorName) ?? "Autor não identificado"}</td>
-            </tr>)}
+            {history.entries.map(item => {
+              const expanded = expandedRevision === item.revision;
+              const detailsId = detailsPrefix + "-" + item.revision;
+              return <Fragment key={item.revision}>
+                <tr className="border-t align-top">
+                  <th scope="row" className="py-2 pr-3 font-medium">
+                    <button type="button" className="rounded-sm underline underline-offset-2 hover:text-primary"
+                      aria-label={"Ver alterações da revisão " + item.revision}
+                      aria-expanded={expanded} aria-controls={expanded ? detailsId : undefined}
+                      onClick={() => setExpandedRevision(expanded ? null : item.revision)}>
+                      {item.revision}
+                    </button>
+                    <span className="block text-xs font-normal text-muted-foreground">{revisionEventLabels[item.event]}</span>
+                  </th>
+                  <td className="py-2 pr-3">
+                    <time dateTime={item.occurredAt}>{briefingSaveTimeFormat.format(new Date(item.occurredAt))}</time>
+                  </td>
+                  <td className="py-2 break-words">{readBriefingAuthorName(item.authorName) ?? "Autor não identificado"}</td>
+                </tr>
+                {expanded && <tr className="bg-muted/40">
+                  <td colSpan={3} className="rounded-md p-3" id={detailsId}>
+                    <RevisionChangeDetails entry={item} />
+                  </td>
+                </tr>}
+              </Fragment>;
+            })}
           </tbody>
         </table>
       </div>}

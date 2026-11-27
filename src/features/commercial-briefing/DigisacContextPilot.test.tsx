@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { emptyCommercialBriefing, emptyCommercialBriefingItem } from "./commercialBriefingDomain";
-import DigisacContextPilot, { BriefingConsultationResult } from "./DigisacContextPilot";
+import DigisacContextPilot, { BriefingConsultationResult, RevisionChangeDetails } from "./DigisacContextPilot";
 
 vi.mock("@/lib/supabase", () => ({ supabase: {} }));
 afterEach(() => vi.unstubAllGlobals());
@@ -59,6 +59,7 @@ describe("consultation opened from Digisac", () => {
     expect(html).toContain('<time dateTime="2026-11-27T01:05:09+00:00">26/11/2026, 22:05</time>');
     expect(html).toContain("Consultora de Teste");
     expect(html).toContain('aria-label="Histórico de revisões"');
+    expect(html).toContain('aria-label="Ver alterações da revisão 2"');
     expect(html).toContain("Autor não identificado");
     expect(html).toContain("26/11/2026, 17:00");
     expect(html).not.toContain("private@example.invalid");
@@ -77,5 +78,26 @@ describe("consultation opened from Digisac", () => {
     const html = renderToStaticMarkup(<BriefingConsultationResult result={{ kind }} />);
     expect(html).toContain(message);
     expect(html).not.toMatch(/aria-label="Briefing encontrado"|<input|<button/);
+  });
+});
+
+describe("changes shown for a revision", () => {
+  const saved = {
+    revision: 3, occurredAt: "2026-11-27T01:05:09+00:00", event: "SAVED" as const, authorName: null,
+  };
+
+  it("shows the previous revision and only the changed field labels", () => {
+    const html = renderToStaticMarkup(<RevisionChangeDetails entry={{
+      ...saved, changedFields: ["artInstructions", "item.quantity"],
+    }} />);
+    expect(html).toContain("Campos alterados desde a revisão 2");
+    expect(html).toContain("Orientações internas para Arte");
+    expect(html).toContain("Quantidade de item");
+    expect(html).not.toContain("item.quantity");
+  });
+
+  it("does not infer changes for older saves with metadata only", () => {
+    const html = renderToStaticMarkup(<RevisionChangeDetails entry={{ ...saved, changedFields: null }} />);
+    expect(html).toContain("Os campos alterados não foram registrados nesta revisão.");
   });
 });

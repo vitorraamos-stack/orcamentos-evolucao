@@ -1,13 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 import {
-  canConsultDigisacBriefing, digisacDraftListSchema, digisacRequestSchema,
+  canConsultDigisacBriefing, digisacBriefingChangedFieldsSchema, digisacDraftListSchema, digisacRequestSchema,
   readBriefingAuthorName, type DigisacBriefingState,
 } from "../shared/digisac/context.js";
 import { inspectDigisacConsultation, inspectDigisacContext } from "./_shared/digisac/contextDiagnostic.js";
 import { DigisacClientError, digisacReadClientFromEnv } from "./_shared/digisac/readClient.js";
 
 const historyPageSize = 20;
-const historyColumns = "history:commercial_briefing_revisions(revision, occurred_at, event, actor_id)";
+const historyColumns = "history:commercial_briefing_revisions(revision, occurred_at, event, actor_id, changed_fields)";
 
 // Diagnostic and consultation are manager-only. Creation uses the commercial
 // role and runs the existing draft RPC under the authenticated user's JWT.
@@ -130,7 +130,7 @@ export default async function handler(req: any, res: any) {
         cancelled_at?: string | null;
         os_id?: string | null;
         saves?: { actor_id: string; occurred_at: string }[];
-        history?: { actor_id: string; revision: number; occurred_at: string; event: string }[];
+        history?: { actor_id: string; revision: number; occurred_at: string; event: string; changed_fields?: unknown }[];
       };
       const lastSave = row.saves?.[0];
       const page = (row.history ?? []).slice(0, historyPageSize);
@@ -153,6 +153,7 @@ export default async function handler(req: any, res: any) {
           occurredAt: event.occurred_at,
           event: event.event,
           authorName: authorNames.get(event.actor_id) ?? null,
+          changedFields: digisacBriefingChangedFieldsSchema.safeParse(event.changed_fields).data ?? null,
         })),
         nextBefore: (row.history?.length ?? 0) > historyPageSize ? page[page.length - 1].revision : null,
       };
