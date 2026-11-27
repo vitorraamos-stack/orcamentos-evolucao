@@ -100,13 +100,23 @@ export default async function handler(req: any, res: any) {
       }
 
       const { data, error } = await actor.from("commercial_briefings")
-        .select("draft, revision, cancelled_at, os_id").eq("digisac_contact_id", refs.contactId).limit(2);
+        .select("draft, revision, cancelled_at, os_id, saves:commercial_briefing_revisions(occurred_at)")
+        .eq("digisac_contact_id", refs.contactId)
+        // Cancellation updates the briefing without saving its draft.
+        .in("saves.event", ["CREATED", "SAVED"])
+        .order("revision", { ascending: false, referencedTable: "saves" })
+        .limit(1, { referencedTable: "saves" })
+        .limit(2);
       if (error || !Array.isArray(data)) return reply(503, "SERVER_UNAVAILABLE");
       if (data.length === 0) return reply(200, "BRIEFING_NOT_FOUND");
       if (data.length > 1) return reply(200, "BRIEFING_AMBIGUOUS");
       const row = data[0];
       const state: DigisacBriefingState = row.cancelled_at ? "cancelled" : row.os_id ? "linked" : "draft";
-      return reply(200, "BRIEFING_FOUND", { briefing: { draft: row.draft, state }, revision: row.revision });
+      return reply(200, "BRIEFING_FOUND", {
+        briefing: { draft: row.draft, state },
+        revision: row.revision,
+        lastSavedAt: row.saves?.[0]?.occurred_at ?? null,
+      });
     }
 
     const [contact, ticket, user] = await Promise.all([
