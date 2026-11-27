@@ -46,12 +46,22 @@ describe("consultation opened from Digisac", () => {
     const html = renderToStaticMarkup(<BriefingConsultationResult result={{
       kind: "found", briefing: { state: "draft", draft }, revision: 2, lastSavedAt: "2026-11-27T01:05:09+00:00",
       lastSavedBy: "Consultora de Teste",
+      history: {
+        entries: [
+          { revision: 2, occurredAt: "2026-11-27T01:05:09+00:00", event: "SAVED", authorName: "Consultora de Teste" },
+          { revision: 1, occurredAt: "2026-11-26T20:00:09+00:00", event: "CREATED", authorName: "private@example.invalid" },
+        ], nextBefore: null,
+      },
     }} />);
     expect(html).toContain('aria-label="Briefing encontrado"');
     expect(html).toContain("Revisão 2");
     expect(html).toContain("Último salvamento");
     expect(html).toContain('<time dateTime="2026-11-27T01:05:09+00:00">26/11/2026, 22:05</time>');
     expect(html).toContain("Consultora de Teste");
+    expect(html).toContain('aria-label="Histórico de revisões"');
+    expect(html).toContain("Autor não identificado");
+    expect(html).toContain("26/11/2026, 17:00");
+    expect(html).not.toContain("private@example.invalid");
     expect(html).toContain("Cliente de teste");
     expect(html).toContain("Item de teste");
     const fields = html.match(/<(?:input|textarea|select)\b[^>]*>/g) ?? [];
